@@ -30,8 +30,10 @@
 //   node scripts/pa-db.mjs tijd-regel-weg "patroon"
 //   node scripts/pa-db.mjs bijlage <storage-pad>      chatbijlage → ~/Downloads/Business OS bijlagen/, print lokaal pad
 //
-// Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
-// en pas Kerstens klik op Toestaan voert ze uit.
+//   node scripts/pa-db.mjs wijziging-test            test van de bewaakte lijst + Ongedaan maken (eigen testrij, ruimt zichzelf op)
+//
+// Datawijzigingen kunnen hier niet: die gaan als actie terug naar de PA, die ze
+// via business_os_wijziging_uitvoeren laat lopen (controleert de bewaakte lijst).
 
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -314,6 +316,75 @@ if (cmd === 'lees') {
 } else if (cmd === 'tijd-regel-weg') {
   const { data, error } = await sb.from('business_os_tijd_regels').delete().eq('patroon', String(arg || '').toLowerCase()).select('id')
   uit(error ? { fout: error.message } : { ok: !!data?.length })
+} else if (cmd === 'wijziging-test') {
+  // Alles zonder bevestigd: dit is de route van de PA, dus zonder klik. Bewaakte
+  // proeven gebruiken een onmogelijk id en een rij die de database toch weigert,
+  // zodat er ook bij een fout in de poort geen klant iets krijgt.
+  const { data: { user } } = await sb.auth.getUser(token)
+  const NIEMAND = '00000000-0000-0000-0000-000000000000'
+  const voer = (p_voorstel) => sb.rpc('business_os_wijziging_uitvoeren', { p_voorstel }).then(r => r.error ? { status: 'rpc-fout', fout: r.error.message } : r.data)
+  const op_id = [{ kolom: 'id', op: 'eq', waarde: NIEMAND }]
+  const telMeldingen = async () => (await sb.from('notifications').select('id', { count: 'exact', head: true })).count
+  const meldingenVoor = await telMeldingen()
+  const uitslag = {}
+  const proef = (naam, ok, r) => { uitslag[naam] = { ok, ...r } }
+  // 1. Gewone wijziging: direct, in het log, Ongedaan maken.
+  const titel = 'TEST Gino wijziging (mag weg)'
+  const nieuw = await voer({ actie: 'insert', tabel: 'productivity_tasks', uitleg: 'TEST', rijen: [{ coach_id: user.id, title: titel, status: 'active' }] })
+  proef('insert gaat direct', nieuw.status === 'uitgevoerd', nieuw)
+  const id = nieuw.status === 'uitgevoerd'
+    ? (await sb.from('business_os_wijzigingen').select('ingevoegde_ids').eq('id', nieuw.wijziging_id).single()).data?.ingevoegde_ids?.[0] : null
+  proef('insert zegt dat terugdraaien niet netjes kan', !!nieuw.ongedaan_kan, { ongedaan_kan: nieuw.ongedaan_kan })
+  if (id) {
+    const upd = await voer({ actie: 'update', tabel: 'productivity_tasks', uitleg: 'TEST', filters: [{ kolom: 'id', op: 'eq', waarde: id }], velden: { title: `${titel} 2` } })
+    proef('update gaat direct', upd.status === 'uitgevoerd' && upd.aantal === 1, upd)
+    const { data: log } = await sb.from('business_os_wijzigingen').select('oude_waarden, nieuwe_waarden').eq('id', upd.wijziging_id).single()
+    proef('log bevat oud en nieuw', log?.oude_waarden?.[0]?.waarden?.title === titel && log?.nieuwe_waarden?.[0]?.waarden?.title === `${titel} 2`, {})
+    const terug = await sb.rpc('business_os_wijziging_ongedaan', { p_id: upd.wijziging_id })
+    const { data: rij } = await sb.from('productivity_tasks').select('title').eq('id', id).single()
+    proef('ongedaan zet oude waarde terug', terug.data?.status === 'ongedaan' && rij?.title === titel, { uitkomst: terug.data || terug.error?.message })
+    const nogEens = await sb.rpc('business_os_wijziging_ongedaan', { p_id: upd.wijziging_id })
+    proef('twee keer ongedaan doet niets', nogEens.data?.status === 'al_ongedaan', { uitkomst: nogEens.data })
+    const { error: wegFout } = await sb.from('productivity_tasks').delete().eq('id', id)
+    proef('testrij opgeruimd', !wegFout, { fout: wegFout?.message })
+  }
+  // 2. Bewaakt: nooit zonder klik.
+  const bewaakt = {
+    'clients.assigned_schema_id': { actie: 'update', tabel: 'clients', filters: op_id, velden: { assigned_schema_id: NIEMAND } },
+    'clients.workout_schedule': { actie: 'update', tabel: 'clients', filters: op_id, velden: { workout_schedule: {} } },
+    workout_schemas: { actie: 'update', tabel: 'workout_schemas', filters: op_id, velden: { name: 'TEST' } },
+    client_meal_plans: { actie: 'update', tabel: 'client_meal_plans', filters: op_id, velden: { is_active: false } },
+    client_day_overrides: { actie: 'update', tabel: 'client_day_overrides', filters: op_id, velden: { note: 'TEST' } },
+    client_plan_proposals: { actie: 'update', tabel: 'client_plan_proposals', filters: op_id, velden: { status: 'TEST' } },
+    notifications: { actie: 'insert', tabel: 'notifications', rijen: [{ client_id: NIEMAND, title: 'TEST' }] },
+    notification_schedules: { actie: 'insert', tabel: 'notification_schedules', rijen: [{ coach_id: NIEMAND }] },
+    business_os_opdrachten: { actie: 'insert', tabel: 'business_os_opdrachten', rijen: [{ opdracht: 'TEST' }] },
+    'content_items.autopilot_status': { actie: 'update', tabel: 'content_items', filters: op_id, velden: { autopilot_status: 'goedgekeurd' } },
+    'lead_movements sale': { actie: 'insert', tabel: 'lead_movements', rijen: [{ lead_id: NIEMAND, to_section_title: 'Sale' }] },
+    'onbekende tabel': { actie: 'update', tabel: 'bestaat_niet', filters: op_id, velden: { a: 1 } },
+    'gewone tabel, Gino vraagt zelf': { actie: 'update', tabel: 'productivity_tasks', toestemming: true, filters: op_id, velden: { title: 'TEST' } },
+  }
+  for (const [naam, v] of Object.entries(bewaakt)) {
+    const r = await voer(v)
+    proef(`bewaakt: ${naam}`, r.status === 'toestemming_nodig', r)
+  }
+  const meldingenNa = await telMeldingen()
+  proef('geen melding erbij', meldingenVoor === meldingenNa, { voor: meldingenVoor, na: meldingenNa })
+  // 3. Grenzen.
+  const zonderFilter = await voer({ actie: 'update', tabel: 'productivity_tasks', velden: { title: 'TEST' } })
+  proef('update zonder filter geweigerd', zonderFilter.status === 'fout', zonderFilter)
+  const verwijder = await voer({ actie: 'delete', tabel: 'productivity_tasks', filters: op_id })
+  proef('delete geweigerd', verwijder.status === 'fout', verwijder)
+  // 4. Code-opdrachten: alleen de beoordeling, zodat de proef niets start.
+  for (const [tekst, moet] of [
+    ['Stuur alle klanten een push over de actie', true], ['Pas het schema van klant Jan aan', true], ['Zet live met npm run release', true],
+    ['Publiceer deze reel live op Instagram', true], ['Doe een echte Stripe afschrijving', true], ['Maak de Business OS grafiek groen', false],
+  ]) {
+    const { data } = await sb.rpc('business_os_opdracht_bewaakt', { p_tekst: tekst })
+    proef(`code: ${tekst}`, !!data === moet, { reden: data })
+  }
+  const mis = Object.entries(uitslag).filter(([, r]) => !r.ok).map(([n]) => n)
+  uit({ geslaagd: Object.keys(uitslag).length - mis.length, mislukt: mis, uitslag })
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

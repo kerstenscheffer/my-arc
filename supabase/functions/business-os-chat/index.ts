@@ -19,15 +19,15 @@
 // clients.account_locked_at (zelfde als de slotknop in Coach Inzicht).
 //
 // Database (business-os-agent.sql): bekijk_schema en lees_database (alleen
-// SELECT, read-only transactie, RLS van de coach). stel_wijziging_voor voert
-// niets uit: de chat toont tabel/filter/velden/aantal met een Toestaan-knop en
-// pas die klik schrijft via supabase-js met Kerstens eigen rechten.
+// SELECT, read-only transactie, RLS van de coach). stel_wijziging_voor laat de
+// wijziging lopen via de RPC business_os_wijziging_uitvoeren (business-os-
+// wijzigingen.sql): gewone gaan direct, bewaakte krijgen de Toestaan-knop.
 // Schemawijzigingen (kolommen/tabellen) kunnen nooit vanuit de chat.
 //
-// Code: stel_lokale_opdracht_voor zet een opdracht klaar; Kerstens klik op
-// "Uitvoeren op mijn Mac" schrijft hem in business_os_opdrachten en zijn
-// lokale PA (scripts/business-os-pa.mjs, npm run pa) voert hem uit met
-// Claude Code in zijn workapp-map.
+// Code: stel_lokale_opdracht_voor laat de opdracht lopen via de RPC
+// business_os_code_starten: gewone komen meteen in business_os_opdrachten voor de
+// lokale PA (scripts/business-os-pa.mjs), bewaakte houden de knop "Uitvoeren op
+// mijn Mac".
 //
 // Alleen de teameigenaar (coach_teams.owner_id), anders kan een medewerker of
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
@@ -51,7 +51,7 @@ Het systeem: de MY ARC-app. Kersten werkt in CoachHub (coach-kant: Command met k
 Klantaccounts op slot: een account op slot betekent dat de klant in zijn app alleen een pauzescherm ziet; alle data blijft bewaard en ontgrendelen kan altijd. Werkwijze: eerst zoek_klanten, dan de namen met reden laten zien, dan stel_slot_voor. Kersten bevestigt zelf met de knop onder je bericht; zeg dus nooit dat het al gebeurd is.
 
 Database: je kunt de hele database lezen met bekijk_schema (welke tabellen en kolommen er zijn) en lees_database (een SELECT-vraag). Begin bij de App-kaart-skill; ken je een tabel niet, kijk eerst het schema na in plaats van kolomnamen te gokken. Geef antwoorden in gewone taal, niet als ruwe JSON.
-Iets aanpassen in de data (een veld wijzigen, rijen toevoegen): gebruik stel_wijziging_voor. Dat is toestemming vragen: Kersten ziet precies wat er verandert en klikt Toestaan. Zeg nooit dat het al gedaan is. Verwijderen van rijen en het schema veranderen (kolommen, tabellen) kan niet; zet dat op de app-lijst.
+Iets aanpassen in de data (een veld wijzigen, rijen toevoegen): gebruik stel_wijziging_voor. Gewone wijzigingen gaan dan direct, vraag er niet om; meld achteraf kort wat er veranderde. Alles wat een klant of lead een melding, push, mail of bericht kan sturen, plannen van klanten en onbekende tabellen krijgen een Toestaan-knop: de tool zegt wat er gebeurd is. Zeg alleen dat iets gedaan is als de tool dat meldt, en toon een fout altijd eerlijk. Verwijderen van rijen en het schema veranderen (kolommen, tabellen) kan niet; zet dat op de app-lijst.
 
 Zelf leren: je bouwt je eigen skills op. Gebruik bewaar_skill met geleerd: true, zonder het te vragen, wanneer:
 - je een taak hebt afgerond waarvoor nog geen skill bestond en die vaker kan terugkomen: leg de werkwijze vast die werkte;
@@ -147,7 +147,7 @@ const TOOLS = [{
   },
 }, {
   name: 'stel_wijziging_voor',
-  description: 'Vraag toestemming om data aan te passen. Voert NIETS uit: Kersten ziet tabel, filter, velden en aantal rijen en klikt Toestaan.',
+  description: 'Pas data aan. Gewone wijzigingen gaan direct; bewaakte tabellen (meldingen, klantplannen, onbekend) krijgen een Toestaan-knop. Het resultaat zegt wat er gebeurd is.',
   input_schema: {
     type: 'object',
     properties: {
@@ -307,8 +307,23 @@ Deno.serve(async (req) => {
       return klantCache
     }
 
-    // Voorstel voor een datawijziging: controleren en het aantal rijen tellen
-    // (met Kerstens RLS), uitvoeren doet pas de Toestaan-knop in de chat.
+    // Datawijziging: controleren en het aantal rijen tellen (met Kerstens RLS),
+    // daarna beslist de RPC: direct uitgevoerd, of Toestaan-knop. Bestaat de RPC
+    // nog niet of faalt de aanroep, dan is er niets gedaan en blijft de knop.
+    const voerWijzigingUit = async (voorstel: any, tabel: string, aantal: number, acties: any[]) => {
+      const { data, error } = await sb.rpc('business_os_wijziging_uitvoeren', { p_voorstel: voorstel })
+      if (data?.status === 'uitgevoerd') {
+        acties.push({ ...voorstel, uitgevoerd: true, wijziging_id: data.wijziging_id, aantal: data.aantal, ongedaan_kan: data.ongedaan_kan || null })
+        return `Uitgevoerd: ${data.aantal} rij(en) in ${tabel}. Kersten ziet de uitkomst met een knop Ongedaan maken.`
+      }
+      if (data?.status === 'fout') {
+        acties.push({ ...voorstel, mislukt: true, fout: data.fout })
+        return `Mislukt, er is niets veranderd: ${data.fout}`
+      }
+      const reden = data?.reden || (error?.code === 'PGRST202' ? 'automatisch uitvoeren staat nog niet aan' : `automatisch uitvoeren lukte niet: ${error?.message}`)
+      acties.push({ ...voorstel, aantal, toestemming_nodig: true, reden })
+      return `Nog niets gedaan (${reden}). Kersten moet op Toestaan klikken.`
+    }
     const pasFilters = (q: any, filters: any[]) => {
       for (const f of filters) {
         if (f.op === 'in') q = q.in(f.kolom, Array.isArray(f.waarde) ? f.waarde : [f.waarde])
@@ -325,10 +340,10 @@ Deno.serve(async (req) => {
         .filter((f: any) => f && /^[a-z_][a-z0-9_]*$/.test(String(f.kolom)) && OPS.includes(f.op))
       const uitleg = String(inp.uitleg || '').slice(0, 300)
       if (inp.actie === 'insert') {
-        const rijen = (Array.isArray(inp.rijen) ? inp.rijen : []).filter((r: any) => r && typeof r === 'object').slice(0, 50)
+        const rijen = (Array.isArray(inp.rijen) ? inp.rijen : []).filter((r: any) => r && typeof r === 'object')
         if (!rijen.length) return 'Geen rijen om toe te voegen.'
-        acties.push({ soort: 'wijziging_voorstel', actie: 'insert', tabel, rijen, uitleg, aantal: rijen.length })
-        return `Voorstel staat klaar (${rijen.length} nieuwe rij(en) in ${tabel}). Kersten moet op Toestaan klikken; er is nog niets uitgevoerd.`
+        if (rijen.length > 500) return `Te veel rijen (${rijen.length}); maximaal 500.`
+        return voerWijzigingUit({ soort: 'wijziging_voorstel', actie: 'insert', tabel, rijen, uitleg, aantal: rijen.length }, tabel, rijen.length, acties)
       }
       const velden = inp.velden && typeof inp.velden === 'object' ? inp.velden : null
       if (!velden || !Object.keys(velden).length) return 'Geen velden om te wijzigen.'
@@ -338,8 +353,8 @@ Deno.serve(async (req) => {
       if (error) return 'Controle mislukt: ' + error.message
       if (!count) return 'Er vallen geen rijen onder dit filter (of Kersten mag ze niet zien).'
       if (count > 500) return `Te veel rijen (${count}); maak het filter specifieker of splits het op.`
-      acties.push({ soort: 'wijziging_voorstel', actie: 'update', tabel, filters, velden, uitleg, aantal: count })
-      return `Voorstel staat klaar: ${count} rij(en) in ${tabel}. Voorbeeld huidige waarden: ${JSON.stringify(voorbeeld).slice(0, 2000)}. Kersten moet op Toestaan klikken; er is nog niets uitgevoerd.`
+      const uitkomst = await voerWijzigingUit({ soort: 'wijziging_voorstel', actie: 'update', tabel, filters, velden, uitleg, aantal: count }, tabel, count, acties)
+      return `${uitkomst} Waarden vóór de wijziging (voorbeeld): ${JSON.stringify(voorbeeld).slice(0, 2000)}`
     }
 
     // Tool-lus: maximaal 8 rondes (schema → lezen → voorstel → antwoord).
@@ -407,8 +422,15 @@ Deno.serve(async (req) => {
           const opdracht = String(blok.input?.opdracht || '').trim().slice(0, 8000)
           if (!opdracht) uitkomst = 'Lege opdracht.'
           else {
-            acties.push({ soort: 'pa_voorstel', tekst: opdracht })
-            uitkomst = 'Opdracht staat klaar; Kersten moet op "Uitvoeren op mijn Mac" klikken. Er is nog niets uitgevoerd.'
+            const { data: start, error } = await sb.rpc('business_os_code_starten', { p_tekst: opdracht })
+            if (!error && start?.status === 'gestart') {
+              acties.push({ soort: 'pa_voorstel', tekst: opdracht, opdrachtId: start.opdracht_id })
+              uitkomst = 'Opdracht gestart op de Mac (loopt zodra de Mac aan staat); Kersten kan hem stoppen.'
+            } else {
+              const reden = start?.reden || start?.fout || (error?.code === 'PGRST202' ? 'automatisch starten staat nog niet aan' : error?.message)
+              acties.push({ soort: 'pa_voorstel', tekst: opdracht, toestemming_nodig: true, reden })
+              uitkomst = `Nog niet gestart (${reden}); Kersten moet op "Uitvoeren op mijn Mac" klikken.`
+            }
           }
         }
         if (blok.name === 'wacht_op_jou') {

@@ -35,7 +35,9 @@
 //
 // Claude Code mag hier: bestanden lezen/bewerken, build, lint, git diff/status.
 // Niet: committen, pushen, stashen, iets anders in de shell, of MCP-tools
-// (dus ook geen databasewijzigingen; die lopen via de Toestaan-knop in de chat).
+// (dus ook geen databasewijzigingen). Wijzigingen staan als actie in Gino's
+// antwoord; deze PA voert ze uit via de RPC's in business-os-wijzigingen.sql,
+// die zelf de bewaakte lijst controleren (voerActiesUit).
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -140,8 +142,8 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 
 // yt-transcript: alleen ondertitels van YouTube naar ~/Downloads/Creator transcripts (schrijft niets anders).
 const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)']
-// De chat past nooit zelf iets aan (dat loopt via Toestaan / Uitvoeren op mijn
-// Mac). Hard verboden, ook als een instellingenbestand het ooit toestaat.
+// De chat past nooit zelf iets aan (dat loopt via voerActiesUit en de knoppen).
+// Hard verboden, ook als een instellingenbestand het ooit toestaat.
 const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit']
 // Chat licht houden (sneller antwoord): ander model, lage effort, geen
 // MCP-servers, geen user- of local-instellingen (settings.local.json staat
@@ -453,6 +455,54 @@ async function rondeCode() {
   } finally { bezig.code = false }
 }
 
+// Acties uit een chatantwoord: gewone wijzigingen en code-opdrachten gaan direct,
+// bewaakte acties houden hun knop. De RPC beslist, niet Gino en niet de frontend.
+// Bestaat de RPC nog niet (SQL niet gedraaid) of faalt de aanroep: niets gedaan,
+// knop blijft. De uitkomst komt als regel onder de tekst, want Gino schreef die
+// tekst voordat er iets uitgevoerd was. Niet bij groeirondes: die draaien zonder
+// Kersten erbij, dus daar blijven het voorstellen.
+async function voerActiesUit(rijId, antwoord) {
+  if (!antwoord?.acties?.length) return antwoord
+  // Gestopt terwijl hij typte? Dan niets meer uitvoeren.
+  const { data: nu } = await sb.from('business_os_opdrachten').select('status').eq('id', rijId).maybeSingle()
+  if (nu?.status !== 'bezig') return antwoord
+  const regels = []
+  let codeGestart = false
+  for (const ac of antwoord.acties) {
+    if (ac.soort === 'wijziging_voorstel') {
+      const { data, error } = await sb.rpc('business_os_wijziging_uitvoeren', { p_voorstel: ac, p_opdracht_id: rijId })
+      if (error) {
+        ac.toestemming_nodig = true
+        ac.reden = error.code === 'PGRST202' ? 'automatisch uitvoeren staat nog niet aan' : `automatisch uitvoeren lukte niet: ${error.message}`
+        regels.push(`→ Nog niets gedaan in ${ac.tabel}: ${ac.reden}. Klik Toestaan.`)
+      } else if (data?.status === 'uitgevoerd') {
+        Object.assign(ac, { uitgevoerd: true, wijziging_id: data.wijziging_id, aantal: data.aantal, ongedaan_kan: data.ongedaan_kan || null })
+        regels.push(`→ Gedaan: ${data.aantal} ${data.aantal === 1 ? 'rij' : 'rijen'} in ${ac.tabel}.`)
+      } else if (data?.status === 'toestemming_nodig') {
+        Object.assign(ac, { toestemming_nodig: true, reden: data.reden })
+        regels.push(`→ Nog niets gedaan in ${ac.tabel}: ${data.reden}. Klik Toestaan.`)
+      } else {
+        Object.assign(ac, { mislukt: true, fout: data?.fout || 'onbekende fout' })
+        regels.push(`→ Mislukt in ${ac.tabel}: ${ac.fout}. Er is niets veranderd.`)
+      }
+    } else if (ac.soort === 'pa_voorstel') {
+      if (codeGestart) {
+        Object.assign(ac, { toestemming_nodig: true, reden: 'één code-opdracht per antwoord gaat vanzelf' })
+        continue
+      }
+      const { data, error } = await sb.rpc('business_os_code_starten', { p_tekst: ac.tekst, p_toestemming: ac.toestemming === true })
+      if (!error && data?.status === 'gestart') {
+        ac.opdrachtId = data.opdracht_id
+        codeGestart = true
+        regels.push('→ Code-opdracht gestart op de Mac.')
+      } else {
+        Object.assign(ac, { toestemming_nodig: true, reden: data?.reden || data?.fout || (error?.code === 'PGRST202' ? 'automatisch starten staat nog niet aan' : error?.message) })
+      }
+    }
+  }
+  return regels.length ? { ...antwoord, tekst: [antwoord.tekst, regels.join('\n')].filter(Boolean).join('\n\n') } : antwoord
+}
+
 async function rondeChat() {
   const rij = await pak('chat')
   if (!rij) return
@@ -478,8 +528,12 @@ async function rondeChat() {
     lopend.delete(rij.id)
     const model = rij.invoer?.modus === 'slim' ? `${SLIM_MODEL}, slim` : CHAT_MODEL
     console.log(`${tijd()} ${gestopt ? '⏹ chat gestopt' : r.ok ? '✓ chat-antwoord' : '✗ chat-antwoord'} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})`)
+    const antwoord = r.ok && !gestopt ? await voerActiesUit(rij.id, r.antwoord).catch(e => {
+      console.error(tijd(), 'Acties uitvoeren mislukt:', e.message)
+      return { ...r.antwoord, tekst: `${r.antwoord.tekst}\n\n→ Acties uitvoeren mislukt: ${e.message}. Controleer de kaarten hieronder.` }
+    }) : r.antwoord
     await sb.from('business_os_opdrachten')
-      .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
+      .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord, klaar_at: new Date().toISOString() })
       .eq('id', rij.id).eq('status', 'bezig')
   } finally { bezig.chat-- }
 }

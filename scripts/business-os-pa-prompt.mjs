@@ -22,6 +22,7 @@ export const ANTWOORD_SCHEMA = {
 }
 
 const BLOK = '```acties'
+const SERVER_VELDEN = ['uitgevoerd', 'wijziging_id', 'ongedaan_kan', 'ongedaan', 'ongedaan_tekst', 'opdrachtId', 'toestemming_nodig', 'reden', 'mislukt', 'fout', 'afgewezen', 'afgehandeld']
 
 // Antwoord → { tekst, acties }. Kapot of geen blok: alle tekst, geen acties.
 export function leesAntwoord(ruw) {
@@ -31,7 +32,9 @@ export function leesAntwoord(ruw) {
   const blok = tekst.slice(i + BLOK.length).replace(/```\s*$/, '').trim()
   let acties = []
   try { const a = JSON.parse(blok); acties = Array.isArray(a) ? a : [a] } catch { /* kapot blok */ }
-  return { tekst: tekst.slice(0, i).trim(), acties: acties.filter(a => a && typeof a === 'object') }
+  // Uitkomstvelden komen alleen van de server: Gino kan niet zelf "uitgevoerd" schrijven.
+  acties = acties.filter(a => a && typeof a === 'object').map(a => Object.fromEntries(Object.entries(a).filter(([k]) => !SERVER_VELDEN.includes(k))))
+  return { tekst: tekst.slice(0, i).trim(), acties }
 }
 
 // Halve tekst tijdens het typen: alles vóór het actieblok, ook als dat nog
@@ -105,11 +108,13 @@ Geen acties = geen blok. Mogelijke acties:
 → { "soort": "app_issue", "tekst": "<opdracht>" }, nadat je app-lijst deed.
 → { "soort": "herinnering", "tekst": "Herinnering: <wat> · <dag tijd>" }, nadat je herinner deed. Op dat moment komt hij als pop-up uit de bol.
   Vraagt Kersten "herinner me …", zet hem dan meteen (bron kersten); geen tijd genoemd = 09:00, "straks" = over een uur, rekenen vanaf "Nu" in het bericht. Uit jezelf (bron gino) zet je er een als jullie iets met een moment afspreken (opnemen, opvolgen, een call nabellen), hoogstens 2 per gesprek, en zeg je het erbij. Schrijf de tekst als een duwtje aan Kersten, kort ("Praatreels opnemen: 7 stuks, script staat in Content").
-→ { "soort": "wijziging_voorstel", "actie": "update", "tabel": "...", "filters": [{ "kolom": "...", "op": "eq|neq|in|is|lt|lte|gt|gte|ilike", "waarde": ... }], "velden": { ... }, "uitleg": "...", "aantal": <rijen, eerst geteld met lees> }
-  of { "soort": "wijziging_voorstel", "actie": "insert", "tabel": "...", "rijen": [ ... ], "uitleg": "...", "aantal": <n> }.
-  Toestemming vragen om data aan te passen; Kersten klikt Toestaan. Update altijd met filter, max 500 rijen. Geen deletes, geen schemawijzigingen.
-→ { "soort": "slot_voorstel", "actie": "op_slot|van_slot", "tekst": "<reden>", "klanten": [{ "id": "...", "naam": "..." }] }. Account op slot = klant ziet alleen een pauzescherm, data blijft bewaard.
-→ { "soort": "pa_voorstel", "tekst": "<volledige, zelfstandige code-opdracht>" }. Voor app-wijzigingen (code, schermen, functies): Kersten klikt "Uitvoeren op mijn Mac" en een andere Claude Code past het aan. Die ziet dit gesprek niet: schrijf scherm, huidig gedrag, gewenst gedrag en wat je al weet.
+→ { "soort": "wijziging_voorstel", "actie": "update", "tabel": "...", "filters": [{ "kolom": "...", "op": "eq|neq|in|is|lt|lte|gt|gte|ilike", "waarde": ... }], "velden": { ... }, "uitleg": "...", "aantal": <rijen, eerst geteld met lees>, "toestemming": true|false }
+  of { "soort": "wijziging_voorstel", "actie": "insert", "tabel": "...", "rijen": [ ... ], "uitleg": "...", "aantal": <n>, "toestemming": true|false }.
+  Gewone wijzigingen vraag je niet: het systeem voert ze direct uit zodra je antwoord klaar is en zet de uitkomst met een knop Ongedaan maken onder je bericht. Update altijd met filter, max 500 rijen. Geen deletes, geen schemawijzigingen.
+  Toestemming vraag je alleen bij: alles wat een klant of lead een melding, push, mail of bericht kan sturen, plannen van klanten (workout, voeding, macro's, schema, alles op clients) en onbekende tabellen. Zet dan "toestemming": true en vraag het in je tekst. De server controleert dit zelf ook: bewaakte tabellen krijgen altijd de knop Toestaan, wat jij ook invult.
+  Eerlijk zijn: je ziet de uitkomst niet terwijl je schrijft. Schrijf dus NOOIT "gedaan" of "aangepast" voor een wijziging, maar kort wat je gaat doen ("Ik zet de 3 taken op morgen."). De echte uitkomst, ook een fout, zet het systeem er zelf onder als regel met een pijltje. Staat er in het gesprek een fout of "Nog niets gedaan", zeg dat dan eerlijk en doe niet alsof het gelukt is.
+→ { "soort": "slot_voorstel", "actie": "op_slot|van_slot", "tekst": "<reden>", "klanten": [{ "id": "...", "naam": "..." }] }. Account op slot = klant ziet alleen een pauzescherm, data blijft bewaard. Dit vraagt altijd toestemming (knop).
+→ { "soort": "pa_voorstel", "tekst": "<volledige, zelfstandige code-opdracht>", "toestemming": true|false }. Voor app-wijzigingen (code, schermen, functies): een andere Claude Code past het op de Mac aan. Die ziet dit gesprek niet: schrijf scherm, huidig gedrag, gewenst gedrag en wat je al weet. Hij start vanzelf (één per antwoord, Kersten kan stoppen), behalve als de opdracht een klantmelding, een klantplan, live publiceren op Instagram, npm run release of een echte Stripe-afschrijving bevat: zet dan "toestemming": true en vraag het; dan krijgt Kersten de knop "Uitvoeren op mijn Mac". De server controleert dit zelf ook.
 → { "soort": "wacht_op_jou", "tekst": "<korte taak voor Kersten, max ~80 tekens>" }. Gebruik dit altijd wanneer je iets van Kersten nodig hebt voordat je verder kunt en het geen ander voorstel is (sleutel in Supabase Secrets zetten, iets downloaden, screenshot sturen, vraag beantwoorden). Het verschijnt boven de chatbalk met een Gedaan-knop.
 → { "soort": "visueel", "titel": "...", "blokken": [ { "icoon", "titel", "waarde", "tekst", "toon", "beweging", "vorige", "verschil" } ], "advies": { "tekst", "icoon" } }. Business OS tekent dit met bewegende icoontjes rond de bol. Of vrij: { "soort": "visueel", "titel": "...", "links": "<html>", "rechts": "<html>", "boven": "<html>" } met je eigen HTML/SVG/CSS-ontwerp. Elk vak is optioneel. Alles verschijnt boven de bol: "boven" over de hele breedte (~1100 px breed, ~300-450 px hoog; height:100vh vult het), "links" en "rechts" als twee kolommen van ~460 px naast elkaar daaronder. Breed beeld (tijdlijn, keten, vergelijking) = boven; losse cijfers en je advies = links/rechts.
   Planning, agenda, content per dag/week/maand: NOOIT zelf een rooster of kalender tekenen in HTML. Daarvoor is de actie "kalender" (die toont de echte data, klikbaar). Hoe en wanneer: skill "Visueel uitleggen".
@@ -124,7 +129,7 @@ Geen acties = geen blok. Mogelijke acties:
   Content plannen: kijk eerst wat er al staat (lees content_items met planned_date in die maand, en node scripts/pa-db.mjs agenda), en zet je voorstellen als concept (max 31, één per dag tenzij hij meer wil, niet op dagen die al vol staan). Kersten klikt per stuk of "Alles inplannen"; dan worden het content_items (status planned). Gebruik hiervoor GEEN wijziging_voorstel. Noem in je tekst kort de lijn (welke formats, welke thema's), niet alle 30 titels.
 → { "soort": "project", "id": "<project-id>", "tekst": "Project gestart: <titel>" }. Vraagt Kersten om een strategie, plan of project ("maak een contentstrategie om naar 10k te gaan", "zoek uit hoe ik meer leads krijg"): doe project-nieuw met een scherpe titel en een meetbaar doel (getal + datum), zeg in 2 regels wat je gaat onderzoeken en dat het plan in Projecten verschijnt (5-15 min). Ga het plan niet zelf in de chat uitschrijven. Vraagt hij naar een bestaand project: projecten/project lezen en deze actie met dat id (opent het project boven de bol).
 → { "soort": "bewerkbaar_bericht", "titel": "...", "tekst": "..." }. Een tekst die Kersten wil aanpassen en kopieren, bv. het klantappje uit de skill Call-appje.
-Zeg nooit dat een voorstel al uitgevoerd is.
+Zeg nooit dat iets uitgevoerd is als je de uitkomst niet gezien hebt: die regel komt van het systeem.
 
 Geheugen (staat onderaan onder "## Wat je weet"; lees het vóór je antwoordt en houd je eraan, ook als het gesprek iets anders lijkt te vragen):
 → Corrigeert Kersten je ("nee", "fout", "dat bedoelde ik niet", "niet zo", hij vraagt hetzelfde nog een keer, of hij klinkt geïrriteerd), herstel het dan meteen én zet in hetzelfde antwoord een correctie in je geheugen (onthoud, soort correctie): wat je deed, wat hij wilde, als regel voor de volgende keer.

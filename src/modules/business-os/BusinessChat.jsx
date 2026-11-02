@@ -382,9 +382,19 @@ async function voerSlotUit(voorstel) {
   return error ? { fout: 'Opslaan mislukt: ' + error.message } : { veld: { uitgevoerd: true } }
 }
 
-// Data (stel_wijziging_voor): de AI heeft het aantal rijen al geteld; dit draait
-// met Kerstens eigen rechten (RLS), dus nooit meer dan hij zelf in de app zou mogen.
+// Toestaan-knop op een bewaakt voorstel. Gewone wijzigingen doet de server al zelf
+// (PA / edge function, RPC business_os_wijziging_uitvoeren); deze klik is de enige
+// plek met bevestigd = true. Draait met Kerstens eigen rechten (RLS).
 async function voerWijzigingUit(voorstel) {
+  const { data, error } = await supabase.rpc('business_os_wijziging_uitvoeren', { p_voorstel: voorstel, p_bevestigd: true })
+  if (error?.code === 'PGRST202') return voerWijzigingDirect(voorstel) // SQL nog niet gedraaid
+  if (error) return { fout: 'Mislukt: ' + error.message }
+  if (data?.status !== 'uitgevoerd') return { fout: 'Mislukt: ' + (data?.fout || data?.reden || 'onbekende fout') }
+  return { veld: { uitgevoerd: true, wijziging_id: data.wijziging_id, aantal: data.aantal, ongedaan_kan: data.ongedaan_kan || null } }
+}
+
+async function voerWijzigingDirect(voorstel) {
+  if (voorstel.actie !== 'insert' && !voorstel.filters?.length) return { fout: 'Mislukt: een update zonder filter mag niet' }
   let q
   if (voorstel.actie === 'insert') {
     q = supabase.from(voorstel.tabel).insert(voorstel.rijen)
@@ -400,6 +410,15 @@ async function voerWijzigingUit(voorstel) {
   return error ? { fout: 'Mislukt: ' + error.message } : { veld: { uitgevoerd: true } }
 }
 
+// Ongedaan maken: oude waarden terug of rij gemarkeerd, de RPC bepaalt wat kan.
+async function draaiWijzigingTerug(voorstel) {
+  const { data, error } = await supabase.rpc('business_os_wijziging_ongedaan', { p_id: voorstel.wijziging_id })
+  if (error) return { fout: 'Ongedaan maken mislukt: ' + error.message }
+  if (data?.status === 'al_ongedaan') return { veld: { ongedaan: true, ongedaan_tekst: 'Was al ongedaan gemaakt' } }
+  if (data?.status !== 'ongedaan') return { fout: 'Ongedaan maken lukte niet: ' + (data?.reden || data?.fout || 'onbekende fout') }
+  return { veld: { ongedaan: true, ongedaan_tekst: data.overgeslagen ? `${data.hersteld} teruggezet, ${data.overgeslagen} overgeslagen (intussen veranderd)` : 'Ongedaan gemaakt' } }
+}
+
 // Code: zet een rij in business_os_opdrachten voor de lokale PA.
 async function startPaOpdracht(voorstel) {
   const { data, error } = await supabase.from('business_os_opdrachten')
@@ -412,14 +431,14 @@ async function startPaOpdracht(voorstel) {
 const meldGedaan = async () => ({ veld: { afgehandeld: true } })
 
 const VOER_UIT = { slot_voorstel: voerSlotUit, wijziging_voorstel: voerWijzigingUit, pa_voorstel: startPaOpdracht, wacht_op_jou: meldGedaan }
-const staatOpen = (ac) => !!ac && !!VOER_UIT[ac.soort] && !ac.uitgevoerd && !ac.opdrachtId && !ac.afgewezen && !ac.afgehandeld
+const staatOpen = (ac) => !!ac && !!VOER_UIT[ac.soort] && !ac.uitgevoerd && !ac.opdrachtId && !ac.afgewezen && !ac.afgehandeld && !ac.mislukt
 
 const waardeTekst = (v) => v === null ? 'leeg' : typeof v === 'object' ? JSON.stringify(v) : String(v)
 const wijzigingRegels = (v) => v.actie === 'insert'
   ? [`${v.aantal} nieuwe rij(en) in ${v.tabel}`]
   : [
-      `${v.aantal} rij(en) in ${v.tabel} waar ${v.filters.map(f => `${f.kolom} ${f.op} ${waardeTekst(f.waarde)}`).join(' en ')}`,
-      `→ ${Object.entries(v.velden).map(([k, w]) => `${k} = ${waardeTekst(w)}`).join(', ')}`,
+      `${v.aantal} rij(en) in ${v.tabel} waar ${(v.filters || []).map(f => `${f.kolom} ${f.op} ${waardeTekst(f.waarde)}`).join(' en ')}`,
+      `→ ${Object.entries(v.velden || {}).map(([k, w]) => `${k} = ${waardeTekst(w)}`).join(', ')}`,
     ]
 
 const kort = (t, max = 80) => {
@@ -612,8 +631,9 @@ function SlotVoorstel({ voorstel, staat, onToestaan }) {
   )
 }
 
-// Voorstel van de AI om data aan te passen (stel_wijziging_voor).
-function WijzigingVoorstel({ voorstel, staat, onToestaan }) {
+// Wijziging van de AI: gewone gaan direct (kaart met uitkomst en Ongedaan maken),
+// bewaakte houden de knop Toestaan met de reden erbij. Beslist door de server.
+function WijzigingVoorstel({ voorstel, staat, onToestaan, onOngedaan }) {
   const { bezig, fout } = staat || {}
   const regels = wijzigingRegels(voorstel)
   return (
@@ -623,10 +643,24 @@ function WijzigingVoorstel({ voorstel, staat, onToestaan }) {
       </div>
       <div style={{ ...KAART_SUB, wordBreak: 'break-word' }}>
         {regels.map((r, i) => <div key={i}>{r}</div>)}
+        {voorstel.reden && !voorstel.uitgevoerd && <div>Vraagt toestemming: {voorstel.reden}</div>}
       </div>
-      {voorstel.uitgevoerd ? (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
-          <Check size={14} /> Uitgevoerd
+      {voorstel.mislukt ? (
+        <div style={{ color: colors.danger, fontWeight: 800 }}>Mislukt, er is niets veranderd: {voorstel.fout}</div>
+      ) : voorstel.uitgevoerd ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
+            <Check size={14} /> Uitgevoerd
+          </span>
+          {voorstel.ongedaan ? (
+            <span style={{ color: colors.textSecondary, fontWeight: 800 }}>{voorstel.ongedaan_tekst || 'Ongedaan gemaakt'}</span>
+          ) : voorstel.ongedaan_kan ? (
+            <span style={{ color: colors.textSecondary, fontWeight: 600 }}>Ongedaan maken kan niet: {voorstel.ongedaan_kan}</span>
+          ) : voorstel.wijziging_id ? (
+            <button onClick={onOngedaan} disabled={bezig} style={{ ...KNOP, background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }}>
+              {bezig ? 'Bezig…' : 'Ongedaan maken'}
+            </button>
+          ) : null}
         </div>
       ) : voorstel.afgewezen ? <Afgewezen /> : (
         <button onClick={onToestaan} disabled={bezig} style={KNOP}>
@@ -686,6 +720,7 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
         <Laptop size={13} /> Code-opdracht
       </div>
       <div style={KAART_SUB}><Inkort tekst={voorstel.tekst} /></div>
+      {voorstel.reden && !id && <div style={KAART_SUB}>Vraagt toestemming: {voorstel.reden}</div>}
       {voorstel.afgewezen && !id ? <Afgewezen /> : !id ? (
         <button onClick={onToestaan} disabled={bezig} style={KNOP}>
           {bezig ? 'Versturen…' : 'Uitvoeren op mijn Mac'}
@@ -1972,6 +2007,15 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
   const afwijzen = (t, i, j) => zetActie(t, i, j, { afgewezen: true })
+  const ongedaanMaken = async (t, i, j) => {
+    const ac = gesprekken.find(g => g.id === t)?.berichten[i]?.acties?.[j]
+    const sleutel = `${t}-${i}-${j}`
+    if (!ac?.wijziging_id || ac.ongedaan || actieStaat[sleutel]?.bezig) return
+    setActieStaat(s => ({ ...s, [sleutel]: { bezig: true } }))
+    const { veld, fout: f } = await draaiWijzigingTerug(ac)
+    setActieStaat(s => ({ ...s, [sleutel]: { bezig: false, fout: f || null } }))
+    if (!f) zetActie(t, i, j, veld)
+  }
   if (stuurRef) stuurRef.current = stuur
   stuurNu.current = stuur
   // Nieuw gesprek in hetzelfde tabje: berichten leeg, nieuwe Slim-sessie.
@@ -2087,7 +2131,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     const kaart = { voorstel: ac, staat: actieStaat[`${actief.id}-${i}-${j}`], onToestaan: () => toestaan(actief.id, i, j) }
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
-                    if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} onOngedaan={() => ongedaanMaken(actief.id, i, j)} />
                     if (ac.soort === 'bewerkbaar_bericht') return isBewerkbaarBericht(ac)
                       ? <BewerkbaarBericht key={j} voorstel={ac} sleutel={`${actief.id}-${i}-${j}`} /> : null
                     if (ac.soort === 'visueel') {
