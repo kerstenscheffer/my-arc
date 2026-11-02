@@ -130,7 +130,8 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Klaar = npm run build en eslint op de gewijzigde bestanden zijn groen.
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
 
-const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)']
+// yt-transcript: alleen ondertitels van YouTube naar ~/Downloads/Creator transcripts (schrijft niets anders).
+const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)']
 // De chat past nooit zelf iets aan (dat loopt via Toestaan / Uitvoeren op mijn
 // Mac). Hard verboden, ook als een instellingenbestand het ooit toestaat.
 const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit']
