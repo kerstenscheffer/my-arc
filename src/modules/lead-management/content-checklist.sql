@@ -123,3 +123,9 @@ $$;
 -- PostgREST gaf 500 → leeg Betaling-tabblad). Nu: team één keer in een
 -- materialized CTE, en get_awaiting_payment is security definer met het team
 -- van auth.uid() als grens (RLS per rij kostte de rest). ~270 ms.
+
+-- 2 nov 2026: bereik + nieuwe volgers komen nu automatisch uit Instagram
+-- (sync_instagram_bereik(dagen), security definer, token meta_ig_token;
+-- pg_cron 'instagram-bereik' elk uur op :26, laatste 7 dagen). Dagindeling
+-- gelijk aan Metricool: dag = datum van end_time. Sinds 18 okt kwam er niets
+-- meer binnen omdat Metricool alleen eenmalig met de hand gevuld was.
