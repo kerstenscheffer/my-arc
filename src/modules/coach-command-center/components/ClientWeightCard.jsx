@@ -82,10 +82,16 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
+  // Verjaardagsmelding aangetikt: Command vraagt om deze kaart te openen.
+  useEffect(() => {
+    if (!openInzicht) return
+    setShowInsight(true)
+    onInzichtGeopend?.()
+  }, [openInzicht, onInzichtGeopend])
 
   // Handmatige kleur van de streep links. null = laat de berekening z'n werk
   // doen. Lokaal bijgehouden zodat de kaart meteen omslaat bij een klik.

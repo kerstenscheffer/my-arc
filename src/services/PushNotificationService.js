@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '../lib/supabase.js';
 import { openUitMelding } from '../modules/video-feedback/feedbackOpenen';
+import { openKlantkaart } from '../modules/coach-command-center/klantkaartOpenen';
 
 class PushNotificationService {
   constructor() {
@@ -76,6 +77,11 @@ class PushNotificationService {
       // Gino-herinnering (alleen naar de coach): open Business OS in CoachHub.
       if (data.soort === 'gino_herinnering') {
         window.location.hash = 'business-os';
+        return;
+      }
+      // Verjaardag (alleen naar de coach): klantkaart, of Command bij meerdere.
+      if (data.soort === 'verjaardag') {
+        openKlantkaart(data.client_id);
         return;
       }
       openUitMelding(data.trigger_data);

@@ -12,6 +12,7 @@ import AddClientModal from './components/AddClientModal'
 import { laadDoorstap } from './components/doorstap'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
+import { OPEN_KLANTKAART_EVENT, pakWachtendeKlantkaart } from './klantkaartOpenen'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
@@ -76,6 +77,27 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     setOpenVideos(m)
   }, [db])
   useEffect(() => { if (activeView === 'clients') laadOpenVideos() }, [activeView, laadOpenVideos])
+
+  // Verjaardagsmelding: open de kaart van deze klant. Filters los, anders staat
+  // een gepauzeerde of inactieve klant niet in de lijst en opent er niets.
+  const [kaartKlantId, setKaartKlantId] = useState(null)
+  useEffect(() => {
+    const opVraag = () => {
+      const id = pakWachtendeKlantkaart()
+      if (!id) return
+      setJourneyClient(null)
+      setActiveView('clients')
+      setStatusFilter('all')
+      setSearchQuery('')
+      setUrgencyFilter('all')
+      setChallengeFilter('all')
+      setVinkFilter('all')
+      setKaartKlantId(id)
+    }
+    opVraag()
+    window.addEventListener(OPEN_KLANTKAART_EVENT, opVraag)
+    return () => window.removeEventListener(OPEN_KLANTKAART_EVENT, opVraag)
+  }, [])
 
   // Doorstap na de week-5 evaluatie, laatste rij per klant in één query.
   // null = tabel nog niet aangemaakt; dan tonen de kaarten niets.
@@ -604,6 +626,8 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 onDoorstap={(rij) => setDoorstap(m => ({ ...(m || {}), [client.id]: rij }))}
                 openVideos={openVideos[client.id]?.length || 0}
                 onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
+                openInzicht={kaartKlantId === client.id}
+                onInzichtGeopend={() => setKaartKlantId(null)}
               />
             ))}
           </div>

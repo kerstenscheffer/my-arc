@@ -54,10 +54,11 @@ export default function EditableRow({ label, value, field, type = 'text', option
           </select>
         ) : (
           <input
-            autoFocus type={type === 'number' || type === 'integer' ? 'number' : 'text'}
+            autoFocus type={type === 'number' || type === 'integer' ? 'number' : type === 'date' ? 'date' : 'text'}
             value={draft} onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }}
             style={{
+              colorScheme: 'dark',
               flex: 1, padding: '0.25rem 0.3rem', background: 'rgba(255,255,255,0.06)',
               border: `1px solid ${C.gold}40`, borderRadius: '4px', color: '#fff',
               fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', outline: 'none', fontFamily: 'inherit',

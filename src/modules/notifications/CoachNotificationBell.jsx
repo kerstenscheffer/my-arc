@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Bell, X, Check, ChevronRight } from 'lucide-react'
 import { geleden } from '../../utils/tijd'
+import { openKlantkaart } from '../coach-command-center/klantkaartOpenen'
 
 export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
@@ -16,62 +17,6 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
   }
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef(null)
-
-  // Check client birthdays once on mount and insert a coach_notification if needed
-  useEffect(() => {
-    const checkBirthdays = async () => {
-      try {
-        const { data: { user } } = await db.supabase.auth.getUser()
-        if (!user) return
-
-        const today = new Date()
-        const mm = String(today.getMonth() + 1).padStart(2, '0')
-        const dd = String(today.getDate()).padStart(2, '0')
-        const todayStr = today.toISOString().split('T')[0]
-
-        const { data: clients, error: cErr } = await db.supabase
-          .from('clients')
-          .select('id, first_name, last_name, date_of_birth')
-          .eq('coach_id', user.id)
-          .not('date_of_birth', 'is', null)
-
-        if (cErr || !clients?.length) return
-
-        const verjaardagClients = clients.filter(c =>
-          c.date_of_birth && String(c.date_of_birth).slice(5, 10) === `${mm}-${dd}`
-        )
-        if (!verjaardagClients.length) return
-
-        const { data: bestaand } = await db.supabase
-          .from('coach_notifications')
-          .select('client_id')
-          .eq('coach_id', user.id)
-          .eq('type', 'birthday')
-          .gte('created_at', `${todayStr}T00:00:00`)
-
-        const alGenotificeerd = new Set((bestaand || []).map(n => n.client_id))
-        const nieuw = verjaardagClients.filter(c => !alGenotificeerd.has(c.id))
-        if (!nieuw.length) return
-
-        await db.supabase.from('coach_notifications').insert(
-          nieuw.map(c => ({
-            coach_id: user.id,
-            client_id: c.id,
-            type: 'birthday',
-            priority: 'normal',
-            title: `🎂 ${c.first_name} is jarig!`,
-            message: `Vandaag is ${c.first_name} ${c.last_name || ''} jarig. Stuur een berichtje!`.trim(),
-            read_status: false,
-            tags: ['birthday']
-          }))
-        )
-      } catch (err) {
-        console.error('Birthday check failed:', err)
-      }
-    }
-
-    checkBirthdays()
-  }, [])
 
   // Load notifications on mount + poll every 30s
   useEffect(() => {
@@ -313,7 +258,10 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                   key={notif.id}
                   onClick={() => {
                     if (!notif.read_status) markAsRead(notif.id)
-                    if (notif.action_data?.plan_id && onNavigate) {
+                    if (notif.action_data?.soort === 'verjaardag') {
+                      openKlantkaart(notif.action_data.client_id)
+                      setIsOpen(false)
+                    } else if (notif.action_data?.plan_id && onNavigate) {
                       onNavigate(notif.action_data.plan_id)
                       setIsOpen(false)
                     }
@@ -324,7 +272,7 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                     padding: '0.7rem 1rem',
                     borderBottom: '1px solid rgba(255,255,255,0.03)',
                     background: notif.read_status ? 'transparent' : 'rgba(201, 165, 90, 0.04)',
-                    cursor: notif.read_status ? 'default' : 'pointer',
+                    cursor: notif.read_status && notif.action_data?.soort !== 'verjaardag' ? 'default' : 'pointer',
                     transition: 'background 0.15s ease'
                   }}
                 >

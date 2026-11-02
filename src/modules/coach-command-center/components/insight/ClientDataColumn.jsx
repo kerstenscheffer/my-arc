@@ -294,7 +294,7 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
         <E label="Email"        value={client.email}          field="email" />
         <E label="Telefoon"     value={client.phone}          field="phone" />
         <E label="Geslacht"     value={client.gender}         field="gender" options={['male', 'female', 'other']} />
-        <E label="Geboortedatum" value={client.date_of_birth ? client.date_of_birth.split('T')[0] : null} field="date_of_birth" />
+        <E label="Geboortedatum" value={client.date_of_birth ? client.date_of_birth.split('T')[0] : null} field="date_of_birth" type="date" />
         <E label="Lengte"       value={client.height}         field="height" type="number" suffix=" cm" />
         <E label="Huidig gew."  value={client.current_weight ? parseFloat(client.current_weight).toFixed(1) : null} field="current_weight" type="number" suffix=" kg" />
         <E label="Startgewicht" value={client.start_weight ? parseFloat(client.start_weight).toFixed(1) : null} field="start_weight" type="number" suffix=" kg" />
