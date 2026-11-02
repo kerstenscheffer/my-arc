@@ -190,9 +190,26 @@ function ReelRij({ r }) {
   )
 }
 
+const KOL_MC = 'minmax(0, 1fr) 48px 56px 48px 56px'
+
+// Eén regel ManyChat-cijfers: een woord, of ingesprongen een variant daarvan.
+function ManychatRij({ label, r, sub }) {
+  const cijfer = { textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: KOL_MC, gap: 8, alignItems: 'center', padding: sub ? '0.4rem 0 0.4rem 0.75rem' : '0.7rem 0', borderBottom: LIJN, fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontSize: sub ? '0.8rem' : '0.9rem', fontWeight: sub ? 700 : 900, color: sub ? ZWAK : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span style={cijfer}>{r.gids}</span>
+      <span style={cijfer}>{r.geklikt}</span>
+      <span style={cijfer}>{r.geantwoord}</span>
+      <span style={{ ...cijfer, fontWeight: 900 }}>{r.antwoord_pct != null ? `${String(r.antwoord_pct).replace('.', ',')}%` : '–'}</span>
+    </div>
+  )
+}
+
 export default function MagnetTrechter({ data, m, laden, route = 'alles' }) {
   // Welk woord; leeg = alle magnets samen.
   const [woord, setWoord] = useState('')
+  const manychat = data?.manychat || []
   const reels = data?.reels || []
   const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
@@ -261,6 +278,28 @@ export default function MagnetTrechter({ data, m, laden, route = 'alles' }) {
             </button>
           )
         })}
+      </div>
+
+      {/* ManyChat-flow per woord, uit manychat_events (uniek per persoon).
+          Varianten alleen als de webhook er een meestuurt (A/B). */}
+      <div style={{ marginTop: m ? 28 : 36 }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: ZWAK, marginBottom: 10 }}>ManyChat per woord</div>
+        <div style={{ display: 'grid', gridTemplateColumns: KOL_MC, gap: 8, paddingBottom: 6, borderBottom: LIJN }}>
+          <span style={{ ...kopStijl, textAlign: 'left' }}>Woord</span>
+          <span style={kopStijl}>Gids</span>
+          <span style={kopStijl}>Geklikt</span>
+          <span style={kopStijl}>Antw.</span>
+          <span style={kopStijl}>Antw. %</span>
+        </div>
+        {!laden && manychat.length === 0 && (
+          <div style={{ padding: '1rem 0', fontSize: '0.84rem', fontWeight: 700, color: ZWAK }}>Nog geen ManyChat-gegevens in deze periode.</div>
+        )}
+        {manychat.map(w => (
+          <div key={w.woord}>
+            <ManychatRij label={w.woord} r={w} />
+            {w.varianten?.map(v => <ManychatRij key={v.variant} label={`Variant ${v.variant}`} r={v} sub />)}
+          </div>
+        ))}
       </div>
 
       {lijst && (() => {

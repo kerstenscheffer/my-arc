@@ -1037,6 +1037,23 @@ export default function KanbanCard({
           </div>
         )}
 
+        {/* ═══ ANTWOORD UIT DE MANYCHAT-FLOW (manychat.sql) ═══ */}
+        {lead.manychat_antwoord && (
+          <div title={lead.manychat_antwoord} style={{
+            display: 'flex', alignItems: 'flex-start', gap: '5px',
+            padding: isMobile ? '0.35rem 0.625rem' : '0.35rem 0.75rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)'
+          }}>
+            <MessageCircle size={10} style={{ color: '#10b981', flexShrink: 0, marginTop: 1 }} />
+            <p style={{
+              margin: 0, color: '#fff', fontSize: '0.68rem', fontWeight: 700, lineHeight: '1.3',
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {lead.manychat_antwoord}
+            </p>
+          </div>
+        )}
+
         {/* ═══ ACTIE-STRIP — edge-to-edge met verticale scheidingslijntjes,
             in de stijl van de meal-cards. Reacties · Opvolg · Later. ═══ */}
         <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
