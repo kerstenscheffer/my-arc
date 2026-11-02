@@ -14,7 +14,7 @@ import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 import { OPEN_KLANTKAART_EVENT, pakWachtendeKlantkaart } from './klantkaartOpenen'
 
-export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
   // Laatste volledige stand van de vorige keer (sessionStorage): daarmee
   // staat de lijst meteen, in de goede volgorde en op de goede hoogte, en
@@ -48,16 +48,6 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   // vorige keer komt terug, zie privacyModus.js.
   const [prive, setPrive] = useState(false)
   useEffect(() => { setPrive(herstelPrivacy()) }, [])
-  // Dropdown-stijl: dik wit, geen accentkleur. Vervangt de gekleurde
-  // filterpillen die eerder een eigen rij innamen.
-  const selectStijl = {
-    flex: isMobile ? '1 1 0' : '0 0 auto', minWidth: 0,
-    height: 36, padding: '0 0.5rem', borderRadius: 10,
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
-    cursor: 'pointer', outline: 'none', maxWidth: isMobile ? 'none' : 170,
-  }
-  const optieStijl = { background: '#0a0a0a', color: '#fff' }
 
   const serviceRef = useRef(new CommandCenterService(db))
   const service = serviceRef.current

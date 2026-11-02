@@ -5,7 +5,7 @@ import { Bell, X, Check, ChevronRight } from 'lucide-react'
 import { geleden } from '../../utils/tijd'
 import { openKlantkaart } from '../coach-command-center/klantkaartOpenen'
 
-export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
+export default function CoachNotificationBell({ db, onNavigate, open: openProp, onOpenChange, onCountChange }) {
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -15,7 +15,6 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
     const next = typeof val === 'function' ? val(isOpen) : val
     if (controlled) onOpenChange(next); else setOpenInternal(next)
   }
-  const [loading, setLoading] = useState(false)
   const dropdownRef = useRef(null)
 
   // Load notifications on mount + poll every 30s

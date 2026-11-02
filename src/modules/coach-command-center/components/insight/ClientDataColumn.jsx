@@ -43,7 +43,7 @@ const SECTION_META = {
 
 
 // Compacte rij met label + percentage-input voor de BF-calculator.
-function BfRow({ label, value, onChange, onBlur, color, isMobile }) {
+function BfRow({ label, value, onChange, onBlur, color }) {
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -126,7 +126,7 @@ const ToggleRow = ({ label, value, defaultValue = true, onChange, isMobile, hint
 }
 
 // ── Macro Editor (unchanged from v1) ──
-function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRef }) {
+function MacroEditor({ initKcal, initProtein, initFat, isMobile, onRef }) {
   const [kcal, setKcal] = useState(initKcal || 2000)
   const [protein, setProtein] = useState(initProtein || 150)
   const [fat, setFat] = useState(initFat || 70)
@@ -213,15 +213,6 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
   const [activeSection, setActiveSection] = useState('profiel')
   // Tijdlijn, urgentie, motivatie en obstakels komen uit de intake en worden
   // hier zelden aangepast; ze stonden wel permanent onder de macro's.
-  const [editingMacros, setEditingMacros] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const macroRef = useRef(null)
-
-  const curKcal    = client.target_calories ?? 2000
-  const curProtein = client.target_protein  ?? 150
-  const curCarbs   = client.target_carbs    ?? 200
-  const curFat     = client.target_fat      ?? 70
 
   // ── Save single field to Supabase ──
   const handleFieldSave = async (field, value) => {
@@ -238,34 +229,6 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
     } catch (e) { console.error('❌ Save error:', e) }
   }
 
-  // ── Save macros ──
-  const handleSaveMacros = async () => {
-    const macros = macroRef.current
-    if (!db?.supabase || !client.id || !macros || saving) return
-    setSaving(true)
-    try {
-      const payload = {
-        target_calories: macros.kcal,
-        target_protein: macros.protein,
-        target_carbs: macros.carbs,
-        target_fat: macros.fat,
-        manual_macro_targets: true,
-      }
-      const before = pickTrackedFields(client)
-      const { error } = await db.supabase
-        .from('clients')
-        .update(payload)
-        .eq('id', client.id)
-      if (error) { console.error('❌ Macro save error:', error); return }
-      onClientUpdate?.({ target_calories: macros.kcal, target_protein: macros.protein, target_carbs: macros.carbs, target_fat: macros.fat })
-      await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'save_macros' })
-      setSaved(true)
-      setTimeout(() => { setSaved(false); setEditingMacros(false); macroRef.current = null }, 1200)
-    } catch (e) { console.error('❌ Macro save:', e) }
-    setSaving(false)
-  }
-
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) : null
   const fmtArr = (v) => { if (!v) return null; if (Array.isArray(v)) return v.join(', ') || null; if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p.join(', ') || null : v } catch { return v } } return String(v) }
 
   const wp = client.workout_preferences || client.workoutPreferences || {}
