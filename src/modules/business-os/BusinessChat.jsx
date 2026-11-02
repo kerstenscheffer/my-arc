@@ -1895,12 +1895,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       return
     }
     const berichten = naarBerichten(nieuw)
-    const metBeeld = berichten.some(b => b.afbeelding)
     let laatsteDeel = ''
     const opDeel = (t) => { if (t) laatsteDeel = t; setDeelPer(d => ({ ...d, [id]: t })) }
     const signaal = { id: null, gestopt: false }
     stopPer.current[id] = signaal
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal, geupload) : null
+    // Ook met screenshots via de Mac (2 nov 2026): de PA geeft ze als afbeelding door.
+    const mac = viaMac ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal, geupload) : null
     opDeel('')
     if (signaal.gestopt || mac?.gestopt) {
       // Gestopt: wat hij al typte blijft staan, zoals bij ChatGPT.

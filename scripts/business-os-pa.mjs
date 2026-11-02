@@ -310,8 +310,14 @@ async function beantwoordChat(invoer, opDeel, opStop = null) {
   }
   const berichten = (invoer?.berichten || []).slice(-20)
   // Hervat Slim-gesprek: de sessie kent de rest al, alleen de nieuwe vraag.
-  const gesprek = (hervat ? berichten.slice(-1) : berichten)
-    .map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.content}`).join('\n\n')
+  const stuk = hervat ? berichten.slice(-1) : berichten
+  const gesprek = stuk
+    .map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.afbeelding ? '[screenshot, zie bijgevoegde afbeelding] ' : ''}${b.content}`).join('\n\n')
+  // Screenshots (2 nov 2026): gingen eerst altijd via de API (zwakkere Gino
+  // zonder bestanden). Nu als afbeeldingen mee in het bericht aan Claude Code.
+  const BEELD_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+  const beelden = stuk.filter(b => b.role === 'user' && BEELD_TYPES.includes(b.afbeelding?.media_type) && typeof b.afbeelding?.data === 'string')
+    .slice(-3).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
   const r = await new Promise((klaar) => {
     let deel = ''
     const stop = setTimeout(() => w.p.kill('SIGTERM'), (slimId ? 10 : 5) * 60 * 1000)
@@ -329,7 +335,7 @@ async function beantwoordChat(invoer, opDeel, opStop = null) {
     w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
     opStop?.(() => w.p.kill('SIGTERM'))
     if (w.dood) return w.opEinde()
-    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
+    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
   })
   if (slimId && r.ok) bewaarSlimSessie(slimId)
   if (!slimId) setTimeout(zetWarmKlaar, 500)
