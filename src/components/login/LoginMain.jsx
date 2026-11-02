@@ -62,7 +62,15 @@ export default function LoginMain() {
 
   const checkSession = async () => {
     const user = await db.getCurrentUser()
-    if (user) window.location.href = '/'
+    if (user) naarStart()
+  }
+
+  // Na het inloggen herladen op /, mét de hash: een deeplink (bv.
+  // #business-os:content=<id> uit Gino's chat) opent dan alsnog. Staan we al op
+  // /, dan zou href alleen de hash zetten zonder herladen, dus reload.
+  const naarStart = () => {
+    if (window.location.pathname === '/') window.location.reload()
+    else window.location.href = `/${window.location.hash}`
   }
 
   // ── login ──────────────────────────────────────────────────────────────────
@@ -77,7 +85,7 @@ export default function LoginMain() {
         // 'klant' en werd daarna alsnog door de rolcheck overschreven.
         if (rememberMe) localStorage.setItem('rememberEmail', email)
         else localStorage.removeItem('rememberEmail')
-        window.location.href = '/'
+        naarStart()
       } else {
         setError('Onjuist email of wachtwoord')
       }
