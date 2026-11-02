@@ -1,0 +1,5 @@
+-- Gino's tijdmeter (2 nov 2026). Live gezet via execute_sql.
+-- business_os_tijd: één rij per minuut achter de Mac (scripts/gino-tijd.mjs).
+-- business_os_tijd_regels: Gino's/Kerstens eigen indeling (pa-db.mjs tijd-regel).
+-- business_os_tijd_overzicht(van, tot): per dag/uur/bron, eigen regel wint (ook terug in de tijd).
+-- Zie de live definitie: select pg_get_functiondef('public.business_os_tijd_overzicht(date,date)'::regprocedure);

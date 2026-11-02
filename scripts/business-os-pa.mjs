@@ -45,6 +45,7 @@ import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
+import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -496,14 +497,16 @@ Bericht: "Vandaag" + de 3 punten met tijd, en één zin waarom.`,
 Doe nu:
 1. Wat is er vandaag gebeurd: calls (gehouden/no-show/sales), content (lees content_checklist en content_metricool van vandaag), leads en reacties. Vergelijk met wat je vanochtend voorstelde.
 2. Meet de lopende experimenten (experiment-bij met een tussenstand in uitkomst; sluit af als de einddatum voorbij is: geslaagd of mislukt, met het getal). Wat je leert over wat bij hem werkt: in je geheugen (onthoud).
-3. Eén inzicht van vandaag en het plan voor morgen in 2-3 punten.
-4. Heb je iets van hem nodig om morgen beter te helpen: één vraag als actie wacht_op_jou.`,
+3. Tijd: lees pa-db.mjs tijd voor vandaag. Hoeveel ging naar geldtijd (sales, calls, coaching, content) en wat at de meeste tijd op zonder geld op te leveren? Staat er veel in overig: deel de grootste bronnen in met tijd-regel.
+4. Eén inzicht van vandaag en het plan voor morgen in 2-3 punten.
+5. Heb je iets van hem nodig om morgen beter te helpen: één vraag als actie wacht_op_jou.`,
   week: `Weekreview Strategie (zondagavond, automatisch). ${STRATEEG}
 
 Doe nu:
 1. De week in cijfers tegen de week ervoor en tegen wat nodig is voor het maanddoel (omzet, sales, calls, reacties, content). Actie "kalender" met weergave omzet en focus op wat het meest opvalt, met notitie.
 2. Sluit experimenten af die klaar zijn (met uitkomst en getal) en start er hoogstens 2 nieuwe op de zwakste schakel (experiment). Elk: één actie die hij deze week echt kan doen, een meetpunt dat je in de database kunt nalezen, een nulmeting en een einddatum binnen 7-14 dagen.
-3. Hoe kun jij hem volgende week beter helpen? Hoogstens 1 app-verbetering als pa_voorstel (volledige, zelfstandige opdracht, alleen toevoegen), alleen als die echt tijd scheelt of omzet oplevert.
+3. Tijd: pa-db.mjs tijd over de afgelopen 7 dagen tegen de week ervoor. Waar valt winst te halen (minder afleiding/admin/bouwen, meer geldtijd, beste uren voor sales en content)? Eén concreet voorstel, eventueel als experiment.
+4. Hoe kun jij hem volgende week beter helpen? Hoogstens 1 app-verbetering als pa_voorstel (volledige, zelfstandige opdracht, alleen toevoegen), alleen als die echt tijd scheelt of omzet oplevert.
 Bericht: de week in 3 regels, de experimenten (stoppen/starten) en je focus voor volgende week.`,
 }
 // Projectronde: onderzoek + plan voor één project (invoer.project_id).
@@ -703,3 +706,5 @@ setInterval(() => rondeChat().catch(fout), 3000)
 setInterval(() => rondeCode().catch(fout), 5000)
 setInterval(() => rondeGroei().catch(fout), 60 * 1000)
 setInterval(() => planGroei().catch(fout), 10 * 60 * 1000)
+// Gino's tijdmeter: elke minuut welke app/site voorop staat (scripts/gino-tijd.mjs).
+startTijdmeter(sb, () => gebruiker, (...x) => console.error(tijd(), ...x))

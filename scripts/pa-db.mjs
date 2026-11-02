@@ -25,6 +25,9 @@
 //   node scripts/pa-db.mjs projecten                 alle projecten (kort)
 //   node scripts/pa-db.mjs project "<id>"            één project volledig
 //   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'
+//   node scripts/pa-db.mjs tijd [van] [tot]          Kerstens gemeten tijd per dag/categorie/uur + grootste bronnen (standaard laatste 7 dagen)
+//   node scripts/pa-db.mjs tijd-regel '{"patroon","categorie"}'   indeling bijsturen (app, domein, #tab of titel bevat patroon); werkt terug in de tijd
+//   node scripts/pa-db.mjs tijd-regel-weg "patroon"
 //   node scripts/pa-db.mjs bijlage <storage-pad>      chatbijlage → ~/Downloads/Business OS bijlagen/, print lokaal pad
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
@@ -43,6 +46,7 @@ const env = Object.fromEntries(
     .map(r => r.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)).filter(Boolean)
     .map(([, k, v]) => [k, v.replace(/^['"]|['"]$/g, '')])
 )
+const TIJD_CATEGORIEEN = ['sales', 'calls', 'coaching', 'content', 'bouwen', 'admin', 'social', 'afleiding', 'overig']
 const token = process.env.PA_ACCESS_TOKEN
 if (!token) { console.log(JSON.stringify({ fout: 'Geen PA-sessie (alleen te gebruiken vanuit npm run pa).' })); process.exit(1) }
 
@@ -289,6 +293,27 @@ if (cmd === 'lees') {
     sb.from('business_os_experimenten').select('id, titel, status, uitkomst, start_dag, eind_dag').neq('status', 'loopt').order('updated_at', { ascending: false }).limit(10),
   ])
   uit(l.error || a.error ? { fout: (l.error || a.error).message } : { lopend: l.data, afgerond: a.data })
+} else if (cmd === 'tijd') {
+  // Tijdmeter (scripts/gino-tijd.mjs): minuten achter de Mac, ingedeeld.
+  const dag = (d) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+  const van = /^\d{4}-\d{2}-\d{2}$/.test(arg || '') ? arg : dag(new Date(Date.now() - 6 * 864e5))
+  const tot = /^\d{4}-\d{2}-\d{2}$/.test(process.argv[4] || '') ? process.argv[4] : dag(new Date())
+  const [o, r] = await Promise.all([
+    sb.rpc('business_os_tijd_overzicht', { van, tot }),
+    sb.from('business_os_tijd_regels').select('patroon, categorie, bron').order('categorie'),
+  ])
+  uit(o.error ? { fout: o.error.message } : { van, tot, categorieen: TIJD_CATEGORIEEN, ...o.data, regels: r.data || [] })
+} else if (cmd === 'tijd-regel') {
+  let t
+  try { t = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const patroon = String(t.patroon || '').trim().toLowerCase().slice(0, 80)
+  if (patroon.length < 3 || !TIJD_CATEGORIEEN.includes(t.categorie)) { uit({ fout: `patroon (min. 3 tekens) en categorie (${TIJD_CATEGORIEEN.join('|')}) verplicht` }); process.exit(1) }
+  const { error } = await sb.from('business_os_tijd_regels')
+    .upsert({ patroon, categorie: t.categorie, bron: t.bron === 'kersten' ? 'kersten' : 'gino' }, { onConflict: 'coach_id,patroon' })
+  uit(error ? { fout: error.message } : { ok: true })
+} else if (cmd === 'tijd-regel-weg') {
+  const { data, error } = await sb.from('business_os_tijd_regels').delete().eq('patroon', String(arg || '').toLowerCase()).select('id')
+  uit(error ? { fout: error.message } : { ok: !!data?.length })
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

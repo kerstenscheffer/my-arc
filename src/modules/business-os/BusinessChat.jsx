@@ -1132,6 +1132,8 @@ const AGENDA_VRAAG = /(agenda|kalender|calend|planning|plannen|rooster|afspraken
 const OMZET_VRAAG = /(omzet|inkomsten|verdien|uitbetal|verdeling|cashflow|geld binnen|komt (er )?binnen|winst|marcel krijgt)/i
 // Gaat het over content (planning, reels, opnemen), dan de contentkalender.
 const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
+// Over zijn tijd/productiviteit: het tijdscherm (Gino's tijdmeter).
+const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
@@ -1812,7 +1814,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
     const project = (bericht.acties || []).find(a => a?.soort === 'project' && a.id)
     const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender') || (project ? { weergave: 'projecten', project: project.id } : null)
-    const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '') || OMZET_VRAAG.test(vraag || '')
+    const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '') || OMZET_VRAAG.test(vraag || '') || TIJD_VRAAG.test(vraag || '')
     if (visueel && !overAgenda) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     if (kalender) onKalender?.(kalender)
     markeer(id)
@@ -1857,8 +1859,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stopHerkenner()
     if (!vanBuiten) setInvoer('')
     stem.stop()
-    if (AGENDA_VRAAG.test(vraag) || OMZET_VRAAG.test(vraag)) {
-      onKalender?.({ weergave: OMZET_VRAAG.test(vraag) ? 'omzet' : CONTENT_VRAAG.test(vraag) ? 'content' : 'week' })
+    if (AGENDA_VRAAG.test(vraag) || OMZET_VRAAG.test(vraag) || TIJD_VRAAG.test(vraag)) {
+      onKalender?.({ weergave: TIJD_VRAAG.test(vraag) ? 'tijd' : OMZET_VRAAG.test(vraag) ? 'omzet' : CONTENT_VRAAG.test(vraag) ? 'content' : 'week' })
       onVisueel?.(null, actief.id) // oud getekend rooster van dit tabje weg
     }
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
