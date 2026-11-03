@@ -1510,11 +1510,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   useEffect(() => {
     let weg = false
     const haalLaatst = () => supabase.from('business_os_opdrachten')
-      .select('opdracht, resultaat, klaar_at').eq('soort', 'code').eq('status', 'klaar')
+      .select('opdracht, resultaat, uitkomst, nodig, klaar_at').eq('soort', 'code').eq('status', 'klaar')
       .not('klaar_at', 'is', null).order('klaar_at', { ascending: false }).limit(1).maybeSingle()
       .then(({ data }) => {
         if (weg || !data) return
-        const tekst = laatstGedaanRegel(data)
+        const tekst = data.uitkomst === 'wacht_op_jou' ? `Wacht op jou: ${data.nodig || 'bekijk resultaat'}` : laatstGedaanRegel(data)
         // vol: de hele tekst voor de stem; de regel zelf is ingekort tot ~60 tekens.
         const vol = data.resultaat?.trim() || `Gino deed: ${data.opdracht || ''}`
         if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at ? o : { tekst, vol, klaar_at: data.klaar_at }))
@@ -1552,7 +1552,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     let vorige = []
     // Ruim venster: met een rij kan een opdracht lang op zijn beurt wachten.
     const kijk = () => supabase.from('business_os_opdrachten')
-      .select('id, status, opdracht, gestart_at, created_at').eq('soort', 'code').in('status', ['wacht', 'bezig'])
+      .select('id, status, opdracht, voortgang, gestart_at, created_at').eq('soort', 'code').in('status', ['wacht', 'bezig'])
       .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
       .order('created_at')
       .then(({ data }) => {
@@ -1566,11 +1566,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
         const klaar = vorige.filter(id => !ids.includes(id))
         vorige = ids
         if (!klaar.length) return
-        supabase.from('business_os_opdrachten').select('status').in('id', klaar)
+        supabase.from('business_os_opdrachten').select('status, uitkomst, nodig').in('id', klaar)
           .then(({ data: af }) => {
             if (weg) return
             if (af?.length && af.every(r => r.status === 'gestopt')) { meld('Gestopt', false); return }
-            meld(af?.some(r => r.status === 'mislukt') ? 'Mislukt, bekijk resultaat' : 'Klaar', af?.some(r => r.status === 'mislukt'))
+            const wacht = af?.find(r => r.uitkomst === 'wacht_op_jou')
+            if (wacht) meld(`Wacht op jou: ${wacht.nodig || 'bekijk resultaat'}`, true)
+            else meld(af?.some(r => r.status === 'mislukt') ? 'Mislukt, bekijk resultaat' : 'Klaar', af?.some(r => r.status === 'mislukt'))
             // Stip op het tabje waar de opdracht vandaan kwam (anders het actieve).
             const bij = gesprekkenRef.current.filter(g => g.berichten.some(b => (b.acties || []).some(a => a?.opdrachtId && klaar.includes(a.opdrachtId))))
             ;(bij.length ? bij.map(g => g.id) : [actiefRef.current]).forEach(markeer)
@@ -2231,7 +2233,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                       }}>{opdrachtKop(w)}</div>
                       <div style={{ marginTop: 4, fontSize: '0.74rem', fontWeight: 700, color: colors.textSecondary }}>
-                        {w.status === 'bezig' ? `Op je Mac · ${duurSinds(w)}` : 'In de rij'}
+                        {w.status === 'bezig' ? `Op je Mac · ${duurSinds(w)}${w.voortgang ? ` · ${w.voortgang}` : ''}` : 'In de rij'}
                       </div>
                     </div>
                     <button type="button" onClick={() => supabase.from('business_os_opdrachten')
@@ -2283,7 +2285,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
                     fontSize: '0.75rem', fontWeight: 800,
                   }}>
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{opdrachtKop(macNu)}</span>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{macNu.voortgang || opdrachtKop(macNu)}</span>
                   <span style={{ flexShrink: 0, color: colors.textSecondary }}>
                     {macNu.status === 'bezig' ? duurSinds(macNu) : 'in de rij'}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
                   </span>

@@ -136,9 +136,15 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Je mag lezen in Kerstens eigen mappen (${EIGEN_MAPPEN.join(', ')}) en daaruit kopiëren naar deze repo (cp; zoeken met mdfind of ls). Pas daar nooit iets aan en verwijder niets. Bestanden van Kersten (boeken, PDF's) zet je in een map die in .gitignore staat, zodat ze niet online komen.
 - Bestanden die je voor Kersten maakt (uittreksels, transcripts, notities) zet je in ${GINO_MAP}, nooit in /tmp. Zeg in je samenvatting het pad.
 - Database lezen: node scripts/pa-db.mjs (lees, schema, bijlage …). Pdf lezen: Read met pages, of pdftotext <bestand> -.
-- Schemawijzigingen in de database kun je hier niet doen; heb je er een nodig, zeg dat in je samenvatting.
-- Klaar = npm run build en eslint op de gewijzigde bestanden zijn groen.
-- Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
+- Begin met een check van 1 minuut: kun je dit helemaal afmaken? Kijk wat er nodig is (SQL, edge function, sleutel, iets dat alleen Kersten kan). Kan een onmisbaar deel niet, stop dan meteen en zeg wat er nodig is, in plaats van eerst alles te bouwen.
+- Schemawijzigingen kun je hier niet doen, ook niet via de Supabase-MCP: de bevestiging daarvan wordt automatisch geannuleerd. Heb je er een nodig, schrijf de SQL dan in een bestand onder src/modules/ en zeg bij NODIG welk bestand gedraaid moet worden.
+- Een release kun je hier ook niet zelf doen. Moet het live, dan is de uitkomst wacht_op_jou met bij NODIG: npm run release.
+- Af = het doet wat Kersten vroeg, en dat heb je getest: build en eslint op de gewijzigde bestanden groen, en je hebt de echte uitkomst nagelezen met pa-db (getallen vergelijken, niet aannemen). Wat je niet kon testen, noem je.
+- Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.
+- De allerlaatste regels zijn precies:
+UITKOMST: live | wacht_op_jou | mislukt
+NODIG: <wat Kersten nog moet doen, in één zin; leeg bij live>
+live = hij kan het nu gebruiken. wacht_op_jou = gebouwd of deels klaar, maar het werkt pas als Kersten iets doet (ook een release). mislukt = het is niet gelukt.`
 
 // yt-transcript: alleen ondertitels van YouTube naar ~/Downloads/Creator transcripts (schrijft niets anders).
 const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)']
@@ -189,7 +195,28 @@ const bewaarSlimSessie = (id) => {
 const lopend = new Map()
 
 // opStop(fn): krijgt de functie die dit proces (en alles wat het startte) stopt.
-function claude(args, extraEnv = {}, opStop = null) {
+// Korte zin over wat een opdracht nu doet, voor de statusregel in Business OS.
+function stapTekst({ name, input = {} }) {
+  const bestand = (x) => path.basename(String(x || ''))
+  if (name === 'Read') return `Leest ${bestand(input.file_path)}`
+  if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return `Past ${bestand(input.file_path)} aan`
+  if (name === 'Grep') return `Zoekt "${String(input.pattern || '').slice(0, 40)}"`
+  if (name === 'Glob') return 'Zoekt bestanden'
+  if (name === 'Bash') return String(input.description || input.command || 'Draait een commando').split('\n')[0].slice(0, 80)
+  if (name === 'WebSearch') return `Zoekt online: ${String(input.query || '').slice(0, 50)}`
+  if (name === 'WebFetch') return 'Leest een webpagina'
+  return null
+}
+
+// Mac wakker houden zolang er werk loopt (klep dicht houdt dit niet tegen).
+function wakkerTijdens(werk) {
+  const c = spawn('caffeinate', ['-i'], { stdio: 'ignore' })
+  c.on('error', () => {})
+  return Promise.resolve().then(werk).finally(() => c.kill())
+}
+
+// opStap: met stream-json meelezen welke tool er loopt.
+function claude(args, extraEnv = {}, opStop = null, opStap = null) {
   return new Promise((klaar) => {
     const p = spawn('claude', args, { cwd: MAP, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...extraEnv } })
     // Stoppen: eerst de commando's die Claude startte (build, lint…), dan Claude zelf.
@@ -198,14 +225,33 @@ function claude(args, extraEnv = {}, opStop = null) {
       p.kill('SIGTERM')
     })
     let uit = '', fout = ''
-    p.stdout.on('data', d => { uit += d })
+    let rest = '', slot = null
+    const regel = (r) => {
+      let e
+      try { e = JSON.parse(r) } catch { return }
+      if (e.type === 'result') slot = e
+      if (e.type === 'assistant') {
+        for (const b of e.message?.content || []) {
+          const t = b.type === 'tool_use' ? stapTekst(b) : null
+          if (t) opStap(t)
+        }
+      }
+    }
+    p.stdout.on('data', d => {
+      if (!opStap) { uit += d; return }
+      rest += d
+      const regels = rest.split('\n')
+      rest = regels.pop()
+      regels.forEach(regel)
+    })
     p.stderr.on('data', d => { fout += d })
     const stop = setTimeout(() => p.kill('SIGTERM'), 30 * 60 * 1000)
     p.on('close', (code) => {
       clearTimeout(stop)
-      let json = null
-      try { json = JSON.parse(uit) } catch { /* geen JSON */ }
-      klaar({ code, json, ruw: uit.trim(), fout: fout.trim() })
+      if (rest) regel(rest)
+      let json = slot
+      if (!opStap) { try { json = JSON.parse(uit) } catch { /* geen JSON */ } }
+      klaar({ code, json, ruw: opStap ? '' : uit.trim(), fout: fout.trim() })
     })
   })
 }
@@ -224,16 +270,16 @@ async function versToken() {
 // "Brian heb ik nog niet gelezen" terwijl een opdracht dat net gedaan had).
 async function macWerkVoorChat() {
   const { data } = await sb.from('business_os_opdrachten')
-    .select('status, opdracht, resultaat, created_at, klaar_at').eq('soort', 'code')
+    .select('status, uitkomst, nodig, opdracht, resultaat, created_at, klaar_at').eq('soort', 'code')
     .gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: false }).limit(6).then(r => r, () => ({ data: [] }))
   if (!data?.length) return ''
   const t = (x) => x ? new Date(x).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : ''
   return `Code-opdrachten op de Mac (laatste 12 uur, nieuwste eerst). Wat hier staat heb je zelf (via een opdracht) gedaan; gebruik de uitkomst en bestanden, doe het niet opnieuw en zeg niet dat je het niet hebt:\n${data.map(r =>
-    `- [${r.status}${r.klaar_at ? ` ${t(r.klaar_at)}` : ` sinds ${t(r.created_at)}`}] ${String(r.opdracht || '').split('\n')[0].slice(0, 200)}${r.resultaat ? `\n  Uitkomst: ${r.resultaat.slice(0, 1500).replace(/\n+/g, ' ')}` : ''}`).join('\n')}\n\n`
+    `- [${r.uitkomst || r.status}${r.nodig ? ` (nodig: ${r.nodig})` : ''}${r.klaar_at ? ` ${t(r.klaar_at)}` : ` sinds ${t(r.created_at)}`}] ${String(r.opdracht || '').split('\n')[0].slice(0, 200)}${r.resultaat ? `\n  Uitkomst: ${r.resultaat.slice(0, 1500).replace(/\n+/g, ' ')}` : ''}`).join('\n')}\n\n`
 }
 
-async function voerCodeUit(opdracht, opStop) {
+async function voerCodeUit(opdracht, opStop, opStap) {
   // Correcties, besluiten en voorkeuren uit Gino's geheugen gelden ook hier.
   const { data: geheugen } = await sb.from('business_os_geheugen').select('soort, tekst')
     .eq('actief', true).in('soort', ['correctie', 'besluit', 'voorkeur']).order('created_at').limit(60)
@@ -243,15 +289,20 @@ async function voerCodeUit(opdracht, opStop) {
     : ''
   const r = await claude([
     '-p', `${INSTRUCTIE}${regels}\n\nOpdracht:\n${opdracht}`,
-    '--output-format', 'json',
+    '--output-format', 'stream-json', '--verbose',
+    '--model', 'opus', '--effort', 'high',
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
     '--disallowedTools', VERBODEN.join(','),
     ...EIGEN_ARGS,
     '--max-budget-usd', '10',
-  ], { PA_ACCESS_TOKEN: await versToken() }, opStop)
-  const tekst = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
-  return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result, tekst: tekst.slice(0, 8000) }
+  ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap)
+  const ruw = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
+  // De afsluitregels zijn voor het systeem; Kersten leest de samenvatting.
+  const uitkomst = ruw.match(/^UITKOMST:\s*(live|wacht_op_jou|mislukt)\s*$/im)?.[1]?.toLowerCase() || null
+  const nodig = ruw.match(/^NODIG:[ \t]*(.+)$/im)?.[1]?.trim() || null
+  const tekst = ruw.replace(/^(UITKOMST|NODIG):.*$/gim, '').trim()
+  return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result && uitkomst !== 'mislukt', tekst: tekst.slice(0, 8000), uitkomst, nodig }
 }
 
 // Snelle chat: er staat altijd één Claude-proces klaar (opgestart, ingelogd,
@@ -437,11 +488,17 @@ async function rondeCode() {
   bezig.code = true
   try {
     console.log(`${tijd()} ▶ code: ${rij.opdracht.split('\n')[0].slice(0, 100)}`)
-    const r = await voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f))
+    let vorigeStap = 0
+    const opStap = (t) => {
+      if (Date.now() - vorigeStap < 4000) return
+      vorigeStap = Date.now()
+      sb.from('business_os_opdrachten').update({ voortgang: t }).eq('id', rij.id).then(() => {}, () => {})
+    }
+    const r = await wakkerTijdens(() => voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f), opStap))
     lopend.delete(rij.id)
     // Alleen als hij nog 'bezig' staat: een gestopte rij blijft gestopt.
     const { data: gezet, error } = await sb.from('business_os_opdrachten')
-      .update({ status: r.ok ? 'klaar' : 'mislukt', resultaat: r.tekst, klaar_at: new Date().toISOString() })
+      .update({ status: r.ok ? 'klaar' : 'mislukt', resultaat: r.tekst, uitkomst: r.uitkomst, nodig: r.nodig, voortgang: null, klaar_at: new Date().toISOString() })
       .eq('id', rij.id).eq('status', 'bezig').select('id')
     if (!error && !gezet?.length) {
       await sb.from('business_os_opdrachten').update({ resultaat: `Gestopt door Kersten.\n\n${r.tekst}`.slice(0, 8000) })
@@ -449,7 +506,7 @@ async function rondeCode() {
       console.log(`${tijd()} ⏹ code gestopt (wijzigingen tot dan blijven staan)\n`)
       return
     }
-    console.log(`${tijd()} ${r.ok ? '✓ klaar' : '✗ mislukt'}\n${r.tekst}\n`)
+    console.log(`${tijd()} ${r.ok ? `✓ ${r.uitkomst || 'klaar'}` : '✗ mislukt'}\n${r.tekst}\n`)
     if (error) console.error(tijd(), 'Resultaat opslaan mislukt, geen herstart:', error.message)
     else herstartNa(rij.id).catch(e => console.error(tijd(), 'Herstart mislukt:', e.message))
   } finally { bezig.code = false }
@@ -626,8 +683,16 @@ async function rondeGroei() {
     console.log(`${tijd()} 🌱 ${project ? rij.opdracht : ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
     const t0 = Date.now()
     const vraag = project ? PROJECT_VRAAG(project) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
-    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f))
+    const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f)))
     lopend.delete(rij.id)
+    // Mislukt, meestal doordat de Mac sliep: nog twee keer proberen als hij weer wakker is.
+    const poging = Number(rij.invoer?.poging) || 0
+    if (!r.ok && poging < 2) {
+      console.log(`${tijd()} ↻ groeironde opnieuw (poging ${poging + 2})`)
+      await sb.from('business_os_opdrachten').update({ status: 'wacht', invoer: { ...(rij.invoer || {}), poging: poging + 1 } })
+        .eq('id', rij.id).eq('status', 'bezig')
+      return
+    }
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
