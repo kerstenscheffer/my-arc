@@ -284,7 +284,8 @@ function maakWaakhond(stilMs, opVast) {
     tool(b) {
       const stap = stapTekst(b)
       if (stap) laatste = stap
-      const sleutel = `${b.name}:${JSON.stringify(b.input || {})}`
+      // Bij Bash telt alleen het commando: de beschrijving verschilt per aanroep.
+      const sleutel = `${b.name}:${b.name === 'Bash' ? b.input?.command : JSON.stringify(b.input || {})}`
       const n = (gezien.get(sleutel) || 0) + 1
       gezien.set(sleutel, n)
       if (n >= LUS_MAX) opVast(`Vastgelopen: ${n} keer hetzelfde geprobeerd (${stap || b.name}) zonder verder te komen. Ik ben gestopt.`)
