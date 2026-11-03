@@ -11,6 +11,8 @@
 //   └────────────── maandgrafiek met doellijn ──┘
 
 import { useEffect, useMemo, useState } from 'react'
+import { Info, X } from 'lucide-react'
+import { createPortal } from '../../client/paginaPortal'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -120,7 +122,86 @@ function Bronnen({ maand, toegezegd, focus }) {
   )
 }
 
+// Uitbetaalperiode van de sleutel YYYY-MM: 26e van de maand ervoor t/m de 25e.
+const periodeTekst = (k) => {
+  const [j, m] = String(k).split('-').map(Number)
+  const maand = (d) => d.toLocaleDateString('nl-NL', { month: 'short' })
+  return `26 ${maand(new Date(j, m - 2, 1))} t/m 25 ${maand(new Date(j, m - 1, 1))}`
+}
+const dagTekst = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
+function InfoRegel({ links, onder, rechts, dik = false, kleur = colors.textPrimary }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '8px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: dik ? 900 : 800, color: kleur }}>{links}</div>
+        {onder && <div style={{ fontSize: 12, fontWeight: 700, color: colors.textSecondary, marginTop: 4 }}>{onder}</div>}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: dik ? 900 : 800, color: kleur, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rechts}</div>
+    </div>
+  )
+}
+
+// Waar de verdeling uit bestaat: alle posten, wat eraf gaat en wie wat krijgt.
+function VerdelingInfo({ p, partner, jij, onSluit }) {
+  useEffect(() => {
+    const toets = (e) => { if (e.key === 'Escape') onSluit() }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onSluit])
+  // Eén regel per persoon: borg en verlenging van dezelfde klant horen bij elkaar.
+  const personen = []
+  ;(p.ontvangsten || []).forEach(o => {
+    let x = personen.find(q => q.naam === o.naam)
+    if (!x) { x = { naam: o.naam, bedrag: 0, posten: [] }; personen.push(x) }
+    x.bedrag += Number(o.bedrag) || 0
+    x.posten.push(o)
+  })
+  return createPortal(
+    <div onClick={onSluit} style={{
+      position: 'fixed', inset: 0, zIndex: 2147483400, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div role="dialog" aria-modal="true" aria-label="Opbouw van de verdeling" onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 440, maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box', padding: 16,
+        background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: colors.textPrimary }}>Opbouw verdeling</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: colors.textSecondary, marginTop: 4 }}>Uitbetaalperiode {periodeTekst(p.key)}</div>
+          </div>
+          <button type="button" onClick={onSluit} aria-label="Sluiten" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, background: 'transparent', border: 'none', color: colors.textPrimary, cursor: 'pointer' }}>
+            <X size={18} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {personen.map(x => (
+          <InfoRegel key={x.naam} links={x.naam} rechts={euro(x.bedrag)}
+            onder={x.posten.map((o, i) => (
+              <div key={i} style={{ marginTop: i ? 4 : 0 }}>
+                {[o.soort, x.posten.length > 1 ? euro(o.bedrag) : null, o.datum ? dagTekst(o.datum) : null, o.eerder ? 'eerder ontvangen, telt nu mee' : null].filter(Boolean).join(' · ')}
+              </div>
+            ))} />
+        ))}
+        <InfoRegel links="Telt voor verdeling" rechts={euro(p.revenue)} dik />
+        <InfoRegel links="Vaste lasten" onder="Gaan eerst van het bedrag af" rechts={`− ${euro(p.fixedCosts)}`} kleur={colors.textSecondary} />
+        <InfoRegel links="Adspend" onder={p.adSpendBron === 'meta' ? 'Automatisch uit Meta' : null} rechts={`− ${euro(p.adSpend)}`} kleur={colors.textSecondary} />
+        <InfoRegel links="Te verdelen" rechts={euro(p.netRevenue)} dik kleur={G} />
+        <InfoRegel links="Jij" rechts={euro(jij)} />
+        <InfoRegel links={partner} rechts={euro(p.earned)} />
+
+        <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.5, color: colors.textSecondary, marginTop: 8 }}>
+          Het bedrag links op het scherm is wat er deze kalendermaand binnenkwam. Open challenges staan hier niet tussen: een borg telt pas als de doorstap betaald is.
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 function Verdeling({ p, partner = 'Marcel', focus }) {
+  const [info, setInfo] = useState(false)
   if (!p) return <div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>Geen gegevens voor deze periode.</div></div>
   const jij = Math.max(0, (p.netRevenue || 0) - (p.earned || 0))
   const regels = [
@@ -137,7 +218,17 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
         <div style={{ position: 'absolute', left: 2, top: 6, bottom: 6, width: 1, background: `linear-gradient(to bottom, ${G}22, ${G})`, transformOrigin: 'top', animation: 'go-lijn .6s ease-out .2s both' }} />
         {regels.map(([l, v, kleur], i) => (
           <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: l === 'Te verdelen' ? 900 : 700, color: kleur, padding: '2px 0', animation: `go-in .3s ease-out ${250 + i * 90}ms both` }}>
-            <span>{l}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{v < 0 ? `− ${euro(-v)}` : euro(v)}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {l}
+              {i === 0 && (
+                <button type="button" onClick={() => setInfo(true)} aria-label="Opbouw van de verdeling bekijken" title="Waar komt dit vandaan?" style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, margin: '-5px 0',
+                  padding: 0, background: 'transparent', border: 'none', color: colors.textSecondary, cursor: 'pointer',
+                }}>
+                  <Info size={14} strokeWidth={2.5} />
+                </button>
+              )}
+            </span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{v < 0 ? `− ${euro(-v)}` : euro(v)}</span>
           </div>
         ))}
       </div>
@@ -159,6 +250,7 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
           Nog uit te betalen aan {partner}: <span style={{ color: '#fff', fontWeight: 900 }}>{euro(p.outstanding)}</span>
         </div>
       )}
+      {info && <VerdelingInfo p={p} partner={partner} jij={jij} onSluit={() => setInfo(false)} />}
     </div>
   )
 }

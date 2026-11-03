@@ -65,3 +65,9 @@ begin
 end $$;
 
 commit;
+
+-- Marco Molenaar = ditgeeftmijenergie: verlenging en borg bij elkaar (al betaald,
+-- de borg stond al op behouden). Los gedraaid op 3 nov, staat hier voor de volledigheid.
+update public.lead_movements set borg_movement_id = 'e5645a14-8b27-4a82-9d8a-47523c61fd49'
+ where client_id = '953b39cb-c3d0-45c8-b7d2-b084d1ef0c21' and outcome_type = 'verlenging'
+   and reverted_at is null and borg_movement_id is null;

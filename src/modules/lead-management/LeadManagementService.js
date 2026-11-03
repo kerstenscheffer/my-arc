@@ -3173,7 +3173,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // telt hij hier wél mee.
         .or('sale_kind.eq.coaching,challenge_status.eq.behouden')
       const [saleNieuw, { data: paidRows }, { data: adRows }, pauzesVan, itemRes] = await Promise.all([
-        haalSales(`${SALE_KOLOMMEN}, telt_mee_vanaf`),
+        haalSales(`${SALE_KOLOMMEN}, telt_mee_vanaf, borg_movement_id`),
         // Geen coach-filter: RLS geeft je eigen rijen + die van teamgenoten
         // (de owner zet de betaal-status; teamleden lezen 'm mee).
         // select('*'): vaste_lasten/adspend bestaan pas na partner-uitbetaling-vast.sql.
@@ -3204,8 +3204,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         adBron[k] = r.bron
       })
 
+      // Challenge-sales staan vaak onder de Instagram-naam. Hoort er een verlenging
+      // bij, dan geldt de naam van de klant.
+      const naamVanBorg = {}
+      ;(saleRows || []).forEach(r => { if (r.borg_movement_id && r.lead_name) naamVanBorg[r.borg_movement_id] = r.lead_name })
+
       const sales = (saleRows || []).map(r => ({
         id: r.id,
+        borg: r.sale_kind === 'challenge',
         // Uitbetaalperiode (YYYY-MM) waarin de sale meetelt. Null = nog niet:
         // de betaling is er niet of de doorstap is niet rond.
         vanaf: r.telt_mee_vanaf ? String(r.telt_mee_vanaf).slice(0, 7) : null,
@@ -3220,7 +3226,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           : (r.outcome_type === 'verlenging' ? STANDAARD_PARTNER_PCT : 0),
         verlenging: r.outcome_type === 'verlenging',
         date: new Date(r.moved_at),
-        naam: r.lead_name || null,
+        naam: naamVanBorg[r.id] || r.lead_name || null,
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
         restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
         // Net als bij de omzet: over een ja waarvan het geld nog moet komen
@@ -3361,7 +3367,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               portie: `termijn-${i + 1}`,
               los: false,
             }))
-          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald', portie: 'rest', los: true }]
+          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: s.borg ? 'Challenge-borg' : heeftRest ? 'Restbetaling' : 'Vooruitbetaald', portie: 'rest', los: true }]
 
         // Betaalpauze: termijnen die stilstaan vallen weg, na hervatten
         // landen ze in de periode van hun nieuwe datum.
@@ -3519,6 +3525,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               portie: p.portie || null,
               partnerDeel: Math.round((p.partnerDeel || 0) * 100) / 100,
               los: p.los === true,
+              eerder: !!p.oudK && p.oudK < k,
             })),
           orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100, // omzet uit orders die maand
           fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
