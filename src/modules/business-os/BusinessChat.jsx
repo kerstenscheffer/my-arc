@@ -45,7 +45,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -60,6 +60,12 @@ const PA_ONLINE_MS = 45000
 const MAX_BEELDEN = 3 // zoveel recente screenshots gaan mee naar de AI
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
+const opdrachtKop = (w) => String(w.opdracht || '').split('\n')[0].replace(/^Onderwerp:\s*/i, '')
+const duurSinds = (w) => {
+  const min = Math.max(0, Math.round((Date.now() - new Date(w.gestart_at || w.created_at).getTime()) / 60000))
+  return duurTekst(min)
+}
+const duurTekst = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} u ${min % 60} min`)
 const slaap = (ms) => new Promise(r => setTimeout(r, ms))
 
 const TEKST = { fontSize: '0.78rem', lineHeight: 1.4 }
@@ -1490,8 +1496,15 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // hoe hij geëindigd is voor de korte melding.
   const [code, setCode] = useState(null) // null | 'wacht' | 'bezig'
   const [inRij, setInRij] = useState(0) // code-opdrachten die op hun beurt wachten
-  // Wat er nu op de Mac loopt of wacht, met tekst: zichtbaar boven de balk (2 nov 2026).
+  // Wat er nu op de Mac loopt of wacht: in de statusregel, details + Stop in een dropdown.
   const [macWerk, setMacWerk] = useState([])
+  const [macOpen, setMacOpen] = useState(false)
+  useEffect(() => {
+    if (!macOpen) return
+    const buiten = (e) => { if (!e.target.closest?.('[data-mac-werk]')) setMacOpen(false) }
+    document.addEventListener('pointerdown', buiten)
+    return () => document.removeEventListener('pointerdown', buiten)
+  }, [macOpen])
   // Laatst afgeronde code-opdracht: de rustregel van het robotje.
   const [laatst, setLaatst] = useState(null) // { tekst (kort), vol (voor de stem), klaar_at }
   useEffect(() => {
@@ -1545,6 +1558,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       .then(({ data }) => {
         if (weg || !data) return
         setMacWerk(data)
+        if (!data.length) setMacOpen(false)
         const loopt = data.some(r => r.status === 'bezig')
         setCode(loopt ? 'bezig' : data.length ? 'wacht' : null)
         setInRij(Math.max(0, data.length - 1))
@@ -2082,6 +2096,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     : bezig ? (isEditor(actief) ? 'ChatGPT denkt na…' : deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
     : anderBezig ? `Gino denkt na in ${anderBezig.naam}…`
     : code === 'wacht' ? 'Wacht op je Mac…' : null
+  // De opdracht die de statusregel noemt; zolang de chat zelf bezig is, gaat die voor.
+  const macNu = macWerk.find(w => w.status === 'bezig') || (code === 'wacht' && !bezig && !spreekt ? macWerk[0] : null)
 
   return (
     <div ref={wortel} style={{
@@ -2199,32 +2215,33 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
           <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
-            {/* Op de Mac: elke lopende/wachtende code-opdracht met wat hij doet, hoe lang al, en Stop */}
-            {macWerk.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
-                {macWerk.map(w => {
-                  const sinds = Math.max(0, Math.round((Date.now() - new Date(w.gestart_at || w.created_at).getTime()) / 60000))
-                  const loopt = w.status === 'bezig'
-                  return (
-                    <div key={w.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px 5px 10px', borderRadius: 10,
-                      background: 'rgba(10,10,10,0.85)', border: `1px solid ${loopt ? colors.success + '55' : 'rgba(255,255,255,0.12)'}`,
-                      fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary,
-                    }}>
-                      <span className={loopt ? 'bos-stip' : undefined} style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: loopt ? colors.success : 'rgba(255,255,255,0.35)' }} />
-                      <span style={{ flexShrink: 0, color: '#fff', fontWeight: 800 }}>{loopt ? `Op je Mac · ${sinds} min` : 'In de rij'}</span>
-                      <span title={w.opdracht} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {String(w.opdracht || '').split('\n')[0]}
-                      </span>
-                      <button type="button" onClick={() => supabase.from('business_os_opdrachten')
-                        .update({ status: 'gestopt', klaar_at: new Date().toISOString() }).eq('id', w.id).in('status', ['wacht', 'bezig'])
-                        .then(() => setMacWerk(l => l.filter(x => x.id !== w.id)), () => {})}
-                        style={{ flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        Stop
-                      </button>
+            {/* Op de Mac: alle opdrachten voluit, hoe lang al, en Stop */}
+            {macOpen && macWerk.length > 0 && (
+              <div data-mac-werk style={{
+                position: 'absolute', left: 0, right: 0, bottom: '100%', marginBottom: 8, zIndex: 6,
+                maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, padding: 16, boxSizing: 'border-box',
+                background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: 16,
+                boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+              }}>
+                {macWerk.map(w => (
+                  <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '0.8rem', fontWeight: 800, lineHeight: 1.4, color: colors.textPrimary,
+                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                      }}>{opdrachtKop(w)}</div>
+                      <div style={{ marginTop: 4, fontSize: '0.74rem', fontWeight: 700, color: colors.textSecondary }}>
+                        {w.status === 'bezig' ? `Op je Mac · ${duurSinds(w)}` : 'In de rij'}
+                      </div>
                     </div>
-                  )
-                })}
+                    <button type="button" onClick={() => supabase.from('business_os_opdrachten')
+                      .update({ status: 'gestopt', klaar_at: new Date().toISOString() }).eq('id', w.id).in('status', ['wacht', 'bezig'])
+                      .then(() => setMacWerk(l => l.filter(x => x.id !== w.id)), () => {})}
+                      style={{ ...KNOP, minHeight: 32, padding: '0 12px', fontSize: '0.72rem', flexShrink: 0 }}>
+                      Stop
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
             {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
@@ -2253,17 +2270,33 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     }} />
                   )}
                 </span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {!macNu && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))}
-                </span>
+                </span>}
               </button>
+              {macNu && (
+                <button type="button" data-mac-werk onClick={() => setMacOpen(o => !o)} aria-expanded={macOpen}
+                  title="Wat loopt er op je Mac?"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, whiteSpace: 'nowrap',
+                    flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
+                    background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+                    fontSize: '0.75rem', fontWeight: 800,
+                  }}>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{opdrachtKop(macNu)}</span>
+                  <span style={{ flexShrink: 0, color: colors.textSecondary }}>
+                    {macNu.status === 'bezig' ? duurSinds(macNu) : 'in de rij'}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
+                  </span>
+                  <ChevronDown size={12} strokeWidth={3} color={colors.textSecondary} style={{ flexShrink: 0, transform: macOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+              )}
               {/* Herhaalknop direct achter het laatste opdrachtresultaat (robot-regel) */}
               {!werk && !(melding && !vraagNu) && !vraagNu && laatst?.tekst && stem.beschikbaar() && (
                 <span style={{ display: 'flex', flexShrink: 0, marginLeft: -6 }}>{herhaalKnop(laatst.vol)}</span>
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
               <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" style={{
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : '0 1 auto', overflowX: 'auto', marginLeft: 2,
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile || macNu ? '0 0 auto' : '0 1 auto', overflowX: 'auto', marginLeft: 2,
               }}>
                 {gesprekken.map((g, gi) => {
                   const aan = g.id === actief.id
