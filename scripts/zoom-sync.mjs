@@ -5,12 +5,16 @@
 // start het elke dag vanaf 05:15 (planZoomSync in business-os-pa.mjs).
 //
 //   node scripts/zoom-sync.mjs            nieuwe notes sinds de laatste opgeslagen call (3 dagen overlap)
-//   node scripts/zoom-sync.mjs --alles    alle notes + controle van alle meetings op transcripts buiten My Notes
-//   node scripts/zoom-sync.mjs --droog [--max N]   wel Zoom lezen en koppelen, niets schrijven; alleen aantallen
+//   node scripts/zoom-sync.mjs --alles    alles vanaf het begin, ongeacht de markering
+//   node scripts/zoom-sync.mjs --droog [--max N] [--sinds ISO]   wel Zoom lezen en koppelen, niets schrijven; alleen aantallen
 //
 // Inhalen: het vertrekpunt is de start van de laatste foutloze run (markering in
 // ~/Gino/zoom-transcripts/werk) min 3 dagen. Geen markering = eerste keer = --alles.
 // Een run met fouten verzet de markering niet, dus er vallen geen gaten.
+//
+// Zoom search toont niet alle notes (3 nov: 50 van de 183, niets ouder dan 14 okt).
+// Daarom gaat elke run ook de meetings zonder note langs via get_meeting_assets:
+// die geeft my_notes.file_id, de exacte koppeling tussen meeting en note.
 //
 // Zoom bereiken we via een headless `claude -p` met alleen leestools. De data
 // komt uit de stream-uitvoer (tool_use_result.structuredContent), niet uit wat
@@ -33,6 +37,7 @@ const WERK = path.join(os.homedir(), 'Gino', 'zoom-transcripts', 'werk')
 const MARKERING = path.join(WERK, 'laatste-foutloze-run.txt')
 const ALLES_VLAG = process.argv.includes('--alles')
 const DROOG = process.argv.includes('--droog')
+const SINDS = process.argv.includes('--sinds') ? process.argv[process.argv.indexOf('--sinds') + 1] : null
 const MAX = process.argv.includes('--max') ? Number(process.argv[process.argv.indexOf('--max') + 1]) : Infinity
 
 const MODEL = 'claude-haiku-5-5'
@@ -60,6 +65,11 @@ const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
   global: { headers: { Authorization: `Bearer ${token}` } },
 })
+
+// Sessie verlopen: netjes stoppen in plaats van honderd fouten. De volgende run gaat verder.
+const sessieNogGeldig = () => {
+  if (!DROOG && Date.now() > jwt.exp * 1000 - 60 * 1000) throw new Error('PA-sessie verlopen tijdens de run, volgende run gaat verder')
+}
 
 const meld = async (melding) => {
   console.error(new Date().toISOString(), melding)
@@ -189,12 +199,12 @@ async function main() {
   const startRun = new Date().toISOString()
   let marker = null
   try { marker = Date.parse(fs.readFileSync(MARKERING, 'utf8').trim()) || null } catch { /* eerste keer */ }
-  const volledig = ALLES_VLAG || !marker
+  const volledig = ALLES_VLAG || (!marker && !SINDS)
   const rapport = { modus: `${volledig ? 'alles' : 'nacht'}${DROOG ? ' (droog)' : ''}`, notes_gezien: 0, opgehaald: 0, ok: 0, leeg: 0, ongewijzigd: 0, mislukt: 0, ok_niet_overschreven_met_leeg: 0 }
   const fouten = []
 
   const bestaand = await leesBestaand()
-  const sinds = volledig ? '2020-01-01T00:00:00Z' : new Date(marker - OVERLAP_DAGEN * DAG_MS).toISOString().replace(/\.\d+Z$/, 'Z')
+  const sinds = SINDS || volledig ? SINDS || '2020-01-01T00:00:00Z' : new Date(marker - OVERLAP_DAGEN * DAG_MS).toISOString().replace(/\.\d+Z$/, 'Z')
 
   const [notes, meetings] = [await zoekAlles('zoom_my_notes', 'create_time', sinds), await zoekAlles('zoom_meeting', 'meeting_start_time', sinds)]
   rapport.notes_gezien = notes.length
@@ -275,6 +285,7 @@ async function main() {
 
   const haalNotes = async (lijst) => {
     for (let i = 0; i < lijst.length; i += NOTES_PER_RONDE) {
+      sessieNogGeldig()
       const deel = lijst.slice(i, i + NOTES_PER_RONDE)
       const open = new Map(deel.map(n => [n.file_id, n]))
       const res = await zoomRonde('my_notes_get_note_content', deel.map(n => ({ noteId: n.file_id, include: 'transcript' })))
@@ -297,15 +308,16 @@ async function main() {
   rapport.notes_nieuwste = notes.map(n => n.create_time).sort().at(-1) || null
   await haalNotes(teHalen.slice(0, MAX))
 
-  // ---------- Controle meetings buiten My Notes (alleen eenmalig) ----------
-  if (volledig) {
+  // ---------- Meetings zonder gevonden note nalopen ----------
+  {
     const gekoppeld = new Set(noteMeeting.values())
     const rest = meetings.filter(m => !gekoppeld.has(m.meeting_uuid))
     const c = { totaal: meetings.length, has_transcript_vlag: meetings.filter(m => m.has_transcript).length, has_recording_vlag: meetings.filter(m => m.has_recording).length,
       gekoppeld_op_tijd_en_titel: gekoppeld.size, nagelopen_via_assets: 0, geen_toegang_of_fout: 0, met_note_bekend: 0, met_note_onbekend: 0,
-      met_meeting_summary: 0, met_recording: 0, zonder_iets: 0 }
+      met_meeting_summary: 0, met_recording: 0, zonder_iets: 0, zonder_note_met_transcript_vlag: 0 }
     const onbekend = new Map()
     for (let i = 0; i < rest.length; i += MEETINGS_PER_RONDE) {
+      sessieNogGeldig()
       const deel = rest.slice(i, i + MEETINGS_PER_RONDE)
       const res = await zoomRonde('get_meeting_assets', deel.map(m => ({ meetingId: m.meeting_uuid })))
         .catch(e => { fouten.push(`ronde assets: ${e.message}`); return [] })
@@ -323,7 +335,10 @@ async function main() {
             c.met_note_onbekend++
             onbekend.set(fileId, { file_id: fileId, title: r.data.topic, create_time: r.data.start_time, modify_time: r.data.start_time, link: r.data.my_notes.file_link })
           }
-        } else if (!heeftSummary && !heeftOpname) c.zonder_iets++
+        } else {
+          if (!heeftSummary && !heeftOpname) c.zonder_iets++
+          if (meetingPerUuid.get(r.input.meetingId)?.has_transcript) c.zonder_note_met_transcript_vlag++
+        }
       }
     }
     rapport.meetings = c
