@@ -38,6 +38,15 @@
 // (dus ook geen databasewijzigingen). Wijzigingen staan als actie in Gino's
 // antwoord; deze PA voert ze uit via de RPC's in business-os-wijzigingen.sql,
 // die zelf de bewaakte lijst controleren (voerActiesUit).
+//
+// Toestemmingsvragen (3 nov 2026): wat niet op de lijst staat wordt niet meer
+// stil geweigerd. Claude Code krijgt --permission-prompt-tool met een kleine
+// MCP-server (gino-toestemming-mcp.mjs), die het via POST /toestemming op het
+// lokale loket aan deze PA vraagt. Volgorde: harde blokkade (gino-blokkade.mjs,
+// geen knop) → eigen lijst Altijd toestaan → kaart in de chat + push aan Kersten,
+// wachten tot 30 min (de opdrachtklok staat dan stil). Weigert de SQL of de
+// zelftest: dan blijft alles als voorheen (toestemmingAan = false). Groeirondes
+// vragen nooit: daar kijkt niemand mee.
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -49,6 +58,7 @@ import readline from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
+import { gewoneTaal, hardeBlokkade, kaartInvoer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 process.chdir(MAP)
@@ -127,7 +137,20 @@ const GINO_MAP = path.join(HOME, 'Gino')
 fs.mkdirSync(GINO_MAP, { recursive: true })
 const EIGEN_ARGS = ['--add-dir', ...EIGEN_MAPPEN, GINO_MAP]
 const EIGEN_NIET_BEWERKEN = EIGEN_MAPPEN.flatMap(m => [`Edit(/${m}/**)`, `Write(/${m}/**)`, `NotebookEdit(/${m}/**)`])
-const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN]
+// De permissiecode zelf en de instellingen: nooit via een opdracht, ook niet via
+// acceptEdits. Geheimen: ook niet met Read, dat op de allow-list staat en dus niet
+// langs de permissiecode komt.
+const BLOKKADE_BESTANDEN = ['gino-blokkade.mjs', 'gino-toestemming-mcp.mjs'].map(b => path.join(MAP, 'scripts', b))
+const NIET_AANRAKEN = [
+  ...BLOKKADE_BESTANDEN.flatMap(b => [`Edit(/${b})`, `Write(/${b})`]),
+  'Bash(cp *gino-blokkade*)', 'Bash(cp *gino-toestemming-mcp*)',
+  'Edit(~/.claude/**)', 'Write(~/.claude/**)', 'Edit(./.claude/**)', 'Write(./.claude/**)',
+]
+const GEHEIMEN_NIET_LEZEN = ['Read(./.env*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.config/myarc-pa/**)']
+const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN, ...GEHEIMEN_NIET_LEZEN, ...NIET_AANRAKEN]
+// Met vragen aan: git push en rm gaan niet stil dood op een deny-regel maar komen
+// bij de permissiecode, zodat ze als 'Geblokkeerd' in de chat staan (rm in /tmp mag).
+const VERBODEN_MET_VRAGEN = VERBODEN.filter(v => v !== 'Bash(git push*)' && v !== 'Bash(rm *)')
 
 const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat. Voer hem uit in deze repo.
 - Volg CLAUDE.md (lees het eerst) en zijn memory.
@@ -146,11 +169,21 @@ UITKOMST: live | wacht_op_jou | mislukt
 NODIG: <wat Kersten nog moet doen, in één zin; leeg bij live>
 live = hij kan het nu gebruiken. wacht_op_jou = gebouwd of deels klaar, maar het werkt pas als Kersten iets doet (ook een release). mislukt = het is niet gelukt.`
 
+// Staat alleen in de opdracht als het vragen aan staat. Gaat voor de regels
+// hierboven over wat hier niet kan.
+const INSTRUCTIE_VRAGEN = `
+
+Toestemming vragen (dit gaat voor wat hierboven staat over dingen die hier niet kunnen):
+- Heb je een commando of tool nodig dat niet op de lijst staat (node scripts/pa-sql.mjs, npm run release, yt-dlp, een connector, een routine), roep het dan gewoon aan in plaats van te stoppen: Kersten krijgt een kaart in de chat met Toestaan en Afwijzen en jij wacht op zijn antwoord, zodat hij niet de terminal in hoeft. Geef bij Bash altijd een korte Nederlandse description, die leest hij.
+- Vraag één specifiek commando per keer, geen algemene toegang. npm run release alleen als de opdracht zegt dat Kersten akkoord is.
+- Afgewezen of verlopen: probeer het niet opnieuw of via een omweg; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.
+- Geblokkeerd: daar is geen knop voor (berichten aan klanten of leads, Stripe-acties, verwijderen buiten tijdelijke mappen, git push, rechten omzeilen, geheimen tonen). Nooit omzeilen; meld het bij NODIG.`
+
 // yt-transcript: alleen ondertitels van YouTube naar ~/Downloads/Creator transcripts (schrijft niets anders).
 const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)']
 // De chat past nooit zelf iets aan (dat loopt via voerActiesUit en de knoppen).
 // Hard verboden, ook als een instellingenbestand het ooit toestaat.
-const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit']
+const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit', ...GEHEIMEN_NIET_LEZEN]
 // Chat licht houden (sneller antwoord): ander model, lage effort, geen
 // MCP-servers, geen user- of local-instellingen (settings.local.json staat
 // Edit/Write/sed toe voor jouw eigen sessies) en geen skills. Inloggen blijft
@@ -163,7 +196,7 @@ const CHAT_ENV = { CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO
 const CHAT_LICHT = [
   '--model', CHAT_MODEL,
   '--effort', 'low',
-  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--strict-mcp-config',
   '--setting-sources', 'project',
   '--disable-slash-commands',
 ]
@@ -178,7 +211,7 @@ const SLIM_TOEGESTAAN = [...CHAT_TOEGESTAAN, 'WebSearch', 'WebFetch']
 const SLIM_ARGS = [
   '--model', SLIM_MODEL,
   '--effort', 'high',
-  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--strict-mcp-config',
   '--setting-sources', 'project',
   '--disable-slash-commands',
 ]

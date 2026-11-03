@@ -2290,7 +2290,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 title={open ? 'Berichten verbergen' : 'Berichten tonen'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
-                  flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
+                  flex: isMobile || macNu ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
                   background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                   fontSize: '0.75rem', fontWeight: 800,
                   color: werk || vraagNu || open ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
@@ -2312,16 +2312,19 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               </button>
               {macNu && (
                 <button type="button" data-mac-werk onClick={() => setMacOpen(o => !o)} aria-expanded={macOpen}
-                  title="Wat loopt er op je Mac?"
+                  title={opdrachtKop(macNu)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, whiteSpace: 'nowrap',
-                    flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
+                    flex: isMobile ? '0 0 auto' : '0 1 240px', maxWidth: isMobile ? '62vw' : 240,
                     background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
                     fontSize: '0.75rem', fontWeight: 800,
                   }}>
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{macNu.voortgang || opdrachtKop(macNu)}</span>
-                  <span style={{ flexShrink: 0, color: colors.textSecondary }}>
-                    {macNu.status === 'bezig' ? duurSinds(macNu) : 'in de rij'}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
+                  {/* Regel 1: de opdracht. Regel 2: hoe lang al en de stap van nu. */}
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left', lineHeight: '13px' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{opdrachtKop(macNu)}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textSecondary, fontSize: '0.7rem', fontWeight: 700 }}>
+                      {macNu.status === 'bezig' ? `Bezig · ${duurSinds(macNu)}` : 'In de rij'}{macNu.status === 'bezig' && macNu.voortgang ? ` · ${macNu.voortgang}` : ''}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
+                    </span>
                   </span>
                   <ChevronDown size={12} strokeWidth={3} color={colors.textSecondary} style={{ flexShrink: 0, transform: macOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                 </button>
@@ -2332,7 +2335,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
               <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" style={{
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile || macNu ? '0 0 auto' : '0 1 auto', overflowX: 'auto', marginLeft: 2,
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : macNu ? '1 1 auto' : '0 1 auto', overflowX: 'auto', marginLeft: macNu && !isMobile ? 12 : 2,
               }}>
                 {gesprekken.map((g, gi) => {
                   const aan = g.id === actief.id
