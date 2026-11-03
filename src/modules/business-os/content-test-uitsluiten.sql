@@ -4,7 +4,7 @@
 -- Nieuwe RPC content_stand_per_dag_v2 (zelfde uitvoer, zonder testrijen); de
 -- oude blijft staan voor oudere app-versies. De frontend (contentStatusData.js
 -- laadStandPerDag) probeert v2 en valt anders terug op v1 + zelf aftrekken.
--- NOG NIET GEDRAAID (de PA mag geen schema wijzigen).
+-- Gedraaid op 3 nov 2026.
 
 create or replace function public.content_stand_per_dag_v2(p_van date, p_tot date)
 returns table (dag date, draft int, ingepland int, gepost int, mislukt int, los_gepost int, views bigint)

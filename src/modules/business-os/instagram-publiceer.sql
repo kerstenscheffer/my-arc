@@ -110,3 +110,5 @@ begin
     left('Publiceren mislukt: ' || coalesce(new.hook, new.title, new.id::text) || ' | ' || coalesce(new.autopilot_fout, 'geen melding'), 500));
   return new;
 end $$;
+
+-- Gedraaid op 3 nov 2026 na akkoord van Kersten.
