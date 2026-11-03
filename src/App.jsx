@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import lazy from './lazyMetHerlaad'
 import LaadScherm from './components/LaadScherm'
+import { kiesPortaal } from './portaalKeuze'
 import Login from './components/Login'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -76,6 +77,17 @@ const FunnelViewer = lazy(() => import('./pages/FunnelViewer'))
 
 const db = DatabaseService
 
+// De server gaf geen antwoord op wie dit is: nooit gokken, wel opnieuw laten proberen.
+function PortaalOnbekend() {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', gap: 16 }}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>Geen verbinding</div>
+      <div style={{ color: 'rgba(255,255,255,0.6)', maxWidth: 320 }}>We konden je account niet controleren. Check je internet en probeer het opnieuw.</div>
+      <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', borderRadius: 10, border: 'none', background: '#fff', color: '#000', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Opnieuw proberen</button>
+    </div>
+  )
+}
+
 function App() {
   const currentPath = window.location.pathname
   const isFunnelRoute = currentPath.startsWith('/funnel/')
@@ -89,6 +101,8 @@ function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isClientMode, setIsClientMode] = useState(storedMode)
+  // Coachportaal alleen na een expliciet 'coach' of 'both' van de server (zie portaalKeuze.js).
+  const [magCoach, setMagCoach] = useState(false)
 
   useEffect(() => {
     // Opruimen van het oude portal-switch-lek: die knop bewaarde e-mail +
@@ -113,56 +127,27 @@ function App() {
       const currentUser = await db.getCurrentUser()
       setUser(currentUser)
 
-      // Rol-check op de server, niet op localStorage — die vlag zegt niets:
-      // de inlog op `/` zet 'm sowieso op true, ongeacht wie je bent.
-      //
-      // Dit was eerder één check: "heeft dit auth-account een clients-rij? →
-      // klant". Voor een account dat BEIDE is ging dat mis. Coach Horstink is
-      // teamlid én heeft een oude (inactieve) clients-rij op zijn naam, dus
-      // 'klant' won altijd en hij kon nooit meer bij CoachHub. De wissel-knop
-      // hielp niet: die logt in op een ánder account, en hij heeft er één.
-      //
-      // get_my_portal_role() weegt beide kanten:
-      //   'coach'  → coach-portaal afdwingen
-      //   'client' → client-portaal afdwingen
-      //   'both'   → de expliciete keuze van de wissel-knop volgen (default coach)
+      // Rol-check op de server. Direct na het opstarten of een live-update kan het
+      // netwerk nog niet klaar zijn, dus een paar keer proberen.
       if (currentUser?.id) {
-        let role = null
-        try {
-          const { data, error } = await db.supabase.rpc('get_my_portal_role')
-          if (!error) role = data
-        } catch (e) {
-          console.warn('Portal-rol ophalen mislukt:', e?.message)
+        let rol = null
+        for (const wacht of [0, 500, 1500, 3000]) {
+          if (wacht) await new Promise(r => setTimeout(r, wacht))
+          try {
+            const { data, error } = await db.supabase.rpc('get_my_portal_role')
+            if (!error && ['coach', 'client', 'both', 'none'].includes(data)) { rol = data; break }
+          } catch (e) {
+            console.warn('Portal-rol ophalen mislukt:', e?.message)
+          }
         }
-
-        if (role === 'client' || role === 'coach' || role === 'both') {
-          // Alleen bij 'both' mag de opgeslagen keuze meespelen. Bewust een
-          // aparte sleutel en niet `isClientMode`: die staat bij dubbelrol-
-          // accounts al op 'true' door de oude bug, en zou ze dus opnieuw
-          // vastzetten in het client-portaal.
-          const choice = (() => {
-            try { return localStorage.getItem('portalChoice') } catch { return null }
-          })()
-          const asClient = role === 'client' || (role === 'both' && choice === 'client')
-          setIsClientMode(asClient)
-          localStorage.setItem('isClientMode', asClient ? 'true' : 'false')
-        } else {
-          // RPC niet beschikbaar (oude DB) of 'none' → oude gedrag als vangnet.
-          const { data: clientRow } = await db.supabase
-            .from('clients')
-            .select('id')
-            .eq('auth_user_id', currentUser.id)
-            .limit(1)
-            .maybeSingle()
-          // Expliciet beide kanten zetten. Bleef dit op de opgeslagen waarde
-          // staan, dan kon een vers coach-account met een oude 'true' in
-          // localStorage alsnog in het klantportaal belanden.
-          const alsKlant = !!clientRow
-          setIsClientMode(alsKlant)
-          localStorage.setItem('isClientMode', alsKlant ? 'true' : 'false')
-        }
+        let keuze = null
+        try { keuze = localStorage.getItem('portalChoice') } catch { /* private mode */ }
+        const portaal = kiesPortaal({ rol, klantLaatst: storedMode, keuze })
+        setMagCoach(portaal === 'coach')
+        setIsClientMode(portaal === 'klant')
+        if (rol) localStorage.setItem('isClientMode', portaal === 'klant' ? 'true' : 'false')
       }
-    } catch (error) {
+    } catch {
       console.log('Not authenticated')
     }
     setLoading(false)
@@ -520,6 +505,7 @@ function App() {
       )
     } else {
       // Already logged in → Route to correct dashboard
+      if (!isClientMode && !magCoach) return <PortaalOnbekend />
       if (isClientMode) {
         return (
           <LanguageProvider>
@@ -566,6 +552,7 @@ function App() {
   }
 
   // Dashboard routing based on mode (fallback for authenticated users)
+  if (!isClientMode && !magCoach) return <PortaalOnbekend />
   if (isClientMode) {
     return (
       <LanguageProvider>
