@@ -8,6 +8,7 @@ import {
   RGBLuminanceSource, HybridBinarizer, BinaryBitmap,
 } from '@zxing/library'
 import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine } from 'lucide-react'
+import { leesBarcodeUitFoto } from './leesBarcodeUitFoto'
 
 const G = {
   primary: '#FFD700',
@@ -29,6 +30,9 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const [torchEnabled, setTorchEnabled] = useState(false)
   const [visible, setVisible] = useState(false)
   const [scanTime, setScanTime] = useState(0)
+  const fotoRef = useRef(null)
+  const [fotoLezen, setFotoLezen] = useState(false)
+  const [fotoFout, setFotoFout] = useState(false)
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
@@ -238,6 +242,24 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
     if (manualBarcode.trim() && manualBarcode.length >= 8) {
       if (window.navigator.vibrate) window.navigator.vibrate(50)
       onScan(manualBarcode.trim())
+    }
+  }
+
+  const kiesFoto = async (e) => {
+    const bestand = e.target.files?.[0]
+    e.target.value = ''
+    if (!bestand) return
+    setFotoFout(false)
+    setFotoLezen(true)
+    try {
+      const code = await leesBarcodeUitFoto(bestand)
+      if (code) handleScanSuccess(code)
+      else setFotoFout(true)
+    } catch (err) {
+      console.warn('Foto van barcode niet gelezen:', err?.message)
+      setFotoFout(true)
+    } finally {
+      setFotoLezen(false)
     }
   }
 
@@ -455,10 +477,35 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
           }}>
             Barcode invoeren
           </div>
+          {status === 'error' && (
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', marginBottom: '0.5rem', textAlign: 'center' }}>
+              De live camera opent niet op dit toestel. Maak een foto van de barcode.
+            </div>
+          )}
+
+          {/* Foto via de camera-app: werkt ook als de live camera niet opent. */}
+          <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={kiesFoto} style={{ display: 'none' }} />
+          <button onClick={() => fotoRef.current?.click()} disabled={fotoLezen}
+            style={{
+              width: '100%', maxWidth: '300px', minHeight: '48px', marginTop: '0.5rem',
+              background: '#fff', border: 'none', borderRadius: '10px', color: '#000',
+              fontSize: '0.9rem', fontWeight: '800', fontFamily: 'inherit',
+              cursor: fotoLezen ? 'wait' : 'pointer', opacity: fotoLezen ? 0.6 : 1, touchAction: 'manipulation',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            }}
+          >
+            <Camera size={17} strokeWidth={2.6} /> {fotoLezen ? 'Foto lezen…' : 'Foto van barcode maken'}
+          </button>
+          {fotoFout && (
+            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff', marginTop: '0.6rem', textAlign: 'center', maxWidth: '300px' }}>
+              Geen barcode gevonden. Maak de foto wat dichterbij en scherp, of typ de cijfers.
+            </div>
+          )}
+
           <div style={{
-            fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1.5rem', textAlign: 'center'
+            fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: '1.1rem 0 0.75rem', textAlign: 'center'
           }}>
-            Typ de cijfers onder de streepjescode
+            Of typ de cijfers onder de streepjescode
           </div>
 
           <input
@@ -467,7 +514,6 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
             onChange={(e) => setManualBarcode(e.target.value.replace(/[^0-9]/g, ''))}
             onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
             placeholder="8710400000000"
-            autoFocus
             style={{
               width: '100%', maxWidth: '300px', height: '52px',
               background: 'rgba(255,255,255,0.06)',

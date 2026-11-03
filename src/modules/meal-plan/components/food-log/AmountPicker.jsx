@@ -681,10 +681,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
                 color: '#fff', fontSize: '16px', fontWeight: 800, fontFamily: 'inherit', textAlign: 'center',
               }}
             />
-            g totaal
+            g {Number(gewicht.totaal) > 0 ? 'gewogen' : 'rauw gewicht'}
           </div>
           <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
-            Gebakken of gekookt? Weeg het geheel en vul dat in.
+            {Number(gewicht.totaal) > 0 ? 'Jouw eindgewicht van het hele recept.' : 'Eindgewicht gewogen na bakken of koken? Vul het hier in.'}
           </div>
         </div>
       )}
