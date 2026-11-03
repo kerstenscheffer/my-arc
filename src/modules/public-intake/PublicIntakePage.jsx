@@ -7,6 +7,12 @@ import BetalingGelukt from '../../components/BetalingGelukt'
 import DatabaseService from '../../services/DatabaseService'
 import { findClient, updateClient, saveBaseline, ensureClient } from '../../lib/publicIntakeApi'
 
+const ACCOUNT_KEY = 'myarc_intake_account'
+const APP_LINKS = [
+  ['App Store', 'https://apps.apple.com/nl/app/my-arc/id6764539959'],
+  ['Google Play', 'https://play.google.com/store/apps/details?id=com.myarcfitness.app'],
+]
+
 const supabase = DatabaseService.supabase
 
 const isMobileCheck = () => window.innerWidth <= 768
@@ -279,7 +285,13 @@ export default function PublicIntakePage() {
   const [errorType, setErrorType] = useState(null)
   // Gezet als deze intake zojuist een account heeft aangemaakt: dan vertellen
   // we dat de klant een mail krijgt om zijn wachtwoord in te stellen.
-  const [accountInfo, setAccountInfo] = useState(null)
+  // Bewaard op dit apparaat: de voedingsintake is een aparte pagina, en het
+  // eindscherm moet de inloggegevens nog kunnen tonen.
+  const [accountInfo, zetAccountInfo] = useState(() => { try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY)) } catch { return null } })
+  const setAccountInfo = (info) => {
+    zetAccountInfo(info)
+    try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(info)) } catch { /* alleen gemak */ }
+  }
   const [intakeId, setIntakeId]   = useState(null)
 
   useEffect(() => {
@@ -841,6 +853,28 @@ export default function PublicIntakePage() {
           </div>
           <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, marginBottom: '2rem' }}>
             Je coach heeft nu alle informatie om jouw persoonlijke plan te maken.
+          </div>
+
+          {/* Inloggen */}
+          <div style={{ marginBottom: '1.5rem', padding: '1rem', borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', textAlign: 'left' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem' }}>Inloggen op de app</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.5rem 0', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>E-mail</span>
+              <strong style={{ color: '#fff', minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>{accountInfo?.email || personalData.email}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.5rem 0', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>Wachtwoord</span>
+              {accountInfo?.wachtwoord
+                ? <strong style={{ color: '#fff', fontFamily: 'ui-monospace, monospace' }}>{accountInfo.wachtwoord}</strong>
+                : <span style={{ fontWeight: 700, color: '#fff', textAlign: 'right' }}>Je eigen wachtwoord. Vergeten? Kies op het inlogscherm voor wachtwoord vergeten.</span>}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+              {APP_LINKS.map(([naam, url]) => (
+                <a key={naam} href={url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: '0.85rem 0.5rem', borderRadius: 12, background: '#fff', color: '#000', fontSize: '0.85rem', fontWeight: 900, textAlign: 'center', textDecoration: 'none' }}>
+                  {naam}
+                </a>
+              ))}
+            </div>
           </div>
 
           {/* Missie kaart */}
