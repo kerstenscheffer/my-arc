@@ -1556,7 +1556,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
         const tekst = data.uitkomst === 'wacht_op_jou' ? `Wacht op jou: ${data.nodig || 'bekijk resultaat'}` : laatstGedaanRegel(data)
         // vol: de hele tekst voor de stem; de regel zelf is ingekort tot ~60 tekens.
         const vol = data.resultaat?.trim() || `Gino deed: ${data.opdracht || ''}`
-        if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at ? o : { tekst, vol, klaar_at: data.klaar_at }))
+        // Ook de tekst vergelijken: 'Wacht op jou' verdwijnt zodra de opdracht is afgehandeld.
+        if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at && o?.tekst === tekst ? o : { tekst, vol, klaar_at: data.klaar_at }))
       }, () => {})
     haalLaatst()
     const t = setInterval(haalLaatst, 15000)
