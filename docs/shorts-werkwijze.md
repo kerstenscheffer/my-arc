@@ -11,7 +11,7 @@ Standaard twee per week: dinsdag en donderdag om 18:00, aansluitend op het laats
 1. `node scripts/reel-gino.mjs shorts` toont de open shorts met hun datum. Neem ze van boven naar beneden, tenzij hij oefeningen noemt.
 2. Schrijf per short de caption met Write naar `~/Gino/yt-shorts/<id>/caption.txt`, in het format hieronder.
 3. **Eén of een paar shorts:** `node scripts/reel-gino.mjs short <id> --datum <datum uit stap 1>` met Bash-timeout 600000.
-   **Alle of veel shorts:** schrijf 8 captions en draai `node scripts/reel-gino.mjs reeks` met Bash-timeout 600000. Die doet de volgende 8 met caption en kiest zelf de datums. Herhaal tot `nog_open` 0 is. Een lopende run die stopt, kan later gewoon verder: klare shorts slaat hij over.
+   **Alle of veel shorts:** schrijf 8 captions en draai `node scripts/reel-gino.mjs reeks --ronde 1` met Bash-timeout 600000, daarna `--ronde 2` enzovoort (hetzelfde commando herhalen ziet de waakhond als vastlopen). Die doet de volgende 8 met caption en kiest zelf de datums. Herhaal tot `nog_open` 0 is. Een lopende run die stopt, kan later gewoon verder: klare shorts slaat hij over.
 
 Download, upload en concept zitten in deze commando's. Ze vragen geen toestemming.
 

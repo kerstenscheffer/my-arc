@@ -208,15 +208,15 @@ const shortConcepten = () => shortLijst().flatMap((s) => {
   return fs.existsSync(f) ? [JSON.parse(fs.readFileSync(f, 'utf8'))] : []
 })
 
-// Twee per week: dinsdag en donderdag om 18:00, na het laatste concept en nooit vandaag of eerder.
+// Twee per week: de eerstvolgende vrije dinsdag en donderdag om 18:00, vanaf morgen. Een gat door een mislukte short vult hij op.
 function volgendeDatums(aantal) {
-  const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
-  const laatste = shortConcepten().map(c => c.datum.slice(0, 10)).sort().at(-1) || vandaag
-  const d = new Date(`${laatste > vandaag ? laatste : vandaag}T12:00:00Z`)
+  const bezet = new Set(shortConcepten().map(c => c.datum.slice(0, 10)))
+  const d = new Date(`${new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })}T12:00:00Z`)
   const uit = []
   while (uit.length < aantal) {
     d.setUTCDate(d.getUTCDate() + 1)
-    if ([2, 4].includes(d.getUTCDay())) uit.push(`${d.toISOString().slice(0, 10)}T18:00`)
+    const dag = d.toISOString().slice(0, 10)
+    if ([2, 4].includes(d.getUTCDay()) && !bezet.has(dag)) uit.push(`${dag}T18:00`)
   }
   return uit
 }
@@ -240,10 +240,9 @@ function schrijfOverzicht() {
 // Eigen proces per short: één mislukte houdt de rest niet tegen. Maximaal 8: past binnen de Bash-timeout.
 async function reeks() {
   const klaar = shortsOpen().filter(s => fs.existsSync(path.join(SHORTS, s.id, 'caption.txt'))).slice(0, 8)
-  const datums = volgendeDatums(klaar.length)
   const resultaat = []
-  for (const [i, s] of klaar.entries()) {
-    const r = await run(process.execPath, [new URL(import.meta.url).pathname, 'short', s.id, '--datum', datums[i]], { timeout: 4 * 60 * 1000 }).then(x => x.stdout, e => e.stdout || String(e.message))
+  for (const s of klaar) {
+    const r = await run(process.execPath, [new URL(import.meta.url).pathname, 'short', s.id, '--datum', volgendeDatums(1)[0]], { timeout: 4 * 60 * 1000 }).then(x => x.stdout, e => e.stdout || String(e.message))
     let u
     try { u = JSON.parse(r) } catch { u = { fout: r.slice(0, 300) } }
     resultaat.push(u.fout ? { id: s.id, titel: s.titel, fout: u.fout } : { titel: s.titel, datum: u.datum })
@@ -274,6 +273,14 @@ async function short(id) {
   const sporen = JSON.parse(stdout).streams
   const beeld = sporen.find(x => x.codec_type === 'video'), geluid = sporen.find(x => x.codec_type === 'audio')
   if (beeld?.codec_name !== 'h264' || geluid?.codec_name !== 'aac' || beeld.height <= beeld.width) stop(`Video niet geschikt voor een reel: ${stdout.replace(/\s+/g, ' ').slice(0, 300)}`)
+  // Grote bestanden breken de upload af (EPIPE, gezien vanaf 32 MB): verklein tot onder de 24 MB.
+  if (fs.statSync(mp4).size > 24e6) {
+    const { stdout: duur } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4])
+    const kbps = Math.floor((23e6 * 8) / Number(duur) / 1000) - 130
+    const klein = path.join(m, 'klein.mp4')
+    await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', mp4, '-c:v', 'h264_videotoolbox', '-b:v', `${kbps}k`, '-c:a', 'copy', '-movflags', '+faststart', klein], { timeout: 4 * 60 * 1000 })
+    fs.renameSync(klein, mp4)
+  }
   const omslag = path.join(m, 'cover.jpg')
   await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', mp4, '-frames:v', '1', '-q:v', '3', omslag])
   const pad = `short-${id.replace(/[^\w-]/g, '_')}`
