@@ -58,7 +58,7 @@ import readline from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
-import { gewoneTaal, hardeBlokkade, kaartInvoer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
+import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 process.chdir(MAP)
@@ -144,7 +144,7 @@ const BLOKKADE_BESTANDEN = ['gino-blokkade.mjs', 'gino-toestemming-mcp.mjs'].map
 const NIET_AANRAKEN = [
   ...BLOKKADE_BESTANDEN.flatMap(b => [`Edit(/${b})`, `Write(/${b})`]),
   'Bash(cp *gino-blokkade*)', 'Bash(cp *gino-toestemming-mcp*)',
-  'Edit(~/.claude/**)', 'Write(~/.claude/**)', 'Edit(./.claude/**)', 'Write(./.claude/**)',
+  'Edit(~/.claude/settings*)', 'Write(~/.claude/settings*)', 'Edit(./.claude/settings*)', 'Write(./.claude/settings*)',
 ]
 const GEHEIMEN_NIET_LEZEN = ['Read(./.env*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.config/myarc-pa/**)']
 const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN, ...GEHEIMEN_NIET_LEZEN, ...NIET_AANRAKEN]
@@ -227,6 +227,180 @@ const bewaarSlimSessie = (id) => {
 // op 'gestopt'; Realtime (of het pollen) roept dan deze stop aan.
 const lopend = new Map()
 
+// ── Toestemmingsvragen ──
+const POORT = 47615
+const VRAAG_TOOL = 'mcp__gino__toestemming'
+const VRAAG_SERVER = path.join(MAP, 'scripts', 'gino-toestemming-mcp.mjs')
+const VRAAG_MS = Number(process.env.PA_TOESTEMMING_MS) || 30 * 60 * 1000
+let toestemmingAan = false
+// Per Claude-proces een eigen sleutel → welke opdracht en welke klok erbij horen.
+const vraagProcessen = new Map()
+const openVragen = new Map() // rij-id → sluit(status)
+
+function nieuweVraagContext(opdrachtId = null) {
+  const ctx = { sleutel: crypto.randomBytes(24).toString('hex'), opdrachtId, klok: null, wacht: 0 }
+  vraagProcessen.set(ctx.sleutel, ctx)
+  return ctx
+}
+const vraagMcp = (ctx) => JSON.stringify({ mcpServers: { gino: {
+  type: 'stdio', command: process.execPath, args: [VRAAG_SERVER],
+  env: { GINO_TOKEN: ctx.sleutel, GINO_POORT: String(POORT) },
+} } })
+// Lukt het starten van de vraag-tool niet, dan terug naar stil weigeren: anders
+// valt elke chat en opdracht om.
+const vraagToolKapot = (fout) => {
+  if (!toestemmingAan || !/permission-prompt-tool|mcp__gino/i.test(fout || '')) return
+  toestemmingAan = false
+  console.error(tijd(), 'Toestemmingsvragen uitgezet, de vraag-tool start niet:', String(fout).slice(0, 300))
+}
+
+// Klok die stilstaat zolang Kersten aan zet is (ook bij meerdere vragen tegelijk).
+function maakKlok(ms, actie) {
+  let t = null, rest = ms, sinds = 0, uit = false
+  const loop = () => { sinds = Date.now(); t = setTimeout(actie, Math.max(rest, 1000)) }
+  loop()
+  return {
+    pauze() { if (!t) return; clearTimeout(t); t = null; rest -= Date.now() - sinds },
+    verder() { if (!t && !uit) loop() },
+    stop() { clearTimeout(t); t = null; uit = true },
+  }
+}
+
+const weigerTool = (message) => ({ behavior: 'deny', message })
+
+// Vraag afsluiten als 'verlopen'; had Kersten net beslist, dan telt zijn besluit.
+async function sluitVraagVerlopen(id) {
+  const { data } = await sb.from('business_os_toestemmingen')
+    .update({ status: 'verlopen', beslist_at: new Date().toISOString() })
+    .eq('id', id).eq('status', 'wacht').select('id').then(r => r, () => ({ data: null }))
+  if (data?.length) return 'verlopen'
+  const { data: rij } = await sb.from('business_os_toestemmingen').select('status').eq('id', id).maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  return rij?.status && rij.status !== 'wacht' ? rij.status : 'verlopen'
+}
+
+function wachtOpBesluit(ctx, id, opGesloten) {
+  ctx.wacht++
+  ctx.klok?.pauze()
+  return new Promise((klaar) => {
+    const sluit = (status) => {
+      if (!openVragen.has(id)) return
+      openVragen.delete(id)
+      clearTimeout(tik)
+      if (--ctx.wacht === 0) ctx.klok?.verder()
+      klaar(status)
+    }
+    const eindig = () => sluitVraagVerlopen(id).then(sluit, () => sluit('verlopen'))
+    const tik = setTimeout(eindig, VRAAG_MS)
+    openVragen.set(id, sluit)
+    opGesloten(eindig) // opdracht gestopt of Claude weg
+  })
+}
+
+// Het hele besluit. Geeft terug wat Claude Code verwacht: allow met de originele
+// invoer, of deny met een boodschap die Gino leest.
+async function besluitTool(ctx, tool, invoer, opGesloten) {
+  if (!gebruiker || !toestemmingAan || !ctx?.opdrachtId) return weigerTool('Geweigerd: nu kan er geen toestemming gevraagd worden.')
+  const toegestaan = { behavior: 'allow', updatedInput: invoer }
+  const basis = { coach_id: gebruiker.id, opdracht_id: ctx.opdrachtId, tool, invoer: kaartInvoer(tool, invoer), reden: gewoneTaal(tool, invoer) }
+
+  // 1. Harde blokkade: geen knop, ook niet via een regel. Alleen tonen.
+  const blok = hardeBlokkade(tool, invoer)
+  if (blok) {
+    await sb.from('business_os_toestemmingen').insert({ ...basis, status: 'geblokkeerd', reden: `${basis.reden} · ${blok.reden}`, beslist_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) console.error(tijd(), 'Blokkade opslaan mislukt:', error.message) }, () => {})
+    console.log(`${tijd()} ⛔ geblokkeerd (${blok.soort}): ${tool}`)
+    return weigerTool(`Geblokkeerd: ${blok.reden}. Hier is geen knop voor en Kersten kan dit hier niet toestaan. Probeer het niet op een andere manier; zet bij NODIG wat hij zelf moet doen.`)
+  }
+
+  // 2. Eigen lijst. patroonVoor is streng: alleen precies dezelfde vorm past.
+  const patroon = patroonVoor(tool, invoer)
+  if (patroon) {
+    const { data: regel } = await sb.from('business_os_toestemming_regels').select('id')
+      .eq('patroon', patroon).eq('actief', true).limit(1).then(r => r, () => ({ data: null }))
+    if (regel?.length) {
+      sb.from('business_os_toestemming_regels').update({ laatst_gebruikt_at: new Date().toISOString() }).eq('id', regel[0].id).then(() => {}, () => {})
+      return toegestaan
+    }
+  }
+
+  // 3. Kaart in de chat + push naar alleen Kersten (bestaande coach-push: trigger op
+  // coach_notifications, ontvanger = coach_id; rij zonder client_id, type personal).
+  const { data: rij, error } = await sb.from('business_os_toestemmingen').insert({ ...basis, patroon, status: 'wacht' }).select('id').single()
+  if (error) return weigerTool(`Geweigerd: toestemming vragen lukte niet (${error.message}). Zet bij NODIG wat er nodig is.`)
+  console.log(`${tijd()} ✋ toestemming gevraagd: ${basis.reden}`)
+  sb.from('coach_notifications').insert({
+    coach_id: gebruiker.id, type: 'personal', priority: 'high', title: 'Gino vraagt toestemming',
+    message: `${basis.reden}`.slice(0, 140), tags: ['gino'], action_data: { soort: 'gino_toestemming', toestemming_id: rij.id },
+  }).then(({ error: e }) => { if (e) console.error(tijd(), 'Push mislukt:', e.message) }, () => {})
+  sb.from('business_os_opdrachten').update({ voortgang: 'Wacht op je toestemming' }).eq('id', ctx.opdrachtId).eq('status', 'bezig').then(() => {}, () => {})
+
+  const status = await wachtOpBesluit(ctx, rij.id, opGesloten)
+  console.log(`${tijd()} ✋ ${status}: ${tool}`)
+  sb.from('business_os_opdrachten').update({ voortgang: null }).eq('id', ctx.opdrachtId).eq('status', 'bezig').then(() => {}, () => {})
+  if (status === 'altijd' && patroon && patroonMagVast(patroon)) {
+    const { error: e } = await sb.from('business_os_toestemming_regels')
+      .insert({ coach_id: gebruiker.id, patroon, tool, reden: basis.reden, toestemming_id: rij.id })
+      .then(r => r, (x) => ({ error: x }))
+    if (e && e.code !== '23505') console.error(tijd(), 'Regel opslaan mislukt:', e.message)
+  }
+  if (status === 'toegestaan' || status === 'altijd') return toegestaan
+  if (status === 'afgewezen') return weigerTool('Kersten heeft dit afgewezen. Probeer het niet opnieuw of via een omweg; ga door met wat wel kan en meld dit in je samenvatting.')
+  return weigerTool(`Geen antwoord van Kersten binnen ${Math.round(VRAAG_MS / 60000)} minuten, dus geweigerd. Probeer het niet opnieuw; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.`)
+}
+
+// Loket: alleen met de sleutel van een lopend Claude-proces. De verbinding blijft
+// open tot er een besluit is; valt hij weg (Claude gestopt), dan sluiten we de vraag.
+async function toestemmingVerzoek(req, res, stuur) {
+  const ctx = vraagProcessen.get(String(req.headers['x-gino-token'] || ''))
+  if (!ctx) return stuur(403, weigerTool('Geweigerd: onbekend proces.'))
+  let body = ''
+  for await (const d of req) { body += d; if (body.length > 500000) return stuur(413, weigerTool('Geweigerd: invoer te groot.')) }
+  let afsluiten = null
+  res.on('close', () => { if (!res.writableEnded) afsluiten?.() })
+  try {
+    const { tool_name, input } = JSON.parse(body || '{}')
+    stuur(200, await besluitTool(ctx, String(tool_name || ''), input && typeof input === 'object' ? input : {}, (f) => { afsluiten = f }))
+  } catch (e) {
+    stuur(200, weigerTool(`Geweigerd: ${e.message}`))
+  }
+}
+
+// Eén keer bij het starten en daarna elke 5 min tot het aan staat, zodat de SQL
+// draaien genoeg is. Oude vragen van een vorige PA worden hier netjes afgesloten.
+let vraagKanaal = null
+async function zetVragenAan() {
+  if (toestemmingAan || !gebruiker) return
+  const fouten = zelftest()
+  if (fouten.length) return console.error(tijd(), 'Toestemmingsvragen uit, zelftest faalt:', fouten.join(' | '))
+  const { error } = await sb.from('business_os_toestemmingen').select('id').limit(1).then(r => r, (e) => ({ error: e }))
+  if (error) return console.log(`${tijd()} Toestemmingsvragen nog uit: ${error.message}`)
+  toestemmingAan = true
+  console.log(`${tijd()} Toestemmingsvragen aan`)
+  if (!openVragen.size) {
+    await sb.from('business_os_toestemmingen').update({ status: 'verlopen', beslist_at: new Date().toISOString() })
+      .eq('status', 'wacht').then(() => {}, () => {})
+  }
+  // Eigen kanaal: een tabel die (nog) niet bestaat mag het opdrachtenkanaal niet raken.
+  if (!vraagKanaal) vraagKanaal = sb.channel('pa-toestemmingen')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_os_toestemmingen' }, (m) => {
+      if (m.new?.status && m.new.status !== 'wacht') openVragen.get(m.new.id)?.(m.new.status)
+    })
+    .subscribe()
+  // Het klaarstaande chatproces kent de vraag-tool nog niet.
+  if (warm && !warm.dood) warm.p.kill()
+  warm = null
+  zetWarmKlaar()
+}
+setInterval(() => zetVragenAan().catch(e => console.error(tijd(), e.message)), 5 * 60 * 1000)
+// Vangnet naast Realtime: elke 3 s de open vragen nalezen.
+setInterval(async () => {
+  if (!openVragen.size || !gebruiker) return
+  const { data } = await sb.from('business_os_toestemmingen').select('id, status')
+    .in('id', [...openVragen.keys()]).neq('status', 'wacht').then(r => r, () => ({ data: null }))
+  for (const r of data || []) openVragen.get(r.id)?.(r.status)
+}, 3000)
+
 // opStop(fn): krijgt de functie die dit proces (en alles wat het startte) stopt.
 // Korte zin over wat een opdracht nu doet, voor de statusregel in Business OS.
 function stapTekst({ name, input = {} }) {
@@ -235,7 +409,7 @@ function stapTekst({ name, input = {} }) {
   if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return `Past ${bestand(input.file_path)} aan`
   if (name === 'Grep') return `Zoekt "${String(input.pattern || '').slice(0, 40)}"`
   if (name === 'Glob') return 'Zoekt bestanden'
-  if (name === 'Bash') return String(input.description || input.command || 'Draait een commando').split('\n')[0].slice(0, 80)
+  if (name === 'Bash') return maskeer(String(input.description || input.command || 'Draait een commando').split('\n')[0]).slice(0, 80)
   if (name === 'WebSearch') return `Zoekt online: ${String(input.query || '').slice(0, 50)}`
   if (name === 'WebFetch') return 'Leest een webpagina'
   return null
@@ -249,7 +423,8 @@ function wakkerTijdens(werk) {
 }
 
 // opStap: met stream-json meelezen welke tool er loopt.
-function claude(args, extraEnv = {}, opStop = null, opStap = null) {
+// ctx: toestemmingscontext; de klok staat stil zolang Kersten aan zet is.
+function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
   return new Promise((klaar) => {
     const p = spawn('claude', args, { cwd: MAP, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...extraEnv } })
     // Stoppen: eerst de commando's die Claude startte (build, lint…), dan Claude zelf.
@@ -278,9 +453,11 @@ function claude(args, extraEnv = {}, opStop = null, opStap = null) {
       regels.forEach(regel)
     })
     p.stderr.on('data', d => { fout += d })
-    const stop = setTimeout(() => p.kill('SIGTERM'), 30 * 60 * 1000)
+    const stop = maakKlok(30 * 60 * 1000, () => p.kill('SIGTERM'))
+    if (ctx) ctx.klok = stop
     p.on('close', (code) => {
-      clearTimeout(stop)
+      stop.stop()
+      if (ctx) { vraagProcessen.delete(ctx.sleutel); vraagToolKapot(fout) }
       if (rest) regel(rest)
       let json = slot
       if (!opStap) { try { json = JSON.parse(uit) } catch { /* geen JSON */ } }
@@ -312,7 +489,7 @@ async function macWerkVoorChat() {
     `- [${r.uitkomst || r.status}${r.nodig ? ` (nodig: ${r.nodig})` : ''}${r.klaar_at ? ` ${t(r.klaar_at)}` : ` sinds ${t(r.created_at)}`}] ${String(r.opdracht || '').split('\n')[0].slice(0, 200)}${r.resultaat ? `\n  Uitkomst: ${r.resultaat.slice(0, 1500).replace(/\n+/g, ' ')}` : ''}`).join('\n')}\n\n`
 }
 
-async function voerCodeUit(opdracht, opStop, opStap) {
+async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
   // Correcties, besluiten en voorkeuren uit Gino's geheugen gelden ook hier.
   const { data: geheugen } = await sb.from('business_os_geheugen').select('soort, tekst')
     .eq('actief', true).in('soort', ['correctie', 'besluit', 'voorkeur']).order('created_at').limit(60)
@@ -320,16 +497,22 @@ async function voerCodeUit(opdracht, opStop, opStap) {
   const regels = (geheugen || []).length
     ? `\n\nWat Kersten eerder besliste of corrigeerde (houd je hieraan):\n${geheugen.map(g => `- ${g.tekst}`).join('\n')}`
     : ''
+  const ctx = toestemmingAan && rijId ? nieuweVraagContext(rijId) : null
   const r = await claude([
-    '-p', `${INSTRUCTIE}${regels}\n\nOpdracht:\n${opdracht}`,
+    '-p', `${INSTRUCTIE}${ctx ? INSTRUCTIE_VRAGEN : ''}${regels}\n\nOpdracht:\n${opdracht}`,
     '--output-format', 'stream-json', '--verbose',
     '--model', 'opus', '--effort', 'high',
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
-    '--disallowedTools', VERBODEN.join(','),
+    '--disallowedTools', (ctx ? VERBODEN_MET_VRAGEN : VERBODEN).join(','),
+    // --setting-sources project is onmisbaar: settings.local.json staat o.a. node *,
+    // curl *, git push * en execute_sql toe. Alles op een allow-lijst slaat de
+    // permissiecode over, dus dan gold de harde blokkade daar niet. CLAUDE.md en
+    // memory blijven gewoon laden (zelfde vlag als Slim).
+    ...(ctx ? ['--setting-sources', 'project', '--mcp-config', vraagMcp(ctx), '--permission-prompt-tool', VRAAG_TOOL] : []),
     ...EIGEN_ARGS,
     '--max-budget-usd', '10',
-  ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap)
+  ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap, ctx)
   const ruw = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
   // De afsluitregels zijn voor het systeem; Kersten leest de samenvatting.
   const uitkomst = ruw.match(/^UITKOMST:\s*(live|wacht_op_jou|mislukt)\s*$/im)?.[1]?.toLowerCase() || null
@@ -346,7 +529,7 @@ async function voerCodeUit(opdracht, opStop, opStap) {
 const WARM_MAX_MS = 20 * 60 * 1000
 let warm = null
 
-// slim = { id, hervat } → Slim-proces voor dat gesprek; anders een Snel-proces.
+// slim = { id, hervat, zonderVragen } → Slim-proces voor dat gesprek; anders een Snel-proces.
 async function maakWarm(slim = null) {
   const [{ data: skills }, { data: geheugen }] = await Promise.all([
     sb.from('business_os_skills').select('naam, wanneer, instructies').eq('actief', true).order('naam'),
@@ -358,25 +541,30 @@ async function maakWarm(slim = null) {
   if (session && session.expires_at * 1000 - Date.now() < 30 * 60 * 1000) {
     session = (await sb.auth.refreshSession()).data.session || session
   }
+  // dontAsk weigert zonder de vraag-tool aan te roepen, dus met vragen: default.
+  // Groeirondes vragen nooit: daar kijkt niemand mee.
+  const ctx = toestemmingAan && !slim?.zonderVragen ? nieuweVraagContext() : null
   const basis = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-    '--permission-mode', 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS]
+    '--permission-mode', ctx ? 'default' : 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS,
+    '--mcp-config', ctx ? vraagMcp(ctx) : '{"mcpServers":{}}', ...(ctx ? ['--permission-prompt-tool', VRAAG_TOOL] : [])]
+  const prompt = chatPrompt({ skills: skills || [], geheugen: geheugen || [], vragen: !!ctx })
   const args = slim ? [
     ...basis,
-    '--append-system-prompt', chatPrompt({ skills: skills || [], geheugen: geheugen || [] }),
+    '--append-system-prompt', prompt,
     '--allowedTools', SLIM_TOEGESTAAN.join(','),
     ...(slim.hervat ? ['--resume', slim.id] : ['--session-id', slim.id]),
     '--max-budget-usd', '10',
     ...SLIM_ARGS,
   ] : [
     ...basis,
-    '--system-prompt', chatPrompt({ skills: skills || [], geheugen: geheugen || [] }),
+    '--system-prompt', prompt,
     '--allowedTools', CHAT_TOEGESTAAN.join(','),
     '--no-session-persistence',
     '--max-budget-usd', '3',
     ...CHAT_LICHT,
   ]
   const p = spawn('claude', args, { cwd: MAP, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...(slim ? {} : CHAT_ENV), PA_ACCESS_TOKEN: session?.access_token || '' } })
-  const w = { p, sinds: Date.now(), dood: false, regels: [] }
+  const w = { p, sinds: Date.now(), dood: false, regels: [], ctx }
   let buf = ''
   p.stdout.on('data', d => {
     buf += d
@@ -390,7 +578,11 @@ async function maakWarm(slim = null) {
     }
   })
   p.stderr.on('data', d => { w.fout = (w.fout || '') + d })
-  p.on('close', () => { w.dood = true; w.opEinde?.() })
+  p.on('close', () => {
+    w.dood = true
+    if (ctx) { vraagProcessen.delete(ctx.sleutel); vraagToolKapot(w.fout) }
+    w.opEinde?.()
+  })
   p.stdin.on('error', () => {})
   return w
 }
@@ -415,16 +607,18 @@ const KLANT_FOCUS = `Je zit in het tabje Klanten. Hier gaat het over Kerstens co
 `
 
 // opDeel(tekst): halve tekst tijdens het typen.
-async function beantwoordChat(invoer, opDeel, opStop = null) {
+// rijId: bij welke opdracht een toestemmingsvraag hoort; zonderVragen: groeironde.
+async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zonderVragen = false } = {}) {
   const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
   const hervat = !!slimId && slimSessies.has(slimId)
   let w
-  if (slimId) w = await maakWarm({ id: slimId, hervat })
+  if (slimId) w = await maakWarm({ id: slimId, hervat, zonderVragen })
   else {
     if (!warm || warm.dood || Date.now() - warm.sinds > WARM_MAX_MS) { warm?.p.kill(); warm = await maakWarm() }
     w = warm
     warm = null
   }
+  if (w.ctx) w.ctx.opdrachtId = rijId
   const berichten = (invoer?.berichten || []).slice(-20)
   // Hervat Slim-gesprek: de sessie kent de rest al, alleen de nieuwe vraag.
   const stuk = hervat ? berichten.slice(-1) : berichten
@@ -438,19 +632,20 @@ async function beantwoordChat(invoer, opDeel, opStop = null) {
     .slice(-3).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
   const r = await new Promise((klaar) => {
     let deel = ''
-    const stop = setTimeout(() => w.p.kill('SIGTERM'), (slimId ? 10 : 5) * 60 * 1000)
+    const stop = maakKlok((slimId ? 10 : 5) * 60 * 1000, () => w.p.kill('SIGTERM'))
+    if (w.ctx) w.ctx.klok = stop
     w.opBericht = (m) => {
       if (m.type === 'stream_event') {
         const e = m.event
         if (e?.type === 'message_start') deel = ''
         else if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta') { deel += e.delta.text; opDeel(zichtbareTekst(deel)) }
       } else if (m.type === 'result') {
-        clearTimeout(stop)
+        stop.stop()
         klaar({ ok: m.subtype === 'success' && !m.is_error, tekst: m.result || '' })
         w.p.stdin.end()
       }
     }
-    w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
+    w.opEinde = () => { stop.stop(); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
     opStop?.(() => w.p.kill('SIGTERM'))
     if (w.dood) return w.opEinde()
     w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
@@ -507,7 +702,8 @@ const herstartVangnet = () => setTimeout(() => {
 async function herstartNa(id) {
   try { if (fs.readFileSync(HERSTART_ID, 'utf8') === String(id)) return } catch { /* nog nooit */ }
   herstartGepland = true
-  for (let i = 0; bezig.chat && i < 600; i++) await new Promise(r => setTimeout(r, 1000))
+  // Een chat die op Kersten wacht krijgt zijn volle tijd; anders sluit de herstart de vraag.
+  for (let i = 0; bezig.chat && i < 600 + (openVragen.size ? VRAAG_MS / 1000 : 0); i++) await new Promise(r => setTimeout(r, 1000))
   fs.writeFileSync(HERSTART_ID, String(id), { mode: 0o600 })
   console.log(`${tijd()} ↻ PA herstart over 3 s (nieuwe code live)`)
   spawn('sh', ['-c', `sleep 3; launchctl kickstart -k gui/${process.getuid()}/nl.myarc.pa`], { detached: true, stdio: 'ignore' }).unref()
@@ -527,7 +723,7 @@ async function rondeCode() {
       vorigeStap = Date.now()
       sb.from('business_os_opdrachten').update({ voortgang: t }).eq('id', rij.id).then(() => {}, () => {})
     }
-    const r = await wakkerTijdens(() => voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f), opStap))
+    const r = await wakkerTijdens(() => voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f), opStap, rij.id))
     lopend.delete(rij.id)
     // Alleen als hij nog 'bezig' staat: een gestopte rij blijft gestopt.
     const { data: gezet, error } = await sb.from('business_os_opdrachten')
@@ -611,7 +807,7 @@ async function rondeChat() {
       const nu = Date.now()
       if (nu - laatst > 300) { laatst = nu; schrijf(tekst) } else wachtend = setTimeout(() => { laatst = Date.now(); if (!klaar) schrijf(tekst) }, 300)
     }
-    const r = await beantwoordChat(rij.invoer, opDeel, (f) => lopend.set(rij.id, f))
+    const r = await beantwoordChat(rij.invoer, opDeel, (f) => lopend.set(rij.id, f), { rijId: rij.id })
     klaar = true
     clearTimeout(wachtend)
     const gestopt = lopend.get(rij.id)?.gestopt
@@ -719,7 +915,7 @@ async function rondeGroei() {
     console.log(`${tijd()} 🌱 ${project ? rij.opdracht : ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
     const t0 = Date.now()
     const vraag = project ? PROJECT_VRAAG(project) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
-    const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f)))
+    const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f), { rijId: rij.id, zonderVragen: true }))
     lopend.delete(rij.id)
     // Mislukt, meestal doordat de Mac sliep: nog twee keer proberen als hij weer wakker is.
     const poging = Number(rij.invoer?.poging) || 0
@@ -806,6 +1002,7 @@ async function start(g) {
   if (!bezig.chat) await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
   if (!bezig.groei) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'groei')
   await hartslag()
+  await zetVragenAan().catch(e => console.error(tijd(), 'Toestemmingsvragen:', e.message))
   zetWarmKlaar()
   // Nieuwe opdracht? Realtime meldt hem meteen (RLS: alleen eigen rijen); het
   // pollen blijft als vangnet. Eén keer aanmelden, ook na opnieuw inloggen.
@@ -861,7 +1058,6 @@ async function herstartVerzoek(req, stuur) {
 }
 
 // Lokaal loket voor inloggen vanuit Business OS.
-const POORT = 47615
 http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'content-type')
@@ -871,6 +1067,7 @@ http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return stuur(204, {})
   if (req.method === 'GET' && req.url === '/status') return stuur(200, { ingelogd: !!gebruiker })
   if (req.method === 'POST' && req.url === '/herstart') return herstartVerzoek(req, stuur)
+  if (req.method === 'POST' && req.url === '/toestemming') return toestemmingVerzoek(req, res, stuur)
   if (req.method !== 'POST' || req.url !== '/login') return stuur(404, { fout: 'onbekend' })
   // Al ingelogd: niets aanraken (een ongeldige sessie zou de huidige wissen).
   if (gebruiker) return stuur(200, { ok: true })

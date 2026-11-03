@@ -59,7 +59,11 @@ export function chatVraag({ gesprek, context }) {
 
 const GEHEUGEN_KOP = { correctie: 'Correcties (hier ging je eerder de mist in, nooit herhalen)', voorkeur: 'Voorkeuren', besluit: 'Besluiten', feit: 'Feiten' }
 
-export function chatPrompt({ skills, geheugen = [] }) {
+const VRAGEN_REGEL = `
+
+Toestemming: heb je een commando of tool nodig die niet op je lijst staat (yt-dlp, een connector, iets op de Mac), roep hem dan gewoon aan in plaats van te stoppen of Kersten de terminal in te sturen. Hij krijgt een kaart in de chat met Toestaan en Afwijzen en jij wacht op zijn antwoord, zodat hij vanaf zijn telefoon kan beslissen. Geef bij Bash een korte Nederlandse description. Afgewezen of verlopen: niet opnieuw proberen, zeg wat er nog nodig is. Geblokkeerd (berichten aan klanten of leads, Stripe-acties, verwijderen, git push, rechten omzeilen, geheimen tonen): daar is geen knop voor, nooit omzeilen. Bestanden wijzigen blijft via voorstellen lopen.`
+
+export function chatPrompt({ skills, geheugen = [], vragen = false }) {
   const geheugenTekst = geheugen.length
     ? Object.entries(GEHEUGEN_KOP).map(([soort, kop]) => {
       const regels = geheugen.filter(g => g.soort === soort)
@@ -96,7 +100,7 @@ Database, alleen via dit commando (Bash):
 → node scripts/pa-db.mjs bijlage <storage-pad>   bijlage ophalen, geeft het lokale pad
 Bijlagen: staat er in Kerstens bericht een regel "[bijlage] naam | business-os-bijlagen/… | type | grootte", draai dan eerst node scripts/pa-db.mjs bijlage <dat pad> en open daarna het lokale pad uit de uitvoer met Read (PDF in stukken van max 20 pagina's; csv/txt/afbeeldingen gewoon; bij .xlsx en .heic zet het commando er een leesbare versie naast (csv / jpg, veld leesbaar), open die; een oude .xls kun je niet lezen, vraag dan om xlsx of csv). Citeer geen hele bestanden terug, alleen wat nodig is voor de vraag. Lukt Read op een pdf niet, gebruik dan pdftotext "<pad>" - (geeft de hele tekst). Een bestand lezen doe je ALTIJD zelf hier in de chat, nooit via een code-opdracht of een prompt voor Kersten: dat is je kerntaak. Lange tekst die Kersten plakt, lees je helemaal.
 Je eigen werkmap is ~/Gino (uittreksels en transcripts van eerdere opdrachten); transcripts van creators staan in ~/Downloads/Creator transcripts/<creator>/. Kijk daar eerst (Glob/Read) voor je zegt dat je iets niet gelezen hebt.
-Begin bij de App-kaart-skill; ken je een tabel niet, kijk het schema na in plaats van te gokken.
+Begin bij de App-kaart-skill; ken je een tabel niet, kijk het schema na in plaats van te gokken.${vragen ? VRAGEN_REGEL : ''}
 
 Je antwoord: gewone tekst voor Kersten (die ziet hij al terwijl je typt). Heb je acties (wat er onder je bericht verschijnt), zet dan helemaal aan het eind één blok, daarna niets meer:
 ${BLOK}

@@ -36,6 +36,8 @@ create policy eigenaar_toestemmingen on public.business_os_toestemmingen
   using (coach_id = auth.uid() and public.get_my_portal_role() in ('coach', 'both'))
   with check (coach_id = auth.uid() and public.get_my_portal_role() in ('coach', 'both'));
 
+-- Supabase geeft nieuwe tabellen standaard alle rechten: eerst weg, dan alleen wat hoort.
+revoke all on public.business_os_toestemmingen from anon, authenticated;
 grant select, insert on public.business_os_toestemmingen to authenticated;
 grant update (status, beslist_at, gezien_at) on public.business_os_toestemmingen to authenticated;
 
@@ -86,6 +88,7 @@ create policy eigenaar_toestemming_regels on public.business_os_toestemming_rege
   using (coach_id = auth.uid() and public.get_my_portal_role() in ('coach', 'both'))
   with check (coach_id = auth.uid() and public.get_my_portal_role() in ('coach', 'both'));
 
+revoke all on public.business_os_toestemming_regels from anon, authenticated;
 grant select, insert on public.business_os_toestemming_regels to authenticated;
 grant update (actief, ingetrokken_at, laatst_gebruikt_at) on public.business_os_toestemming_regels to authenticated;
 

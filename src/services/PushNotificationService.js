@@ -75,7 +75,7 @@ class PushNotificationService {
     PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
       const data = notification?.data || {};
       // Gino-herinnering (alleen naar de coach): open Business OS in CoachHub.
-      if (data.soort === 'gino_herinnering') {
+      if (data.soort === 'gino_herinnering' || data.soort === 'gino_toestemming') {
         window.location.hash = 'business-os';
         return;
       }

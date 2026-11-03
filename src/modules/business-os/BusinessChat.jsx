@@ -45,13 +45,14 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop } from './schermen'
+import { ToestemmingKaarten, ToestemmingRegels } from './GinoToestemmingen'
 import { useNieuweVersie } from './useNieuweVersie'
 import { contentUitHash, openContent } from './contentStatusData'
 
@@ -60,6 +61,7 @@ const PA_ONLINE_MS = 45000
 const MAX_BEELDEN = 3 // zoveel recente screenshots gaan mee naar de AI
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
+const TABS_BREED = 140 // breedte van de tabjes-slider op desktop: twee tabjes
 const opdrachtKop = (w) => String(w.opdracht || '').split('\n')[0].replace(/^Onderwerp:\s*/i, '')
 const duurSinds = (w) => {
   const min = Math.max(0, Math.round((Date.now() - new Date(w.gestart_at || w.created_at).getTime()) / 60000))
@@ -164,6 +166,7 @@ async function wachtOpRij(id, opDeel, signaal = {}, { intrekken = false, start =
     .subscribe()
   try {
     let laatstGepold = 0
+    let grens = start + 11 * 60 * 1000
     for (;;) {
       await slaap(150)
       if (signaal.gestopt) {
@@ -185,7 +188,14 @@ async function wachtOpRij(id, opDeel, signaal = {}, { intrekken = false, start =
           .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
         if (ingetrokken?.length) return null
       }
-      if (Date.now() - start > 11 * 60 * 1000) return null
+      if (Date.now() > grens) {
+        // Wacht de chat op een knop van Kersten (max 30 min)? Dan niet naar de API.
+        const { count } = await supabase.from('business_os_toestemmingen')
+          .select('id', { count: 'exact', head: true }).eq('opdracht_id', rij.id).eq('status', 'wacht')
+          .then(r => r, () => ({ count: 0 }))
+        if (!count) return null
+        grens = Date.now() + 11 * 60 * 1000
+      }
     }
   } finally { supabase.removeChannel(kanaal) }
 }
@@ -1243,6 +1253,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   bezigPerRef.current = bezigPer
   const stopPer = useRef({}) // tabje → { id, gestopt } van de lopende vraag
   const [toonEerder, setToonEerder] = useState(false)
+  const [toonRegels, setToonRegels] = useState(false)
   const [menu, setMenu] = useState(false)
   const [deelPer, setDeelPer] = useState({})
   const [ongelezenPer, setOngelezenPer] = useState({})
@@ -2247,6 +2258,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
           </div>
         )}
 
+        {/* Toestemmingsvragen van Gino: blijven staan ook als de berichten dicht zijn */}
+        <ToestemmingKaarten />
         <div ref={balk} style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
@@ -2315,7 +2328,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   title={opdrachtKop(macNu)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, whiteSpace: 'nowrap',
-                    flex: isMobile ? '0 0 auto' : '0 1 240px', maxWidth: isMobile ? '62vw' : 240,
+                    flex: isMobile ? '0 0 auto' : '1 1 0', maxWidth: isMobile ? '62vw' : undefined,
                     background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
                     fontSize: '0.75rem', fontWeight: 800,
                   }}>
@@ -2334,8 +2347,19 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 <span style={{ display: 'flex', flexShrink: 0, marginLeft: -6 }}>{herhaalKnop(laatst.vol)}</span>
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
-              <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" style={{
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : macNu ? '1 1 auto' : '0 1 auto', overflowX: 'auto', marginLeft: macNu && !isMobile ? 12 : 2,
+              {/* Op desktop passen er twee tabjes in beeld, de rest schuift zijwaarts. Het actieve schuift mee. */}
+              <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" ref={el => {
+                if (!el || el.dataset.actief === actief.id) return
+                el.dataset.actief = actief.id
+                requestAnimationFrame(() => {
+                  const t = el.querySelector('[aria-selected="true"]')
+                  if (!t) return
+                  const a = t.getBoundingClientRect(), v = el.getBoundingClientRect()
+                  if (a.left < v.left) el.scrollLeft += a.left - v.left
+                  else if (a.right > v.right) el.scrollLeft += a.right - v.right
+                })
+              }} style={{
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : `0 0 ${TABS_BREED}px`, overflowX: 'auto', marginLeft: isMobile ? 2 : 'auto',
               }}>
                 {gesprekken.map((g, gi) => {
                   const aan = g.id === actief.id
@@ -2370,7 +2394,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   color: colors.textMuted, fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
                 }}>+</button>
               </div>
-              <span onClick={() => setOpen(o => !o)} style={{ flex: 1, minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
+              <span onClick={() => setOpen(o => !o)} style={{ flex: macNu && !isMobile ? '0 0 8px' : 1, minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
               <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
@@ -2538,6 +2562,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                             <SquarePen size={15} /> <span style={{ flex: 1 }}>Nieuw gesprek</span>
                           </button>
                         )}
+                        <button onClick={() => { setMenu(false); setToonRegels(true) }} style={menuRegel}>
+                          <ShieldCheck size={15} /> <span style={{ flex: 1 }}>Altijd toegestaan</span>
+                        </button>
                         {stem.beschikbaar() && (
                           <>
                             <button role="switch" aria-checked={allesVoorlezen} onClick={() => stem.zetAlles(!allesVoorlezen)} style={menuRegel}>
@@ -2569,6 +2596,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                       wijzigTabje(actief.id, g => ({ ...g, berichten, sessie: gid }))
                       setFout(null)
                     }} />}
+                  {toonRegels && <ToestemmingRegels onSluit={() => setToonRegels(false)} />}
                 </div>
               )}
               <input ref={kiezer} type="file" accept="image/*" multiple hidden
