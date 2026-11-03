@@ -109,13 +109,21 @@ export default function CoachVideoFeedback({ db }) {
 export function KlantVideos({ db, lijst, start = 0, onClose }) {
   const [index, setIndex] = useState(start)
   const gewijzigd = useRef(false)
-  const sub = lijst[index]
+  // Wat er tijdens dit scherm is opgeslagen. De lijst komt van vóór het openen;
+  // zonder dit toont terugbladeren de oude stand (oefenvideo i.p.v. je eigen
+  // video) en overschrijft een nieuw punt de eerder gemaakte punten.
+  const [aanpassingen, setAanpassingen] = useState({})
+  const sub = lijst[index] ? { ...lijst[index], ...aanpassingen[lijst[index].id] } : null
   if (!sub) return null
   return (
     <FeedbackModal
       key={sub.id}
       submission={sub}
       db={db}
+      onWijzig={(patch) => {
+        gewijzigd.current = true
+        setAanpassingen(a => ({ ...a, [sub.id]: { ...a[sub.id], ...patch } }))
+      }}
       positie={lijst.length > 1 ? { nr: index + 1, van: lijst.length, vorige: index > 0 ? () => setIndex(index - 1) : null, volgende: index < lijst.length - 1 ? () => setIndex(index + 1) : null } : null}
       onClose={() => onClose(gewijzigd.current)}
       onUpdate={() => {
@@ -132,7 +140,7 @@ export function KlantVideos({ db, lijst, start = 0, onClose }) {
 // uit de app). Ernaast punten noteren; elk punt kan het moment in de
 // klantvideo vasthouden. Punten worden direct opgeslagen, zodat de klant ze
 // tijdens het gesprek al in de app ziet.
-function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
+function FeedbackModal({ submission, db, onClose, onUpdate, onWijzig, positie }) {
   const isMobile = window.innerWidth <= 768
   const [punten, setPunten] = useState(() => puntenVan(submission))
   // Link naar de video die de coach bij deze feedback maakte (Zoom-opname,
@@ -148,6 +156,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
   const [info, setInfo] = useState(null)
   const [coachVideo, setCoachVideo] = useState(submission.coach_video_url || null)
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [uploadProcent, setUploadProcent] = useState(0)
   const [bron, setBron] = useState(submission.voorbeeld_url ? 'link' : submission.coach_video_url ? 'coach' : 'oefening')
   // Voorbeeld van een externe creator: geplakte link (YouTube, Instagram,
   // TikTok, mp4). Wordt op de inzending bewaard; de klant ziet hem ook.
@@ -160,6 +169,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
       .then(r => r, e => ({ error: e }))
     if (error) { alert('Kon de link niet opslaan'); return }
     setVoorbeeldLink(url)
+    onWijzig({ voorbeeld_url: url })
     setLinkInvoer(null)
     if (url) setBron('link')
   }
@@ -205,6 +215,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
         .eq('id', submission.id)
         .then(r => r, e => ({ error: e }))
       setOpslag(error ? 'fout' : 'ok')
+      if (!error) onWijzig({ feedback_punten: punten, coach_feedback: puntenAlsTekst(punten), feedback_link: schoneLink() })
     }, 600)
   }, [punten, link])
 
@@ -243,21 +254,44 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
     if (!file) return
     if (!file.type.startsWith('video/')) { alert('Selecteer een video bestand'); return }
     if (file.size > 500 * 1024 * 1024) { alert('Video te groot (max 500MB)'); return }
+    setUploadProcent(0)
     setUploadingVideo(true)
     try {
       const fileName = `coach-feedback/${submission.id}/${Date.now()}.mp4`
-      const { error } = await db.supabase.storage.from('videos').upload(fileName, file, { upsert: true })
-      if (error) throw error
+      // XHR i.p.v. storage.upload(): alleen zo is de voortgang zichtbaar.
+      const { data: { session } } = await db.supabase.auth.getSession()
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/videos/${fileName}`)
+        xhr.setRequestHeader('Authorization', `Bearer ${session?.access_token || anonKey}`)
+        xhr.setRequestHeader('apikey', anonKey)
+        xhr.setRequestHeader('x-upsert', 'true')
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) setUploadProcent(Math.round((ev.loaded / ev.total) * 100))
+        }
+        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload mislukt: ${xhr.status} ${xhr.responseText}`))
+        xhr.onerror = () => reject(new Error('Netwerkfout tijdens upload'))
+        const form = new FormData()
+        form.append('cacheControl', '3600')
+        form.append('', file)
+        xhr.send(form)
+      })
       const { data: urlData } = db.supabase.storage.from('videos').getPublicUrl(fileName)
       const { error: e2 } = await db.supabase.from('client_exercise_submissions')
         .update({ coach_video_url: urlData.publicUrl }).eq('id', submission.id)
       if (e2) throw e2
       setCoachVideo(urlData.publicUrl)
+      onWijzig({ coach_video_url: urlData.publicUrl })
       setBron('coach')
     } catch (err) {
       console.error('Coach video upload error:', err)
       alert('Kon je video niet uploaden')
-    } finally { setUploadingVideo(false) }
+    } finally {
+      setUploadingVideo(false)
+      // Zelfde bestand opnieuw kiezen na een mislukte poging moet weer kunnen.
+      if (videoInputRef.current) videoInputRef.current.value = ''
+    }
   }
 
   const handleSubmit = async () => {
@@ -274,6 +308,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
         })
         .eq('id', submission.id)
       if (error) throw error
+      onWijzig({ status, feedback_punten: punten, coach_feedback: puntenAlsTekst(punten), feedback_link: schoneLink() })
       // Eerste keer beoordeeld: de klant krijgt een melding (en push).
       if (submission.status === 'pending' && submission.client_id) {
         db.supabase.from('notifications').insert({
@@ -311,11 +346,11 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
         </div>
         {positie && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={positie.vorige || undefined} disabled={!positie.vorige} aria-label="Vorige video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.vorige ? 1 : 0.25, cursor: positie.vorige ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={positie.vorige || undefined} disabled={!positie.vorige || uploadingVideo} aria-label="Vorige video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.vorige && !uploadingVideo ? 1 : 0.25, cursor: positie.vorige && !uploadingVideo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ChevronRight size={20} strokeWidth={2.6} style={{ transform: 'rotate(180deg)' }} />
             </button>
             <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{positie.nr}/{positie.van}</span>
-            <button onClick={positie.volgende || undefined} disabled={!positie.volgende} aria-label="Volgende video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.volgende ? 1 : 0.25, cursor: positie.volgende ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={positie.volgende || undefined} disabled={!positie.volgende || uploadingVideo} aria-label="Volgende video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.volgende && !uploadingVideo ? 1 : 0.25, cursor: positie.volgende && !uploadingVideo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ChevronRight size={20} strokeWidth={2.6} />
             </button>
           </div>
@@ -323,7 +358,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: opslag === 'fout' ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>
           {opslag === 'bezig' ? 'Opslaan…' : opslag === 'ok' ? 'Opgeslagen · klant ziet het' : opslag === 'fout' ? 'Niet opgeslagen' : ''}
         </span>
-        <button onClick={onClose} aria-label="Sluiten" style={{ width: 40, height: 40, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <button onClick={onClose} disabled={uploadingVideo} aria-label="Sluiten" style={{ width: 40, height: 40, background: 'none', border: 'none', color: '#fff', opacity: uploadingVideo ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingVideo ? 'default' : 'pointer' }}>
           <X size={24} strokeWidth={2.4} />
         </button>
       </div>
@@ -373,7 +408,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
             ))}
             <button onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} style={pil(false)}>
               <Upload size={13} strokeWidth={2.6} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-              {uploadingVideo ? 'Uploaden…' : coachVideo ? 'Andere eigen video' : 'Eigen video'}
+              {uploadingVideo ? (uploadProcent < 100 ? `Uploaden ${uploadProcent}%` : 'Verwerken…') : coachVideo ? 'Andere eigen video' : 'Eigen video'}
             </button>
             <input ref={videoInputRef} type="file" accept="video/*" onChange={handleCoachVideoSelect} style={{ display: 'none' }} />
             <button onClick={() => setLinkInvoer(linkInvoer == null ? (voorbeeldLink || '') : null)} style={pil(linkInvoer != null)}>
@@ -484,7 +519,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
                 </button>
               ))}
             </div>
-            <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: '#fff', color: '#000', fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <button onClick={handleSubmit} disabled={submitting || uploadingVideo} style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: '#fff', color: '#000', fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: submitting ? 'wait' : uploadingVideo ? 'default' : 'pointer', opacity: submitting || uploadingVideo ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <Send size={16} strokeWidth={2.6} />{submitting ? 'Opslaan…' : `${submission.status === 'pending' ? 'Afronden en klant melden' : 'Afronden'}${positie?.volgende ? ' · volgende' : ''}`}
             </button>
           </div>

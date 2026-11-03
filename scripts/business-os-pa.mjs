@@ -128,6 +128,7 @@ const TOEGESTAAN = [
   'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)',
   // 3 nov 2026: reels van Drive tot Metricool-concept. Publiceren kan dit script niet.
   'Bash(node scripts/reel-gino.mjs *)',
+  'mcp__claude_ai_Metricool_Social_Media_Management__getScheduledPosts', // alleen lezen: geen kaart om na te kijken
 ]
 // Eigen mappen op de Mac (boeken, PDF's, exports): alleen lezen. Code-
 // opdrachten mogen eruit kopiëren naar workapp (bv. workapp/hormozi, staat in

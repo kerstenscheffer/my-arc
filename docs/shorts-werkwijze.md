@@ -12,6 +12,8 @@ Noemt Kersten geen aantal: 1 short. Noemt hij geen datum: één per dag vanaf mo
 2. Schrijf de caption met Write naar `~/Gino/yt-shorts/<id>/caption.txt`, in het format hieronder.
 3. `node scripts/reel-gino.mjs short <id> --datum 2026-11-10T18:00` met Bash-timeout 600000. Download, upload en concept zitten hierin. Dit commando vraagt geen toestemming.
 
+Geeft `short` een link terug, dan is hij klaar: het script heeft al gecontroleerd dat het een concept is en dat de video compleet is. Kijk dus niet nog eens in Metricool na.
+
 Eén mislukte short houdt de rest niet tegen. Probeer hem niet opnieuw; noem de foutmelding.
 
 ## Caption
