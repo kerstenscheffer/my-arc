@@ -7,6 +7,8 @@
 //   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog]
 //   node scripts/reel-gino.mjs shorts                    kant-en-klare YouTube-shorts die nog geen concept hebben
 //   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
+//   node scripts/reel-gino.mjs reeks                     de volgende 8 open shorts met caption, elk op de eerstvolgende di/do 18:00
+//   node scripts/reel-gino.mjs overzicht                 alle short-concepten met link, op datum
 //
 // concept zet de reel ALTIJD als concept in Metricool (draft, geen autoPublish) en geeft de link.
 // Publiceren of echt inplannen kan dit script niet. Twee keer hetzelfde concept weigert het.
@@ -201,9 +203,52 @@ async function uploadVoorMetricool(pad, mp4, omslag) {
 
 const shortLijst = () => JSON.parse(fs.readFileSync(path.join(SHORTS, 'lijst.json'), 'utf8'))
 
+const shortConcepten = () => shortLijst().flatMap((s) => {
+  const f = path.join(SHORTS, s.id, 'concept.json')
+  return fs.existsSync(f) ? [JSON.parse(fs.readFileSync(f, 'utf8'))] : []
+})
+
+// Twee per week: dinsdag en donderdag om 18:00, na het laatste concept en nooit vandaag of eerder.
+function volgendeDatums(aantal) {
+  const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+  const laatste = shortConcepten().map(c => c.datum.slice(0, 10)).sort().at(-1) || vandaag
+  const d = new Date(`${laatste > vandaag ? laatste : vandaag}T12:00:00Z`)
+  const uit = []
+  while (uit.length < aantal) {
+    d.setUTCDate(d.getUTCDate() + 1)
+    if ([2, 4].includes(d.getUTCDay())) uit.push(`${d.toISOString().slice(0, 10)}T18:00`)
+  }
+  return uit
+}
+
+const shortsOpen = () => shortLijst().filter(s => !fs.existsSync(path.join(SHORTS, s.id, 'concept.json')))
+
 async function shorts() {
-  const open = shortLijst().filter(s => !fs.existsSync(path.join(SHORTS, s.id, 'concept.json')))
-  uit({ open: open.length, shorts: open })
+  const open = shortsOpen(), datums = volgendeDatums(open.length)
+  uit({ open: open.length, shorts: open.map((s, i) => ({ ...s, datum: datums[i], caption_klaar: fs.existsSync(path.join(SHORTS, s.id, 'caption.txt')) })) })
+}
+
+// Elke regel met de kale link: die maakt Gino's scherm klikbaar.
+function schrijfOverzicht() {
+  const dag = new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const rijen = shortConcepten().sort((a, b) => a.datum.localeCompare(b.datum)).map(c => `${dag.format(new Date(c.datum))} · ${c.titel}\n${c.link}`)
+  const tekst = `${rijen.length} shorts als concept in Metricool\n\n${rijen.join('\n\n')}\n`
+  fs.writeFileSync(path.join(SHORTS, 'overzicht.md'), tekst)
+  return tekst
+}
+
+// Eigen proces per short: één mislukte houdt de rest niet tegen. Maximaal 8: past binnen de Bash-timeout.
+async function reeks() {
+  const klaar = shortsOpen().filter(s => fs.existsSync(path.join(SHORTS, s.id, 'caption.txt'))).slice(0, 8)
+  const datums = volgendeDatums(klaar.length)
+  const resultaat = []
+  for (const [i, s] of klaar.entries()) {
+    const r = await run(process.execPath, [new URL(import.meta.url).pathname, 'short', s.id, '--datum', datums[i]], { timeout: 4 * 60 * 1000 }).then(x => x.stdout, e => e.stdout || String(e.message))
+    let u
+    try { u = JSON.parse(r) } catch { u = { fout: r.slice(0, 300) } }
+    resultaat.push(u.fout ? { id: s.id, titel: s.titel, fout: u.fout } : { titel: s.titel, datum: u.datum })
+  }
+  uit({ gedaan: resultaat, nog_open: shortsOpen().length })
 }
 
 // Kant-en-klaar: niet monteren. Geen cookies nodig, want de lijst bevat alleen niet-openbare links.
@@ -220,7 +265,7 @@ async function short(id) {
   const captionPad = path.join(m, 'caption.txt')
   if (!fs.existsSync(captionPad)) stop(`Schrijf eerst de caption naar ${captionPad}.`)
   const caption = fs.readFileSync(captionPad, 'utf8').trim()
-  if (!caption.startsWith('Reageer "SPLIT"') || !caption.endsWith('⚜️') || caption.length > 2200) stop('Caption klopt niet met het format in docs/shorts-werkwijze.md.')
+  if (!caption.startsWith('Hoe Je De ') || !caption.includes('waar we samen jouw trainingschema bouwen') || !caption.includes('Maar hier meer over de ') || !caption.endsWith('⚜️') || caption.length > 2200) stop('Caption klopt niet met het format in docs/shorts-werkwijze.md.')
   const mp4 = path.join(m, 'video.mp4')
   await run('yt-dlp', ['-q', '--no-warnings', '--no-playlist', '--force-overwrites', '--socket-timeout', '20', '--retries', '2',
     '-f', 'bv*[vcodec^=avc1]+ba[ext=m4a]/b[vcodec^=avc1][ext=mp4]', '--merge-output-format', 'mp4', '-o', mp4,
@@ -243,6 +288,7 @@ async function short(id) {
   const volledig = kop === fs.statSync(mp4).size
   fs.writeFileSync(klaarPad, JSON.stringify({ id: r.post.id, link, datum, titel: item.titel }, null, 1))
   if (volledig) fs.unlinkSync(mp4) // de Mac heeft weinig ruimte; opnieuw downloaden kan altijd
+  schrijfOverzicht()
   uit({ concept: r.post.id, titel: item.titel, link, datum, video_compleet_in_metricool: volledig })
 }
 
@@ -279,6 +325,6 @@ async function concept(b) {
 }
 
 const cmd = args.shift()
-const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()) }[cmd]
-if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00')
+const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()), reeks, overzicht: async () => console.log(schrijfOverzicht()) }[cmd]
+if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00 | reeks | overzicht')
 klus().catch(e => stop(String(e.stderr || e.message || e).slice(0, 800)))

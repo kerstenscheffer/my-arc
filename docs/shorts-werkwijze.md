@@ -6,24 +6,29 @@ Gebruik alleen `scripts/reel-gino.mjs`. **Niet** `scripts/yt-shorts-inplannen.mj
 
 ## Stappen
 
-Noemt Kersten geen aantal: 1 short. Noemt hij geen datum: één per dag vanaf morgen om 18:00.
+Standaard twee per week: dinsdag en donderdag om 18:00, aansluitend op het laatste concept. Het script rekent de datums uit. Noemt Kersten geen aantal: 1 short.
 
-1. `node scripts/reel-gino.mjs shorts` toont de shorts die nog geen concept hebben. Neem ze van boven naar beneden, tenzij hij oefeningen noemt.
-2. Schrijf de caption met Write naar `~/Gino/yt-shorts/<id>/caption.txt`, in het format hieronder.
-3. `node scripts/reel-gino.mjs short <id> --datum 2026-11-10T18:00` met Bash-timeout 600000. Download, upload en concept zitten hierin. Dit commando vraagt geen toestemming.
+1. `node scripts/reel-gino.mjs shorts` toont de open shorts met hun datum. Neem ze van boven naar beneden, tenzij hij oefeningen noemt.
+2. Schrijf per short de caption met Write naar `~/Gino/yt-shorts/<id>/caption.txt`, in het format hieronder.
+3. **Eén of een paar shorts:** `node scripts/reel-gino.mjs short <id> --datum <datum uit stap 1>` met Bash-timeout 600000.
+   **Alle of veel shorts:** schrijf 8 captions en draai `node scripts/reel-gino.mjs reeks` met Bash-timeout 600000. Die doet de volgende 8 met caption en kiest zelf de datums. Herhaal tot `nog_open` 0 is. Een lopende run die stopt, kan later gewoon verder: klare shorts slaat hij over.
 
-Geeft `short` een link terug, dan is hij klaar: het script heeft al gecontroleerd dat het een concept is en dat de video compleet is. Kijk dus niet nog eens in Metricool na.
+Download, upload en concept zitten in deze commando's. Ze vragen geen toestemming.
 
-Eén mislukte short houdt de rest niet tegen. Het script herhaalt netwerkfouten zelf, dus probeer hem niet opnieuw; noem de foutmelding.
+Geeft een commando een link of datum terug, dan is die short klaar: het script heeft al gecontroleerd dat het een concept is en dat de video compleet is. Kijk dus niet nog eens in Metricool na.
+
+Een mislukte short houdt de rest niet tegen. Het script herhaalt netwerkfouten zelf, dus probeer hem niet opnieuw; noem de foutmelding.
 
 ## Caption
 
-Letterlijk de eerste twee regels en de slotregel. Vul de rest in op basis van de titel:
+Letterlijk zoals hieronder, inclusief de SPLIT-alinea en de slotregel. Vul alleen de delen tussen <> in op basis van de titel:
 
 ```
-Reageer "SPLIT" en ik stuur je mijn trainingsschema tool, helemaal gratis.
+Hoe Je De <oefening, netjes gespeld> correct uitvoert
 
-Maar eerst dit.
+Reageer "SPLIT" en ik stuur je mijn trainingsschema tool, waar we samen jouw trainingschema bouwen op jouw niveau kennis en thuis of in de gym. Omdat ik graag zoveel mogelijk mannen help in top shape komen is het helemaal gratis.
+
+Maar hier meer over de <oefening>
 
 <De fout die veel mannen maken bij deze oefening, één zin.>
 
@@ -46,4 +51,4 @@ Alleen algemene, gangbare techniek. Geen verzonnen resultaten, klantverhalen of 
 
 ## Je bericht aan Kersten
 
-Per short: titel, datum, tijd en de link. Meer niet. Er gaat niets live: het zijn concepten die hij zelf goedkeurt.
+Draai als laatste `node scripts/reel-gino.mjs overzicht` en zet de uitvoer letterlijk in je bericht, met de kale links: zijn scherm maakt die klikbaar. Noem daarna alleen mislukte shorts met hun foutmelding. Er gaat niets live: het zijn concepten die hij zelf goedkeurt. Zeg één keer dat de tips op de titel zijn gebaseerd.
