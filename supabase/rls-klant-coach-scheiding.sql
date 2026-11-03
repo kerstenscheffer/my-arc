@@ -113,6 +113,10 @@ drop policy if exists "lead_movements_authenticated_update" on public.lead_movem
 create policy rls_coach_update on public.lead_movements for update to authenticated
   using ((select rls_is_coach())) with check ((select rls_is_coach()));
 
+-- Betalingen en intake zonder client_id zijn geen gedeelde rijen: alleen de coach ziet die.
+drop policy rls_gedeeld_lezen on public.payments;
+drop policy rls_gedeeld_lezen on public.nutrition_preferences;
+
 -- client_calls: dit stond ook voor iedereen zonder login open.
 drop policy if exists "Anyone can view calls" on public.client_calls;
 drop policy if exists "Anyone can insert calls" on public.client_calls;

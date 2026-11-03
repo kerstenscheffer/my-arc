@@ -2,12 +2,12 @@
 // Food-app inspired: gold theme, soft frame, in-viewfinder helper text,
 // silent feedback (no scan-line), late hints, bottom Zoeken|Barcode pill.
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, createElement } from 'react'
 import {
   BarcodeFormat, DecodeHintType, MultiFormatReader,
   RGBLuminanceSource, HybridBinarizer, BinaryBitmap,
 } from '@zxing/library'
-import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine } from 'lucide-react'
+import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine, Image as ImageIcon } from 'lucide-react'
 import { leesBarcodeUitFoto } from './leesBarcodeUitFoto'
 import { colors, radius, space, type, border } from '../../../ui/tokens'
 
@@ -45,6 +45,8 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const [scanTime, setScanTime] = useState(0)
   const fotoRef = useRef(null)
   const invoerRef = useRef(null)
+  const galerijRef = useRef(null)
+  const [fotoKeuze, setFotoKeuze] = useState(false)
   const [fotoLezen, setFotoLezen] = useState(false)
   const [fotoFout, setFotoFout] = useState(false)
 
@@ -520,13 +522,29 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
             Zoeken
           </button>
 
-          {/* Foto via de camera-app: werkt ook als de live camera niet opent. */}
+          {/* Foto via de camera-app: werkt ook als de live camera niet opent.
+              Twee invoervelden: met `capture` opent de camera meteen, zonder de
+              fotokiezer. Desktop heeft geen camera-app: daar direct een bestand. */}
           <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={kiesFoto} style={{ display: 'none' }} />
-          <button onClick={() => fotoRef.current?.click()} disabled={fotoLezen}
-            style={{ ...knopStijl(manualBarcode.length < 8, fotoLezen), marginTop: space[2] }}
-          >
-            <Camera size={17} strokeWidth={2.6} /> {fotoLezen ? 'Foto lezen…' : 'Foto van barcode maken'}
-          </button>
+          <input ref={galerijRef} type="file" accept="image/*" onChange={kiesFoto} style={{ display: 'none' }} />
+          {fotoKeuze ? (
+            <div style={{ display: 'flex', gap: space[2], width: '100%', maxWidth: 300, marginTop: space[2] }}>
+              <button onClick={() => { setFotoKeuze(false); fotoRef.current?.click() }} style={{ ...knopStijl(true, false), flex: 1, minWidth: 0 }}>
+                <Camera size={17} strokeWidth={2.6} /> Camera
+              </button>
+              <button onClick={() => { setFotoKeuze(false); galerijRef.current?.click() }} style={{ ...knopStijl(true, false), flex: 1, minWidth: 0 }}>
+                <ImageIcon size={17} strokeWidth={2.6} /> Foto kiezen
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setFotoFout(false); if (isMobile) setFotoKeuze(true); else galerijRef.current?.click() }}
+              disabled={fotoLezen}
+              style={{ ...knopStijl(manualBarcode.length < 8, fotoLezen), marginTop: space[2] }}
+            >
+              <Camera size={17} strokeWidth={2.6} /> {fotoLezen ? 'Foto lezen…' : 'Foto van barcode'}
+            </button>
+          )}
           {fotoFout && (
             <div style={{ ...type.body, color: colors.textPrimary, marginTop: space[3], textAlign: 'center', maxWidth: 300 }}>
               Geen barcode gevonden. Maak de foto dichterbij en scherp, of typ de cijfers.
@@ -575,7 +593,7 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
               cursor: 'pointer', transition: 'color 0.15s ease',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <Icoon size={16} strokeWidth={2.6} /> {label}
+              {createElement(Icoon, { size: 16, strokeWidth: 2.6 })} {label}
             </button>
           ))}
         </div>
