@@ -73,6 +73,7 @@ const KNOP = {
   background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 10,
   padding: '0 12px', minHeight: 36, fontWeight: 900, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
 }
+const KNOP_RAND = { ...KNOP, background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }
 const KAART = { margin: '2px 0 6px', fontSize: '0.76rem', lineHeight: 1.35 }
 const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 2 }
 const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 6 }
@@ -605,16 +606,45 @@ function vraagVoor(ac) {
   return { vraag: 'Mag ik dit aanpassen in de code?', kort: kort(eersteZin(ac.tekst)), details: ac.tekst }
 }
 
+// Afgewezen voorstellen uit alle tabjes (nieuwste eerst) gaan mee in de context,
+// bovenaan zodat de afkapgrens ze niet raakt. Ook nodig voor een hervat Slim-gesprek,
+// want dat krijgt alleen de nieuwe vraag en ziet de status op de kaart niet.
+// De sleutel is de instructie: zo werkt het op de Mac én via de API.
+const AFGEWEZEN_KOP = 'Afgewezen voorstellen (Kersten zei nee en er is niets uitgevoerd. Behandel ze niet als open en stel ze niet opnieuw voor, tenzij hij er zelf om vraagt)'
+const afgewezenVoorstellen = (gesprekken, max = 10) => gesprekken
+  .flatMap(g => g.berichten.flatMap(b => (b.role !== 'assistant' ? [] : b.acties || [])
+    .filter(ac => ac && typeof ac === 'object' && ac.afgewezen && VOER_UIT[ac.soort])
+    .map(ac => ({ ac, op: b.op || 0 }))))
+  .sort((a, b) => b.op - a.op)
+  .slice(0, max)
+  .map(({ ac }) => { const v = vraagVoor(ac); return v.kort ? `${v.vraag} (${v.kort})` : v.vraag })
+const metAfgewezen = (context, gesprekken) => {
+  const lijst = afgewezenVoorstellen(gesprekken)
+  return lijst.length ? { [AFGEWEZEN_KOP]: lijst, ...context } : context
+}
+
+// Dichtgeklapte kaart na Afwijzen: alleen dit regeltje, de rest van de kaart is weg.
 const Afgewezen = () => (
-  <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.textSecondary, fontWeight: 800 }}>
-    <X size={14} /> Afgewezen
+  <div style={{ ...KAART, display: 'flex', gap: 5, alignItems: 'center', color: colors.textSecondary, fontWeight: 800 }}>
+    <X size={12} /> Afgewezen
   </div>
 )
 
+// Knoppen van een open voorstel. Afwijzen voert niets uit, het zet alleen de status.
+function VoorstelKnoppen({ tekst, bezig, onToestaan, onAfwijzen }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+      <button onClick={onToestaan} disabled={bezig} style={KNOP}>{tekst}</button>
+      <button onClick={onAfwijzen} disabled={bezig} style={KNOP_RAND}>Afwijzen</button>
+    </div>
+  )
+}
+
 // Voorstel van de AI om accounts op slot te zetten of te ontgrendelen.
-function SlotVoorstel({ voorstel, staat, onToestaan }) {
+function SlotVoorstel({ voorstel, staat, onToestaan, onAfwijzen }) {
   const { bezig, fout } = staat || {}
   const opSlot = voorstel.actie === 'op_slot'
+  if (voorstel.afgewezen && !voorstel.uitgevoerd) return <Afgewezen />
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
@@ -627,10 +657,9 @@ function SlotVoorstel({ voorstel, staat, onToestaan }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
           <Check size={14} /> {opSlot ? 'Op slot gezet' : 'Ontgrendeld'}
         </div>
-      ) : voorstel.afgewezen ? <Afgewezen /> : (
-        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
-          {bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`}
-        </button>
+      ) : (
+        <VoorstelKnoppen bezig={bezig} onToestaan={onToestaan} onAfwijzen={onAfwijzen}
+          tekst={bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`} />
       )}
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
@@ -639,9 +668,10 @@ function SlotVoorstel({ voorstel, staat, onToestaan }) {
 
 // Wijziging van de AI: gewone gaan direct (kaart met uitkomst en Ongedaan maken),
 // bewaakte houden de knop Toestaan met de reden erbij. Beslist door de server.
-function WijzigingVoorstel({ voorstel, staat, onToestaan, onOngedaan }) {
+function WijzigingVoorstel({ voorstel, staat, onToestaan, onAfwijzen, onOngedaan }) {
   const { bezig, fout } = staat || {}
   const regels = wijzigingRegels(voorstel)
+  if (voorstel.afgewezen && !voorstel.uitgevoerd && !voorstel.mislukt) return <Afgewezen />
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
@@ -663,15 +693,13 @@ function WijzigingVoorstel({ voorstel, staat, onToestaan, onOngedaan }) {
           ) : voorstel.ongedaan_kan ? (
             <span style={{ color: colors.textSecondary, fontWeight: 600 }}>Ongedaan maken kan niet: {voorstel.ongedaan_kan}</span>
           ) : voorstel.wijziging_id ? (
-            <button onClick={onOngedaan} disabled={bezig} style={{ ...KNOP, background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }}>
+            <button onClick={onOngedaan} disabled={bezig} style={KNOP_RAND}>
               {bezig ? 'Bezig…' : 'Ongedaan maken'}
             </button>
           ) : null}
         </div>
-      ) : voorstel.afgewezen ? <Afgewezen /> : (
-        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
-          {bezig ? 'Bezig…' : 'Toestaan'}
-        </button>
+      ) : (
+        <VoorstelKnoppen bezig={bezig} onToestaan={onToestaan} onAfwijzen={onAfwijzen} tekst={bezig ? 'Bezig…' : 'Toestaan'} />
       )}
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
@@ -684,7 +712,7 @@ function WijzigingVoorstel({ voorstel, staat, onToestaan, onOngedaan }) {
 const PA_STATUS = { wacht: 'Wacht op je Mac…', bezig: 'Claude Code is bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
 
 // herhaalKnop(tekst): herhaalknop achter het resultaat (alleen bij het laatste Gino-bericht).
-function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
+function PaVoorstel({ voorstel, staat, onToestaan, onAfwijzen, herhaalKnop }) {
   const [rij, setRij] = useState(null)
   const { bezig, fout } = staat || {}
   const id = voorstel.opdrachtId
@@ -720,6 +748,7 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
   const status = rij?.status
   const inRij = status === 'wacht' && voor > 0
   const hangt = status === 'wacht' && !inRij && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
+  if (voorstel.afgewezen && !id) return <Afgewezen />
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
@@ -727,10 +756,8 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
       </div>
       <div style={KAART_SUB}><Inkort tekst={voorstel.tekst} /></div>
       {voorstel.reden && !id && <div style={KAART_SUB}>Vraagt toestemming: {voorstel.reden}</div>}
-      {voorstel.afgewezen && !id ? <Afgewezen /> : !id ? (
-        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
-          {bezig ? 'Versturen…' : 'Uitvoeren op mijn Mac'}
-        </button>
+      {!id ? (
+        <VoorstelKnoppen bezig={bezig} onToestaan={onToestaan} onAfwijzen={onAfwijzen} tekst={bezig ? 'Versturen…' : 'Uitvoeren op mijn Mac'} />
       ) : (
         <div style={{ fontWeight: 800 }}>
           <StatusLicht status={status || 'wacht'}
@@ -1970,12 +1997,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       return
     }
     const berichten = naarBerichten(nieuw)
+    const contextNu = metAfgewezen(context, gesprekken)
     let laatsteDeel = ''
     const opDeel = (t) => { if (t) laatsteDeel = t; setDeelPer(d => ({ ...d, [id]: t })) }
     const signaal = { id: null, gestopt: false }
     stopPer.current[id] = signaal
     // Ook met screenshots via de Mac (2 nov 2026): de PA geeft ze als afbeelding door.
-    const mac = viaMac ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal, geupload) : null
+    const mac = viaMac ? await vraagViaMac(berichten, contextNu, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal, geupload) : null
     opDeel('')
     if (signaal.gestopt || mac?.gestopt) {
       // Gestopt: wat hij al typte blijft staan, zoals bij ChatGPT.
@@ -1992,7 +2020,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     }
     signaal.id = null // nu via de API: stoppen = antwoord negeren
     stopPer.current[id] = signaal
-    const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten, context } })
+    const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten, context: contextNu } })
     delete stopPer.current[id]
     if (signaal.gestopt) return // al afgehandeld door de stopknop
     setBezigPer(b => ({ ...b, [id]: false }))
@@ -2022,7 +2050,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     zetActie(t, i, j, veld)
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
-  const afwijzen = (t, i, j) => zetActie(t, i, j, { afgewezen: true })
+  // Alleen een status op de actie: niets uitgevoerd, en toestaan() weigert hem daarna
+  // (staatOpen). Wegschrijven gaat met het tabje mee (localStorage + business_os_gesprekken).
+  const afwijzen = (t, i, j) => {
+    const ac = gesprekken.find(g => g.id === t)?.berichten[i]?.acties?.[j]
+    if (!ac || !staatOpen(ac) || actieStaat[`${t}-${i}-${j}`]?.bezig) return
+    zetActie(t, i, j, { afgewezen: true })
+  }
   const ongedaanMaken = async (t, i, j) => {
     const ac = gesprekken.find(g => g.id === t)?.berichten[i]?.acties?.[j]
     const sleutel = `${t}-${i}-${j}`
@@ -2146,7 +2180,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 500, color: colors.textPrimary }}>
                   {(b.acties || []).map((ac, j) => {
                     if (!ac || typeof ac !== 'object') return null
-                    const kaart = { voorstel: ac, staat: actieStaat[`${actief.id}-${i}-${j}`], onToestaan: () => toestaan(actief.id, i, j) }
+                    const kaart = { voorstel: ac, staat: actieStaat[`${actief.id}-${i}-${j}`], onToestaan: () => toestaan(actief.id, i, j), onAfwijzen: () => afwijzen(actief.id, i, j) }
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} onOngedaan={() => ongedaanMaken(actief.id, i, j)} />

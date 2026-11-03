@@ -379,6 +379,14 @@ if (cmd === 'lees') {
   for (const [tekst, moet] of [
     ['Stuur alle klanten een push over de actie', true], ['Pas het schema van klant Jan aan', true], ['Zet live met npm run release', true],
     ['Publiceer deze reel live op Instagram', true], ['Doe een echte Stripe afschrijving', true], ['Maak de Business OS grafiek groen', false],
+    // Ontkende zinnen (business-os-ontkenning.sql): geen knop.
+    ['Geen meldingen naar klanten of leads.', false], ['geen meldingen naar klanten', false], ['nooit een bericht naar klanten', false], ['niets sturen naar leads', false],
+    ['Geen melding, push, mail of bericht naar klanten.', false], ['Maak de grafiek groen. Geen meldingen naar klanten of leads. Alleen toevoegen in de database.', false],
+    // Echte acties, ook naast of binnen een ontkenning: wel een knop.
+    ['stuur alle klanten een pushmelding', true], ['Stuur alle leads een mail', true], ['Stuur alle klanten de nieuwe prijs', true],
+    ['Geen meldingen naar klanten. Stuur daarna alle leads een mail.', true], ['Stuur alle klanten een push, geen mail', true], ['Geen melding maar een push naar alle klanten', true],
+    ['Geen mail, push naar alle klanten', true], ['Geen meldingen naar klanten, behalve Jan', true], ['Geen meldingen naar klanten tenzij ze betaald hebben', true],
+    ['Als een klant geen mail heeft gehad, stuur hem er een', true], ['Zorg dat klanten nooit een melding missen', true], ['Er gaan geen meldingen naar klanten. Repareer dat.', true],
   ]) {
     const { data } = await sb.rpc('business_os_opdracht_bewaakt', { p_tekst: tekst })
     proef(`code: ${tekst}`, !!data === moet, { reden: data })

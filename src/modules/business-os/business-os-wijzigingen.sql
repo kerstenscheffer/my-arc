@@ -416,6 +416,8 @@ revoke all on function public.business_os_wijziging_ongedaan(uuid) from public, 
 grant execute on function public.business_os_wijziging_ongedaan(uuid) to authenticated;
 
 -- Code-opdracht: reden als hij een knop moet houden, anders null.
+-- LET OP: nieuwere versie in business-os-ontkenning.sql (3 nov 2026). Draai je dit
+-- bestand opnieuw, draai die daarna ook, anders komt het valse alarm terug.
 create or replace function public.business_os_opdracht_bewaakt(p_tekst text)
 returns text language sql immutable as $$
   select case
