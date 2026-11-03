@@ -2395,7 +2395,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   color: colors.textMuted, fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
                 }}>+</button>
               </div>
-              <span onClick={() => setOpen(o => !o)} style={{ flex: macNu && !isMobile ? '0 0 8px' : 1, minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
+              <span onClick={() => setOpen(o => !o)} style={{ flex: isMobile ? 1 : '0 0 8px', minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
               <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
