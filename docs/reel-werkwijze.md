@@ -27,6 +27,10 @@ Geef bij elk commando de Bash-timeout 600000 mee; montage duurt een paar minuten
    - `labels`: [van, tot, tekst] in brontijd. De eerste is de hook vanaf 0. Daarna maximaal 3 kernpunten, één tegelijk.
    - `correcties`: [fout, goed, vorig woord of null]. Alleen duidelijke fouten van Whisper. Twijfel je, verander niets en noem het in je bericht.
    - `muziek`: alleen uit `~/Gino/reel-assets/muziek`. Niets anders, ook niet uit Drive: daar staan commerciële nummers.
+     Kies op de sfeer van de reel en wissel af. De sfeer staat alleen in de bestandsnaam, luisteren kun je niet, dus noem in je bericht welke track je koos:
+     praktische tips of verhaal: `leberch-travel`, `leberch-lofi-vlog`, `leberch-intro-vlog`, `bombinsound-background-music`;
+     persoonlijk of reflectief: `leberch-inspiring`, `the_mountain-cinematic`;
+     training of actie: `leberch-motivation`; zwaar en dramatisch: `sutton-cinematic-dramatic`.
    - `omslag.tijd`: een frame met het gezicht naar de camera. Elke reel een eigen frame.
    - `caption`: geen verzonnen gewoontes, resultaten of weggevers. Geen CTA tenzij die in de reel gesproken wordt of is afgesproken.
 4. `node scripts/reel-gino.mjs monteer <bestand>` maakt versie vN. Bekijk met Read `controle_frames` en `omslag_uitsneden`, en controleer de uitvoer. Fout? Pas de config aan en monteer opnieuw.
