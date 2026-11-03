@@ -78,8 +78,10 @@ function GeblokkeerdKaart({ rij, onWeg }) {
   )
 }
 
-export function ToestemmingKaarten() {
+export function ToestemmingKaarten({ onOpen }) {
   const [rijen, setRijen] = useState([])
+  const open = rijen.filter(r => r.status === 'wacht').length
+  useEffect(() => { onOpen?.(open) }, [open, onOpen])
   const laad = useCallback(async () => {
     const { data, error } = await supabase.from('business_os_toestemmingen')
       .select('id, tool, invoer, reden, patroon, status, gevraagd_at')

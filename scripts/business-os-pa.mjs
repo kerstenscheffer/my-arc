@@ -231,14 +231,20 @@ const lopend = new Map()
 const POORT = 47615
 const VRAAG_TOOL = 'mcp__gino__toestemming'
 const VRAAG_SERVER = path.join(MAP, 'scripts', 'gino-toestemming-mcp.mjs')
-const VRAAG_MS = Number(process.env.PA_TOESTEMMING_MS) || 30 * 60 * 1000
+const VRAAG_MS = Number(process.env.PA_TOESTEMMING_MS) || 15 * 60 * 1000
+const VRAAG_CHAT_MS = Number(process.env.PA_TOESTEMMING_MS) || 3 * 60 * 1000
+// Vastgelopen eerder melden: zoveel tijd zonder enig teken van Claude, of hetzelfde
+// commando zo vaak achter elkaar opnieuw. Wachten op een kaart telt niet mee.
+const STIL_CHAT_MS = 3 * 60 * 1000
+const STIL_CODE_MS = 6 * 60 * 1000
+const LUS_MAX = 5
 let toestemmingAan = false
 // Per Claude-proces een eigen sleutel → welke opdracht en welke klok erbij horen.
 const vraagProcessen = new Map()
 const openVragen = new Map() // rij-id → sluit(status)
 
-function nieuweVraagContext(opdrachtId = null) {
-  const ctx = { sleutel: crypto.randomBytes(24).toString('hex'), opdrachtId, klok: null, wacht: 0 }
+function nieuweVraagContext(opdrachtId = null, vraagMs = VRAAG_MS) {
+  const ctx = { sleutel: crypto.randomBytes(24).toString('hex'), opdrachtId, klok: null, wacht: 0, vraagMs }
   vraagProcessen.set(ctx.sleutel, ctx)
   return ctx
 }
@@ -263,8 +269,29 @@ function maakKlok(ms, actie) {
     pauze() { if (!t) return; clearTimeout(t); t = null; rest -= Date.now() - sinds },
     verder() { if (!t && !uit) loop() },
     stop() { clearTimeout(t); t = null; uit = true },
+    opnieuw() { if (uit) return; rest = ms; if (t) { clearTimeout(t); loop() } },
   }
 }
+
+// Waakhond: meldt het als Claude stil valt of hetzelfde commando blijft herhalen.
+function maakWaakhond(stilMs, opVast) {
+  const gezien = new Map()
+  let laatste = null
+  const klok = maakKlok(stilMs, () => opVast(`Vastgelopen: ${Math.round(stilMs / 60000)} minuten geen enkele activiteit${laatste ? ` (laatste stap: ${laatste})` : ''}. Ik ben gestopt; probeer het opnieuw of geef een kleinere opdracht.`))
+  return {
+    klok,
+    teken() { klok.opnieuw() },
+    tool(b) {
+      const stap = stapTekst(b)
+      if (stap) laatste = stap
+      const sleutel = `${b.name}:${JSON.stringify(b.input || {})}`
+      const n = (gezien.get(sleutel) || 0) + 1
+      gezien.set(sleutel, n)
+      if (n >= LUS_MAX) opVast(`Vastgelopen: ${n} keer hetzelfde geprobeerd (${stap || b.name}) zonder verder te komen. Ik ben gestopt.`)
+    },
+  }
+}
+const beideKlokken = (a, b) => ({ pauze() { a.pauze(); b.pauze() }, verder() { a.verder(); b.verder() } })
 
 const weigerTool = (message) => ({ behavior: 'deny', message })
 
@@ -291,7 +318,7 @@ function wachtOpBesluit(ctx, id, opGesloten) {
       klaar(status)
     }
     const eindig = () => sluitVraagVerlopen(id).then(sluit, () => sluit('verlopen'))
-    const tik = setTimeout(eindig, VRAAG_MS)
+    const tik = setTimeout(eindig, ctx.vraagMs || VRAAG_MS)
     openVragen.set(id, sluit)
     opGesloten(eindig) // opdracht gestopt of Claude weg
   })
@@ -346,7 +373,7 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
   }
   if (status === 'toegestaan' || status === 'altijd') return toegestaan
   if (status === 'afgewezen') return weigerTool('Kersten heeft dit afgewezen. Probeer het niet opnieuw of via een omweg; ga door met wat wel kan en meld dit in je samenvatting.')
-  return weigerTool(`Geen antwoord van Kersten binnen ${Math.round(VRAAG_MS / 60000)} minuten, dus geweigerd. Probeer het niet opnieuw; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.`)
+  return weigerTool(`Geen antwoord van Kersten binnen ${Math.round((ctx.vraagMs || VRAAG_MS) / 60000)} minuten, dus geweigerd. Probeer het niet opnieuw; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.`)
 }
 
 // Loket: alleen met de sleutel van een lopend Claude-proces. De verbinding blijft
@@ -433,20 +460,29 @@ function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
       p.kill('SIGTERM')
     })
     let uit = '', fout = ''
-    let rest = '', slot = null
+    let rest = '', slot = null, vast = null
+    const hond = opStap ? maakWaakhond(STIL_CODE_MS, (reden) => {
+      if (vast) return
+      vast = reden
+      spawn('pkill', ['-TERM', '-P', String(p.pid)], { stdio: 'ignore' }).on('error', () => {})
+      p.kill('SIGTERM')
+    }) : null
     const regel = (r) => {
       let e
       try { e = JSON.parse(r) } catch { return }
       if (e.type === 'result') slot = e
       if (e.type === 'assistant') {
         for (const b of e.message?.content || []) {
-          const t = b.type === 'tool_use' ? stapTekst(b) : null
+          if (b.type !== 'tool_use') continue
+          hond?.tool(b)
+          const t = stapTekst(b)
           if (t) opStap(t)
         }
       }
     }
     p.stdout.on('data', d => {
       if (!opStap) { uit += d; return }
+      hond?.teken()
       rest += d
       const regels = rest.split('\n')
       rest = regels.pop()
@@ -454,14 +490,15 @@ function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
     })
     p.stderr.on('data', d => { fout += d })
     const stop = maakKlok(30 * 60 * 1000, () => p.kill('SIGTERM'))
-    if (ctx) ctx.klok = stop
+    if (ctx) ctx.klok = hond ? beideKlokken(stop, hond.klok) : stop
     p.on('close', (code) => {
       stop.stop()
+      hond?.klok.stop()
       if (ctx) { vraagProcessen.delete(ctx.sleutel); vraagToolKapot(fout) }
       if (rest) regel(rest)
       let json = slot
       if (!opStap) { try { json = JSON.parse(uit) } catch { /* geen JSON */ } }
-      klaar({ code, json, ruw: opStap ? '' : uit.trim(), fout: fout.trim() })
+      klaar({ code, json, ruw: opStap ? '' : uit.trim(), fout: fout.trim(), vast })
     })
   })
 }
@@ -513,12 +550,12 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
     ...EIGEN_ARGS,
     '--max-budget-usd', '10',
   ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap, ctx)
-  const ruw = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
+  const ruw = r.vast || r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
   // De afsluitregels zijn voor het systeem; Kersten leest de samenvatting.
   const uitkomst = ruw.match(/^UITKOMST:\s*(live|wacht_op_jou|mislukt)\s*$/im)?.[1]?.toLowerCase() || null
   const nodig = ruw.match(/^NODIG:[ \t]*(.+)$/im)?.[1]?.trim() || null
   const tekst = ruw.replace(/^(UITKOMST|NODIG):.*$/gim, '').trim()
-  return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result && uitkomst !== 'mislukt', tekst: tekst.slice(0, 8000), uitkomst, nodig }
+  return { ok: !r.vast && r.code === 0 && !r.json?.is_error && !!r.json?.result && uitkomst !== 'mislukt', tekst: tekst.slice(0, 8000), uitkomst: r.vast ? 'mislukt' : uitkomst, nodig }
 }
 
 // Snelle chat: er staat altijd één Claude-proces klaar (opgestart, ingelogd,
@@ -543,7 +580,7 @@ async function maakWarm(slim = null) {
   }
   // dontAsk weigert zonder de vraag-tool aan te roepen, dus met vragen: default.
   // Groeirondes vragen nooit: daar kijkt niemand mee.
-  const ctx = toestemmingAan && !slim?.zonderVragen ? nieuweVraagContext() : null
+  const ctx = toestemmingAan && !slim?.zonderVragen ? nieuweVraagContext(null, VRAAG_CHAT_MS) : null
   const basis = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--permission-mode', ctx ? 'default' : 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS,
     '--mcp-config', ctx ? vraagMcp(ctx) : '{"mcpServers":{}}', ...(ctx ? ['--permission-prompt-tool', VRAAG_TOOL] : [])]
@@ -633,19 +670,29 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
   const r = await new Promise((klaar) => {
     let deel = ''
     const stop = maakKlok((slimId ? 10 : 5) * 60 * 1000, () => w.p.kill('SIGTERM'))
-    if (w.ctx) w.ctx.klok = stop
+    let vast = null
+    const hond = maakWaakhond(STIL_CHAT_MS, (reden) => {
+      if (vast) return
+      vast = reden
+      spawn('pkill', ['-TERM', '-P', String(w.p.pid)], { stdio: 'ignore' }).on('error', () => {})
+      w.p.kill('SIGTERM')
+    })
+    if (w.ctx) w.ctx.klok = beideKlokken(stop, hond.klok)
     w.opBericht = (m) => {
+      hond.teken()
+      if (m.type === 'assistant') for (const b of m.message?.content || []) if (b.type === 'tool_use') hond.tool(b)
       if (m.type === 'stream_event') {
         const e = m.event
         if (e?.type === 'message_start') deel = ''
         else if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta') { deel += e.delta.text; opDeel(zichtbareTekst(deel)) }
       } else if (m.type === 'result') {
         stop.stop()
+        hond.klok.stop()
         klaar({ ok: m.subtype === 'success' && !m.is_error, tekst: m.result || '' })
         w.p.stdin.end()
       }
     }
-    w.opEinde = () => { stop.stop(); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
+    w.opEinde = () => { stop.stop(); hond.klok.stop(); klaar({ ok: false, tekst: vast || w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
     opStop?.(() => w.p.kill('SIGTERM'))
     if (w.dood) return w.opEinde()
     w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')

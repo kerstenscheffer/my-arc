@@ -1537,6 +1537,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // Wat er nu op de Mac loopt of wacht: in de statusregel, details + Stop in een dropdown.
   const [macWerk, setMacWerk] = useState([])
   const [macOpen, setMacOpen] = useState(false)
+  const [kaartenOpen, setKaartenOpen] = useState(0) // toestemmingsvragen waar Gino op wacht
   useEffect(() => {
     if (!macOpen) return
     const buiten = (e) => { if (!e.target.closest?.('[data-mac-werk]')) setMacOpen(false) }
@@ -2139,7 +2140,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
   const anderBezig = gesprekken.find(g => g.id !== actief.id && bezigPer[g.id])
-  const werk = code === 'bezig' ? (inRij ? `Bezig met code · ${inRij} in de rij` : 'Bezig met code…')
+  const werk = kaartenOpen ? 'Wacht op jou: klik op de kaart' : code === 'bezig' ? (inRij ? `Bezig met code · ${inRij} in de rij` : 'Bezig met code…')
     : bezig ? (isEditor(actief) ? 'ChatGPT denkt na…' : deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
     : anderBezig ? `Gino denkt na in ${anderBezig.naam}…`
     : code === 'wacht' ? 'Wacht op je Mac…' : null
@@ -2259,7 +2260,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
         )}
 
         {/* Toestemmingsvragen van Gino: blijven staan ook als de berichten dicht zijn */}
-        <ToestemmingKaarten />
+        <ToestemmingKaarten onOpen={setKaartenOpen} />
         <div ref={balk} style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
@@ -2336,7 +2337,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left', lineHeight: '13px' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textPrimary }}>{opdrachtKop(macNu)}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: colors.textSecondary, fontSize: '0.7rem', fontWeight: 700 }}>
-                      {macNu.status === 'bezig' ? `Bezig · ${duurSinds(macNu)}` : 'In de rij'}{macNu.status === 'bezig' && macNu.voortgang ? ` · ${macNu.voortgang}` : ''}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
+                      {macNu.status === 'bezig' ? `${kaartenOpen ? 'Wacht op jou' : 'Bezig'} · ${duurSinds(macNu)}` : 'In de rij'}{macNu.status === 'bezig' && macNu.voortgang && !kaartenOpen ? ` · ${macNu.voortgang}` : ''}{macWerk.length > 1 ? ` · +${macWerk.length - 1}` : ''}
                     </span>
                   </span>
                   <ChevronDown size={12} strokeWidth={3} color={colors.textSecondary} style={{ flexShrink: 0, transform: macOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
