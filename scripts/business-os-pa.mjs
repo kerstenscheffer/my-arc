@@ -58,6 +58,8 @@ import readline from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
+import { maakStilteKlok } from './gino-waakhond.mjs'
+import { FAMILIE_NAAM, familieVan, veiligeBash, veiligZelftest } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -142,10 +144,10 @@ const EIGEN_NIET_BEWERKEN = EIGEN_MAPPEN.flatMap(m => [`Edit(/${m}/**)`, `Write(
 // De permissiecode zelf en de instellingen: nooit via een opdracht, ook niet via
 // acceptEdits. Geheimen: ook niet met Read, dat op de allow-list staat en dus niet
 // langs de permissiecode komt.
-const BLOKKADE_BESTANDEN = ['gino-blokkade.mjs', 'gino-toestemming-mcp.mjs'].map(b => path.join(MAP, 'scripts', b))
+const BLOKKADE_BESTANDEN = ['gino-blokkade.mjs', 'gino-toestemming-mcp.mjs', 'gino-veilig.mjs', 'gino-waakhond.mjs'].map(b => path.join(MAP, 'scripts', b))
 const NIET_AANRAKEN = [
   ...BLOKKADE_BESTANDEN.flatMap(b => [`Edit(/${b})`, `Write(/${b})`]),
-  'Bash(cp *gino-blokkade*)', 'Bash(cp *gino-toestemming-mcp*)',
+  'Bash(cp *gino-blokkade*)', 'Bash(cp *gino-toestemming-mcp*)', 'Bash(cp *gino-veilig*)', 'Bash(cp *gino-waakhond*)',
   'Edit(~/.claude/settings*)', 'Write(~/.claude/settings*)', 'Edit(./.claude/settings*)', 'Write(./.claude/settings*)',
 ]
 const GEHEIMEN_NIET_LEZEN = ['Read(./.env*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.config/myarc-pa/**)']
@@ -235,12 +237,16 @@ const VRAAG_TOOL = 'mcp__gino__toestemming'
 const VRAAG_SERVER = path.join(MAP, 'scripts', 'gino-toestemming-mcp.mjs')
 const VRAAG_MS = Number(process.env.PA_TOESTEMMING_MS) || 15 * 60 * 1000
 const VRAAG_CHAT_MS = Number(process.env.PA_TOESTEMMING_MS) || 3 * 60 * 1000
-// Vastgelopen eerder melden: zoveel tijd zonder enig teken van Claude, of hetzelfde
-// commando zo vaak achter elkaar opnieuw. Wachten op een kaart telt niet mee.
-const STIL_CHAT_MS = 3 * 60 * 1000
-const STIL_CODE_MS = 6 * 60 * 1000
+// Vastgelopen melden (gino-waakhond.mjs): binnen een minuut zonder teken van Claude
+// en zonder rekenwerk in zijn commando's een melding, na 3 minuten stoppen. Ook bij
+// hetzelfde commando zo vaak achter elkaar. Wachten op een kaart telt niet mee.
+const MELD_MS = 45 * 1000 // met een tik van 10 s: melding binnen de minuut
+const STOP_STIL_MS = 3 * 60 * 1000
 const LUS_MAX = 5
 let toestemmingAan = false
+const veiligFouten = veiligZelftest()
+const veiligAan = veiligFouten.length === 0
+if (!veiligAan) console.error('gino-veilig zelftest faalt, alles krijgt weer een kaart:', veiligFouten.join(' | '))
 // Per Claude-proces een eigen sleutel → welke opdracht en welke klok erbij horen.
 const vraagProcessen = new Map()
 const openVragen = new Map() // rij-id → sluit(status)
@@ -276,10 +282,15 @@ function maakKlok(ms, actie) {
 }
 
 // Waakhond: meldt het als Claude stil valt of hetzelfde commando blijft herhalen.
-function maakWaakhond(stilMs, opVast) {
+function maakWaakhond(pid, opVast, opMelding = () => {}) {
   const gezien = new Map()
   let laatste = null
-  const klok = maakKlok(stilMs, () => opVast(`Vastgelopen: ${Math.round(stilMs / 60000)} minuten geen enkele activiteit${laatste ? ` (laatste stap: ${laatste})` : ''}. Ik ben gestopt; probeer het opnieuw of geef een kleinere opdracht.`))
+  const klok = maakStilteKlok({
+    pid, meldMs: MELD_MS, stopMs: STOP_STIL_MS, tikMs: 10000,
+    opMeld: () => opMelding(`⚠ Lijkt vast${laatste ? ` bij: ${laatste}` : ''}. Geen activiteit sinds bijna een minuut. Stop hem, of zeg in de chat wat ik anders moet doen.`),
+    opHersteld: () => opMelding(null),
+    opVast: () => opVast(`Vastgelopen: ${Math.round(STOP_STIL_MS / 60000)} minuten geen activiteit${laatste ? ` (laatste stap: ${laatste})` : ''}. Ik ben gestopt. Probeer ik het anders, of laten we het hierbij?`),
+  })
   return {
     klok,
     teken() { klok.opnieuw() },
@@ -332,7 +343,11 @@ function wachtOpBesluit(ctx, id, opGesloten) {
 async function besluitTool(ctx, tool, invoer, opGesloten) {
   if (!gebruiker || !toestemmingAan || !ctx?.opdrachtId) return weigerTool('Geweigerd: nu kan er geen toestemming gevraagd worden.')
   const toegestaan = { behavior: 'allow', updatedInput: invoer }
-  const basis = { coach_id: gebruiker.id, opdracht_id: ctx.opdrachtId, tool, invoer: kaartInvoer(tool, invoer), reden: gewoneTaal(tool, invoer) }
+  const soortKaart = veiligAan && tool === 'Bash' ? familieVan(String(invoer?.command || '')) : null
+  const basis = {
+    coach_id: gebruiker.id, opdracht_id: ctx.opdrachtId, tool, invoer: kaartInvoer(tool, invoer),
+    reden: `${gewoneTaal(tool, invoer)}${soortKaart ? ` · Toestaan geldt voor deze opdracht voor alle ${FAMILIE_NAAM[soortKaart]}` : ''}`,
+  }
 
   // 1. Harde blokkade: geen knop, ook niet via een regel. Alleen tonen.
   const blok = hardeBlokkade(tool, invoer)
@@ -343,7 +358,21 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
     return weigerTool(`Geblokkeerd: ${blok.reden}. Hier is geen knop voor en Kersten kan dit hier niet toestaan. Probeer het niet op een andere manier; zet bij NODIG wat hij zelf moet doen.`)
   }
 
-  // 2. Eigen lijst. patroonVoor is streng: alleen precies dezelfde vorm past.
+  // 2. Alleen lezen, of schrijven in ~/Gino en /tmp: geen kaart (gino-veilig.mjs).
+  // Faalt de zelftest bij het starten, dan staat dit uit en krijgt alles weer een kaart.
+  const cmd = tool === 'Bash' ? String(invoer?.command || '') : ''
+  if (veiligAan && cmd && veiligeBash(cmd)) {
+    console.log(`${tijd()} ✓ zonder vraag: ${maskeer(cmd).split('\n')[0].slice(0, 140)}`)
+    return toegestaan
+  }
+  // Eén keer toegestaan in deze opdracht: dezelfde soort hoeft niet nog eens.
+  const familie = veiligAan && cmd ? familieVan(cmd) : null
+  if (familie && ctx.families?.has(familie)) {
+    console.log(`${tijd()} ✓ al toegestaan (${familie}): ${maskeer(cmd).split('\n')[0].slice(0, 120)}`)
+    return toegestaan
+  }
+
+  // 3. Eigen lijst. patroonVoor is streng: alleen precies dezelfde vorm past.
   const patroon = patroonVoor(tool, invoer)
   if (patroon) {
     const { data: regel } = await sb.from('business_os_toestemming_regels').select('id')
@@ -374,6 +403,7 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
       .then(r => r, (x) => ({ error: x }))
     if (e && e.code !== '23505') console.error(tijd(), 'Regel opslaan mislukt:', e.message)
   }
+  if (familie && (status === 'toegestaan' || status === 'altijd')) (ctx.families ||= new Set()).add(familie)
   if (status === 'toegestaan' || status === 'altijd') return toegestaan
   if (status === 'afgewezen') return weigerTool('Kersten heeft dit afgewezen. Probeer het niet opnieuw of via een omweg; ga door met wat wel kan en meld dit in je samenvatting.')
   return weigerTool(`Geen antwoord van Kersten binnen ${Math.round((ctx.vraagMs || VRAAG_MS) / 60000)} minuten, dus geweigerd. Probeer het niet opnieuw; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.`)
@@ -464,12 +494,12 @@ function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
     })
     let uit = '', fout = ''
     let rest = '', slot = null, vast = null
-    const hond = opStap ? maakWaakhond(STIL_CODE_MS, (reden) => {
+    const hond = opStap ? maakWaakhond(() => p.pid, (reden) => {
       if (vast) return
       vast = reden
       spawn('pkill', ['-TERM', '-P', String(p.pid)], { stdio: 'ignore' }).on('error', () => {})
       p.kill('SIGTERM')
-    }) : null
+    }, (t) => opStap.melding?.(t)) : null
     const regel = (r) => {
       let e
       try { e = JSON.parse(r) } catch { return }
@@ -540,7 +570,8 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
   const ctx = toestemmingAan && rijId ? nieuweVraagContext(rijId) : null
   const r = await claude([
     '-p', `${INSTRUCTIE}${ctx ? INSTRUCTIE_VRAGEN : ''}${regels}\n\nOpdracht:\n${opdracht}`,
-    '--output-format', 'stream-json', '--verbose',
+    // Partial messages: ook denkwerk geeft tekens van leven aan de waakhond.
+    '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--model', 'opus', '--effort', 'high',
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
@@ -674,12 +705,12 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
     let deel = ''
     const stop = maakKlok((slimId ? 10 : 5) * 60 * 1000, () => w.p.kill('SIGTERM'))
     let vast = null
-    const hond = maakWaakhond(STIL_CHAT_MS, (reden) => {
+    const hond = maakWaakhond(() => w.p.pid, (reden) => {
       if (vast) return
       vast = reden
       spawn('pkill', ['-TERM', '-P', String(w.p.pid)], { stdio: 'ignore' }).on('error', () => {})
       w.p.kill('SIGTERM')
-    })
+    }, (t) => opDeel(`${zichtbareTekst(deel)}${t ? `${deel ? '\n\n' : ''}${t}` : ''}`))
     if (w.ctx) w.ctx.klok = beideKlokken(stop, hond.klok)
     w.opBericht = (m) => {
       hond.teken()
@@ -772,6 +803,20 @@ async function rondeCode() {
       if (Date.now() - vorigeStap < 4000) return
       vorigeStap = Date.now()
       sb.from('business_os_opdrachten').update({ voortgang: t }).eq('id', rij.id).then(() => {}, () => {})
+    }
+    // Lijkt vast: meteen zichtbaar in de chat (voortgang) en één push per opdracht.
+    let gepusht = false
+    opStap.melding = (t) => {
+      vorigeStap = Date.now()
+      sb.from('business_os_opdrachten').update({ voortgang: t || 'Weer bezig' }).eq('id', rij.id).eq('status', 'bezig').then(() => {}, () => {})
+      if (!t) return
+      console.log(`${tijd()} ${t}`)
+      if (gepusht || !gebruiker) return
+      gepusht = true
+      sb.from('coach_notifications').insert({
+        coach_id: gebruiker.id, type: 'personal', priority: 'high', title: 'Gino lijkt vast',
+        message: t.slice(0, 140), tags: ['gino'], action_data: { soort: 'gino_vast', opdracht_id: rij.id },
+      }).then(({ error: e }) => { if (e) console.error(tijd(), 'Push mislukt:', e.message) }, () => {})
     }
     const r = await wakkerTijdens(() => voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f), opStap, rij.id))
     lopend.delete(rij.id)

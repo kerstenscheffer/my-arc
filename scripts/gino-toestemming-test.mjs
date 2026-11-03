@@ -9,8 +9,9 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 import path from 'node:path'
 import { HARDE_BLOKKADES, zelftest } from './gino-blokkade.mjs'
+import { veiligZelftest } from './gino-veilig.mjs'
 
-const fouten = zelftest()
+const fouten = [...zelftest(), ...veiligZelftest()]
 console.log('Harde blokkades:')
 for (const b of HARDE_BLOKKADES) console.log(`  → ${b}`)
 for (const f of fouten) console.log(`FOUT ${f}`)

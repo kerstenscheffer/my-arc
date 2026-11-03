@@ -71,7 +71,7 @@ const TEKST_REGELS = [
   // Rechten en algemene shell
   ['rechten', /--dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions|skipDangerousModePermissionPrompt|--permission-mode\b|--permission-prompt-tool\b|\bdefaultMode\b/i],
   ['rechten', /\.claude\/settings|\.claude\.json/i],
-  ['rechten', /(>|\btee\b|\bcp\b|\bmv\b|\bln\b|\bsed\s+-i|\bperl\s+-[a-z]*i)[^\n]*(gino-blokkade|gino-toestemming)/i],
+  ['rechten', /(>|\btee\b|\bcp\b|\bmv\b|\bln\b|\bsed\s+-i|\bperl\s+-[a-z]*i)[^\n]*(gino-blokkade|gino-toestemming|gino-veilig|gino-waakhond)/i],
   ['rechten', /(^|[\s;|&(])(bash|sh|zsh|dash|fish|ksh)\s+-[a-z]*c\b|(^|[\s;|&(])eval\s|\|\s*(sudo\s+)?(bash|sh|zsh)\b|(^|[\s;|&(])sudo\s/i],
   // Geheimen
   ['geheim', /(^|[;&|]\s*)(env|printenv|set|export\s+-p)\s*($|[|;&>])/i],
