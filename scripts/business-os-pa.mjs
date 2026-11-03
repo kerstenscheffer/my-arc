@@ -992,6 +992,35 @@ async function planGroei() {
   await sb.from('business_os_opdrachten').insert({ coach_id: gebruiker.id, soort: 'groei', opdracht: 'Groeironde (nacht)' })
 }
 
+// Zoom-transcripts: elke dag vanaf 05:15 (na de Call-verwerker van ~04:40) één
+// run van scripts/zoom-sync.mjs. Mac uit of in slaap: de run komt zodra hij
+// wakker is, en het script haalt zelf de gemiste dagen in. Mislukt: maximaal 3
+// pogingen per dag, 2 uur uit elkaar; de fouten staan in app_fouten (zoom-sync).
+const ZOOM_DAG = path.join(SESSIE_MAP, 'zoom-sync-dag')
+const zoom = { bezig: false, dag: null, pogingen: 0, nietVoor: 0 }
+async function planZoomSync() {
+  if (!gebruiker || zoom.bezig || Date.now() < zoom.nietVoor) return
+  const nu = new Date()
+  if (nu.getHours() * 60 + nu.getMinutes() < 5 * 60 + 15) return
+  const vandaag = nu.toLocaleDateString('sv-SE')
+  try { if (fs.readFileSync(ZOOM_DAG, 'utf8').trim() === vandaag) return } catch { /* nog nooit */ }
+  if (zoom.dag !== vandaag) { zoom.dag = vandaag; zoom.pogingen = 0 }
+  if (zoom.pogingen >= 3) return
+  zoom.pogingen++
+  zoom.bezig = true
+  const t = await versToken().catch(() => '')
+  if (!t) { zoom.bezig = false; return }
+  // caffeinate -i: de Mac niet in slaap laten vallen tijdens de run.
+  const p = spawn('caffeinate', ['-i', 'node', 'scripts/zoom-sync.mjs'], { cwd: MAP, stdio: 'inherit', env: { ...process.env, PA_ACCESS_TOKEN: t } })
+  p.on('error', () => { zoom.bezig = false; zoom.nietVoor = Date.now() + 2 * 3600 * 1000 })
+  p.on('close', (code) => {
+    zoom.bezig = false
+    console.log(`${tijd()} ${code === 0 ? '✓' : '✗'} zoom-sync`)
+    if (code === 0) fs.writeFileSync(ZOOM_DAG, vandaag, { mode: 0o600 })
+    else zoom.nietVoor = Date.now() + 2 * 3600 * 1000
+  })
+}
+
 // Strategierondes: ochtend 08-10, avond 20-22 (zondag: weekreview). Eén per
 // venster per dag; staat de Mac dan uit, dan vervalt die ronde.
 async function planStrategie() {
@@ -1145,5 +1174,6 @@ setInterval(() => rondeChat().catch(fout), 3000)
 setInterval(() => rondeCode().catch(fout), 5000)
 setInterval(() => rondeGroei().catch(fout), 60 * 1000)
 setInterval(() => planGroei().catch(fout), 10 * 60 * 1000)
+setInterval(() => planZoomSync().catch(fout), 5 * 60 * 1000)
 // Gino's tijdmeter: elke minuut welke app/site voorop staat (scripts/gino-tijd.mjs).
 startTijdmeter(sb, () => gebruiker, (...x) => console.error(tijd(), ...x))
