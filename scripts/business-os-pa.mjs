@@ -124,6 +124,8 @@ const TOEGESTAAN = [
   'Bash(node scripts/content-autopilot.mjs *)', // content-autopilot: bibliotheek, winnaars, varianten maken
   // 2 nov 2026: ook in code-opdrachten de database lezen (met PA_ACCESS_TOKEN), transcripts en pdf's.
   'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)',
+  // 3 nov 2026: reels van Drive tot Metricool-concept. Publiceren kan dit script niet.
+  'Bash(node scripts/reel-gino.mjs *)',
 ]
 // Eigen mappen op de Mac (boeken, PDF's, exports): alleen lezen. Code-
 // opdrachten mogen eruit kopiëren naar workapp (bv. workapp/hormozi, staat in
