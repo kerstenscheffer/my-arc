@@ -9,12 +9,25 @@ import {
 } from '@zxing/library'
 import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine } from 'lucide-react'
 import { leesBarcodeUitFoto } from './leesBarcodeUitFoto'
+import { colors, radius, space, type, border } from '../../../ui/tokens'
 
 const G = {
   primary: '#FFD700',
   primarySoft: 'rgba(255, 215, 0, 0.15)',
   primaryBorder: 'rgba(255, 215, 0, 0.35)',
 }
+
+// Eén gevulde witte knop per keer: de actie die nu aan de beurt is.
+const knopStijl = (primair, uit) => ({
+  width: '100%', maxWidth: 300, minHeight: 48,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: space[2],
+  background: primair ? colors.textPrimary : colors.surface,
+  border: 'none', borderRadius: radius.btn,
+  color: primair ? colors.onAccent : colors.textPrimary,
+  fontSize: 15, fontWeight: 800, fontFamily: 'inherit',
+  opacity: uit ? 0.5 : 1, cursor: uit ? 'default' : 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
 
 export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const isMobile = window.innerWidth <= 768
@@ -31,6 +44,7 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const [visible, setVisible] = useState(false)
   const [scanTime, setScanTime] = useState(0)
   const fotoRef = useRef(null)
+  const invoerRef = useRef(null)
   const [fotoLezen, setFotoLezen] = useState(false)
   const [fotoFout, setFotoFout] = useState(false)
 
@@ -470,178 +484,101 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       {manualMode && (
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: '2rem'
+          alignItems: 'center', justifyContent: 'center', padding: space[8], paddingBottom: 96,
         }}>
-          <div style={{
-            fontSize: '1rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem'
-          }}>
+          <div style={{ ...type.title, marginBottom: space[2], textAlign: 'center' }}>
             Barcode invoeren
           </div>
-          {status === 'error' && (
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', marginBottom: '0.5rem', textAlign: 'center' }}>
-              De live camera opent niet op dit toestel. Maak een foto van de barcode.
-            </div>
-          )}
-
-          {/* Foto via de camera-app: werkt ook als de live camera niet opent. */}
-          <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={kiesFoto} style={{ display: 'none' }} />
-          <button onClick={() => fotoRef.current?.click()} disabled={fotoLezen}
-            style={{
-              width: '100%', maxWidth: '300px', minHeight: '48px', marginTop: '0.5rem',
-              background: '#fff', border: 'none', borderRadius: '10px', color: '#000',
-              fontSize: '0.9rem', fontWeight: '800', fontFamily: 'inherit',
-              cursor: fotoLezen ? 'wait' : 'pointer', opacity: fotoLezen ? 0.6 : 1, touchAction: 'manipulation',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            }}
-          >
-            <Camera size={17} strokeWidth={2.6} /> {fotoLezen ? 'Foto lezen…' : 'Foto van barcode maken'}
-          </button>
-          {fotoFout && (
-            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff', marginTop: '0.6rem', textAlign: 'center', maxWidth: '300px' }}>
-              Geen barcode gevonden. Maak de foto wat dichterbij en scherp, of typ de cijfers.
-            </div>
-          )}
-
-          <div style={{
-            fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: '1.1rem 0 0.75rem', textAlign: 'center'
-          }}>
-            Of typ de cijfers onder de streepjescode
+          <div style={{ ...type.body, marginBottom: space[6], textAlign: 'center', maxWidth: 300 }}>
+            {status === 'error'
+              ? 'De camera opent niet op dit toestel. Maak een foto van de barcode of typ de cijfers.'
+              : 'Typ de cijfers onder de streepjescode'}
           </div>
 
           <input
+            ref={invoerRef}
             type="text" inputMode="numeric"
             value={manualBarcode}
             onChange={(e) => setManualBarcode(e.target.value.replace(/[^0-9]/g, ''))}
             onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
             placeholder="8710400000000"
+            autoFocus={status !== 'error'}
             style={{
-              width: '100%', maxWidth: '300px', height: '52px',
-              background: 'rgba(255,255,255,0.06)',
-              border: `1.5px solid ${G.primaryBorder}`,
-              borderRadius: '10px', color: '#fff',
-              fontSize: '1.2rem', fontWeight: '700',
-              textAlign: 'center', letterSpacing: '0.08em',
-              outline: 'none', marginBottom: '0.75rem'
+              width: '100%', maxWidth: 300, height: 52, boxSizing: 'border-box',
+              background: colors.surface, border: 'none', borderRadius: radius.btn,
+              color: colors.textPrimary, fontFamily: 'inherit',
+              fontSize: 22, fontWeight: 800,
+              textAlign: 'center', letterSpacing: '0.04em',
+              outline: 'none', marginBottom: space[3],
             }}
           />
 
           <button onClick={handleManualSubmit}
-            disabled={!manualBarcode.trim() || manualBarcode.length < 8}
-            style={{
-              width: '100%', maxWidth: '300px', height: '48px',
-              background: manualBarcode.length >= 8 ? G.primary : 'rgba(255, 215, 0, 0.15)',
-              border: 'none', borderRadius: '10px',
-              color: manualBarcode.length >= 8 ? '#000' : 'rgba(255,255,255,0.3)',
-              fontSize: '0.9rem', fontWeight: '800',
-              cursor: manualBarcode.length >= 8 ? 'pointer' : 'default',
-              touchAction: 'manipulation'
-            }}
+            disabled={manualBarcode.length < 8}
+            style={knopStijl(manualBarcode.length >= 8, manualBarcode.length < 8)}
           >
             Zoeken
           </button>
+
+          {/* Foto via de camera-app: werkt ook als de live camera niet opent. */}
+          <input ref={fotoRef} type="file" accept="image/*" capture="environment" onChange={kiesFoto} style={{ display: 'none' }} />
+          <button onClick={() => fotoRef.current?.click()} disabled={fotoLezen}
+            style={{ ...knopStijl(manualBarcode.length < 8, fotoLezen), marginTop: space[2] }}
+          >
+            <Camera size={17} strokeWidth={2.6} /> {fotoLezen ? 'Foto lezen…' : 'Foto van barcode maken'}
+          </button>
+          {fotoFout && (
+            <div style={{ ...type.body, color: colors.textPrimary, marginTop: space[3], textAlign: 'center', maxWidth: 300 }}>
+              Geen barcode gevonden. Maak de foto dichterbij en scherp, of typ de cijfers.
+            </div>
+          )}
         </div>
       )}
 
-      {/* ═══ BOTTOM SEGMENTED CONTROL — Zoeken | Barcode ═══ */}
+      {/* ═══ ONDERBALK — Zoeken | Barcode | Typ ═══ */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: isMobile ? '0.875rem 1rem 1.25rem' : '1.25rem 1.5rem 1.5rem',
-        paddingBottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '0.875rem' : '1.25rem'})`,
+        padding: space[4],
+        paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${space[4]}px)`,
         background: 'linear-gradient(0deg, rgba(0,0,0,0.92) 0%, transparent 100%)',
-        display: 'flex', justifyContent: 'center', zIndex: 10
+        display: 'flex', justifyContent: 'center', zIndex: 10,
       }}>
         <div style={{
-          display: 'inline-flex',
-          background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '999px',
-          padding: '4px',
-          backdropFilter: 'blur(20px)',
+          position: 'relative', display: 'flex', width: '100%', maxWidth: 360,
+          background: colors.surface, border: border.subtle,
+          borderRadius: radius.pill, padding: 3,
         }}>
-          <button
-            onClick={() => {
-              if (onSwitchToSearch) onSwitchToSearch()
-              else if (onClose) onClose()
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '0.4rem',
-              padding: '0.6rem 1.25rem',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '999px',
-              color: 'rgba(255, 255, 255, 0.55)',
-              fontSize: '0.82rem', fontWeight: '600',
-              cursor: 'pointer', touchAction: 'manipulation',
-              minHeight: '38px',
-            }}
-          >
-            <Search size={15} strokeWidth={2.4} /> Zoeken
-          </button>
-          <button
-            onClick={() => {
-              // Already on barcode — if in manual mode, toggle back to camera
-              if (manualMode) {
-                setManualMode(false)
-                setStatus('idle')
-                setScanTime(0)
-              }
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '0.4rem',
-              padding: '0.6rem 1.25rem',
-              background: '#000',
-              border: 'none',
-              borderRadius: '999px',
-              color: G.primary,
-              fontSize: '0.82rem', fontWeight: '700',
-              cursor: 'pointer', touchAction: 'manipulation',
-              minHeight: '38px',
-              boxShadow: `0 2px 12px rgba(255, 215, 0, 0.15)`,
-            }}
-          >
-            <ScanLine size={15} strokeWidth={2.4} /> Barcode
-          </button>
+          <div style={{
+            position: 'absolute', top: 3, bottom: 3,
+            left: `calc(3px + (100% - 6px) * ${(manualMode ? 2 : 1) / 3})`, width: 'calc((100% - 6px) / 3)',
+            background: colors.textPrimary, borderRadius: radius.pill,
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+          {[
+            { id: 'zoek', label: 'Zoeken', Icoon: Search, aan: false, doe: () => { if (onSwitchToSearch) onSwitchToSearch(); else if (onClose) onClose() } },
+            { id: 'scan', label: 'Barcode', Icoon: ScanLine, aan: !manualMode, doe: () => {
+              if (!manualMode) return
+              setFotoFout(false); setManualMode(false); setStatus('idle'); setScanTime(0)
+            } },
+            { id: 'typ', label: 'Typ', Icoon: Keyboard, aan: manualMode, doe: () => {
+              // Stond het typscherm al open na een camerafout: dan alleen het toetsenbord.
+              if (manualMode) { setStatus('idle'); invoerRef.current?.focus(); return }
+              stopScanning(); setManualMode(true); setStatus('idle'); setScanTime(0)
+            } },
+          ].map(({ id, label, Icoon, aan, doe }) => (
+            <button key={id} onClick={doe} style={{
+              position: 'relative', zIndex: 1, flex: 1, minWidth: 0, minHeight: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: 'transparent', border: 'none', borderRadius: radius.pill,
+              color: aan ? colors.onAccent : colors.textPrimary,
+              fontSize: 15, fontWeight: 800, fontFamily: 'inherit',
+              cursor: 'pointer', transition: 'color 0.15s ease',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Icoon size={16} strokeWidth={2.6} /> {label}
+            </button>
+          ))}
         </div>
-
-        {/* Subtle "handmatig" link below the segmented control */}
-        {!manualMode && (
-          <button onClick={() => { stopScanning(); setManualMode(true); setStatus('idle'); setScanTime(0) }}
-            style={{
-              position: 'absolute',
-              right: isMobile ? '1rem' : '1.5rem',
-              bottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '1.55rem' : '2rem'})`,
-              padding: '0.4rem 0.6rem',
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(255, 255, 255, 0.45)',
-              fontSize: '0.7rem', fontWeight: '600',
-              cursor: 'pointer', touchAction: 'manipulation',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-            }}
-          >
-            <Keyboard size={13} /> Typ
-          </button>
-        )}
-        {manualMode && (
-          <button onClick={() => { setManualMode(false); setStatus('idle'); setScanTime(0) }}
-            style={{
-              position: 'absolute',
-              right: isMobile ? '1rem' : '1.5rem',
-              bottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '1.55rem' : '2rem'})`,
-              padding: '0.4rem 0.6rem',
-              background: 'transparent',
-              border: 'none',
-              color: G.primary,
-              fontSize: '0.7rem', fontWeight: '600',
-              cursor: 'pointer', touchAction: 'manipulation',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-            }}
-          >
-            <Camera size={13} /> Camera
-          </button>
-        )}
       </div>
 
       <style>{`
