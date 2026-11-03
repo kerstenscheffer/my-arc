@@ -76,7 +76,7 @@ async function plan(bestand) {
   const resultaat = []
   for (const it of items) {
     if (bekend.has(it.url)) { resultaat.push({ url: it.url, id: bekend.get(it.url), dubbel: true }); continue }
-    if (!/comment SPLIT/.test(it.caption)) stop(`Caption zonder 'comment SPLIT': ${it.url}`)
+    if (!it.caption?.includes(WOORD)) stop(`Caption zonder '${WOORD}': ${it.url}`)
     if (!fs.existsSync(it.bestand)) stop(`Bestand ontbreekt: ${it.bestand}`)
     const id = crypto.randomUUID()
     const dir = `${EIGENAAR}/${id}`
@@ -85,12 +85,13 @@ async function plan(bestand) {
       const { error } = await sb.storage.from(BUCKET).upload(pad, fs.readFileSync(lokaal), { contentType: type, upsert: false })
       if (error) stop(`upload ${it.url}: ${error.message}`)
     }
-    fs.unlinkSync(cover)
+    try { fs.unlinkSync(cover) } catch { /* blijft dan in de tijdelijke map staan */ }
     const nu = new Date().toISOString()
     const { error } = await sb.from('content_items').insert({
-      id, coach_id: EIGENAAR, type: 'reel', title: it.title, hook: it.hook, notes: `Bron: ${it.url}`,
+      // hook en woord leeg: de edge function plakt anders de hook ervoor en 'Comment SPLIT' erachter.
+      id, coach_id: EIGENAAR, type: 'reel', title: it.title, hook: null, notes: `Bron: ${it.url}`,
       planned_date: it.datum, planned_time: TIJD, status: 'idea',
-      autopilot_status: 'wacht', autopilot_woord: WOORD, autopilot_caption: it.caption,
+      autopilot_status: 'wacht', autopilot_woord: null, autopilot_caption: it.caption,
       autopilot_preview: `${dir}/variant.mp4`, autopilot_bestand: it.bestand, created_at: nu, updated_at: nu,
     })
     if (error) stop(`insert ${it.url}: ${error.message}`)
