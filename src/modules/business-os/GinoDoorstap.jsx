@@ -6,7 +6,8 @@
 //
 // Betaald: staat er al een onbetaalde verlenging, dan wordt die afgevinkt. Zo
 // niet, dan boekt TrajectModal hem; zelf boeken zou de omzet dubbel tellen.
-// Er gaat niets naar de klant of Marcel.
+// De borg telt pas als winst zodra de verlenging betaald is: de trigger uit
+// borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -40,18 +41,24 @@ export default function GinoDoorstap() {
   const [bezig, setBezig] = useState(null)
   const [bevestig, setBevestig] = useState(null)
   const [traject, setTraject] = useState(null) // { client, rij, sinds }
+  const [borgen, setBorgen] = useState([]) // open challenge-sales die al betaald zijn
+  const [borgKeuze, setBorgKeuze] = useState({}) // client_id → gekozen borg
   const [coachId, setCoachId] = useState(null)
 
   const laad = useCallback(async () => {
-    const [ds, kl, au] = await Promise.all([
+    const [ds, kl, au, bg] = await Promise.all([
       supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at')
         .order('gezet_at', { ascending: false }).order('id', { ascending: false })
         .then(r => r, e => ({ error: e })),
       supabase.from('clients').select('id, first_name, last_name, coach_id').eq('status', 'active').order('first_name')
         .then(r => r, e => ({ error: e })),
       supabase.auth.getUser(),
+      supabase.from('lead_movements').select('id, lead_name, order_value')
+        .eq('sale_kind', 'challenge').eq('challenge_status', 'open').eq('payment_received', true).is('reverted_at', null)
+        .order('lead_name')
+        .then(r => r, e => ({ error: e })),
     ])
-    if (ds.error || kl.error) { setFout((ds.error || kl.error).message || 'Laden mislukt'); setRijen([]); return }
+    if (ds.error || kl.error || bg.error) { setFout((ds.error || kl.error || bg.error).message || 'Laden mislukt'); setRijen([]); return }
     setCoachId(au?.data?.user?.id || null)
 
     const laatste = new Map()
@@ -62,7 +69,7 @@ export default function GinoDoorstap() {
     // Onbetaalde verlengingen van deze klanten: het bedrag dat nog moet komen.
     const ids = open.map(r => r.client_id)
     const { data: sales, error: saleFout } = ids.length
-      ? await supabase.from('lead_movements').select('id, client_id, order_value')
+      ? await supabase.from('lead_movements').select('id, client_id, order_value, borg_movement_id')
         .in('client_id', ids).eq('outcome_type', 'verlenging').eq('payment_received', false).is('reverted_at', null)
         .order('moved_at', { ascending: false })
         .then(r => r, e => ({ error: e }))
@@ -70,6 +77,7 @@ export default function GinoDoorstap() {
     if (saleFout) { setFout(saleFout.message || 'Laden mislukt'); setRijen([]); return }
 
     setFout(null)
+    setBorgen(bg.data || [])
     setRijen(open
       .map(r => ({ ...r, klant: klanten.get(r.client_id), sale: (sales || []).find(s => s.client_id === r.client_id) || null }))
       .sort((a, b) => new Date(a.gezet_at) - new Date(b.gezet_at)))
@@ -106,7 +114,8 @@ export default function GinoDoorstap() {
     }
     setBezig(r.client_id)
     try {
-      const { data, error } = await supabase.from('lead_movements').update({ payment_received: true })
+      const borg = r.sale.borg_movement_id || borgKeuze[r.client_id] || null
+      const { data, error } = await supabase.from('lead_movements').update({ payment_received: true, borg_movement_id: borg })
         .eq('id', r.sale.id).select('id').then(x => x, e => ({ error: e }))
       if (error) throw error
       if (!data?.length) throw new Error('Betaling niet opgeslagen (geen rechten op deze rij?)')
@@ -124,18 +133,28 @@ export default function GinoDoorstap() {
       .eq('client_id', t.rij.client_id).eq('outcome_type', 'verlenging').eq('payment_received', true)
       .gte('moved_at', t.sinds).limit(1)
       .then(x => x, () => ({ data: [] }))
-    if (data?.length) await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
+    if (!data?.length) return
+    const borg = borgKeuze[t.rij.client_id]
+    if (borg) {
+      const { error } = await supabase.from('lead_movements').update({ borg_movement_id: borg }).eq('id', data[0].id)
+        .then(x => x, e => ({ error: e }))
+      if (error) setFout(error.message || 'Borg koppelen mislukt')
+    }
+    await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
   }
 
   if (rijen === null) return null
   const ja = rijen.filter(r => r.status === 'ja_mondeling')
   const nogTeKomen = ja.reduce((s, r) => s + (Number(r.sale?.order_value) || 0), 0)
+  const borgWacht = ja.reduce((s, r) => s + (Number(borgen.find(b => b.id === (r.sale?.borg_movement_id || borgKeuze[r.client_id]))?.order_value) || 0), 0)
+  // Een borg hoort bij één klant: wat al gekoppeld of gekozen is, kan een ander niet kiezen.
+  const bezet = new Set([...ja.map(r => r.sale?.borg_movement_id), ...Object.values(borgKeuze)].filter(Boolean))
 
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: colors.textPrimary }}>
-          Doorstap{nogTeKomen > 0 ? ` · ${euro(nogTeKomen)} nog te komen` : ''}
+          Doorstap{nogTeKomen > 0 ? ` · ${euro(nogTeKomen)} nog te komen` : ''}{borgWacht > 0 ? ` · ${euro(borgWacht)} borg wacht` : ''}
         </div>
         {overig.length > 0 && (
           <select aria-label="Klant doorgeven" value="" disabled={!!bezig} style={veld}
@@ -171,9 +190,18 @@ export default function GinoDoorstap() {
                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.textPrimary }}>{naamVan(r.klant)}</div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, marginTop: 4 }}>
-                    {[r.pakket, `sinds ${dagKort(r.gezet_at)}`].filter(Boolean).join(' · ')}
+                    {[r.pakket, `sinds ${dagKort(r.gezet_at)}`, r.sale?.borg_movement_id ? 'borg telt na betaling' : null].filter(Boolean).join(' · ')}
                   </div>
                 </div>
+                {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
+                  <select aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={veld}
+                    onChange={e => setBorgKeuze(k => ({ ...k, [r.client_id]: e.target.value }))}>
+                    <option value="">Geen borg</option>
+                    {borgen.filter(b => b.id === borgKeuze[r.client_id] || !bezet.has(b.id)).map(b => (
+                      <option key={b.id} value={b.id}>Borg {b.lead_name} {euro(b.order_value)}</option>
+                    ))}
+                  </select>
+                )}
                 {(r.sale || r.status === 'ja_mondeling') && (
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: r.sale ? colors.textPrimary : colors.textSecondary, whiteSpace: 'nowrap' }}>
                     {r.sale ? euro(r.sale.order_value) : 'Nog niet geboekt'}

@@ -251,7 +251,7 @@ export default function OmzetScherm({
       <div style={kaart}>
         <div style={{ ...kop, marginBottom: 2 }}>{isOwner ? `Verdeling jij en ${partnerName}` : 'Jouw aandeel'}</div>
         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-          {modus === 'maand' ? `Uitbetaalperiode ${periodeTekst(gekozen)}` : `${maand.maanden.length} uitbetaalperiodes (26e t/m 25e)`} · ontvangen {eur(ontvangen)}
+          {modus === 'maand' ? `Uitbetaalperiode ${periodeTekst(gekozen)}` : `${maand.maanden.length} uitbetaalperiodes (26e t/m 25e)`} · telt voor verdeling {eur(ontvangen)}{verdeling?.uitEerder > 0.5 ? `, waarvan ${eur(verdeling.uitEerder)} eerder ontvangen` : ''}
         </div>
         {!verdeling ? (
           <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Nog niets te verdelen in deze periode.</div>
@@ -310,7 +310,7 @@ export default function OmzetScherm({
 
             {paneel === 'jij' && (
               <div style={{ marginTop: 12 }}>
-                <Regel label="Ontvangen deze periode" bedrag={ontvangen} />
+                <Regel label="Telt voor verdeling" bedrag={ontvangen} />
                 <Regel label="Vaste lasten" bedrag={-lasten} />
                 {ads > 0 && <Regel label="Adspend" bedrag={-ads} />}
                 <Regel label={`Naar ${partnerName}`} bedrag={-partner} />

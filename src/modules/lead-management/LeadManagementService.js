@@ -3503,6 +3503,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           settled: outstanding <= 0.005 && owedM > 0,
           paidAt: paidAt[k] || null,
           revenue: revM,                                       // ONTVANGEN omzet die maand
+          // Deel daarvan dat eerder binnenkwam en pas nu meetelt (bv. een borg na de doorstap).
+          uitEerder: Math.round((porties[k] || []).reduce((som, p) => som + (p.oudK && p.oudK < k ? p.omzet : 0), 0) * 100) / 100,
           // De losse posten waaruit `revenue` is opgebouwd — voedt de uitklap
           // onder "Ontvangen deze maand".
           ontvangsten: (porties[k] || [])

@@ -124,7 +124,7 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
   if (!p) return <div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>Geen gegevens voor deze periode.</div></div>
   const jij = Math.max(0, (p.netRevenue || 0) - (p.earned || 0))
   const regels = [
-    ['Ontvangen', p.revenue, '#fff'],
+    ['Telt voor verdeling', p.revenue, '#fff'],
     ['Vaste lasten', -(p.fixedCosts || 0), 'rgba(255,255,255,0.5)'],
     ['Adspend', -(p.adSpend || 0), 'rgba(255,255,255,0.5)'],
     ['Te verdelen', p.netRevenue, G],
@@ -141,6 +141,11 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
           </div>
         ))}
       </div>
+      {p.uitEerder > 0.5 && (
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+          Waarvan {euro(p.uitEerder)} eerder ontvangen, telt nu mee
+        </div>
+      )}
       <div style={{ display: 'flex', height: 8, borderRadius: 5, overflow: 'hidden', margin: '10px 0 6px', background: 'rgba(255,255,255,0.06)' }}>
         <div style={{ width: `${(jij / totaal) * 100}%`, background: G, boxShadow: `0 0 10px ${G}`, transformOrigin: 'left', animation: 'go-balk .8s ease-out .6s both' }} />
         <div style={{ width: `${((p.earned || 0) / totaal) * 100}%`, background: 'rgba(255,255,255,0.55)', transformOrigin: 'left', animation: 'go-balk .8s ease-out .75s both' }} />
