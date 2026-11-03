@@ -255,7 +255,17 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
                     })()}
                   </div>
                   {/* De video die de coach bij deze feedback maakte (Zoom, Loom). */}
-                  {sub.feedback_link && (
+                  {embedVan(sub.feedback_link)?.soort === 'iframe' ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
+                        <iframe src={embedVan(sub.feedback_link).src} title="Feedbackvideo" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+                      </div>
+                      {/* Vangnet: laadt de speler niet in de app, dan kan het via de link. */}
+                      <a href={sub.feedback_link} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textDecoration: 'underline' }}>
+                        Speelt de video niet? Open hem hier
+                      </a>
+                    </div>
+                  ) : sub.feedback_link && (
                     <a href={sub.feedback_link} target="_blank" rel="noopener noreferrer" style={{
                       display: 'flex', alignItems: 'center', gap: 10, marginTop: 12,
                       padding: '0.75rem 0.85rem', borderRadius: 12,

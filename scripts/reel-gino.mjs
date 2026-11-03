@@ -184,8 +184,14 @@ async function uploadVoorMetricool(pad, mp4, omslag) {
   const links = {}
   for (const [naam, f, type] of [['video', mp4, 'video/mp4'], ['cover', omslag, 'image/jpeg']]) {
     const p = `${pad}/${naam === 'video' ? 'variant.mp4' : 'cover.jpg'}`
-    const { error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true })
-    if (error) stop(`upload ${naam}: ${error.message}`)
+    // Een haperende verbinding mag een short niet kosten: drie keer proberen, alleen bij netwerkfouten.
+    let error
+    for (let poging = 1; poging <= 3; poging++) {
+      ({ error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true }))
+      if (!error || !/fetch failed|network|timeout|socket/i.test(error.message)) break
+      if (poging < 3) await new Promise(r => setTimeout(r, poging * 5000))
+    }
+    if (error) stop(`upload ${naam}: ${error.message}${error.originalError?.cause ? ` (${error.originalError.cause.code || error.originalError.cause.message})` : ''}`)
     const { data, error: e2 } = await sb.storage.from(BUCKET).createSignedUrl(p, 7200)
     if (e2) stop(`link ${naam}: ${e2.message}`)
     links[naam] = data.signedUrl

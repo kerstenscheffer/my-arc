@@ -14,7 +14,7 @@ Noemt Kersten geen aantal: 1 short. Noemt hij geen datum: één per dag vanaf mo
 
 Geeft `short` een link terug, dan is hij klaar: het script heeft al gecontroleerd dat het een concept is en dat de video compleet is. Kijk dus niet nog eens in Metricool na.
 
-Eén mislukte short houdt de rest niet tegen. Probeer hem niet opnieuw; noem de foutmelding.
+Eén mislukte short houdt de rest niet tegen. Het script herhaalt netwerkfouten zelf, dus probeer hem niet opnieuw; noem de foutmelding.
 
 ## Caption
 

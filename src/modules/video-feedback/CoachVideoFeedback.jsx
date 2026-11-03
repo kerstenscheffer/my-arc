@@ -200,11 +200,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, onWijzig, positie })
   const embed = gekozen ? embedVan(gekozen.url) : null
 
   // Punten en link direct bewaren (kort na de laatste wijziging).
-  const schoneLink = () => {
-    const l = link.trim()
-    if (!l) return null
-    return /^https?:\/\//i.test(l) ? l : `https://${l}`
-  }
+  const schoneLink = () => schoneUrl(link)
   useEffect(() => {
     if (eerste.current) { eerste.current = false; return }
     clearTimeout(bewaarTimer.current)
@@ -473,8 +469,8 @@ function FeedbackModal({ submission, db, onClose, onUpdate, onWijzig, positie })
               <Link2 size={15} strokeWidth={2.4} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0 }} />
               <input
                 value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder="Plak je Zoom- of Loom-link"
+                onChange={(e) => setLink(e.target.value.includes('<') ? (schoneUrl(e.target.value) || '') : e.target.value)}
+                placeholder="Plak je Zoom-clip, insluitcode of Loom-link"
                 inputMode="url"
                 style={{ flex: 1, minWidth: 0, padding: '0.65rem 0', background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}
               />
