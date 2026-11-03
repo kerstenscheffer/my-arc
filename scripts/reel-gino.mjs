@@ -5,6 +5,8 @@
 //   node scripts/reel-gino.mjs ophalen <bestand>         download + transcript met tijden
 //   node scripts/reel-gino.mjs monteer <bestand>         render uit ~/Gino/reels/<naam>/config.json, maakt vN
 //   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog]
+//   node scripts/reel-gino.mjs shorts                    kant-en-klare YouTube-shorts die nog geen concept hebben
+//   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
 //
 // concept zet de reel ALTIJD als concept in Metricool (draft, geen autoPublish) en geeft de link.
 // Publiceren of echt inplannen kan dit script niet. Twee keer hetzelfde concept weigert het.
@@ -31,6 +33,7 @@ const METRICOOL_MERK = '6149311'
 const TOOL = 'mcp__claude_ai_Metricool_Social_Media_Management__createScheduledPost'
 const TOOL_LEES = 'mcp__claude_ai_Metricool_Social_Media_Management__getBrandSettings' // alleen voor --droog
 const BUCKET = 'metricool-drafts'
+const SHORTS = path.join(THUIS, 'Gino', 'yt-shorts') // lijst.json + <id>/caption.txt + <id>/concept.json; niet in de repo (niet-openbare video's)
 
 const uit = (x) => console.log(JSON.stringify(x, null, 1))
 const stop = (fout) => { uit({ fout }); process.exit(1) }
@@ -176,6 +179,67 @@ function maakConcept(datum, lokaal, caption, video, cover, droog) {
   })
 }
 
+async function uploadVoorMetricool(pad, mp4, omslag) {
+  const sb = supabase()
+  const links = {}
+  for (const [naam, f, type] of [['video', mp4, 'video/mp4'], ['cover', omslag, 'image/jpeg']]) {
+    const p = `${pad}/${naam === 'video' ? 'variant.mp4' : 'cover.jpg'}`
+    const { error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true })
+    if (error) stop(`upload ${naam}: ${error.message}`)
+    const { data, error: e2 } = await sb.storage.from(BUCKET).createSignedUrl(p, 7200)
+    if (e2) stop(`link ${naam}: ${e2.message}`)
+    links[naam] = data.signedUrl
+  }
+  return links
+}
+
+const shortLijst = () => JSON.parse(fs.readFileSync(path.join(SHORTS, 'lijst.json'), 'utf8'))
+
+async function shorts() {
+  const open = shortLijst().filter(s => !fs.existsSync(path.join(SHORTS, s.id, 'concept.json')))
+  uit({ open: open.length, shorts: open })
+}
+
+// Kant-en-klaar: niet monteren. Geen cookies nodig, want de lijst bevat alleen niet-openbare links.
+async function short(id) {
+  const lokaal = optie('--datum')
+  const droog = vlag('--droog')
+  const item = shortLijst().find(s => s.id === id)
+  if (!item) stop('Dit id staat niet in de shorts-lijst. Draai `shorts`.')
+  if (!lokaal) stop('Geef --datum 2026-11-10T18:00 mee.')
+  const datum = metVerschuiving(lokaal)
+  const m = path.join(SHORTS, id)
+  const klaarPad = path.join(m, 'concept.json')
+  if (fs.existsSync(klaarPad)) stop(`Deze short staat al in Metricool: ${JSON.parse(fs.readFileSync(klaarPad, 'utf8')).link}`)
+  const captionPad = path.join(m, 'caption.txt')
+  if (!fs.existsSync(captionPad)) stop(`Schrijf eerst de caption naar ${captionPad}.`)
+  const caption = fs.readFileSync(captionPad, 'utf8').trim()
+  if (!caption.startsWith('Reageer "SPLIT"') || !caption.endsWith('⚜️') || caption.length > 2200) stop('Caption klopt niet met het format in docs/shorts-werkwijze.md.')
+  const mp4 = path.join(m, 'video.mp4')
+  await run('yt-dlp', ['-q', '--no-warnings', '--no-playlist', '--force-overwrites', '--socket-timeout', '20', '--retries', '2',
+    '-f', 'bv*[vcodec^=avc1]+ba[ext=m4a]/b[vcodec^=avc1][ext=mp4]', '--merge-output-format', 'mp4', '-o', mp4,
+    `https://www.youtube.com/watch?v=${id}`], { timeout: 5 * 60 * 1000 })
+  const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height', '-of', 'json', mp4])
+  const sporen = JSON.parse(stdout).streams
+  const beeld = sporen.find(x => x.codec_type === 'video'), geluid = sporen.find(x => x.codec_type === 'audio')
+  if (beeld?.codec_name !== 'h264' || geluid?.codec_name !== 'aac' || beeld.height <= beeld.width) stop(`Video niet geschikt voor een reel: ${stdout.replace(/\s+/g, ' ').slice(0, 300)}`)
+  const omslag = path.join(m, 'cover.jpg')
+  await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', mp4, '-frames:v', '1', '-q:v', '3', omslag])
+  const pad = `short-${id.replace(/[^\w-]/g, '_')}`
+  const links = await uploadVoorMetricool(pad, mp4, omslag)
+  const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
+  if (droog) { uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, fout: r.fout }); return }
+  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || 'geen concept terug; connector niet bereikt'}`)
+  if (r.post.draft !== true || r.post.autoPublish !== false) stop(`LET OP: post ${r.post.id} staat niet als concept in Metricool. Controleer hem meteen.`)
+  const link = r.post.plannerUrl || `https://app.metricool.com/planner/calendar?blogId=${METRICOOL_MERK}&openWithPostUuid=${r.post.uuid}`
+  const media = r.post.media?.[0]
+  const kop = media ? await fetch(media, { method: 'HEAD' }).then(x => Number(x.headers.get('content-length')), () => 0) : 0
+  const volledig = kop === fs.statSync(mp4).size
+  fs.writeFileSync(klaarPad, JSON.stringify({ id: r.post.id, link, datum, titel: item.titel }, null, 1))
+  if (volledig) fs.unlinkSync(mp4) // de Mac heeft weinig ruimte; opnieuw downloaden kan altijd
+  uit({ concept: r.post.id, titel: item.titel, link, datum, video_compleet_in_metricool: volledig })
+}
+
 async function concept(b) {
   const lokaal = optie('--datum')
   const droog = vlag('--droog')
@@ -190,17 +254,8 @@ async function concept(b) {
   const mp4 = path.join(vm, `${stam(b)}_${v}.mp4`)
   const omslag = path.join(vm, 'omslag.jpg')
   const caption = fs.readFileSync(path.join(vm, 'caption.txt'), 'utf8').trim()
-  const sb = supabase()
   const pad = `reel-${stam(b).replace(/[^\w-]/g, '_')}-${v}`
-  const links = {}
-  for (const [naam, f, type] of [['video', mp4, 'video/mp4'], ['cover', omslag, 'image/jpeg']]) {
-    const p = `${pad}/${naam === 'video' ? 'variant.mp4' : 'cover.jpg'}`
-    const { error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true })
-    if (error) stop(`upload ${naam}: ${error.message}`)
-    const { data, error: e2 } = await sb.storage.from(BUCKET).createSignedUrl(p, 7200)
-    if (e2) stop(`link ${naam}: ${e2.message}`)
-    links[naam] = data.signedUrl
-  }
+  const links = await uploadVoorMetricool(pad, mp4, omslag)
   const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
   if (droog) {
     // Droog: uploadt wel (test van de token), leest Metricool en maakt geen concept.
@@ -218,6 +273,6 @@ async function concept(b) {
 }
 
 const cmd = args.shift()
-const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())) }[cmd]
-if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00')
+const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()) }[cmd]
+if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00')
 klus().catch(e => stop(String(e.stderr || e.message || e).slice(0, 800)))
