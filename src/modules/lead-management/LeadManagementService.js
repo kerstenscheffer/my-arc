@@ -47,6 +47,7 @@ const BORD_KOLOMMEN = `
   lead_magnets_shared, outreach_campaign_id, source_lead_magnet_id,
   previous_section_color, previous_section_id, previous_section_title,
   qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked, gender,
+  manychat_antwoord, manychat_antwoord_at,
   source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
   outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
 `

@@ -86,7 +86,7 @@ declare
     'productivity_reflections', 'productivity_time_logs', 'productivity_week_reports', 'task_logs',
     'content_items', 'content_doelen', 'content_checklist', 'content_formats', 'content_sections', 'content_pieces',
     'content_batches', 'batch_items', 'output_content', 'output_day_items', 'output_problems', 'output_week_plans',
-    'output_pdfs', 'call_leads', 'lead_movements', 'lead_notes', 'lead_campaign_tags', 'lead_kpi_targets',
+    'output_pdfs', 'call_leads', 'lead_movements', 'client_doorstap', 'lead_notes', 'lead_campaign_tags', 'lead_kpi_targets',
     'lead_templates', 'lead_sections', 'agenda_blocks', 'business_os_skills', 'business_os_geheugen',
     'business_os_herinneringen', 'business_os_schermen', 'business_os_experimenten', 'business_os_projecten',
     'business_os_geldplan', 'business_os_tijd_regels', 'app_issues', 'ideas', 'quick_notes', 'coach_daily_checks',
@@ -125,6 +125,10 @@ begin
     -- Sale of orderwaarde gaat door naar Meta (trigger meta_purchase).
     if p_tabel = 'lead_movements' and exists (select 1 from unnest(p_velden) k where k in ('to_section_title', 'order_value')) then
       return 'raakt een sale of orderwaarde';
+    end if;
+    -- Bepaalt wat er naar Marcel gaat (3 nov 2026).
+    if p_tabel = 'lead_movements' and exists (select 1 from unnest(p_velden) k where k in ('payment_received', 'challenge_status', 'telt_mee_vanaf', 'borg_movement_id', 'partner_share_pct')) then
+      return 'raakt de uitbetaling aan Marcel';
     end if;
   elsif p_tabel = 'lead_movements' then
     for v_rij in select * from jsonb_array_elements(coalesce(p_rijen, '[]'::jsonb)) loop
