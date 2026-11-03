@@ -169,6 +169,17 @@ const MEAL_OPTIONS = [
   { id: 'portion', label: '1 portie', grams: 1, isMultiplier: true }
 ]
 
+// Maaltijd in grammen loggen: per maaltijd onthouden op dit toestel, inclusief
+// een zelf gewogen totaal (na het bakken weegt een recept minder dan de som
+// van de rauwe ingrediënten). Opgeslagen blijft gewoon amount in porties.
+const gewichtSleutel = (naam) => `maaltijd_gewicht_${naam}`
+const leesGewicht = (naam) => {
+  try { return JSON.parse(localStorage.getItem(gewichtSleutel(naam))) || {} } catch { return {} }
+}
+const bewaarGewicht = (naam, waarden) => {
+  try { localStorage.setItem(gewichtSleutel(naam), JSON.stringify(waarden)) } catch { /* privémodus */ }
+}
+
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
@@ -280,6 +291,8 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   const [portieOpen, setPortieOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mealMoment, setMealMoment] = useState(defaultMealMoment || getDefaultMoment())
+  const [gewicht, setGewicht] = useState(() => leesGewicht(item?.name))
+  const [totaalTekst, setTotaalTekst] = useState(null)
 
   if (!item) return null
 
@@ -337,6 +350,29 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   // Wanneer er een preset-specifieke macro-basis is (bv. eigeel/eiwit los),
   // gebruiken we die per-100g-waarden in plaats van item.*; de factor blijft
   // hetzelfde dus quantity-aanpassingen schalen netjes mee.
+  // Gewicht van één portie (de hele maaltijd): som van de ingrediënten. Bij een
+  // eerder gelogde maaltijd is de lijst óf het recept, óf (na aanpassen) wat er
+  // toen gelogd is; de kcal van de lijst wijzen aan welke van de twee.
+  const somGram = ingredientRegels.length > 0 && ingredientRegels.every(i => ['g', 'gram'].includes(i.unit) && Number(i.amount) > 0)
+    ? ingredientRegels.reduce((t, i) => t + Number(i.amount), 0)
+    : 0
+  const opgeslagen = useSavedAnchor && !isPer100g ? item._savedAmount : 1
+  const lijstKcal = ingredientRegels.reduce((t, i) => t + (Number(i.calories) || 0), 0)
+  const lijstIsGelogd = opgeslagen !== 1 && lijstKcal > 0
+    && Math.abs(lijstKcal - (item.calories || 0)) < Math.abs(lijstKcal - (item.calories || 0) / opgeslagen)
+  const receptGram = Math.round(lijstIsGelogd ? somGram / opgeslagen : somGram)
+  // Oude logs zonder per_unit kunnen grammen als aantal hebben: daar niet aanbieden.
+  const kanGram = !isPer100g && receptGram > 0 && (item._savedAmount == null || item._savedPerUnit === 'portion')
+  const inGram = kanGram && !!gewicht.inGram
+  const totaalGram = Number(gewicht.totaal) > 0 ? Number(gewicht.totaal) : receptGram
+  const zetGewicht = (wijziging) => {
+    const nieuw = { ...gewicht, ...wijziging }
+    setGewicht(nieuw)
+    bewaarGewicht(item.name, nieuw)
+  }
+  const gramNaarPortie = (g) => Math.round((g / totaalGram) * 10000) / 10000
+  const huidigGram = Math.round(quantity * totaalGram)
+
   const macroBase = baseMacrosOverride || {
     calories: item.calories || 0,
     protein: item.protein || 0,
@@ -443,7 +479,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     if (frac === 0) return `${whole}`
     if (whole === 0 && closest) return closest.s
     if (closest) return `${whole} ${closest.s}`
-    return `${val}`
+    return `${Math.round(val * 100) / 100}`
   }
 
   // ── Weergave (15 okt 2026: alles gecentreerd, geen uitklaplijsten) ──
@@ -452,7 +488,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   const stuk = isPer100g ? stukVan(item.name) : null
   const stap = gramStand ? (u === 'ml' ? 50 : (stuk?.grams || 10)) : (isPer100g ? 1 : 0.5)
   const kies = (fn) => { fn(); if (navigator.vibrate) navigator.vibrate(12) }
-  const eenheidTekst = gramStand
+  const eenheidTekst = inGram ? 'gram' : gramStand
     ? (u === 'ml' ? 'ml' : 'gram')
     : selectedServing.natuurlijk ? (quantity === 1 ? selectedServing.enkel : selectedServing.meer)
     : isPer100g ? `× ${selectedServing.grams} ${u}` : (quantity === 1 ? 'portie' : 'porties')
@@ -466,6 +502,27 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     if (opt.id === 'gram') setQuantity(totaal > 0 ? totaal : (item.defaultPortion || 100))
     else setQuantity(1)
     setPortieOpen(false)
+  }
+
+  const kiezerOpties = isPer100g
+    ? servingOptions
+    : kanGram
+      ? [{ id: 'portion', label: 'Porties' }, { id: 'maaltijdgram', label: 'Gram', sub: `${totaalGram} g totaal` }]
+      : null
+  const kiezerActief = isPer100g ? selectedServing.id : (inGram ? 'maaltijdgram' : 'portion')
+  const kiesOptie = (opt) => {
+    if (isPer100g) return kiesPortie(opt)
+    zetGewicht({ inGram: opt.id === 'maaltijdgram' })
+    setPortieOpen(false)
+  }
+  // Ander totaal: de ingevulde grammen blijven staan, de portie rekent mee.
+  const bevestigTotaal = () => {
+    const v = Math.round(parseFloat(String(totaalTekst ?? '').replace(',', '.')))
+    if (Number.isFinite(v) && v > 0 && v !== totaalGram) {
+      zetGewicht({ totaal: v === receptGram ? null : v })
+      setQuantity(Math.round((huidigGram / v) * 10000) / 10000)
+    }
+    setTotaalTekst(null)
   }
 
   const plusMin = {
@@ -512,7 +569,9 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
           zelf de portie-kiezer ("gram ▾", "theelepels ▾"). */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 14 : 20, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
         <button aria-label="Minder" style={plusMin}
-          onClick={() => kies(() => setQuantity(q => Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
+          onClick={() => kies(() => setQuantity(q => inGram
+            ? gramNaarPortie(Math.max(10, Math.round(q * totaalGram) - 10))
+            : Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
         {editingQty ? (
           <input
             type="text"
@@ -523,7 +582,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
             onFocus={e => e.target.select()}
             onBlur={() => {
               const v = parseFloat(String(editQtyText).replace(',', '.'))
-              if (Number.isFinite(v) && v > 0) setQuantity(Math.round(v * 100) / 100)
+              if (Number.isFinite(v) && v > 0) setQuantity(inGram ? gramNaarPortie(v) : Math.round(v * 100) / 100)
               setEditingQty(false)
             }}
             onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
@@ -538,21 +597,23 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
             }}
           />
         ) : (
-          <button onClick={() => { setEditingQty(true); setEditQtyText(String(quantity)) }} style={{
+          <button onClick={() => { setEditingQty(true); setEditQtyText(String(inGram ? huidigGram : quantity)) }} style={{
             background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
             fontSize: isMobile ? '3.4rem' : '3.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em',
             lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: '1.6ch', textAlign: 'center',
             WebkitTapHighlightColor: 'transparent',
           }}>
-            {displayQuantity(quantity)}
+            {inGram ? huidigGram : displayQuantity(quantity)}
           </button>
         )}
         <button aria-label="Meer" style={plusMin}
-          onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
+          onClick={() => kies(() => setQuantity(q => inGram
+            ? gramNaarPortie(Math.round(q * totaalGram) + 10)
+            : Math.round((q + stap) * 100) / 100))}>+</button>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
-        {isPer100g ? (
+        {kiezerOpties ? (
           <div style={{ position: 'relative' }}>
             <button onClick={() => setPortieOpen(o => !o)} aria-label="Portiegrootte" style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px', minHeight: 32,
@@ -572,10 +633,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
                   minWidth: 190, background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
                   padding: 4, boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
                 }}>
-                  {servingOptions.map(opt => {
-                    const aan = opt.id === selectedServing.id
+                  {kiezerOpties.map(opt => {
+                    const aan = opt.id === kiezerActief
                     return (
-                      <button key={opt.id} onClick={() => kies(() => kiesPortie(opt))} style={{
+                      <button key={opt.id} onClick={() => kies(() => kiesOptie(opt))} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
                         width: '100%', height: 38, padding: '0 0.75rem', borderRadius: 10,
                         background: aan ? '#fff' : 'transparent', border: 'none', outline: 'none', textAlign: 'left',
@@ -601,6 +662,32 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
           {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} ${u === 'ml' ? 'ml' : 'gram'}`}
         </div>
       ) : null}
+
+      {/* Totaal van het recept, zelf te overschrijven na bakken of koken. */}
+      {inGram && (
+        <div style={{ textAlign: 'center', marginTop: 6, padding: '0 1rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+            van
+            <input
+              type="text" inputMode="numeric" aria-label="Totaal gewicht van het recept"
+              value={totaalTekst ?? totaalGram}
+              onChange={e => setTotaalTekst(e.target.value.replace(/[^0-9]/g, ''))}
+              onFocus={e => { setTotaalTekst(String(totaalGram)); e.target.select() }}
+              onBlur={bevestigTotaal}
+              onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+              style={{
+                width: `${Math.max(3, String(totaalTekst ?? totaalGram).length)}ch`, padding: 0, background: 'none', border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.35)', outline: 'none', borderRadius: 0,
+                color: '#fff', fontSize: '16px', fontWeight: 800, fontFamily: 'inherit', textAlign: 'center',
+              }}
+            />
+            g totaal
+          </div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+            Gebakken of gekookt? Weeg het geheel en vul dat in.
+          </div>
+        </div>
+      )}
 
       {/* Moment */}
       <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
