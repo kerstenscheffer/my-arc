@@ -3159,24 +3159,27 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       if (!coachId) return { months: [], totalOutstanding: 0 }
       const FIXED = Math.max(0, Number(fixedCosts) || 0)
-      const [{ data: saleRows }, { data: paidRows }, { data: adRows }, pauzesVan] = await Promise.all([
-        this.db.supabase
-          .from('lead_movements')
-          .select('id, order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type')
-          .not('order_value', 'is', null)
-          // Geen filter op partner_share_pct meer: verlengingen werden vaak
-          // zonder percentage geboekt (oorspronkelijke lead niet gevonden) en
-          // vielen dan stil uit de uitbetaling. Zie `pct` hieronder.
-          .is('reverted_at', null)
-          // Challenge-geld dat nog terug kan: daar gaat geen commissie over.
-          // Is de challenge afgerond als 'behouden', dan is het gewoon omzet en
-          // telt hij hier wél mee.
-          .or('sale_kind.eq.coaching,challenge_status.eq.behouden'),
+      const SALE_KOLOMMEN = 'id, order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type'
+      const haalSales = (kolommen) => this.db.supabase
+        .from('lead_movements')
+        .select(kolommen)
+        .not('order_value', 'is', null)
+        // Geen filter op partner_share_pct meer: verlengingen werden vaak
+        // zonder percentage geboekt (oorspronkelijke lead niet gevonden) en
+        // vielen dan stil uit de uitbetaling. Zie `pct` hieronder.
+        .is('reverted_at', null)
+        // Challenge-geld dat nog terug kan: daar gaat geen commissie over.
+        // Is de challenge afgerond als 'behouden', dan is het gewoon omzet en
+        // telt hij hier wél mee.
+        .or('sale_kind.eq.coaching,challenge_status.eq.behouden')
+      const [saleNieuw, { data: paidRows }, { data: adRows }, pauzesVan, itemRes] = await Promise.all([
+        haalSales(`${SALE_KOLOMMEN}, telt_mee_vanaf`),
         // Geen coach-filter: RLS geeft je eigen rijen + die van teamgenoten
         // (de owner zet de betaal-status; teamleden lezen 'm mee).
+        // select('*'): vaste_lasten/adspend bestaan pas na partner-uitbetaling-vast.sql.
         this.db.supabase
           .from('partner_payouts')
-          .select('period, amount_paid, paid_at'),
+          .select('*'),
         // Adspend per uitbetaalperiode: gaat net als de vaste lasten van de
         // omzet af vóór de verdeling. Handmatig of automatisch uit Meta.
         this.db.supabase
@@ -3184,7 +3187,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .select('period, bedrag, bron')
           .then(r => r, () => ({ data: [] })),
         this.laadSalePauzes(),
+        this.db.supabase
+          .from('partner_payout_items')
+          .select('payout_id, movement_id, lead_name, soort, portie, datum, bedrag, partner_deel, gereconstrueerd')
+          .then(r => r, error => ({ data: null, error })),
       ])
+      // Vastzetten werkt zodra partner-uitbetaling-vast.sql gedraaid is. Daarvoor
+      // rekent dit precies zoals het deed, zodat het scherm niet stukgaat.
+      const vastzetActief = !saleNieuw.error && !itemRes.error
+      const saleRows = saleNieuw.error ? (await haalSales(SALE_KOLOMMEN)).data : saleNieuw.data
       const adSpend = {}
       const adBron = {}
       ;(adRows || []).forEach(r => {
@@ -3194,6 +3205,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       })
 
       const sales = (saleRows || []).map(r => ({
+        id: r.id,
+        // Uitbetaalperiode (YYYY-MM) waarin de sale meetelt. Null = nog niet:
+        // de betaling is er niet of de doorstap is niet rond.
+        vanaf: r.telt_mee_vanaf ? String(r.telt_mee_vanaf).slice(0, 7) : null,
+        restBinnen: r.payment_received === true,
         total: Number(r.order_value) || 0,
         type: r.payment_type || 'prepaid',
         months: Math.max(1, Number(r.duration_months) || 1),
@@ -3241,12 +3257,30 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // hieronder of een late sale nog in die maand valt of doorschuift.
       const paid = {}
       const paidAt = {}
+      const payoutVan = {}
+      const keyVanPayout = {}
       ;(paidRows || []).forEach(r => {
         const d = new Date(r.period)
         const k = monthKey(d)
         paid[k] = (paid[k] || 0) + (Number(r.amount_paid) || 0)
         paidAt[k] = r.paid_at
+        payoutVan[k] = r
+        keyVanPayout[r.id] = k
       })
+
+      // Waaruit elke uitbetaling bestond. Een portie die hier staat is betaald
+      // en komt nooit meer terug in de berekening.
+      const itemsVan = {}
+      const afgerekend = new Set()
+      if (vastzetActief) {
+        ;(itemRes.data || []).forEach(it => {
+          const k = keyVanPayout[it.payout_id]
+          if (!k) return
+          ;(itemsVan[k] = itemsVan[k] || []).push(it)
+          if (it.movement_id) afgerekend.add(`${it.movement_id}|${it.portie}`)
+        })
+      }
+      const isBevroren = (k) => vastzetActief && !!paidAt[k]
 
       // Vaste lasten er eerst af, DAN verdelen: het partner-aandeel wordt
       // berekend over (omzet − vaste lasten). Bij meerdere %-en schaalt elk
@@ -3267,6 +3301,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         for (let i = 0; i < 24; i++) {
           const betaald = paidAt[key] ? new Date(paidAt[key]) : null
           if (!betaald || saleDatum <= betaald) return key
+          key = volgendeMaand(key)
+        }
+        return key
+      }
+      // Bevroren maand: alleen wat in de uitsplitsing staat hoort erbij, de rest
+      // gaat naar de eerste open maand. Uitbetaling zonder uitsplitsing (gezet
+      // door een oude app-versie): de datumregel, want dat bedrag is al betaald
+      // en mag niet nog een keer komen.
+      const openDoel = (k, datum) => {
+        let key = k
+        for (let i = 0; i < 24; i++) {
+          if (!isBevroren(key)) return key
+          if (!itemsVan[key]?.length && datum <= new Date(paidAt[key])) return null
           key = volgendeMaand(key)
         }
         return key
@@ -3295,9 +3342,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Aanbetaling komt nu binnen.
         if (heeftRest && s.reservering > 0) {
           const k = periodeKey(s.date)
-          ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam, soort: 'Reservering' })
+          ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam, soort: 'Reservering', movementId: s.id, portie: 'reservering', telt: true, los: true, oudK: k })
         }
         if (restBedrag <= 0) return
+
+        // De rest telt pas mee als de betaling binnen is of Kersten een maand
+        // heeft gezet. Een reservering alleen is nog geen betaling.
+        const restTelt = !vastzetActief || s.restBinnen || !!s.vanaf
 
         const delen = (s.type === 'monthly' && s.months > 1)
           ? Array.from({ length: s.months }, (_, i) => ({
@@ -3307,18 +3358,41 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               // uitbetaling viel.
               datum: new Date(restStart.getFullYear(), restStart.getMonth() + i, restStart.getDate()),
               soort: `Termijn ${i + 1} van ${s.months}`,
+              portie: `termijn-${i + 1}`,
+              los: false,
             }))
-          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
+          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald', portie: 'rest', los: true }]
 
         // Betaalpauze: termijnen die stilstaan vallen weg, na hervatten
         // landen ze in de periode van hun nieuwe datum.
-        delen.forEach(({ k: oudeK, omzet, datum: oudeDatum, soort }) => {
+        delen.forEach(({ k: oudeK, omzet, datum: oudeDatum, soort, portie, los }) => {
           const datum = pauzeSchuif(oudeDatum, s.pauzes)
           if (!datum) return
-          const k = s.pauzes ? periodeKey(datum) : oudeK
-          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort: s.verlenging ? `Verlenging · ${soort.toLowerCase()}` : soort })
+          const oudK = s.pauzes ? periodeKey(datum) : oudeK
+          // Eenmalige betaling: de gezette maand is de maand. Termijnen houden
+          // hun eigen datum, maar tellen niet vóór die maand mee.
+          const k = (vastzetActief && s.vanaf && (los || s.vanaf > oudK)) ? s.vanaf : oudK
+          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort: s.verlenging ? `Verlenging · ${soort.toLowerCase()}` : soort, movementId: s.id, portie, telt: restTelt, los, oudK })
         })
       })
+
+      // Wat de oude live-regel (datum + status van nu) per maand zou geven. Alleen
+      // voor het verschil-overzicht; het bepaalt geen enkele uitbetaling meer.
+      const oudePorties = {}
+      Object.keys(porties).forEach(k => {
+        porties[k].forEach(p => {
+          const naar = doelMaand(p.oudK, p.datum)
+          ;(oudePorties[naar] = oudePorties[naar] || []).push(p)
+        })
+      })
+      const lastenOver = (rij, k, doe) => {
+        let rest = FIXED + (adSpend[k] || 0)
+        rij.slice().sort((a, b) => a.datum - b.datum).forEach(p => {
+          const aftrek = Math.min(rest, p.omzet)
+          rest -= aftrek
+          doe(p, (p.omzet - aftrek) * p.share)
+        })
+      }
 
       // De vaste lasten zijn een bedrag dat je ÉÉN keer per maand betaalt, niet
       // een percentage over elke sale. Ze worden daarom opgesoupeerd door wat er
@@ -3338,11 +3412,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // zie je "te verdelen" oplopen in een periode die je al hebt afgesloten.
       const verschoven = []   // wat er is doorgeschoven, voor uitleg in de UI
       const definitief = {}
+      const uitkomst = new Map()   // portie → open maand waar hij nu heen gaat
       Object.keys(porties).forEach(k => {
         porties[k].forEach(p => {
-          const naar = doelMaand(k, p.datum)
+          if (!vastzetActief) {
+            const naar = doelMaand(k, p.datum)
+            ;(definitief[naar] = definitief[naar] || []).push(p)
+            if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(p.omzet * 100) / 100, naam: p.naam })
+            return
+          }
+          if (afgerekend.has(`${p.movementId}|${p.portie}`) || !p.telt) return
+          const naar = openDoel(k, p.datum)
+          uitkomst.set(p, naar)
+          if (!naar) return   // hoort bij een al betaalde maand zonder uitsplitsing
           ;(definitief[naar] = definitief[naar] || []).push(p)
-          if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(p.omzet * 100) / 100, naam: p.naam })
+          if (naar !== p.oudK) verschoven.push({ van: p.oudK, naar, bedrag: Math.round(p.omzet * 100) / 100, naam: p.naam })
         })
       })
       Object.keys(porties).forEach(k => { delete porties[k] })
@@ -3356,12 +3440,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const owed = {}
       const earned = {}
       Object.keys(porties).forEach(k => {
-        const rij = porties[k].slice().sort((a, b) => a.datum - b.datum)
-        let restLasten = FIXED + (adSpend[k] || 0)
-        rij.forEach(p => {
-          const aftrek = Math.min(restLasten, p.omzet)
-          restLasten -= aftrek
-          const netto = (p.omzet - aftrek) * p.share
+        lastenOver(porties[k], k, (p, netto) => {
+          p.partnerDeel = Math.max(0, netto)
           if (netto <= 0) return
           // Omzet én uitbetaling zitten nu in dezelfde periode, dus deze twee
           // lopen niet meer uiteen.
@@ -3376,6 +3456,35 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       for (let i = -monthsBehind; i < monthsAhead; i++) {
         const d = startOfMonth(now, i)
         const k = monthKey(d)
+        // Bevroren: het uitbetaalde bedrag staat vast, er wordt niets herrekend.
+        if (isBevroren(k)) {
+          const items = itemsVan[k] || []
+          const rij = payoutVan[k]
+          const omzet = Math.round(items.reduce((a, it) => a + (Number(it.bedrag) || 0), 0) * 100) / 100
+          const bedrag = Math.round((paid[k] || 0) * 100) / 100
+          const lasten = rij.vaste_lasten != null ? Number(rij.vaste_lasten) : Math.min(FIXED, omzet)
+          const ads = rij.adspend != null ? Number(rij.adspend) : (adSpend[k] || 0)
+          months.push({
+            key: k,
+            label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
+            owed: bedrag, earned: bedrag, paid: bedrag, outstanding: 0,
+            settled: true, bevroren: true,
+            paidAt: paidAt[k],
+            revenue: omzet,
+            ontvangsten: items.slice()
+              .sort((a, b) => String(a.datum || '').localeCompare(String(b.datum || '')))
+              .map(it => ({ naam: it.lead_name || 'Onbekend', bedrag: Number(it.bedrag) || 0, partnerDeel: Number(it.partner_deel) || 0, soort: it.soort || null, datum: it.datum || null })),
+            gereconstrueerd: items.some(it => it.gereconstrueerd),
+            orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100,
+            fixedCosts: lasten,
+            adSpend: Math.round(ads * 100) / 100,
+            adSpendBron: adBron[k] || null,
+            netRevenue: Math.max(0, Math.round((omzet - lasten - ads) * 100) / 100),
+            isPast: i < 0,
+            isCurrent: i === 0,
+          })
+          continue
+        }
         const owedM = Math.round((owed[k] || 0) * 100) / 100
         const paidM = Math.round((paid[k] || 0) * 100) / 100
         const outstanding = Math.round((owedM - paidM) * 100) / 100
@@ -3403,7 +3512,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               naam: p.naam || 'Onbekend',
               bedrag: Math.round(p.omzet * 100) / 100,
               soort: p.soort || null,
-              datum: p.datum instanceof Date ? p.datum.toISOString().slice(0, 10) : null,
+              datum: p.datum instanceof Date ? lokaleDag(p.datum) : null,
+              movementId: p.movementId || null,
+              portie: p.portie || null,
+              partnerDeel: Math.round((p.partnerDeel || 0) * 100) / 100,
+              los: p.los === true,
             })),
           orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100, // omzet uit orders die maand
           fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
@@ -3414,17 +3527,42 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           isCurrent: i === 0,
         })
       }
-      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100, fixedCosts: FIXED, verschoven }
+
+      // Verschil-overzicht: per bevroren maand het uitbetaalde bedrag tegenover
+      // wat de oude live-regel nu zou geven, en welke sales dat verschil maken.
+      const bevrorenKeys = Object.keys(paidAt).filter(isBevroren).sort()
+      const bevroren = bevrorenKeys.map(k => {
+        let live = 0
+        lastenOver(oudePorties[k] || [], k, (_p, netto) => { if (netto > 0) live += netto })
+        const uitbetaald = Math.round((paid[k] || 0) * 100) / 100
+        const regel = Math.round(live * 100) / 100
+        const [j, m] = k.split('-').map(Number)
+        return {
+          key: k,
+          label: new Date(j, m - 1, 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
+          uitbetaald,
+          liveRegel: regel,
+          verschil: Math.round((regel - uitbetaald) * 100) / 100,
+          paidAt: paidAt[k],
+          heeftUitsplitsing: !!itemsVan[k]?.length,
+          nietInBetaling: !itemsVan[k]?.length ? [] : (oudePorties[k] || [])
+            .filter(p => !afgerekend.has(`${p.movementId}|${p.portie}`))
+            .map(p => ({ naam: p.naam || 'Onbekend', bedrag: Math.round(p.omzet * 100) / 100, soort: p.soort, naar: uitkomst.get(p) || null })),
+        }
+      })
+
+      // Maanden waar een sale heen kan: de eerste open periode en de drie erna.
+      const laatsteBevroren = bevrorenKeys[bevrorenKeys.length - 1]
+      const openPeriodes = [laatsteBevroren ? volgendeMaand(laatsteBevroren) : periodeKey(now)]
+      while (openPeriodes.length < 4) openPeriodes.push(volgendeMaand(openPeriodes[openPeriodes.length - 1]))
+
+      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100, fixedCosts: FIXED, verschoven, vastzetActief, bevroren, openPeriodes }
     } catch (error) {
       console.error('❌ getPartnerPayouts failed:', error)
       return { months: [], totalOutstanding: 0 }
     }
   }
 
-  // Markeer een maand als (volledig) uitbetaald: zet amount_paid op het bedrag
-  // dat op dat moment openstaat (owedNow), zodat de maand op €0 openstaand komt.
-  // Komt er later nog een sale in die maand bij, dan wordt owed > paid en
-  // verschijnt alleen dat nieuwe stukje opnieuw als openstaand.
   // Adspend van één uitbetaalperiode handmatig zetten. Leeg = weghalen, zodat
   // de automatische Meta-koppeling het weer overneemt.
   async saveAdSpend(coachId, periodKey, bedrag) {
@@ -3445,10 +3583,28 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
-  async settlePartnerMonth(coachId, periodKey, owedNow) {
+  // Markeer een maand als uitbetaald. Vanaf dat moment is hij bevroren: wat er
+  // later bijkomt of verandert, telt in de eerstvolgende open maand.
+  // Vastzetten: bedrag + uitsplitsing per sale in één transactie (RPC). Zonder
+  // die RPC (SQL nog niet gedraaid) alleen het bedrag, zoals voorheen.
+  async settlePartnerMonth(coachId, periodKey, owedNow, maand = null) {
     try {
       if (!coachId || !periodKey) return { error: 'coach/periode ontbreekt' }
       const period = `${periodKey}-01` // YYYY-MM → YYYY-MM-01
+      if (maand) {
+        const { error: rpcFout } = await this.db.supabase.rpc('partner_uitbetaling_vastzetten', {
+          p_period: period,
+          p_bedrag: Number(owedNow) || 0,
+          p_vaste_lasten: Number(maand.fixedCosts) || 0,
+          p_adspend: Number(maand.adSpend) || 0,
+          p_items: (maand.ontvangsten || []).map(o => ({
+            movement_id: o.movementId, lead_name: o.naam, soort: o.soort, portie: o.portie,
+            datum: o.datum, bedrag: o.bedrag, partner_deel: o.partnerDeel,
+          })),
+        })
+        if (!rpcFout) return { error: null }
+        if (rpcFout.code !== 'PGRST202') return { error: rpcFout }
+      }
       const { error } = await this.db.supabase
         .from('partner_payouts')
         .upsert(
@@ -3458,6 +3614,24 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return { error }
     } catch (error) {
       console.error('❌ settlePartnerMonth failed:', error)
+      return { error }
+    }
+  }
+
+  // Kersten bepaalt zelf in welke uitbetaalperiode een sale meetelt.
+  async setTeltMeeVanaf(movementId, periodKey) {
+    try {
+      if (!movementId || !periodKey) return { error: 'sale/periode ontbreekt' }
+      const { data, error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ telt_mee_vanaf: `${periodKey}-01` })
+        .eq('id', movementId)
+        .select('id')
+      if (error) return { error }
+      if (!data?.length) return { error: 'niets bijgewerkt (geen rechten op deze rij?)' }
+      return { error: null }
+    } catch (error) {
+      console.error('❌ setTeltMeeVanaf failed:', error)
       return { error }
     }
   }

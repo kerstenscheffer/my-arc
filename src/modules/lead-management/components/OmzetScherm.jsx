@@ -72,7 +72,7 @@ const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent
 
 export default function OmzetScherm({
   revenue, payouts, isOwner = true, partnerName = 'Marcel', maandDoel = null,
-  onDoel, onSettle, payoutBusy, leadService, coachId, onHerlaad, onAdSpend, isMobile,
+  onDoel, onSettle, onVerplaats, payoutBusy, leadService, coachId, onHerlaad, onAdSpend, isMobile,
 }) {
   const maanden = useMemo(() => revenue?.months || [], [revenue])
   const huidigeMaand = maanden.find(m => m.isCurrent)?.key || maanden[0]?.key
@@ -321,9 +321,19 @@ export default function OmzetScherm({
             {paneel === 'partner' && (
               <div style={{ marginTop: 12 }}>
                 {(verdeling.ontvangsten || []).map((o, i) => (
-                  <Regel key={i} label={<>{o.naam}<span style={{ color: 'rgba(255,255,255,0.4)' }}>{o.soort ? ` · ${o.soort}` : ''}</span></>} bedrag={o.bedrag} klein />
+                  <div key={i}>
+                    <Regel label={<>{o.naam}<span style={{ color: 'rgba(255,255,255,0.4)' }}>{o.soort ? ` · ${o.soort}` : ''}</span></>} bedrag={o.bedrag} klein />
+                    {isOwner && losseMaand && !verdeling.bevroren && payouts?.vastzetActief && o.movementId && o.portie !== 'reservering' && (
+                      <MaandKeuze huidig={gekozen} opties={(payouts.openPeriodes || []).filter(k => o.los || k >= gekozen)} onKies={(k) => onVerplaats?.(o.movementId, k)} />
+                    )}
+                  </div>
                 ))}
-                {isOwner && losseMaand && (
+                {verdeling.bevroren && (
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
+                    {!verdeling.ontvangsten?.length ? 'Alleen het totaal is vastgelegd. ' : verdeling.gereconstrueerd ? 'Uitsplitsing achteraf herleid, telt exact op tot het bedrag. ' : ''}Vastgezet: dit bedrag verandert niet meer.
+                  </div>
+                )}
+                {isOwner && losseMaand && (!verdeling.bevroren || binnenDag(verdeling.paidAt)) && (
                   <button
                     onClick={() => onSettle?.(verdeling)}
                     disabled={payoutBusy === verdeling.key}
@@ -339,6 +349,7 @@ export default function OmzetScherm({
                   </button>
                 )}
                 <Openstaand payouts={payouts} isOwner={isOwner} partnerName={partnerName} />
+                {isOwner && <VerschilOverzicht rijen={payouts?.bevroren} />}
               </div>
             )}
           </>
@@ -459,6 +470,63 @@ function Regel({ label, bedrag, dik = false, klein = false }) {
       <span style={{ flexShrink: 0, fontSize: dik ? '1.05rem' : '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
         {bedrag < 0 ? `− ${eur(-bedrag)}` : eur(bedrag)}
       </span>
+    </div>
+  )
+}
+
+// Een per ongeluk afgevinkte uitbetaling kun je nog een dag terugdraaien. Daarna
+// staat hij vast; anders verdwijnt de uitsplitsing met één tik.
+const binnenDag = (iso) => !!iso && Date.now() - new Date(iso).getTime() < 24 * 3600 * 1000
+
+// Kersten bepaalt in welke uitbetaalperiode een sale meetelt.
+function MaandKeuze({ huidig, opties, onKies }) {
+  const alle = opties.includes(huidig) ? opties : [huidig, ...opties]
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '-2px 0 6px' }}>
+      <select
+        value={huidig}
+        onChange={e => { if (e.target.value !== huidig) onKies(e.target.value) }}
+        aria-label="Telt mee in maand"
+        style={{ ...tik, minHeight: 32, padding: '0 0.5rem', borderRadius: 8, background: '#000', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', fontSize: '0.75rem', fontWeight: 800, fontFamily: 'inherit' }}
+      >
+        {alle.map(k => <option key={k} value={k}>Telt in {maandNaam(k, false)}</option>)}
+      </select>
+    </div>
+  )
+}
+
+// Per bevroren maand: wat is betaald, wat de oude live-regel nu zou geven en
+// welke sales dat verschil maken. Die sales schuiven door naar een open maand.
+function VerschilOverzicht({ rijen }) {
+  if (!rijen?.length) return null
+  const kolom = { flex: '0 0 72px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const centen = (n) => '€' + (n || 0).toLocaleString('nl-NL', { maximumFractionDigits: 2 })
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', marginBottom: 6 }}>Betaald tegenover de oude regel</div>
+      <div style={{ display: 'flex', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', paddingBottom: 4 }}>
+        <span style={{ flex: 1 }}>Maand</span><span style={kolom}>Betaald</span><span style={kolom}>Regel</span><span style={kolom}>Verschil</span>
+      </div>
+      {rijen.map(r => (
+        <div key={r.key} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '6px 0' }}>
+          <div style={{ display: 'flex', fontSize: '0.84rem', fontWeight: 900, color: '#fff' }}>
+            <span style={{ flex: 1 }}>{cap(maandNaam(r.key, false))}</span>
+            <span style={kolom}>{centen(r.uitbetaald)}</span>
+            <span style={kolom}>{centen(r.liveRegel)}</span>
+            <span style={kolom}>{centen(r.verschil)}</span>
+          </div>
+          {r.nietInBetaling.map((n, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>{n.naam}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{eur(n.bedrag)}</span>
+              <span style={{ color: '#fff', fontWeight: 800 }}>{n.naar ? `→ ${maandNaam(n.naar, false)}` : '→ nog niet'}</span>
+            </div>
+          ))}
+          {!r.heeftUitsplitsing && (
+            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Alleen het totaal is vastgelegd.</div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

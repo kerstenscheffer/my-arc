@@ -319,14 +319,22 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     if (!m || payoutBusy) return
     setPayoutBusy(m.key)
     try {
-      if (m.settled) await leadService.unsettlePartnerMonth(coachId, m.key)
-      else await leadService.settlePartnerMonth(coachId, m.key, m.owed)
+      const res = m.settled
+        ? await leadService.unsettlePartnerMonth(coachId, m.key)
+        : await leadService.settlePartnerMonth(coachId, m.key, m.owed, m)
+      if (res?.error) window.alert(`Uitbetaling niet opgeslagen: ${res.error.message || res.error}`)
       await loadPayouts()
     } catch (e) {
       console.error('Uitbetaling bijwerken mislukt:', e)
     } finally {
       setPayoutBusy(null)
     }
+  }
+
+  const verplaatsSale = async (movementId, periodKey) => {
+    const res = await leadService.setTeltMeeVanaf(movementId, periodKey)
+    if (res?.error) window.alert(`Verplaatsen niet gelukt: ${res.error.message || res.error}`)
+    await loadPayouts()
   }
 
   const saveKpiPanel = async () => {
@@ -1673,6 +1681,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   maandDoel={maandDoel}
                   onDoel={() => setDoelOpen(true)}
                   onSettle={settleMonth}
+                  onVerplaats={verplaatsSale}
                   payoutBusy={payoutBusy}
                   leadService={leadService}
                   coachId={coachId}
