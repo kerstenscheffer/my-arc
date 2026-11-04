@@ -304,7 +304,15 @@ export default function WisselModal({
       })
 
       setAllMeals(meals)
-      setCustomMeals((customRes.data || []).map(m => ({ ...m, _isCustom: true })))
+      // Eigen maaltijden bewaren hoeveelheden als amount_gram, plannen en de
+      // boodschappenlijst lezen amount + unit. Beide meegeven.
+      setCustomMeals((customRes.data || []).map(m => ({
+        ...m,
+        _isCustom: true,
+        ingredients_list: Array.isArray(m.ingredients_list)
+          ? m.ingredients_list.map(i => (i?.amount == null && i?.amount_gram != null ? { ...i, amount: i.amount_gram, unit: i.unit || 'gram' } : i))
+          : m.ingredients_list,
+      })))
       setCoachOptions(curated)
       setCoachPerMoment(perMoment)
       setMoment(slotKey)
@@ -357,7 +365,8 @@ export default function WisselModal({
   const allesTonen = () => { setMoment('alles'); setSortering('smart'); setMaxKcal(''); setMinEiwit('') }
 
   // Kopje boven een groep in de lijst.
-  const KOPPEN = ['Vaste swaps', 'Favorieten', 'Eigen maaltijden klant', 'Meer maaltijden']
+  // Eigen maaltijden van de klant bovenaan: daar zoekt de coach ze.
+  const KOPPEN = ['Eigen maaltijden klant', 'Vaste swaps', 'Favorieten', 'Meer maaltijden']
   const kopVan = (m) => (m ? KOPPEN[laagRef.current.get(m.id) ?? 3] : null)
 
   const getFilteredMeals = () => {
@@ -385,9 +394,11 @@ export default function WisselModal({
     })
     laagRef.current = laag
     const pool = [
-      ...neem(vast, 0),
-      ...neem(allMeals.filter(m => favorites.has(m.id) && pastMoment(m)), 1),
-      ...neem(customMeals.filter(pastMoment), 2),
+      // Alle eigen maaltijden, ook van een ander moment: een klant zet zijn
+      // eiwitshake onder snack en wil hem misschien bij het ontbijt.
+      ...neem(customMeals, 0),
+      ...neem(vast, 1),
+      ...neem(allMeals.filter(m => favorites.has(m.id) && pastMoment(m)), 2),
       ...neem(allMeals.filter(pastMoment), 3),
     ]
 
@@ -438,7 +449,7 @@ export default function WisselModal({
         return [...meals].sort((a, b) => {
           const la = laag.get(a.id) ?? 3, lb = laag.get(b.id) ?? 3
           if (la !== lb) return la - lb
-          if (la === 0) return volg.get(a.id) - volg.get(b.id)
+          if (la === 1) return volg.get(a.id) - volg.get(b.id)
           return afstand.get(a.id) - afstand.get(b.id)
         })
       }
@@ -730,6 +741,11 @@ export default function WisselModal({
             }} />
           </div>
         ) : (filteredMeals.length > 0 || producten.length > 0 || productenLaden) ? (<>
+          {clientId && customMeals.length === 0 && !searchTerm && (
+            <div style={{ padding: `0.2rem ${isMobile ? '0.9rem' : '1.25rem'} 0.5rem`, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+              Deze klant heeft nog geen eigen maaltijden.
+            </div>
+          )}
           {filteredMeals.map((meal, idx) => {
             const kop = sortering === 'smart' && !searchTerm ? kopVan(meal) : null
             const nieuweKop = kop && kop !== kopVan(filteredMeals[idx - 1])
