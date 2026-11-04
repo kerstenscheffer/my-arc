@@ -162,8 +162,9 @@ create policy rls_eigen_wijzigen on public.clients for update to authenticated
 create policy rls_eigen_toevoegen on public.clients for insert to authenticated
   with check (auth_user_id = auth.uid());
 
--- /nutritionintake zonder login: alleen de kolommen die die pagina echt gebruikt.
-create policy rls_intake_anon on public.clients for select to anon using (true);
+-- Zonder login: geen enkele rij. De kolomrechten blijven staan zodat oudere code die de
+-- naam meejoint (nutrition_preferences -> clients) een lege koppeling krijgt in plaats van
+-- een fout. /nutritionintake haalt de klant via /api/public-intake (service key).
 revoke select, insert, update, delete on public.clients from anon;
 grant select (id, first_name, last_name, tdee, surplus, target_calories, target_protein, target_carbs, target_fat)
   on public.clients to anon;
