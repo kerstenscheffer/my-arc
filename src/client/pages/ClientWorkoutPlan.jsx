@@ -2,6 +2,7 @@
 // UPDATED VERSION - Clean modular import
 
 import WorkoutPlan from '../../modules/workout/WorkoutPlan'
+import RustKlokBalk from '../../modules/workout/components/todays-workout/components/RustKlokBalk'
 
 /**
  * ClientWorkoutPlan - Clean wrapper component
@@ -10,7 +11,12 @@ import WorkoutPlan from '../../modules/workout/WorkoutPlan'
  * All logic has been moved to the /modules/workout folder
  */
 export default function ClientWorkoutPlan({ client, schema, db, onFocusChange, onClientUpdate }) {
-  return <WorkoutPlan client={client} schema={schema} db={db} onFocusChange={onFocusChange} onClientUpdate={onClientUpdate} />
+  return (
+    <>
+      <WorkoutPlan client={client} schema={schema} db={db} onFocusChange={onFocusChange} onClientUpdate={onClientUpdate} />
+      <RustKlokBalk />
+    </>
+  )
 }
 
 /**

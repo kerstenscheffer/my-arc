@@ -12,6 +12,8 @@ import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
 import BladModal from './BladModal'
 import RustTimer from './RustTimer'
+import { RustKlokPil } from './RustKlokBalk'
+import { useRustKlokLoopt, startRustKlok, stopRustKlok } from '../rustKlok'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import ExerciseService from '../../../../../services/ExerciseService'
 import OpwarmPoort from './OpwarmPoort'
@@ -536,7 +538,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // De stand wordt onthouden: wie met een timer traint doet dat de hele
   // workout, niet per oefening opnieuw aanzetten.
   const [rustTimerAan, setRustTimerAan] = useState(() => timerStaatAan())
-  const [rust, setRust] = useState(false)
+  // De klok zelf staat los van dit scherm (rustKlok.js): hij loopt door als je
+  // naar een andere oefening gaat en is daar dan ook te zien.
+  const rust = useRustKlokLoopt()
 
   // De rusttijd komt uit het schema van de coach (het veld `rust` bij de
   // oefening), tenzij de klant hem zelf heeft aangepast. Per oefening, dus
@@ -730,7 +734,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     // Rusttimer starten vóór het opslaan: dat is een netwerkrondje, en die
     // seconden horen bij je rust en niet bij het wachten op de server.
     // Niet na een correctie van een bestaande set — dan rust je niet.
-    if (rustTimerAan && editingIndex === null) setRust(true)
+    if (rustTimerAan && editingIndex === null) startRustKlok({ oefening: exercise.name, sec: rusttijd.sec, bron: rusttijd.bron })
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
   }
@@ -739,9 +743,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // zodra het geplande aantal sets erin staat; doorgaan kan altijd met de
   // knop, maar de app moet niet blijven duwen.
   const volgendeSet = () => {
-    setRust(false)
+    stopRustKlok()
     const gepland = parseInt(exercise.sets, 10)
-    if (Number.isFinite(gepland) && loggedSets.length >= gepland) { setRustTimerAan(false); bewaarTimerAan(false); return }
+    // De schakelaar blijft aan: die geldt voor de hele workout, en anders is de
+    // timer bij de volgende oefening weg.
+    if (Number.isFinite(gepland) && loggedSets.length >= gepland) return
     setEditingIndex(null)
     setShowWizard(true)
   }
@@ -754,7 +760,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     const nieuw = !rustTimerAan
     setRustTimerAan(nieuw)
     bewaarTimerAan(nieuw)
-    if (!nieuw) setRust(false)   // uitzetten stopt ook een lopende rust
+    if (!nieuw) stopRustKlok()   // uitzetten stopt ook een lopende rust
   }
 
   // ✅ Nieuwe handler: start edit mode voor bestaande set
@@ -1011,6 +1017,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {/* Verkleinen staat rechtsonder in het beeld en niet bovenin: daar
                 zit de eigen knoppenrij van YouTube, en twee pijltjes naast
                 elkaar die het tegenovergestelde doen leest niet. */}
+            {toonVideo && <RustKlokPil style={{ bottom: 12, left: '50%', transform: 'translateX(-50%)' }} />}
+
             {toonVideo && (
               <button
                 onClick={() => setToonVideo(false)}
@@ -1291,10 +1299,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {rust && (
               <div style={{ padding: isMobile ? '0.8rem 1rem 0.2rem' : '0.9rem 1.25rem 0.3rem' }}>
                 <RustTimer
-                  oefeningNaam={exercise.name}
-                  startSec={rusttijd.sec}
-                  bron={rusttijd.bron}
-                  onKlaar={() => {}}
+                  huidigeOefening={exercise.name}
                   onStop={volgendeSet}
                   isMobile={isMobile}
                 />
@@ -1467,6 +1472,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               maxWidth: '100vw', maxHeight: '100dvh',
             }}
           />
+          <RustKlokPil style={{ top: 'calc(env(safe-area-inset-top, 0px) + 13px)', left: 12 }} />
           <button
             onClick={() => setVideoGroot(false)}
             aria-label="Sluit volledig scherm"

@@ -11,60 +11,34 @@
 // minuten pakt en bij curls veertig seconden, wil dat niet elke set opnieuw
 // instellen.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { Pause, Play, RotateCcw, SkipForward, Minus, Plus } from 'lucide-react'
 import { bewaarRusttijd } from '../rusttijd'
+import { useRustKlok, verzetRustKlok, herstartRustKlok, wisselPauzeRustKlok, klokTekst } from '../rustKlok'
 
 const GROEN = '#10b981'
 
-const mmss = (sec) => {
-  const m = Math.floor(Math.max(0, sec) / 60)
-  const s = Math.max(0, sec) % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+const mmss = (sec) => klokTekst(Math.max(0, sec))
 
-// `startSec` en `bron` komen van rusttijdVoor(): de tijd die de coach in het
-// schema zette, of wat de klant er zelf van maakte.
-export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', onKlaar, onStop, isMobile }) {
-  const [totaal, setTotaal] = useState(startSec)
-  const [over, setOver] = useState(startSec)
-  const [loopt, setLoopt] = useState(true)
-  const [aangepast, setAangepast] = useState(false)
-  const klaarRef = useRef(false)
-
-  // Aftellen op een eindtijd en niet met een teller die je elke seconde met
-  // één verlaagt: zet de telefoon zijn scherm uit, dan lopen intervallen
-  // achter en klopt de resterende tijd niet meer bij het terugkomen.
-  const eindRef = useRef(Date.now() + startSec * 1000)
-
-  useEffect(() => {
-    if (!loopt) return
-    const tik = () => {
-      const rest = Math.round((eindRef.current - Date.now()) / 1000)
-      setOver(rest)
-      if (rest <= 0 && !klaarRef.current) {
-        klaarRef.current = true
-        if (navigator.vibrate) navigator.vibrate([30, 50, 30])
-        onKlaar?.()
-      }
-    }
-    tik()
-    const id = setInterval(tik, 250)
-    return () => clearInterval(id)
-  }, [loopt, onKlaar])
+// De klok zelf staat in rustKlok.js en blijft lopen als dit scherm dicht gaat.
+// `huidigeOefening`: het scherm waarin hij nu staat. Is dat een andere dan waar
+// de rust begon, dan staat erbij waar de klok bij hoort.
+export default function RustTimer({ huidigeOefening, onStop, isMobile }) {
+  const { klok, over } = useRustKlok()
+  const totaal = klok?.totaal ?? 0
+  const loopt = klok?.pauzeOver == null
+  const oefeningNaam = klok?.oefening
+  const bron = klok?.bron
+  const aangepast = !!klok?.aangepast
 
   const verzet = (delta) => {
     const nieuw = Math.max(15, Math.min(600, totaal + delta))
-    setTotaal(nieuw)
-    setAangepast(true)
     // Handmatig aanpassen overschrijft de tijd van de coach voor déze
     // oefening, en blijft staan tot de klant hem weer verandert.
     bewaarRusttijd(oefeningNaam, nieuw)
     // De lopende klok meeschuiven, zodat +15 tijdens het rusten ook echt
     // vijftien seconden extra geeft in plaats van pas de volgende set.
-    eindRef.current += delta * 1000
-    klaarRef.current = false
-    setOver(Math.round((eindRef.current - Date.now()) / 1000))
+    verzetRustKlok(nieuw, over + delta)
   }
 
   // Slepen over de klok verzet de rusttijd, in stappen van vijf seconden.
@@ -84,34 +58,16 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
     if (stappen === 0) return
     const nieuw = Math.max(15, Math.min(600, sleep.current.totaal + stappen * 5))
     if (nieuw === totaal) return
-    setTotaal(nieuw)
-    setAangepast(true)
-    eindRef.current = Date.now() + Math.max(0, sleep.current.over + (nieuw - sleep.current.totaal)) * 1000
-    klaarRef.current = false
-    setOver(Math.round((eindRef.current - Date.now()) / 1000))
+    verzetRustKlok(nieuw, Math.max(0, sleep.current.over + (nieuw - sleep.current.totaal)))
   }, [totaal])
 
   const sleepEinde = useCallback(() => {
     if (!sleep.current) return
     sleep.current = null
-    bewaarRusttijd(oefeningNaam, totaal)
+    if (oefeningNaam) bewaarRusttijd(oefeningNaam, totaal)
   }, [oefeningNaam, totaal])
 
-  const opnieuw = () => {
-    eindRef.current = Date.now() + totaal * 1000
-    klaarRef.current = false
-    setLoopt(true)
-    setOver(totaal)
-  }
-
-  const pauze = () => {
-    if (loopt) {
-      setLoopt(false)
-    } else {
-      eindRef.current = Date.now() + Math.max(0, over) * 1000
-      setLoopt(true)
-    }
-  }
+  if (!klok) return null
 
   const voorbij = over <= 0
   const pct = Math.max(0, Math.min(100, (over / Math.max(1, totaal)) * 100))
@@ -121,6 +77,14 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
 
   return (
     <div style={{ flexShrink: 0 }}>
+      {huidigeOefening && oefeningNaam !== huidigeOefening && (
+        <div style={{
+          fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: 6,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          Rust na {oefeningNaam}
+        </div>
+      )}
       {/* Aflopende balk: in één oogopslag hoeveel er nog staat, zonder te lezen */}
       <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: kleur, transition: 'width 0.25s linear' }} />
@@ -150,7 +114,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
             fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: kleur,
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em', lineHeight: 1,
           }}>
-            {voorbij ? '0:00' : mmss(over)}
+            {klokTekst(over)}
           </div>
           <div
             title={bron === 'coach' && !aangepast
@@ -174,10 +138,10 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
         <div style={{ display: 'flex', gap: isMobile ? 5 : 8, flexShrink: 0 }}>
           <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)} isMobile={isMobile}><Minus size={15} /></RondeKnop>
           <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)} isMobile={isMobile}><Plus size={15} /></RondeKnop>
-          <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze} isMobile={isMobile}>
+          <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={wisselPauzeRustKlok} isMobile={isMobile}>
             {loopt ? <Pause size={15} /> : <Play size={15} />}
           </RondeKnop>
-          <RondeKnop titel="Opnieuw" onClick={opnieuw} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
+          <RondeKnop titel="Opnieuw" onClick={herstartRustKlok} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }} />
