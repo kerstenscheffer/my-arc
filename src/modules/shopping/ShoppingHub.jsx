@@ -127,7 +127,9 @@ export default function ShoppingHub({ client, db, onNavigate }) {
   return (
     <div style={{
       minHeight: '100vh',
-      paddingBottom: isMobile ? '100px' : '2rem'
+      paddingBottom: isMobile ? '100px' : '2rem',
+      // Vangnet: een te lange productnaam mag de pagina niet breder maken dan het scherm.
+      overflowX: 'clip',
     }}>
       <WeekShoppingTab
         shoppingData={shoppingData}

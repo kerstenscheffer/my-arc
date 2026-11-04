@@ -24,10 +24,12 @@ import { SHOPPING_BANNER_URL } from '../../../client/PaginaSkeletten'
 // foto toont zonder deze code mee te laden.
 export { SHOPPING_BANNER_URL }
 
+// kort: op een telefoon past de rij met de volle woorden niet (hij werd 407 px
+// breed, en dan schuift de hele pagina heen en weer).
 const WEEK_OPTIES = [
-  { id: 1, label: '1 week' },
-  { id: 2, label: '2 weken' },
-  { id: 3, label: '3 weken' },
+  { id: 1, label: '1 week', kort: '1 wk' },
+  { id: 2, label: '2 weken', kort: '2 wk' },
+  { id: 3, label: '3 weken', kort: '3 wk' },
 ]
 
 // Sectie-titel met bold witte tekst (vervangt de oude tiny gouden uppercase
@@ -459,7 +461,7 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
           { id: 'week', label: 'Hele week', aan: !selectedDay,  klik: () => setSelectedDay(null) },
         ].map(k => (
           <button key={k.id} onClick={k.klik} style={{
-            padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+            padding: isMobile ? '0 clamp(0.4rem, 2.8vw, 0.7rem)' : '0 1.2rem',
             background: 'transparent', border: 'none',
             borderRight: '1px solid rgba(255,255,255,0.1)',
             color: k.aan ? '#fff' : 'rgba(255,255,255,0.45)',
@@ -473,7 +475,7 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
         <div style={{ flex: 1 }} />
         {WEEK_OPTIES.map(w => (
           <button key={w.id} onClick={() => setWeekMultiplier(w.id)} style={{
-            padding: isMobile ? '0 0.7rem' : '0 0.9rem',
+            padding: isMobile ? '0 clamp(0.35rem, 2.4vw, 0.6rem)' : '0 0.9rem',
             background: 'transparent', border: 'none',
             borderLeft: '1px solid rgba(255,255,255,0.1)',
             color: weekMultiplier === w.id ? '#fff' : 'rgba(255,255,255,0.45)',
@@ -482,7 +484,7 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
             fontVariantNumeric: 'tabular-nums',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
-            {w.label}
+            {isMobile ? w.kort : w.label}
           </button>
         ))}
       </div>
