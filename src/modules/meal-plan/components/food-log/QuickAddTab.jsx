@@ -52,7 +52,7 @@ const Veld = ({ label, kleur, value, onChange, placeholder, eenheid, groot = fal
   </label>
 )
 
-export default function QuickAddTab({ onLog, isMobile, db }) {
+export default function QuickAddTab({ onLog, isMobile, db, initialValues }) {
   const [name, setName] = useState('')
   const [calories, setCalories] = useState('')
   const [protein, setProtein] = useState('')
@@ -60,6 +60,17 @@ export default function QuickAddTab({ onLog, isMobile, db }) {
   const [fat, setFat] = useState('')
   const [mealMoment, setMealMoment] = useState(getDefaultMoment())
   const [saving, setSaving] = useState(false)
+
+  // Pre-fill state when editing an existing quick-add meal.
+  useEffect(() => {
+    if (!initialValues) return
+    setName(initialValues.name || '')
+    setCalories(String(initialValues.calories || ''))
+    setProtein(String(initialValues.protein || ''))
+    setCarbs(String(initialValues.carbs || ''))
+    setFat(String(initialValues.fat || ''))
+    if (initialValues.meal_type) setMealMoment(initialValues.meal_type)
+  }, [initialValues])
 
   // Product-lookup: matched ai_ingredient (with image) for the typed name.
   // The user can dismiss the match (then it logs without image).
@@ -142,9 +153,9 @@ export default function QuickAddTab({ onLog, isMobile, db }) {
       await onLog({
         name: name.trim() || matchedProduct?.name || 'Snel toevoegen',
         calories: cal,
-        protein: parseInt(protein) || 0,
-        carbs: parseInt(carbs) || 0,
-        fat: parseInt(fat) || 0,
+        protein: parseFloat(String(protein).replace(',', '.')) || 0,
+        carbs: parseFloat(String(carbs).replace(',', '.')) || 0,
+        fat: parseFloat(String(fat).replace(',', '.')) || 0,
         type: 'quick_add',
         source: 'quick_add',
         meal_type: mealMoment,

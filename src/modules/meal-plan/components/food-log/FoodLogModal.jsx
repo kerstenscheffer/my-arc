@@ -41,6 +41,10 @@ export default function FoodLogModal({
   const [addIngredientCallback, setAddIngredientCallback] = useState(null)
   const [buildingMeal, setBuildingMeal] = useState(null)
   const [showFeedback, setShowFeedback] = useState(false)
+  // Quick-add edit: when editing a quick_add meal, bypass AmountPicker and
+  // show QuickAddTab with pre-filled values so the client can correct macros.
+  const [quickAddEditId, setQuickAddEditId] = useState(null)
+  const [quickAddInitialValues, setQuickAddInitialValues] = useState(null)
   // Coach maaltijden: dezelfde lijst als het wisselvenster, ingebouwd.
   const [mealService] = useState(() => (db ? new AIMealPlanService(db) : null))
   // Waarmee het wisselvenster vergelijkt. Bij loggen is er niets om te
@@ -69,6 +73,8 @@ export default function FoodLogModal({
       setSuccessData(null)
       setAddIngredientCallback(null)
       setBuildingMeal(null)
+      setQuickAddEditId(null)
+      setQuickAddInitialValues(null)
     }
   }, [isOpen, startTab])
 
@@ -93,6 +99,26 @@ export default function FoodLogModal({
     })
 
     if (isOpen && editMeal && editMeal.id) {
+      // Quick-add meals: show QuickAddTab pre-filled so the client can correct
+      // macro values directly, instead of the AmountPicker (which only scales).
+      if (editMeal.source === 'quick_add') {
+        setQuickAddEditId(editMeal.id)
+        setQuickAddInitialValues({
+          name: editMeal.meal_name || '',
+          calories: Math.round(editMeal.calories || 0),
+          protein: editMeal.protein || 0,
+          carbs: editMeal.carbs || 0,
+          fat: editMeal.fat || 0,
+          meal_type: editMeal.meal_type || 'snack',
+          _oldCalories: editMeal.calories || 0,
+          _oldProtein: editMeal.protein || 0,
+          _oldCarbs: editMeal.carbs || 0,
+          _oldFat: editMeal.fat || 0
+        })
+        setWeergave('snel')
+        return
+      }
+
       const hasAmount = editMeal.amount !== null && editMeal.amount !== undefined
       // Strict per_unit detection — legacy null falls back to portion-mode
       // so the stored totals are treated as "1 portion" instead of "per-100g".
@@ -156,11 +182,12 @@ export default function FoodLogModal({
     if (!loggingService || !client?.id) return
 
     try {
-      if (selectedItem?._editId) {
+      const idToDelete = selectedItem?._editId || quickAddEditId
+      if (idToDelete) {
         await db.supabase
           .from('consumed_meals')
           .delete()
-          .eq('id', selectedItem._editId)
+          .eq('id', idToDelete)
       }
 
       // Fire-and-forget: als dit een ingredient is zonder image maar mét
@@ -209,6 +236,17 @@ export default function FoodLogModal({
             fat: Math.round(logData.fat) - Math.round(oldFat),
             _isEdit: true
           })
+        } else if (quickAddEditId && quickAddInitialValues) {
+          onMealLogged({
+            ...result,
+            calories: Math.round(logData.calories) - Math.round(quickAddInitialValues._oldCalories),
+            protein: Math.round(logData.protein) - Math.round(quickAddInitialValues._oldProtein),
+            carbs: Math.round(logData.carbs) - Math.round(quickAddInitialValues._oldCarbs),
+            fat: Math.round(logData.fat) - Math.round(quickAddInitialValues._oldFat),
+            _isEdit: true
+          })
+          setQuickAddEditId(null)
+          setQuickAddInitialValues(null)
         } else {
           onMealLogged({
             ...result,
@@ -224,7 +262,7 @@ export default function FoodLogModal({
         name: logData.name,
         calories: Math.round(logData.calories),
         meal_type: logData.meal_type || 'snack',
-        isEdit: !!selectedItem?._editId
+        isEdit: !!(selectedItem?._editId || quickAddEditId)
       })
 
       meldSucces('gelogd')
@@ -378,7 +416,7 @@ export default function FoodLogModal({
             ) : weergave === 'foto' ? (
               <FotoTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : weergave === 'snel' ? (
-              <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
+              <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} initialValues={quickAddInitialValues} />
             ) : filter === 'coach' ? (
               <AIAlternativesModal
                 embedded
