@@ -12,6 +12,7 @@ import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
 import LooptijdKort from './LooptijdKort'
+import { isOnbeperkt } from './trajectPeriode'
 import { KolomKop } from './insight/KolomKop'
 import TrajectModal from './TrajectModal'
 import DoorstapKeuze from './DoorstapKeuze'
@@ -115,7 +116,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   useEffect(() => {
     if (!isOpen || !client?.id || gevraagdRef.current.has(client.id)) return
     const c = localClient ? { ...client, ...localClient } : client
-    if ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_status === 'ended') return
+    if ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_status === 'ended' || isOnbeperkt(c)) return
     gevraagdRef.current.add(client.id)
     setTrajectModus('start')
     // eslint-disable-next-line react-hooks/exhaustive-deps

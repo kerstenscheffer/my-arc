@@ -3,8 +3,8 @@
 // Klik-door blad voor de looptijd van een klant, in dezelfde stijl als het
 // slaapblad op home (één vraag per stap, sliders, witte knop onderaan).
 //
-//   modus 'start'   — nieuwe klant zonder looptijd: startdatum, hoe lang,
-//                     hoe betaalt hij. Geen omzet: die sale staat al op het
+//   modus 'start'   — nieuwe klant zonder looptijd: startdatum, aantal weken
+//                     (intypen), hoe betaalt hij. Geen omzet: die sale staat al op het
 //                     leadbord.
 //   modus 'verleng' — hoe lang erbij, hoe betaalt hij, wat kost het. Schuift
 //                     de einddatum op én boekt de verlenging als omzet in
@@ -36,6 +36,7 @@ const VERLENGING_TITEL = 'Verlenging 🔁'
 // niet terug te vinden is. Zelfde standaard als SaleForm en getPartnerPayouts.
 const STANDAARD_PARTNER_PCT = 50
 
+const MAX_WEKEN = 104
 const MAANDEN = Array.from({ length: 24 }, (_, i) => i + 1)
 // Startdatum: half jaar terug tot twee maanden vooruit, als dag-offset.
 const START_OFFSETS = Array.from({ length: 241 }, (_, i) => i - 180)
@@ -46,6 +47,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const [stap, setStap] = useState(1)
   const [startOffset, setStartOffset] = useState(0)
   const [maanden, setMaanden] = useState(4)
+  const [weken, setWeken] = useState('12')     // tekst: het veld mag tijdens typen leeg zijn
   const [betaling, setBetaling] = useState('prepaid')
   const [prijs, setPrijs] = useState(500)
   const [vorige, setVorige] = useState(null)   // { leadId, pct } van de oorspronkelijke sale
@@ -59,7 +61,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     if (!open || !client?.id) return
     let weg = false
     setStap(1); setFout(null); setBezig(false)
-    setStartOffset(0); setMaanden(4)
+    setStartOffset(0); setMaanden(4); setWeken('12')
     setBetaling(client.payment_plan === 'monthly' ? 'monthly' : 'prepaid')
     setPrijs(client.payment_plan === 'monthly' ? 150 : 500)
     setVorige(null)
@@ -105,8 +107,12 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const basis = isStart
     ? startIso
     : (periode && periode.endDate > vandaagIso() ? periode.endDate : vandaagIso())
-  const nieuwEind = plusMaanden(basis, maanden)
-  const totaalWeken = Math.max(1, Math.round((dagenTussen(startIso, nieuwEind) - (isStart ? 0 : gepauzeerd)) / 7))
+  const wekenGetal = Number(weken)
+  const wekenGeldig = wekenGetal >= 1 && wekenGetal <= MAX_WEKEN
+  const nieuwEind = isStart ? plusDagen(basis, (wekenGeldig ? wekenGetal : 0) * 7) : plusMaanden(basis, maanden)
+  const totaalWeken = isStart
+    ? wekenGetal
+    : Math.max(1, Math.round((dagenTussen(startIso, nieuwEind) - gepauzeerd) / 7))
   const totaalBedrag = betaling === 'monthly' ? prijs * maanden : prijs
 
   const bewaar = async () => {
@@ -116,6 +122,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         ? {
             coaching_start_date: startIso,
             coaching_total_weeks: totaalWeken,
+            coaching_onbeperkt: false,
             coaching_status: 'active',
             coaching_paused_at: null,
             coaching_pause_reason: null,
@@ -124,6 +131,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           }
         : {
             coaching_total_weeks: totaalWeken,
+            coaching_onbeperkt: false,
             coaching_status: 'active',
             payment_plan: betaling,
             goal_deadline: nieuwEind,
@@ -167,6 +175,25 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     } finally {
       setBezig(false)
     }
+  }
+
+  // Geen einddatum: geen weken, geen betaalvraag, meteen klaar.
+  const bewaarOnbeperkt = async () => {
+    setBezig(true); setFout(null)
+    const payload = {
+      coaching_start_date: startIso,
+      coaching_total_weeks: null,
+      coaching_onbeperkt: true,
+      coaching_status: 'active',
+      coaching_paused_at: null,
+      coaching_pause_reason: null,
+      goal_deadline: null,
+    }
+    const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
+    setBezig(false)
+    if (error) { setFout(error.message || 'Opslaan mislukt'); return }
+    onClientUpdate?.(payload)
+    onClose?.()
   }
 
   const kleinKnop = {
@@ -261,9 +288,33 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           </>
         )}
 
-        {huidig === 'duur' && (
+        {huidig === 'duur' && isStart && (
           <>
-            {vraag(isStart ? 'Hoe lang loopt het traject?' : 'Hoe lang verlengen?')}
+            {vraag('Hoeveel weken loopt het traject?')}
+            <label style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, height: 86, cursor: 'text' }}>
+              <input
+                value={weken}
+                onChange={(e) => setWeken(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                onFocus={(e) => e.target.select()}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Aantal weken"
+                style={{
+                  width: '2.2em', padding: '0.1em 0', textAlign: 'center',
+                  background: 'transparent', border: 'none', borderBottom: '2px solid rgba(255,255,255,0.35)',
+                  borderRadius: 0, outline: 'none', color: '#fff', fontFamily: 'inherit',
+                  fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+                }}
+              />
+              <span style={{ fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>weken</span>
+            </label>
+            {onder(wekenGeldig ? `Loopt tot ${mooi(nieuwEind)}` : `Vul 1 tot ${MAX_WEKEN} weken in`)}
+          </>
+        )}
+
+        {huidig === 'duur' && !isStart && (
+          <>
+            {vraag('Hoe lang verlengen?')}
             <HorizontaleSlider
               waarden={MAANDEN}
               waarde={maanden}
@@ -272,9 +323,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
               itemBreedte={88}
               groot="1.6rem"
             />
-            {onder(isStart
-              ? `Loopt tot ${mooi(nieuwEind)} · ${totaalWeken} weken`
-              : `${periode ? `Nu tot ${mooi(periode.endDate)} → ` : ''}nieuw eind ${mooi(nieuwEind)}`)}
+            {onder(`${periode ? `Nu tot ${mooi(periode.endDate)} → ` : ''}nieuw eind ${mooi(nieuwEind)}`)}
           </>
         )}
 
@@ -318,7 +367,23 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
               {bezig ? 'Opslaan…' : isStart ? 'Looptijd opslaan' : `Verlengen · ${euro(totaalBedrag)}`}
             </button>
           )
-          : <button onClick={() => setStap(n => n + 1)} style={primair}>Volgende</button>}
+          : (() => {
+              const geblokkeerd = isStart && huidig === 'duur' && !wekenGeldig
+              return (
+                <button
+                  onClick={() => setStap(n => n + 1)}
+                  disabled={geblokkeerd}
+                  style={{ ...primair, opacity: geblokkeerd ? 0.4 : 1, cursor: geblokkeerd ? 'default' : 'pointer' }}
+                >
+                  Volgende
+                </button>
+              )
+            })()}
+        {isStart && huidig === 'duur' && (
+          <button onClick={bewaarOnbeperkt} disabled={bezig} style={{ ...primair, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', minHeight: 44, marginTop: 4 }}>
+            Onbeperkt, geen einddatum
+          </button>
+        )}
         {isStart && stap === 1 && (
           <button onClick={onClose} style={{ ...primair, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', minHeight: 40, marginTop: 4 }}>
             Later

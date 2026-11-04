@@ -5,6 +5,10 @@
 // door de trajectlijn bovenaan de klantkaart in Command. Eigen bestand,
 // omdat een componentbestand alleen componenten mag exporteren (fast refresh).
 
+// Onbeperkt = geen einddatum (Kersten zelf, familie). Weken leeg, dus computePeriod
+// geeft null; staan er toch weken, dan winnen die (oude coachversie zette ze).
+export const isOnbeperkt = (client) => !!client?.coaching_onbeperkt && !client?.coaching_total_weeks
+
 export function computePeriod(client) {
   const start = client.coaching_start_date
   const weeks = client.coaching_total_weeks

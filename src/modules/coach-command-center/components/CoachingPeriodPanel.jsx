@@ -35,7 +35,7 @@ const formatDate = (iso) => {
 }
 
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
-import { computePeriod } from './trajectPeriode'
+import { computePeriod, isOnbeperkt } from './trajectPeriode'
 import BetaalPauze from './BetaalPauze'
 
 // `menu`: alleen de acties als lijstje (dropdown onder de looptijd-lijn in de
@@ -72,6 +72,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
       const payload = {
         coaching_start_date: draftStart,
         coaching_total_weeks: weeks,
+        coaching_onbeperkt: false,
         coaching_status: 'active',
         coaching_paused_at: null,
         coaching_pause_reason: null,
@@ -85,6 +86,28 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     } catch (err) {
       console.error('Save coaching period failed:', err)
       alert('Opslaan mislukt')
+    } finally { setBusy(false) }
+  }
+
+  const maakOnbeperkt = async () => {
+    if (period && !window.confirm('Traject onbeperkt maken?\n\nDe einddatum vervalt en de klant krijgt geen check-ins meer.')) return
+    setBusy(true)
+    try {
+      const payload = {
+        coaching_start_date: client.coaching_start_date || vandaag(),
+        coaching_total_weeks: null,
+        coaching_onbeperkt: true,
+        coaching_status: 'active',
+        coaching_paused_at: null,
+        coaching_pause_reason: null,
+        goal_deadline: null,
+      }
+      const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
+      if (error) throw error
+      onClientUpdate?.(payload)
+      setEditing(false)
+    } catch (err) {
+      console.error('Onbeperkt maken mislukt:', err); alert('Opslaan mislukt')
     } finally { setBusy(false) }
   }
 
@@ -206,7 +229,8 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
   }
 
   // ── Setup-mode ────────────────────────────────────────────────────────────
-  if (!period || editing) {
+  const onbeperkt = isOnbeperkt(client)
+  if ((!period && !onbeperkt) || editing) {
     return (
       <div style={panelShell(null, isMobile)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.55rem' }}>
@@ -267,6 +291,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
           {!isMobile && <div style={{ flex: 1, minWidth: 0 }} />}
 
+          <button onClick={maakOnbeperkt} disabled={busy} style={{ ...secondaryBtnStyle, height: 36, minHeight: 36, flex: isMobile ? '1 1 100%' : undefined, justifyContent: 'center' }}>Onbeperkt</button>
           {editing && (
             <button onClick={() => setEditing(false)} style={{ ...secondaryBtnStyle, height: 36, minHeight: 36, flex: isMobile ? '1 1 0' : undefined, justifyContent: 'center' }}>Annuleer</button>
           )}
@@ -291,7 +316,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
   }
   const sm = STATUS_META[status] || STATUS_META.active
   const StatusIcon = sm.icon
-  const overdue = period.isOver && status !== 'ended'
+  const overdue = !!period?.isOver && status !== 'ended'
   const barColor = overdue ? '#ef4444' : status === 'paused' ? '#f59e0b' : '#10b981'
 
   const menuRij = (kleur) => ({
@@ -302,6 +327,22 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
+
+  // Geen einddatum: alleen wat dan nog zin heeft.
+  if (onbeperkt) {
+    return (
+      <div style={{ padding: '0.35rem' }}>
+        <div style={{ padding: '0.4rem 0.7rem 0.5rem', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+          <span style={{ color: '#fff', fontWeight: 900 }}>Onbeperkt</span>
+          {client.coaching_start_date && <> · sinds {formatDate(client.coaching_start_date)}</>}
+        </div>
+        <button onClick={() => setEditing(true)} style={menuRij()}><Settings size={16} /> Looptijd instellen</button>
+        <button onClick={wisselSlot} disabled={busy} style={menuRij(opSlot ? '#ef4444' : undefined)}>
+          {opSlot ? <><LockOpen size={16} /> Account ontgrendelen</> : <><Lock size={16} /> Account op slot</>}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -322,6 +363,9 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
             <button onClick={resume} disabled={busy} style={menuRij()}><Play size={16} color="#10b981" /> Hervatten</button>
           )}
           <button onClick={() => setEditing(true)} style={menuRij()}><Settings size={16} /> Periode aanpassen</button>
+          {status !== 'paused' && (
+            <button onClick={maakOnbeperkt} disabled={busy} style={menuRij()}><Clock size={16} /> Onbeperkt maken</button>
+          )}
           <button onClick={wisselSlot} disabled={busy} style={menuRij(opSlot ? '#ef4444' : undefined)}>
             {opSlot ? <><LockOpen size={16} /> Account ontgrendelen</> : <><Lock size={16} /> Account op slot</>}
           </button>

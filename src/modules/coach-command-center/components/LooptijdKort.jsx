@@ -6,7 +6,7 @@
 // Stond eerder achter een "Looptijd"-knop als volle-breedte balk onder de kop.
 
 import { ChevronDown, Lock } from 'lucide-react'
-import { computePeriod } from './trajectPeriode'
+import { computePeriod, isOnbeperkt } from './trajectPeriode'
 
 const kort = (iso) => {
   if (!iso) return ''
@@ -35,7 +35,9 @@ export default function LooptijdKort({ client, open, onClick, isMobile }) {
       }}
     >
       <span style={{ width: 7, height: 7, borderRadius: '50%', background: kleur, flexShrink: 0 }} />
-      {!period ? (
+      {isOnbeperkt(client) ? (
+        <span style={{ fontSize: '0.78rem', fontWeight: 900, whiteSpace: 'nowrap' }}>Onbeperkt</span>
+      ) : !period ? (
         <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>Looptijd instellen</span>
       ) : (
         <>
