@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
-import { haalVerlengen, STATUS_LABEL } from './verlengenData'
+import { haalVerlengen, STATUS_LABEL, EINDCALL_NODIG } from './verlengenData'
 
 const FILTERS = [
   { id: 'actie', label: 'Actie nodig', past: r => r.actie && r.actie !== 'Klaar' },
@@ -18,8 +18,8 @@ const FILTERS = [
 ]
 
 const SOORT = { challenge: 'Challenge', coaching: 'Coaching' }
-const KOLOMMEN = ['Klant', 'Traject', 'Start', 'Einde', 'Dagen', 'Doorstap', 'Open', 'Actie']
-const RASTER = 'minmax(140px, 1.5fr) 92px 74px 74px 76px 104px 60px minmax(150px, 1fr)'
+const KOLOMMEN = ['Klant', 'Traject', 'Start', 'Einde', 'Dagen', 'Doorstap', 'Open', 'Volgende call', 'Actie']
+const RASTER = 'minmax(140px, 1.5fr) 92px 66px 66px 72px 100px 56px 118px minmax(116px, 1fr)'
 
 const datum = (iso) => {
   const d = new Date(`${iso}T12:00:00`)
@@ -27,6 +27,12 @@ const datum = (iso) => {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', ...(eigenJaar ? {} : { year: '2-digit' }) })
 }
 const dagenTekst = (n) => (n === 0 ? 'vandaag' : n < 0 ? `${-n} d voorbij` : `${n} d`)
+const callMoment = (iso) => {
+  const d = new Date(iso)
+  const dag = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' })
+  const tijd = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })
+  return `${dag} ${tijd}`
+}
 const euro = (n) => `€${Math.round(n).toLocaleString('nl-NL')}`
 const soortTekst = (r) => `${SOORT[r.soort]}${r.gepauzeerd ? ' · pauze' : ''}`
 const statusTekst = (s) => STATUS_LABEL[s] || 'Geen status'
@@ -35,6 +41,34 @@ const actieKleur = (a) => (a === 'Verlopen' ? colors.danger : a === 'Klaar' ? co
 const SUB = { fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary }
 const NAAM = { fontSize: '0.85rem', fontWeight: 800, color: colors.textPrimary }
 const ACTIE = { fontSize: '0.8rem', fontWeight: 900 }
+const NAAM_CHECKEN = {
+  display: 'inline-block', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap',
+  border: '1px solid rgba(255,255,255,0.35)', color: colors.textPrimary, fontSize: '0.66rem', fontWeight: 800,
+}
+
+// Label in de rij: Eindcall nodig als gevuld groen vlak, de rest als kale tekst.
+function ActieLabel({ actie }) {
+  if (actie === EINDCALL_NODIG) {
+    return (
+      <span style={{
+        ...ACTIE, display: 'inline-block', padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+        background: colors.success, color: '#000',
+      }}>{actie}</span>
+    )
+  }
+  return <span style={{ ...ACTIE, color: actieKleur(actie) }}>{actie || ''}</span>
+}
+
+function VolgendeCall({ r, voorvoegsel = '' }) {
+  if (!r.volgendeCall) return <span style={{ ...SUB, color: colors.textMuted }}>{voorvoegsel ? 'Geen call gepland' : '–'}</span>
+  const moment = callMoment(r.volgendeCall.start)
+  return (
+    <span title={r.volgendeCall.titel || undefined} style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 6px' }}>
+      <span style={{ ...SUB, color: r.naamChecken ? colors.textSecondary : colors.textPrimary, whiteSpace: 'nowrap' }}>{voorvoegsel}{moment}</span>
+      {r.naamChecken && <span style={NAAM_CHECKEN}>Naam checken</span>}
+    </span>
+  )
+}
 
 function Regel({ r, isMobile }) {
   if (isMobile) {
@@ -42,7 +76,7 @@ function Regel({ r, isMobile }) {
       <div style={{ padding: '10px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ ...NAAM, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.naam}</span>
-          {r.actie && <span style={{ ...ACTIE, color: actieKleur(r.actie), flexShrink: 0 }}>{r.actie}</span>}
+          {r.actie && <span style={{ flexShrink: 0 }}><ActieLabel actie={r.actie} /></span>}
         </div>
         <div style={{ ...SUB, marginTop: 4, lineHeight: 1.45 }}>
           {soortTekst(r)} · {datum(r.start)} → {datum(r.eind)} · {dagenTekst(r.dagen)}
@@ -51,6 +85,7 @@ function Regel({ r, isMobile }) {
           {statusTekst(r.status)}
           {r.openBetaling > 0 && <span style={{ color: colors.textPrimary, fontWeight: 800 }}> · {euro(r.openBetaling)} open</span>}
         </div>
+        <div style={{ marginTop: 3 }}><VolgendeCall r={r} voorvoegsel="Call: " /></div>
       </div>
     )
   }
@@ -65,7 +100,8 @@ function Regel({ r, isMobile }) {
       <span style={{ ...SUB, color: r.openBetaling > 0 ? colors.textPrimary : colors.textMuted, fontWeight: 800 }}>
         {r.openBetaling > 0 ? euro(r.openBetaling) : '–'}
       </span>
-      <span style={{ ...ACTIE, color: actieKleur(r.actie) }}>{r.actie || ''}</span>
+      <VolgendeCall r={r} />
+      <span><ActieLabel actie={r.actie} /></span>
     </div>
   )
 }
@@ -85,7 +121,11 @@ export default function GinoVerlengen({ isMobile = false }) {
   }, [])
 
   const actieve = FILTERS.find(f => f.id === filter) || FILTERS[0]
-  const lijst = (rijen || []).filter(actieve.past)
+  const gefilterd = (rijen || []).filter(actieve.past)
+  // Actie nodig: Eindcall nodig bovenaan, verder de volgorde op einddatum.
+  const lijst = filter === 'actie'
+    ? [...gefilterd.filter(r => r.actie === EINDCALL_NODIG), ...gefilterd.filter(r => r.actie !== EINDCALL_NODIG)]
+    : gefilterd
 
   return (
     <div style={{ marginTop: 16, marginBottom: 24 }}>
@@ -108,7 +148,7 @@ export default function GinoVerlengen({ isMobile = false }) {
       </div>
 
       {open && (
-        <div>
+        <div style={{ overflowX: isMobile ? 'visible' : 'auto' }}>
           {fout && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.danger }}>{fout}</div>}
           {!rijen && <div style={SUB}>Laden…</div>}
           {rijen && !fout && lijst.length === 0 && <div style={SUB}>Niemand in deze lijst.</div>}

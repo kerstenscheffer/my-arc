@@ -1,5 +1,8 @@
 -- supabase/traject-verlopen-slot.sql (4 nov 2026)
 --
+-- LET OP: traject_verlopen_klanten() is op 5 nov vervangen door
+-- src/modules/business-os/traject-slot-eindcall.sql. Dit bestand niet opnieuw draaien.
+--
 -- Regel van Kersten: traject voorbij = app op slot, automatisch. Elke nacht.
 -- Zelfde velden als de slotknop (CoachingPeriodPanel.wisselSlot).
 --

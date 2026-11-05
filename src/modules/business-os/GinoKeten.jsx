@@ -44,6 +44,7 @@ const RIJEN = [
   { key: 'nieuw', label: 'Nieuwe leads', Icon: UserPlus, kleur: '#3b82f6', stat: 'Nieuwe leads' },
   { key: 'follow', label: 'Follow-ups', Icon: Send, kleur: '#f59e0b', stat: 'Follow-ups' },
   { key: 'challenge', label: 'Campagne', Icon: Megaphone, kleur: '#a855f7' },
+  { key: 'chal', label: 'Challenge', Icon: Trophy, kleur: '#FFD700' },
   { key: 'reacties', label: 'Reacties', Icon: MessageCircle, kleur: GROEN, stat: 'Reacties', stap: true },
   { key: 'voorgesteld', label: 'Voorgesteld', Icon: PhoneCall, kleur: '#a855f7', stat: 'Voorgesteld', stage: 'callProposed', stap: true },
   { key: 'ingepland', label: 'Ingepland', Icon: CalendarCheck, kleur: '#06b6d4', stat: 'Ingepland', stage: 'callScheduled', stap: true },
@@ -81,6 +82,45 @@ const UITKLAP = {
   posts: { groep: (p) => p.soort || 'overig', naam: (g) => SOORTEN[g] || g },
   magnets: { groep: (p) => (p.soort === 'magnet' && p.woord ? String(p.woord).trim().toUpperCase() : null), naam: (g) => g, leads: true },
 }
+UITKLAP.chal = { naam: (g) => g }
+// De challenge in groepen. veld = uit get_keten_challenge. deel = percentage van twee rijen.
+// neutraal = geen kleur: een cohort dat nog loopt is geen slechte week.
+const CHALLENGE_GROEPEN = [
+  { id: 'campagne', label: 'Campagne', rijen: [
+    { id: 'berichten', label: 'Berichten', geslacht: 'chalBerichten' },
+    { id: 'reacties', label: 'Reacties', veld: 'reacties' },
+    { id: 'voorgesteld', label: 'Voorgesteld', veld: 'voorgesteld' },
+    { id: 'ingepland', label: 'Ingepland', veld: 'ingepland' },
+    { id: 'per100', label: 'Ingepland per 100 berichten', decimaal: true },
+  ] },
+  { id: 'calls', label: 'Calls', rijen: [
+    { id: 'gevoerd', label: 'Gevoerd', veld: 'gevoerd' },
+    { id: 'noshow', label: 'No-shows', veld: 'noshow', omgekeerd: true },
+    { id: 'afgewezen', label: 'Call afgewezen', veld: 'afgewezen', omgekeerd: true },
+    { id: 'verloren', label: 'Sale verloren', veld: 'verloren', omgekeerd: true },
+    { id: 'sales', label: 'Sales uit campagne', veld: 'sales_campagne' },
+    { id: 'close', label: 'Close', deel: ['chal:calls:sales', 'chal:calls:gevoerd'] },
+  ] },
+  { id: 'geld', label: 'Verkoop', rijen: [
+    { id: 'verkocht', label: 'Challenges verkocht', veld: 'verkocht' },
+    { id: 'order', label: 'Orderwaarde', veld: 'order', euro: true },
+    { id: 'uitgesteld', label: 'Uitgesteld', veld: 'uitgesteld', omgekeerd: true },
+    { id: 'verlengingen', label: 'Verlengingen', veld: 'verlengingen' },
+    { id: 'verleng', label: 'Orderwaarde verlengingen', veld: 'verleng_order', euro: true },
+  ] },
+  { id: 'cohort', label: 'Uit deze week verkocht, nu', rijen: [
+    { id: 'open', label: 'Loopt nog', veld: 'cohort_open', neutraal: true },
+    { id: 'doorgezet', label: 'Doorgezet', veld: 'cohort_doorgezet', neutraal: true },
+    { id: 'behouden', label: 'Borg behouden', veld: 'cohort_behouden', neutraal: true },
+    { id: 'refund', label: 'Refunds', veld: 'cohort_refund', neutraal: true },
+    { id: 'doorzet', label: 'Doorzet %', deel: ['chal:cohort:doorgezet', 'chal:geld:verkocht'], neutraal: true },
+  ] },
+  { id: 'doorstap', label: 'Doorstap-gesprekken', rijen: [
+    { id: 'ja', label: 'Ja', veld: 'doorstap_ja', neutraal: true },
+    { id: 'denkt', label: 'Denkt na', veld: 'doorstap_denkt', neutraal: true },
+    { id: 'nee', label: 'Nee', veld: 'doorstap_nee', neutraal: true },
+  ] },
+]
 const UITKLAP_KEY = 'myarc.keten.uitklap'
 // Leads per 10 posts onder elk woord. Staat standaard aan: alleen "uit" wordt bewaard, zo
 // verschijnt de rij ook in weergaven die al bestonden. Oudere app-versies negeren deze sleutel.
@@ -165,7 +205,7 @@ async function haalWeek(svc, coachId, van) {
   // Geslacht apart tellen op de server: dezelfde telling als newLeads, plus het filter.
   const telLeads = (g) => supabase.from('call_leads').select('id', { count: 'exact', head: true })
     .gte('created_at', s).lt('created_at', e).is('deleted_at', null).eq('gender', g).then(res => (res.error ? null : res.count), () => null)
-  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen, magnetLeads] = await Promise.all([
+  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen, magnetLeads, chal] = await Promise.all([
     svc.getRangeActivity(coachId, s, e),
     svc.getRangeFunnelStats(coachId, s, e),
     svc.getRangeReactionStats(coachId, s, e),
@@ -177,6 +217,7 @@ async function haalWeek(svc, coachId, van) {
     telChallenge(s, e, 'male'),
     telChallenge(s, e, 'female'),
     supabase.rpc('get_keten_magnet_leads', { p_van: s, p_tot: e }).then(res => (res.error ? null : res.data || []), () => null),
+    supabase.rpc('get_keten_challenge', { p_van: s, p_tot: e }).then(res => res.data || null, () => null),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -193,6 +234,7 @@ async function haalWeek(svc, coachId, van) {
   }
   // De uitklaprijen: posts, views en comments per groep, leads per woord.
   for (const [rij, u] of Object.entries(UITKLAP)) {
+    if (!u.groep) continue
     for (const p of m || []) {
       const g = u.groep(p)
       if (!g) continue
@@ -236,6 +278,22 @@ async function haalWeek(svc, coachId, van) {
       waarden['magnetsTotaal:per10'] = (tel('totaal') / metTotaal.length) * 10
       waarden['magnetsTotaal:per10Mannen'] = (tel('mannen') / metTotaal.length) * 10
       waarden['magnetsTotaal:per10Vrouwen'] = (tel('vrouwen') / metTotaal.length) * 10
+    }
+  }
+  // Challenge: de rijen uit CHALLENGE_GROEPEN, plus de berichten uit de telling hierboven.
+  waarden['chal:campagne:berichten'] = challenge
+  waarden['chal:campagne:berichtenMannen'] = challengeMannen
+  waarden['chal:campagne:berichtenVrouwen'] = challengeVrouwen
+  if (chal) {
+    waarden.chal = Number(chal.verkocht) || 0
+    for (const g of CHALLENGE_GROEPEN) {
+      for (const c of g.rijen) if (c.veld) waarden[`chal:${g.id}:${c.id}`] = Number(chal[c.veld]) || 0
+    }
+    waarden['chal:campagne:per100'] = challenge > 0 ? (waarden['chal:campagne:ingepland'] / challenge) * 100 : null
+    for (const g of CHALLENGE_GROEPEN) {
+      for (const c of g.rijen) {
+        if (c.deel) waarden[`chal:${g.id}:${c.id}`] = waarden[c.deel[1]] > 0 ? Math.round((waarden[c.deel[0]] / waarden[c.deel[1]]) * 100) : null
+      }
     }
   }
   waarden.challenge = challenge
@@ -609,7 +667,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
   }
 
   const kleurVan = (r, v, gem, loopt) => {
-    if (loopt || v == null || !(gem > 0)) return '#fff'
+    if (loopt || r.neutraal || v == null || !(gem > 0)) return '#fff'
     const d = (v - gem) / gem
     const slechter = Math.max(0, r.omgekeerd ? d : -d)
     return `hsl(${Math.round(GROEN_TINT * (1 - Math.min(1, slechter / ROOD_BIJ)))}, 80%, 52%)`
@@ -618,6 +676,18 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const per10Label = `${{ beide: 'Leads', mannen: 'Mannen', vrouwen: 'Vrouwen' }[geslachtVan('magnetLeads')]} per 10 posts`
   // De groepen onder een uitgeklapte rij, de grootste eerst. Alleen wat er ook gepost is.
   const subRijen = (rij) => {
+    if (rij === 'chal') {
+      return CHALLENGE_GROEPEN.flatMap((g) => {
+        const klap = `chal:${g.id}`
+        return [
+          { key: `${klap}:posts`, label: g.label, kop: true, klap, leeg: true },
+          ...(uitklap[klap] ? g.rijen.map(c => ({
+            ...c, key: `${klap}:${c.id}`, titel: `${g.label}: ${c.label.toLowerCase()}`, sub: true,
+            ...(c.geslacht ? { basis: `${klap}:${c.id}` } : null),
+          })) : []),
+        ]
+      })
+    }
     const u = UITKLAP[rij]
     const posts = {}
     for (const k of volle) {
