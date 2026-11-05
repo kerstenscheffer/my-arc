@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Film, Sparkles, Eye, BarChart3, MessageSquare, UserPlus, Send, MessageCircle, PhoneCall, CalendarCheck, Calendar,
-  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2, Mars, Venus, VenusAndMars, Megaphone,
+  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2, Mars, Venus, VenusAndMars, Megaphone, ChevronRight,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LeadManagementService from '../lead-management/LeadManagementService'
@@ -73,6 +73,18 @@ const VRAGEN = [
   { label: 'Hoeveel komt er zeker binnen deze maand?', vraag: 'Hoeveel geld komt er deze en volgende maand zeker binnen uit termijnen en openstaande betalingen, hoeveel nieuwe omzet is er dan nog nodig voor €10.000, en hoeveel sales is dat?' },
   { label: 'Wat doe ik deze week als eerste?', vraag: 'Kies op basis van de keten de 3 acties die deze week het meeste opleveren richting €10.000 per maand, op volgorde, met wat ik precies moet doen en hoe we zien of het werkt.' },
 ]
+
+// Posts en Magnets klappen uit: per soort en per magnet-woord de posts, views en comments
+// van elke week, bij een woord ook de nieuwe leads met dat woord. Zo zie je wat je postte
+// en wie daardoor binnenkwam.
+const UITKLAP = {
+  posts: { groep: (p) => p.soort || 'overig', naam: (g) => SOORTEN[g] || g },
+  magnets: { groep: (p) => (p.soort === 'magnet' && p.woord ? String(p.woord).trim().toUpperCase() : null), naam: (g) => g, leads: true },
+}
+const UITKLAP_KEY = 'myarc.keten.uitklap'
+const leesUitklap = () => {
+  try { const u = JSON.parse(localStorage.getItem(UITKLAP_KEY)); return u && typeof u === 'object' ? u : {} } catch { return {} }
+}
 
 // Klik op de naam van deze rijen wisselt beide → mannen → vrouwen. Per rij; dit apparaat onthoudt het.
 const GESLACHT_RIJEN = { nieuw: { mannen: 'nieuwMannen', vrouwen: 'nieuwVrouwen' }, challenge: { mannen: 'challengeMannen', vrouwen: 'challengeVrouwen' } }
@@ -149,7 +161,7 @@ async function haalWeek(svc, coachId, van) {
   // Geslacht apart tellen op de server: dezelfde telling als newLeads, plus het filter.
   const telLeads = (g) => supabase.from('call_leads').select('id', { count: 'exact', head: true })
     .gte('created_at', s).lt('created_at', e).is('deleted_at', null).eq('gender', g).then(res => (res.error ? null : res.count), () => null)
-  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen] = await Promise.all([
+  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen, magnetLeads] = await Promise.all([
     svc.getRangeActivity(coachId, s, e),
     svc.getRangeFunnelStats(coachId, s, e),
     svc.getRangeReactionStats(coachId, s, e),
@@ -160,6 +172,7 @@ async function haalWeek(svc, coachId, van) {
     telChallenge(s, e),
     telChallenge(s, e, 'male'),
     telChallenge(s, e, 'female'),
+    supabase.rpc('get_keten_magnet_leads', { p_van: s, p_tot: e }).then(res => res.data || [], () => []),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -173,6 +186,22 @@ async function haalWeek(svc, coachId, van) {
   }
   for (const r of RIJEN) {
     if (r.deel) waarden[r.key] = waarden[r.deel[1]] > 0 ? Math.round((waarden[r.deel[0]] / waarden[r.deel[1]]) * 100) : null
+  }
+  // De uitklaprijen: posts, views en comments per groep, leads per woord.
+  for (const [rij, u] of Object.entries(UITKLAP)) {
+    for (const p of m || []) {
+      const g = u.groep(p)
+      if (!g) continue
+      const k = `${rij}:${g}`
+      waarden[`${k}:posts`] = (waarden[`${k}:posts`] || 0) + 1
+      if (p.views != null) waarden[`${k}:views`] = (waarden[`${k}:views`] || 0) + Number(p.views)
+      if (p.comments != null) waarden[`${k}:comments`] = (waarden[`${k}:comments`] || 0) + Number(p.comments)
+    }
+  }
+  for (const l of magnetLeads) {
+    waarden[`magnets:${l.woord}:leads`] = l.totaal
+    waarden[`magnets:${l.woord}:leadsMannen`] = l.mannen
+    waarden[`magnets:${l.woord}:leadsVrouwen`] = l.vrouwen
   }
   waarden.challenge = challenge
   waarden.challengeMannen = challengeMannen
@@ -226,7 +255,7 @@ function Detail({ open, onSluit, isMobile }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 8, flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, color: '#fff' }}>
-          {rij.label} · {kolom.label} <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>({aantal})</span>
+          {rij.titel || rij.label} · {kolom.label} <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>({aantal})</span>
         </div>
         <button type="button" onClick={onSluit} aria-label="Sluiten" style={{
           width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -335,6 +364,12 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const [sleepKey, setSleepKey] = useState(null)
   const [geslacht, setGeslacht] = useState(leesGeslacht)
   const geslachtVan = (k) => (GESLACHT[geslacht[k]] ? geslacht[k] : 'beide')
+  const [uitklap, setUitklap] = useState(leesUitklap)
+  const wisselUitklap = (k) => {
+    const nieuw = { ...uitklap, [k]: !uitklap[k] }
+    setUitklap(nieuw)
+    try { localStorage.setItem(UITKLAP_KEY, JSON.stringify(nieuw)) } catch { /* privémodus */ }
+  }
   const wisselGeslacht = (k) => {
     const nieuw = { ...geslacht, [k]: GESLACHT[geslachtVan(k)].volgende }
     setGeslacht(nieuw)
@@ -398,6 +433,18 @@ export default function GinoKeten({ isMobile, onVraag }) {
     setNaam('')
     setMelding(null)
     bewaarStand(data.id, keys)
+  }
+  const hernoemWeergave = async () => {
+    const schoon = naam.trim()
+    if (!schoon || !actief) return
+    const { error } = await supabase.from('business_os_keten_weergaven').update({ naam: schoon, updated_at: new Date().toISOString() }).eq('id', actief)
+    if (error) {
+      setMelding(error.code === '23505' ? 'Die naam bestaat al.' : `Hernoemen mislukt: ${error.message}`)
+      return
+    }
+    setWeergaven(l => l.map(w => (w.id === actief ? { ...w, naam: schoon } : w)).sort((a, b) => a.naam.localeCompare(b.naam)))
+    setNaam('')
+    setMelding(null)
   }
   const verwijderWeergave = async () => {
     const { error } = await supabase.from('business_os_keten_weergaven').delete().eq('id', actief)
@@ -513,6 +560,29 @@ export default function GinoKeten({ isMobile, onVraag }) {
     return `hsl(${Math.round(GROEN_TINT * (1 - Math.min(1, slechter / ROOD_BIJ)))}, 80%, 52%)`
   }
 
+  // De groepen onder een uitgeklapte rij, de grootste eerst. Alleen wat er ook gepost is.
+  const subRijen = (rij) => {
+    const u = UITKLAP[rij]
+    const posts = {}
+    for (const k of volle) {
+      for (const [sleutel, v] of Object.entries(k.waarden)) {
+        const m = sleutel.match(new RegExp(`^${rij}:(.+):posts$`))
+        if (m) posts[m[1]] = (posts[m[1]] || 0) + v
+      }
+    }
+    const metPost = (g) => (p) => u.groep(p) === g
+    return Object.keys(posts).sort((a, b) => posts[b] - posts[a]).flatMap((g) => [
+      { key: `${rij}:${g}:posts`, label: u.naam(g), kop: true, lijst: { sorteer: 'tijd', filter: metPost(g) } },
+      { key: `${rij}:${g}:views`, label: 'Views', titel: `${u.naam(g)}: views`, sub: true, lijst: { sorteer: 'views', filter: metPost(g) } },
+      { key: `${rij}:${g}:comments`, label: 'Comments', titel: `${u.naam(g)}: comments`, sub: true, lijst: { sorteer: 'comments', filter: metPost(g) } },
+      ...(u.leads ? [{ key: `${rij}:${g}:leads`, label: 'Nieuwe leads', sub: true, geslacht: 'magnetLeads', basis: `${rij}:${g}:leads` }] : []),
+    ])
+  }
+  const weergaveRijen = keys.flatMap((k) => {
+    const rij = RIJ_VAN[k]
+    return UITKLAP[k] && uitklap[k] ? [rij, ...subRijen(k)] : [rij]
+  })
+
   const NAAM_B = isMobile ? 150 : 170
   const LIJN = '1.5px solid #fff'
   const knop = (aan) => ({
@@ -617,14 +687,20 @@ export default function GinoKeten({ isMobile, onVraag }) {
                 </div>
                 <div style={{ display: 'flex', gap: 8, paddingTop: 10, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
                   <input value={naam} onChange={(e) => setNaam(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') bewaarAlsNieuw() }}
-                    maxLength={60} placeholder="Naam van deze weergave" style={{
+                    maxLength={60} placeholder={actief ? 'Nieuwe naam' : 'Naam van deze weergave'} style={{
                       flex: 1, minWidth: 0, height: 34, padding: '0 10px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9,
                       color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, outline: 'none',
                     }} />
                   <button type="button" onClick={bewaarAlsNieuw} disabled={!naam.trim()} style={{
                     height: 34, padding: '0 12px', background: '#fff', border: '1px solid #fff', borderRadius: 9, color: '#0a0a0a', cursor: naam.trim() ? 'pointer' : 'default',
                     opacity: naam.trim() ? 1 : 0.5, fontFamily: 'inherit', fontSize: 13, fontWeight: 900, flexShrink: 0,
-                  }}>Opslaan</button>
+                  }}>{actief ? 'Als nieuwe' : 'Opslaan'}</button>
+                  {actief && (
+                    <button type="button" onClick={hernoemWeergave} disabled={!naam.trim()} style={{
+                      height: 34, padding: '0 10px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9, color: '#fff', cursor: naam.trim() ? 'pointer' : 'default',
+                      opacity: naam.trim() ? 1 : 0.5, fontFamily: 'inherit', fontSize: 13, fontWeight: 800, flexShrink: 0,
+                    }}>Hernoem</button>
+                  )}
                   {actief && (
                     <button type="button" onClick={verwijderWeergave} aria-label="Deze weergave verwijderen" title="Deze weergave verwijderen" style={{
                       width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -633,7 +709,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
                   )}
                 </div>
                 {melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: ROOD }}>{melding}</div>}
-                {actief && !melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>Wijzigingen in deze weergave worden vanzelf bewaard.</div>}
+                {actief && !melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>Aanvinken en slepen wordt in deze weergave vanzelf bewaard.</div>}
               </div>
             )}
           </div>
@@ -678,31 +754,40 @@ export default function GinoKeten({ isMobile, onVraag }) {
               </tr>
             </thead>
             <tbody ref={romp}>
-              {keys.map((key, ri) => {
-                const r = RIJ_VAN[key]
-                const sleept = sleepKey === key
+              {weergaveRijen.map((r, ri) => {
+                const sleept = sleepKey === r.key
+                const isSub = r.kop || r.sub
                 // Om de rij een dikke witte lijn boven en onder: zo volg je een rij zonder te verspringen.
                 const lijn = ri % 2 === 0 ? { borderTop: LIJN, borderBottom: LIJN } : {}
-                const rijGeslacht = GESLACHT_RIJEN[r.key] ? geslachtVan(r.key) : null
+                const geslachtSleutel = r.geslacht || (GESLACHT_RIJEN[r.key] ? r.key : null)
+                const rijGeslacht = geslachtSleutel ? geslachtVan(geslachtSleutel) : null
                 const G = rijGeslacht && GESLACHT[rijGeslacht]
-                const waardeKey = rijGeslacht && rijGeslacht !== 'beide' ? GESLACHT_RIJEN[r.key][rijGeslacht] : r.key
+                const waardeKey = !rijGeslacht || rijGeslacht === 'beide' ? r.key
+                  : r.geslacht ? `${r.basis}${rijGeslacht === 'mannen' ? 'Mannen' : 'Vrouwen'}`
+                    : GESLACHT_RIJEN[r.key][rijGeslacht]
                 const gem = gemiddelde({ ...r, key: waardeKey }, basis)
                 const Icon = r.Icon
                 return (
-                  <tr key={r.key} data-rij={r.key} style={sleept ? { background: 'rgba(255,255,255,0.14)' } : undefined}>
+                  <tr key={r.key} data-rij={isSub ? undefined : r.key} style={sleept ? { background: 'rgba(255,255,255,0.14)' } : undefined}>
                     <td
-                      onPointerDown={(e) => sleepRij(e, r.key)}
+                      onPointerDown={isSub ? undefined : (e) => sleepRij(e, r.key)}
                       onMouseDown={(e) => e.stopPropagation()}
                       style={{ ...cel, ...lijn, ...plak, background: sleept ? '#2a2a2a' : '#000', padding: '4px 8px 4px 0', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.85)', cursor: sleept ? 'grabbing' : 'grab' }}
                     >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>
-                        <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />
-                        {G ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingLeft: r.kop ? 20 : r.sub ? 34 : 0, ...(r.kop ? { color: '#fff', fontWeight: 900 } : r.sub ? { color: 'rgba(255,255,255,0.7)', fontWeight: 600 } : {}) }}>
+                        {!isSub && <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>}
+                        {Icon && <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />}
+                        {UITKLAP[r.key] ? (
+                          <button type="button" aria-expanded={!!uitklap[r.key]} onPointerDown={(e) => e.stopPropagation()} onClick={() => wisselUitklap(r.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
+                            {r.label}
+                            <ChevronRight size={14} strokeWidth={2.8} color="#fff" style={{ flexShrink: 0, transform: uitklap[r.key] ? 'rotate(90deg)' : 'none' }} />
+                          </button>
+                        ) : null}
+                        {UITKLAP[r.key] ? null : G ? (
                           <button
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={() => wisselGeslacht(r.key)}
+                            onClick={() => wisselGeslacht(geslachtSleutel)}
                             title={`${G.naam}. Klik om te wisselen. Bij een deel van de leads is het geslacht niet ingevuld, dus mannen plus vrouwen is minder dan beide.`}
                             aria-label={`${r.label}: ${G.naam}. Klik om te wisselen.`}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
