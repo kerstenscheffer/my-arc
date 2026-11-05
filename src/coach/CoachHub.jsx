@@ -93,10 +93,15 @@ const PRIMARY_TABS = [
   { id: 'leads', label: 'Leads', icon: UserPlus },
   // Business OS staat sinds 30 okt 2026 in de onderbalk; Output, Productivity
   // en Agenda zijn naar het Meer-menu verhuisd.
-  // Eigenaar en teamleden. Teamleden (Marcel) krijgen een beperkte versie,
-  // zonder agenda en tijdregistratie; de edge function beperkt hun tools ook.
+  // Eigenaar en, als TEAMLEDEN_BUSINESS_OS aan staat, teamleden. Teamleden (Marcel)
+  // krijgen een beperkte versie, zonder agenda en tijdregistratie; de edge function
+  // beperkt hun tools ook.
   { id: 'business-os', label: 'Business OS', icon: Activity, alleenTeam: true }
 ]
+
+// Beperkte Business OS voor teamleden. Staat uit (5 nov 2026): teamleden zien niets,
+// precies als nu live. Pas aanzetten als business-os-chat met LID_TOOLS is gedeployd.
+const TEAMLEDEN_BUSINESS_OS = false
 
 // ============================================
 // DROPDOWN CATEGORIES (inside "Meer")
@@ -426,8 +431,12 @@ export default function CoachHub() {
       const { data: eigenTeam } = await db.supabase
         .from('coach_teams').select('id').eq('owner_id', currentUser.id).limit(1)
       setIsEigenaar(!!eigenTeam?.length)
-      const { data: stand } = await db.supabase.rpc('business_os_gebruik_stand').then(r => r, () => ({ data: null }))
-      setIsTeamlid(!!stand?.lid)
+      if (TEAMLEDEN_BUSINESS_OS) {
+        const { data: stand } = await db.supabase.rpc('business_os_gebruik_stand').then(r => r, () => ({ data: null }))
+        setIsTeamlid(!!stand?.lid)
+      } else {
+        setIsTeamlid(false)
+      }
     } catch (error) {
       console.error('Failed to load user:', error)
     }

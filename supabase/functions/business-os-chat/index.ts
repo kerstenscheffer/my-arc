@@ -211,7 +211,7 @@ const LID_TOOLS = [
   ...TOOLS.filter((t: any) => ['zoek_klanten', 'bekijk_schema', 'lees_database'].includes(t.name)),
   {
     name: 'plan_content',
-    description: 'Zet content in de contentkalender van MY ARC. Met datum: ingepland. Zonder datum: idee. Schrijf hook en script zelf als Marcel de content aan jou uitbesteedt. Er wordt niets gepubliceerd.',
+    description: 'Zet content in de contentkalender van MY ARC. Met datum: ingepland. Zonder datum: idee. Maximaal 3 items per aanroep, want lange scripts passen anders niet in één antwoord; bij meer: meerdere aanroepen achter elkaar. Schrijf hook en script zelf als Marcel de content aan jou uitbesteedt. Er wordt niets gepubliceerd.',
     input_schema: {
       type: 'object',
       properties: {
@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: mijnTools, messages: metBewaarpunt(messages) }),
+        body: JSON.stringify({ model: MODEL, max_tokens: 6000, system: systeem, tools: mijnTools, messages: metBewaarpunt(messages) }),
         signal: AbortSignal.timeout(90000),
       })
       const data = await r.json().catch(() => null)
@@ -544,7 +544,18 @@ Deno.serve(async (req) => {
     }
     if (!data) return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 502)
     const tekst = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
-    return json({ tekst: tekst || (acties.length ? 'Klaar.' : ''), acties })
+    // Geen tekst terug (te lang, te veel stappen): zeg wat er aan de hand is in
+    // plaats van een kale foutmelding, en leg de reden vast in de logs.
+    if (!tekst && !acties.length) {
+      console.error('Leeg antwoord', data.stop_reason, JSON.stringify(data.usage))
+      const uitleg = data.stop_reason === 'max_tokens'
+        ? 'Dit werd te lang voor één antwoord. Vraag minder tegelijk, bijvoorbeeld één script per keer.'
+        : data.stop_reason === 'tool_use'
+          ? 'Ik had te veel stappen nodig en ben gestopt. Maak de vraag wat kleiner.'
+          : 'Ik kreeg geen antwoord terug. Stel de vraag nog een keer, iets anders verwoord.'
+      return json({ tekst: uitleg, acties })
+    }
+    return json({ tekst: tekst || 'Klaar.', acties })
   } catch (e) {
     console.error(e)
     return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 500)

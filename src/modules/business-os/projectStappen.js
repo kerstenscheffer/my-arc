@@ -62,6 +62,68 @@ export const zetStapTerug = ({ plek, stap, si, naId }) => (plan) => {
   return true
 }
 
+// ── Testbord (fase.bord) ──
+
+// Naar een andere kolom: onderaan die kolom.
+export const verplaatsStap = (id, kolom) => (plan) => {
+  const hit = zoekStap(plan, id)
+  if (!hit) return false
+  const [stap] = hit.fase.stappen.splice(hit.si, 1)
+  hit.fase.stappen.push({ ...stap, kolom })
+  return true
+}
+
+// Leeg (null of '') haalt het veld weg, zodat het weer als open telt.
+export const wijzigTest = (plek, velden) => (plan) => {
+  const fase = zoekFase(plan, plek)
+  if (!fase) return false
+  if (!fase.test || typeof fase.test !== 'object') fase.test = {}
+  for (const [veld, waarde] of Object.entries(velden)) {
+    if (waarde === null || waarde === '' || waarde === undefined) delete fase.test[veld]
+    else fase.test[veld] = waarde
+  }
+  return true
+}
+
+// Fases worden op naam teruggevonden, dus een naam komt maar één keer voor.
+const uniekeNaam = (fases, naam, behalve = null) => {
+  const bezet = (n) => fases.some(f => f !== behalve && f.naam === n)
+  let uit = naam
+  for (let i = 2; bezet(uit); i++) uit = `${naam} ${i}`
+  return uit
+}
+
+export const hernoemFase = (plek, naam) => (plan) => {
+  const fase = zoekFase(plan, plek)
+  if (!fase) return false
+  fase.naam = uniekeNaam(plan.fases, naam, fase)
+  return true
+}
+
+// Onder de laatste test.
+export const voegTestToe = (naam) => (plan) => {
+  if (!Array.isArray(plan.fases)) plan.fases = []
+  const laatste = plan.fases.reduce((n, f, i) => (f.bord === true ? i : n), -1)
+  const fase = { naam: uniekeNaam(plan.fases, naam), bord: true, test: {}, stappen: [] }
+  plan.fases.splice(laatste >= 0 ? laatste + 1 : plan.fases.length, 0, fase)
+  return true
+}
+
+export const verwijderFase = (plek) => (plan) => {
+  const fase = zoekFase(plan, plek)
+  if (fase) plan.fases.splice(plan.fases.indexOf(fase), 1)
+  return true
+}
+
+// Terug op de oude plek: achter de fase die ervoor stond, anders op hetzelfde nummer.
+export const zetFaseTerug = ({ fase, fi, naNaam }) => (plan) => {
+  if (!Array.isArray(plan.fases)) plan.fases = []
+  if (plan.fases.some(f => f.naam === fase.naam)) return true
+  const na = naNaam ? plan.fases.findIndex(f => f.naam === naNaam) : -1
+  plan.fases.splice(na >= 0 ? na + 1 : Math.min(fi, plan.fases.length), 0, kopieVanPlan(fase))
+  return true
+}
+
 // Geeft { ok, plan }: plan is de stand in de database, of null als die niet te lezen was.
 export async function schrijfPlan(sb, projectId, wijzig) {
   let laatste = null

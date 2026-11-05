@@ -8,26 +8,29 @@
 //   detail → KPI's, fases als rijen onder elkaar met stappen als kaartjes (afvinken,
 //     tekst aanpassen, verwijderen, toevoegen; opslaan via projectStappen.js) en, bij
 //     een fase.test, live cijfers + oordeel (testMeting.js); teksten achter een
-//     klik op de rij; onderzoek lezen
+//     klik op de rij; onderzoek lezen. Een fase met bord: true is een test en krijgt
+//     een horizontale kanban (TestBord.jsx); de rest blijft een rij.
 //   "Presenteer" → Gino loopt het plan door met zijn stem (stem.leesVoor):
 //     per deel licht dat stuk op, de rest dimt, ondertitel onderin, en
 //     vanzelf door naar het volgende deel als hij uitgepraat is.
 //   "Plan goedkeuren & inplannen" → content-stappen als content_items
 //     (planned), de rest als productivity_tasks; status uitvoering.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
 import * as stem from './stem'
-import { meetTest, vandaagIso } from './testMeting'
-import { kopieVanPlan, nieuweStapId, schrijfPlan, verwijderStap, voegStapToe, wijzigStap, zetStapTerug } from './projectStappen'
+import { vandaagIso } from './testMeting'
+import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetStapTerug } from './projectStappen'
+import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
+import { komma, kortDag } from './testBord'
+import { useTestMeting } from './useTestMeting'
+import TestBord from './TestBord'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
 const STATUS = { onderzoek: 'Gino onderzoekt', plan: 'Plan klaar', uitvoering: 'Loopt', klaar: 'Klaar', gestopt: 'Gestopt' }
-const SOORT_ICOON = { content: Film, taak: CheckCircle2, call: Phone, leren: BookOpen }
 const TEST_TEKSTEN = [['waarom', 'Waarom'], ['hoe', 'Hoe'], ['hoeveel', 'Hoeveel'], ['verwachting', 'Verwachting'], ['meetdatum', 'Meetdatum']]
-const kortDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : '')
 const stappenVan = (p) => (p?.plan?.fases || []).flatMap(f => f.stappen || [])
 const spreekDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' }) : '')
 const getal = (n) => Number(n || 0).toLocaleString('nl-NL')
@@ -83,44 +86,6 @@ function Onderzoek({ tekst }) {
   )
 }
 
-const komma = (n, dec = 0) => Number(n).toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec })
-
-function Cijfer({ waarde, label }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>{waarde}</div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{label}</div>
-    </div>
-  )
-}
-
-function OordeelPil({ tekst, uitslag }) {
-  const kleur = uitslag === 'Werkt' ? G : uitslag === 'Matig' ? '#f59e0b' : uitslag === 'Zwak' ? colors.danger : 'rgba(255,255,255,0.45)'
-  return (
-    <span style={{
-      flexShrink: 0, padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap',
-      border: `1.5px solid ${kleur}`, background: uitslag === 'Werkt' ? G : 'transparent', color: uitslag === 'Werkt' ? '#000' : '#fff',
-    }}>{tekst}</span>
-  )
-}
-
-// Eigen stand per rij: een fout of traag antwoord raakt de andere rijen niet.
-function useTestMeting(test, doel) {
-  const sleutel = JSON.stringify(test ?? null)
-  const [stand, setStand] = useState(null)
-  useEffect(() => {
-    const t = JSON.parse(sleutel)
-    if (!t) return
-    let weg = false
-    meetTest(supabase, t, doel).then(
-      uit => { if (!weg) setStand({ klaar: true, uit }) },
-      () => { if (!weg) setStand({ klaar: true, uit: null, fout: true }) },
-    )
-    return () => { weg = true }
-  }, [sleutel, doel])
-  return stand
-}
-
 function TestCijfers({ m, isMobile }) {
   const fout = 'fout'
   const mannen = m.geslachtFout || m.leads == null ? fout : m.mannen == null ? 'niet bekend' : komma(m.mannen)
@@ -137,109 +102,21 @@ function TestCijfers({ m, isMobile }) {
   )
 }
 
-// Enter of klikken buiten = klaar, Escape = annuleren. onKlaar krijgt de nieuwe tekst,
-// of null als er niets op te slaan valt (geannuleerd, leeg of ongewijzigd).
-function StapInvoer({ begin = '', label, isMobile, onKlaar }) {
-  const [tekst, setTekst] = useState(begin)
-  const veld = useRef(null)
-  const afgerond = useRef(false)
-  useLayoutEffect(() => {
-    const el = veld.current
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [tekst])
-  useEffect(() => {
-    const el = veld.current
-    el.focus()
-    el.setSelectionRange(el.value.length, el.value.length)
-  }, [])
-  // Na Enter of Escape verdwijnt het veld en kan er nog een blur volgen: maar één keer afronden.
-  const rond = (bewaren) => {
-    if (afgerond.current) return
-    afgerond.current = true
-    const schoon = tekst.replace(/\s+/g, ' ').trim()
-    onKlaar(bewaren && schoon && tekst !== begin ? schoon : null)
-  }
-  return (
-    <textarea ref={veld} rows={1} value={tekst} aria-label={label}
-      onChange={e => setTekst(e.target.value)}
-      onBlur={() => rond(true)}
-      onKeyDown={e => {
-        if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); rond(true) }
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rond(false) }
-      }}
-      style={{
-        display: 'block', boxSizing: 'content-box', width: '100%', padding: 0, border: 'none', borderBottom: `1.5px solid ${G}`, outline: 'none', resize: 'none', overflow: 'hidden',
-        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: isMobile ? 16 : 14, fontWeight: 800, lineHeight: 1.3,
-      }} />
-  )
-}
-
-const kaartMaat = (isMobile) => (isMobile ? { width: '100%' } : { width: 240, maxWidth: '100%' })
-
-function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg }) {
-  const [bewerkt, setBewerkt] = useState(false)
-  const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
-  const isNu = s.dag === vandaag
-  const achter = !s.klaar && s.dag && s.dag < vandaag
-  const meta = [isNu ? 'vandaag' : kortDag(s.dag), s.gepland_id ? 'ingepland' : ''].filter(Boolean).join(' · ')
-  const rondMarge = isMobile ? 12 : 4
-  return (
-    <div className="gp-stap" title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
-      style={{
-        ...kaartMaat(isMobile), position: 'relative', boxSizing: 'border-box', display: 'flex', gap: 10, alignItems: 'flex-start', minHeight: 44, minWidth: 0,
-        padding: `10px ${isMobile ? 40 : 28}px 10px 10px`, borderRadius: 10,
-        background: oplichten ? `${G}22` : isNu ? `${G}14` : 'transparent',
-      }}>
-      <button type="button" onClick={onKlaar} aria-pressed={!!s.klaar} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
-        flexShrink: 0, padding: rondMarge, margin: -rondMarge, border: 'none', background: 'none', cursor: 'pointer', display: 'flex',
-      }}>
-        <span style={{
-          width: 20, height: 20, borderRadius: '50%', boxSizing: 'border-box',
-          border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.45)'}`, background: s.klaar ? G : 'transparent',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
-        }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
-      </button>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        {bewerkt ? (
-          <StapInvoer begin={s.titel || ''} label="Stap" isMobile={isMobile}
-            onKlaar={t => { setBewerkt(false); if (t) onTekst(t) }} />
-        ) : (
-          <button type="button" onClick={() => setBewerkt(true)} style={{
-            display: 'block', width: '100%', minHeight: 18, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
-            fontSize: 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none',
-          }}>{s.titel}</button>
-        )}
-        {meta && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-            <Icoon size={12} strokeWidth={2.6} /> {meta}
-          </span>
-        )}
-      </div>
-      {!bewerkt && (
-        <button type="button" className="gp-stapweg" onClick={onWeg} aria-label="Verwijderen" style={{
-          position: 'absolute', top: isMobile ? 4 : 6, right: isMobile ? 4 : 6, width: isMobile ? 36 : 20, height: isMobile ? 36 : 20, padding: 0, border: 'none', borderRadius: 6,
-          background: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(isMobile ? { opacity: 1 } : {}),
-        }}><X size={14} strokeWidth={2.8} /></button>
-      )}
-    </div>
-  )
-}
-
-function NieuweStap({ isMobile, onNieuw }) {
+// Onder de laatste test: vraagt alleen de naam.
+function NieuweTest({ isMobile, onNieuw }) {
   const [open, setOpen] = useState(false)
   if (open) {
     return (
-      <div className="gp-stap" style={{ ...kaartMaat(isMobile), boxSizing: 'border-box', minHeight: 44, padding: 10, borderRadius: 10 }}>
-        <StapInvoer label="Nieuwe stap" isMobile={isMobile} onKlaar={t => { setOpen(false); if (t) onNieuw(t) }} />
+      <div style={{ padding: '8px 0', maxWidth: 320 }}>
+        <StapInvoer label="Naam van de test" isMobile={isMobile} fontGrootte={18} onKlaar={t => { setOpen(false); if (t) onNieuw(t) }} />
       </div>
     )
   }
   return (
-    <button type="button" className="gp-nieuw" onClick={() => setOpen(true)} style={{
-      ...(isMobile ? { width: '100%' } : { width: 96 }), minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-      borderRadius: 10, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
-    }}><Plus size={14} strokeWidth={2.8} /> Stap</button>
+    <button type="button" onClick={() => setOpen(true)} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, padding: 0, border: 'none', background: 'none', color: '#fff', cursor: 'pointer',
+      fontFamily: 'inherit', fontSize: 14, fontWeight: 900,
+    }}><Plus size={16} strokeWidth={3} color={G} /> Nieuwe test</button>
   )
 }
 
@@ -421,10 +298,21 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   const zetStap = (stapId, klaar) => wijzigPlan(wijzigStap(stapId, { klaar }))
   const zetStapTekst = (stapId, titel) => wijzigPlan(wijzigStap(stapId, { titel }))
-  const nieuweStap = (fi, titel) => wijzigPlan(voegStapToe(
+  const nieuweStap = (fi, titel, kolom) => wijzigPlan(voegStapToe(
     { fi, naam: p.plan.fases[fi].naam },
-    { id: nieuweStapId(), titel, soort: 'taak', klaar: false },
+    { id: nieuweStapId(), titel, soort: 'taak', klaar: false, ...(kolom ? { kolom } : {}) },
   ))
+  const plekVan = (fi) => ({ fi, naam: p.plan.fases[fi].naam })
+  const verplaats = (stapId, kolom) => wijzigPlan(verplaatsStap(stapId, kolom))
+  const zetTest = (fi, velden) => wijzigPlan(wijzigTest(plekVan(fi), velden))
+  const hernoem = (fi, naam) => wijzigPlan(hernoemFase(plekVan(fi), naam))
+  const nieuweTest = (naam) => wijzigPlan(voegTestToe(naam))
+  const testWeg = async (fi) => {
+    const fase = p.plan.fases[fi]
+    const item = { pid: p.id, terug: zetFaseTerug({ fase, fi, naNaam: p.plan.fases[fi - 1]?.naam }) }
+    setWeg(w => [...w, item])
+    if (!await wijzigPlan(verwijderFase(plekVan(fi)))) setWeg(w => w.filter(x => x !== item))
+  }
   const stapWeg = async (fi, si) => {
     const fase = p.plan.fases[fi]
     const stap = fase.stappen[si]
@@ -493,6 +381,12 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
       .gp-stap:hover .gp-stapweg, .gp-stapweg:focus-visible { opacity: .7 }
       .gp-stapweg:hover { opacity: 1 !important }
       @media (hover: none) { .gp-stapweg { opacity: .7 } }
+      .gp-stap.gp-opbord { border-color: transparent }
+      .gp-stap.gp-opbord:hover, .gp-stap.gp-opbord:focus-within { border-color: rgba(255,255,255,0.28) }
+      .gp-bord { scrollbar-width: none }
+      .gp-bord::-webkit-scrollbar { display: none }
+      .gp-bordnieuw { color: rgba(255,255,255,0.7); transition: color .15s }
+      .gp-bordnieuw:hover { color: #fff }
       .gp-nieuw { border: 1px dashed rgba(255,255,255,0.22); color: rgba(255,255,255,0.7); transition: color .15s, border-color .15s }
       .gp-nieuw:hover { border-color: ${G}; color: #fff }
       .gp-kaart { transition: box-shadow .2s, transform .2s }
@@ -542,6 +436,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   // ── Detail ──
   const fases = p.plan?.fases || []
+  const laatsteBord = fases.reduce((n, f, i) => (f.bord === true ? i : n), -1)
   const st = stappenVan(p)
   const klaar = st.filter(s => s.klaar).length
   return (
@@ -596,11 +491,22 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
           )}
           {/* Fases als rijen onder elkaar */}
           <div>
-            {fases.map((f, fi) => (
-              <FaseRij key={fi} f={f} fi={fi} doel={p.kpis?.[0]?.doel} vandaag={vandaag} isMobile={isMobile} huidig={huidig}
-                zetStap={zetStap} zetStapTekst={zetStapTekst} nieuweStap={nieuweStap} stapWeg={stapWeg}
-                spotStijl={spot(`fase-${fi}`)} vakRef={zet(`fase-${fi}`)} />
-            ))}
+            {fases.map((f, fi) => {
+              const gedeeld = {
+                f, fi, doel: p.kpis?.[0]?.doel, vandaag, isMobile, huidig, zetStap, zetStapTekst, nieuweStap, stapWeg,
+                spotStijl: spot(`fase-${fi}`), vakRef: zet(`fase-${fi}`),
+              }
+              return (
+                <Fragment key={f.bord === true ? `bord-${f.naam}` : fi}>
+                  {f.bord === true
+                    ? <TestBord {...gedeeld} verplaats={verplaats} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
+                    : <FaseRij {...gedeeld} />}
+                  {fi === laatsteBord && <NieuweTest isMobile={isMobile} onNieuw={nieuweTest} />}
+                </Fragment>
+              )
+            })}
+            {/* Laatste test verwijderd: blijf er een kunnen maken. */}
+            {!fases.length && <NieuweTest isMobile={isMobile} onNieuw={nieuweTest} />}
           </div>
         </div>
       )}

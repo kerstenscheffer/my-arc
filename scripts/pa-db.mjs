@@ -25,6 +25,10 @@
 //     plan.fases[].test (optioneel, maakt van de rij een test met live cijfers):
 //       { woorden: ["LIDL"], van: "YYYY-MM-DD", tot?: "YYYY-MM-DD", ig_ids?: ["…"], nulmeting_per_10?: getal,
 //         waarom?, hoe?, hoeveel?, verwachting?, meetdatum? }  lege tekstvelden tonen als open
+//     plan.fases[].bord: true maakt van de fase een test met kanban (TestBord.jsx, regels in testBord.js).
+//       stappen[].kolom: onderzoek | plan | maken | posten | meten | besluit (geen kolom = onderzoek)
+//       test erbij: wat, controlegroep, posts_doel (getal), besluit (meer|aanpassen|stoppen), les
+//       test mag leeg {} zijn; zonder test.van is de test niet gestart (Posten en Meten: Nog geen data)
 //   node scripts/pa-db.mjs projecten                 alle projecten (kort)
 //   node scripts/pa-db.mjs project "<id>"            één project volledig
 //   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'
