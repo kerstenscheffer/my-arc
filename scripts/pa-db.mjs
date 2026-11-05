@@ -21,6 +21,10 @@
 //   node scripts/pa-db.mjs experiment-bij '{"id","status"?,"uitkomst"?,"eind_dag"?}'  bijwerken/afsluiten
 //   node scripts/pa-db.mjs experimenten              lopende + laatste 10 afgeronde
 //   node scripts/pa-db.mjs project-nieuw '{"titel","doel"}'   project + onderzoeksronde op de Mac
+//   node scripts/pa-db.mjs project-leeg '{"titel","doel","plan"?,"kpis"?}'   project met status uitvoering, ZONDER onderzoeksronde
+//     (project-nieuw start er wel een, en die overschrijft het plan). Stappen krijgen een id zoals bij project-bij.
+//   node scripts/pa-db.mjs project-fase-weg '{"project_id","fases":["naam"]}'   leest het plan vlak ervoor opnieuw en haalt alleen
+//     die fases eruit. Staat een naam er niet in, dan verandert er niets.
 //   node scripts/pa-db.mjs project-bij '{"id","status"?,"onderzoek"?,"plan"?,"kpis"?,"doel"? (max 1000 tekens)}'
 //     plan.fases[].test (optioneel, maakt van de rij een test met live cijfers):
 //       { woorden: ["LIDL"], van: "YYYY-MM-DD", tot?: "YYYY-MM-DD", ig_ids?: ["…"], nulmeting_per_10?: getal,
@@ -63,6 +67,7 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { createClient } from '@supabase/supabase-js'
 import { kiesTaken, leesLopendeProjecten, vandaagNL, wijzigKaart } from './takenronde.mjs'
+import { schrijfPlan } from '../src/modules/business-os/projectStappen.js'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const env = Object.fromEntries(
@@ -71,6 +76,11 @@ const env = Object.fromEntries(
     .map(([, k, v]) => [k, v.replace(/^['"]|['"]$/g, '')])
 )
 const TIJD_CATEGORIEEN = ['sales', 'calls', 'coaching', 'content', 'bouwen', 'admin', 'social', 'afleiding', 'overig']
+// Elke stap een vaste id, zodat afvinken en inplannen hem terugvinden.
+function stappenMetId(plan) {
+  let n = 0
+  for (const f of plan.fases || []) for (const st of f.stappen || []) { st.id ||= `s${Date.now().toString(36)}${n++}`; st.klaar = !!st.klaar }
+}
 const token = process.env.PA_ACCESS_TOKEN
 if (!token) { console.log(JSON.stringify({ fout: 'Geen PA-sessie (alleen te gebruiken vanuit npm run pa).' })); process.exit(1) }
 
@@ -254,6 +264,29 @@ if (cmd === 'lees') {
     coach_id: user.id, soort: 'groei', opdracht: `Strategie · project: ${titel}`.slice(0, 200), invoer: { ronde: 'project', project_id: data.id },
   })
   uit(e2 ? { fout: e2.message, id: data.id } : { ok: true, id: data.id, onderzoek: 'gestart' })
+} else if (cmd === 'project-leeg') {
+  // Project zonder onderzoeksronde: het plan staat er al en blijft staan.
+  let pr
+  try { pr = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const titel = String(pr.titel || '').trim().slice(0, 160), doel = String(pr.doel || '').trim().slice(0, 1000)
+  if (!titel || !doel) { uit({ fout: 'titel en doel zijn verplicht' }); process.exit(1) }
+  const plan = pr.plan ?? { fases: [] }, kpis = pr.kpis ?? []
+  if (typeof plan !== 'object' || Array.isArray(plan) || !Array.isArray(kpis)) { uit({ fout: 'plan moet een object zijn en kpis een lijst' }); process.exit(1) }
+  stappenMetId(plan)
+  const { data, error } = await sb.from('business_os_projecten').insert({ titel, doel, status: 'uitvoering', plan, kpis }).select('id').single()
+  uit(error ? { fout: error.message } : { ok: true, id: data.id })
+} else if (cmd === 'project-fase-weg') {
+  let w
+  try { w = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const namen = Array.isArray(w.fases) ? w.fases : []
+  if (!w.project_id || !namen.length) { uit({ fout: 'project_id en fases zijn verplicht' }); process.exit(1) }
+  const { ok, plan } = await schrijfPlan(sb, w.project_id, (p) => {
+    const fases = p.fases || []
+    if (!namen.every(n => fases.some(f => f.naam === n))) return false
+    p.fases = fases.filter(f => !namen.includes(f.naam))
+    return true
+  })
+  uit(ok ? { ok: true, fases: plan.fases.map(f => f.naam) } : { fout: 'Niets gewijzigd: fase niet gevonden of opslaan mislukt' })
 } else if (cmd === 'project-bij') {
   let pr
   try { pr = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
@@ -261,9 +294,7 @@ if (cmd === 'lees') {
   if (['onderzoek', 'plan', 'uitvoering', 'klaar', 'gestopt'].includes(pr.status)) velden.status = pr.status
   if (typeof pr.onderzoek === 'string') velden.onderzoek = pr.onderzoek.slice(0, 30000)
   if (pr.plan && typeof pr.plan === 'object') {
-    // Elke stap een vaste id, zodat afvinken en inplannen hem terugvinden.
-    let n = 0
-    for (const f of pr.plan.fases || []) for (const st of f.stappen || []) { st.id ||= `s${Date.now().toString(36)}${n++}`; st.klaar = !!st.klaar }
+    stappenMetId(pr.plan)
     velden.plan = pr.plan
   }
   if (Array.isArray(pr.kpis)) velden.kpis = pr.kpis

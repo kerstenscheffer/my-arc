@@ -4,7 +4,10 @@
 // project aan (pa-db project-nieuw), onderzoekt in een aparte Slim-ronde op de
 // Mac (eigen data + web) en schrijft een plan: fases met stappen per dag en
 // KPI's met nulmeting (business_os_projecten). Hier:
-//   lijst  → kaarten met voortgangsring en volgende stap
+//   lijst  → kaarten met voortgangsring en volgende stap. Prullenbak: vraagt eerst
+//     bevestiging, verwijdert de rij echt (RLS projecten_eigen staat het toe) en
+//     Ongedaan maken zet 5 s lang de hele rij terug. Agenda en contentkalender hebben
+//     geen koppeling met deze tabel, dus ingeplande kaarten blijven daar staan.
 //   detail → KPI's, fases als rijen onder elkaar met stappen als kaartjes (afvinken,
 //     tekst aanpassen, verwijderen, toevoegen; opslaan via projectStappen.js) en, bij
 //     een fase.test, live cijfers + oordeel (testMeting.js); teksten achter een
@@ -18,7 +21,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, Check, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Sparkles, FileText, X, Play, Pause, Plus, Trash2 } from 'lucide-react'
 import * as stem from './stem'
 import { vandaagIso } from './testMeting'
 import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetKaartVelden, zetStapTerug } from './projectStappen'
@@ -193,6 +196,9 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   const [leest, setLeest] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [melding, setMelding] = useState(null)
+  const [bevestigWeg, setBevestigWeg] = useState(null)   // id van het kaartje dat om bevestiging vraagt
+  const [projectenWeg, setProjectenWeg] = useState([])   // zojuist verwijderde rijen, voor Ongedaan maken
+  const [lijstFout, setLijstFout] = useState(null)
 
   const laad = useCallback(async () => {
     const { data } = await supabase.from('business_os_projecten').select('*').order('updated_at', { ascending: false }).limit(30)
@@ -207,6 +213,38 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
     const t = setInterval(laad, 15000)
     return () => clearInterval(t)
   }, [wacht, laad])
+
+  // ── Project verwijderen ──
+  // De database geeft de verwijderde rij terug: Ongedaan maken zet precies die terug,
+  // ook als Gino het plan vlak daarvoor nog wijzigde.
+  const verwijderProject = async (id) => {
+    setBevestigWeg(null)
+    setLijstFout(null)
+    const { data, error } = await supabase.from('business_os_projecten').delete().eq('id', id).select('*')
+      .then(r => r, e => ({ error: e }))
+    if (error || !data?.length) { setLijstFout('Verwijderen mislukt'); return }
+    setLijst(l => l?.filter(x => x.id !== id))
+    setProjectenWeg(w => [...w, data[0]])
+  }
+  const projectTerug = async () => {
+    const rij = projectenWeg.at(-1)
+    if (!rij) return
+    setLijstFout(null)
+    setProjectenWeg(w => w.filter(x => x !== rij))
+    const { error } = await supabase.from('business_os_projecten').insert(rij).then(r => r, e => ({ error: e }))
+    if (error) { setProjectenWeg(w => [...w, rij]); setLijstFout('Terugzetten mislukt'); return }
+    laad()
+  }
+  useEffect(() => {
+    if (!projectenWeg.length) return
+    const t = setTimeout(() => setProjectenWeg([]), 5000)
+    return () => clearTimeout(t)
+  }, [projectenWeg])
+  useEffect(() => {
+    if (!lijstFout) return
+    const t = setTimeout(() => setLijstFout(null), 4000)
+    return () => clearTimeout(t)
+  }, [lijstFout])
 
   const p = projectId ? (lijst || []).find(x => x.id === projectId) : null
   const vandaag = vandaagIso()
@@ -381,7 +419,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
       .gp-stap { border: 1px solid rgba(255,255,255,0.12); transition: background .4s, border-color .15s }
       .gp-stap:hover, .gp-stap:focus-within { border-color: rgba(255,255,255,0.28) }
       .gp-stapweg { opacity: 0; transition: opacity .15s }
-      .gp-stap:hover .gp-stapweg, .gp-stapweg:focus-visible { opacity: .7 }
+      .gp-stap:hover .gp-stapweg, .gp-kaart:hover .gp-stapweg, .gp-stapweg:focus-visible { opacity: .7 }
       .gp-stapweg:hover { opacity: 1 !important }
       @media (hover: none) { .gp-stapweg { opacity: .7 } }
       .gp-stap.gp-opbord { border-color: transparent }
@@ -402,37 +440,68 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   // ── Lijst ──
   if (!p) {
     return (
-      <div style={{ height: '100%', overflowY: 'auto' }} className="gk-scroll">
+      <div style={{ position: 'relative', height: '100%' }}>
         {animaties}
-        {!lijst.length && (
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.55)', padding: '24px 0' }}>
-            Nog geen projecten. Vraag Gino bijvoorbeeld: "maak een contentstrategie om naar 10k te gaan".
+        <div style={{ height: '100%', overflowY: 'auto' }} className="gk-scroll">
+          {!lijst.length && (
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.55)', padding: '24px 0' }}>
+              Nog geen projecten. Vraag Gino bijvoorbeeld: "maak een contentstrategie om naar 10k te gaan".
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 240 : 300}px, 1fr))`, gap: 16 }}>
+            {lijst.map((x, i) => {
+              const st = stappenVan(x)
+              const klaar = st.filter(s => s.klaar).length
+              const volgende = st.filter(s => !s.klaar && s.dag).sort((a, b) => a.dag.localeCompare(b.dag))[0]
+              return (
+                <div key={x.id} className="gp-kaart" style={{
+                  position: 'relative', minWidth: 0, borderRadius: 14,
+                  animation: `gp-in .35s ease-out ${i * 60}ms both`, opacity: x.status === 'gestopt' ? 0.5 : 1,
+                }}>
+                  {bevestigWeg === x.id ? (
+                    <div style={{ ...kaartVorm, color: '#fff' }}>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, lineHeight: 1.25 }}>{x.titel} verwijderen?</div>
+                      <button type="button" onClick={() => verwijderProject(x.id)} style={{ ...keuzeKnop(isMobile), color: colors.danger }}>Ja</button>
+                      <button type="button" onClick={() => setBevestigWeg(null)} style={keuzeKnop(isMobile)}>Nee</button>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => onKies?.(x.id)} style={{
+                        ...kaartVorm, width: '100%', height: '100%', paddingRight: isMobile ? 48 : 40,
+                        textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', color: '#fff',
+                      }}>
+                        {x.status === 'onderzoek'
+                          ? <span style={{ width: 40, height: 40, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gp-radar 2.4s linear infinite', flexShrink: 0 }} />
+                          : <Ring deel={st.length ? klaar / st.length : 0} kind={<span style={{ fontSize: 10.5, fontWeight: 900 }}>{st.length ? Math.round((klaar / st.length) * 100) : 0}%</span>} />}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 900, lineHeight: 1.25 }}>{x.titel}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: x.status === 'onderzoek' ? G : 'rgba(255,255,255,0.55)', marginTop: 3, animation: x.status === 'onderzoek' ? 'gp-puls 1.6s ease-in-out infinite' : 'none' }}>
+                            {STATUS[x.status]}{volgende && x.status === 'uitvoering' ? ` · volgende: ${kortDag(volgende.dag)} ${volgende.titel}` : ''}
+                          </div>
+                        </div>
+                      </button>
+                      {/* Naast de kaartknop, niet erin: een klik hier opent het project niet. */}
+                      <button type="button" className="gp-stapweg" onClick={() => setBevestigWeg(x.id)} aria-label={`${x.titel} verwijderen`} style={{
+                        position: 'absolute', top: 4, right: 4, width: isMobile ? 44 : 30, height: isMobile ? 44 : 30, padding: 0, border: 'none', borderRadius: 8,
+                        background: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(isMobile ? { opacity: 0.7 } : {}),
+                      }}><Trash2 size={15} strokeWidth={2.6} /></button>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        {(lijstFout || projectenWeg.length > 0) && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 16, zIndex: 20, display: 'flex', justifyContent: 'center', gap: 8, pointerEvents: 'none' }}>
+            {lijstFout && (
+              <span role="alert" style={{ ...balkStijl, border: `1.5px solid ${colors.danger}`, display: 'inline-flex', alignItems: 'center' }}>{lijstFout}</span>
+            )}
+            {projectenWeg.length > 0 && (
+              <button type="button" onClick={projectTerug} style={{ ...balkStijl, border: `1.5px solid ${G}`, cursor: 'pointer', fontFamily: 'inherit', pointerEvents: 'auto' }}>Ongedaan maken</button>
+            )}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 240 : 300}px, 1fr))`, gap: 16 }}>
-          {lijst.map((x, i) => {
-            const st = stappenVan(x)
-            const klaar = st.filter(s => s.klaar).length
-            const volgende = st.filter(s => !s.klaar && s.dag).sort((a, b) => a.dag.localeCompare(b.dag))[0]
-            return (
-              <button key={x.id} type="button" className="gp-kaart" onClick={() => onKies?.(x.id)} style={{
-                textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', color: '#fff', padding: 16, borderRadius: 14,
-                border: `1px solid ${G}33`, background: 'rgba(255,255,255,0.02)', display: 'flex', gap: 14, alignItems: 'center',
-                animation: `gp-in .35s ease-out ${i * 60}ms both`, opacity: x.status === 'gestopt' ? 0.5 : 1,
-              }}>
-                {x.status === 'onderzoek'
-                  ? <span style={{ width: 40, height: 40, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gp-radar 2.4s linear infinite', flexShrink: 0 }} />
-                  : <Ring deel={st.length ? klaar / st.length : 0} kind={<span style={{ fontSize: 10.5, fontWeight: 900 }}>{st.length ? Math.round((klaar / st.length) * 100) : 0}%</span>} />}
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900, lineHeight: 1.25 }}>{x.titel}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: x.status === 'onderzoek' ? G : 'rgba(255,255,255,0.55)', marginTop: 3, animation: x.status === 'onderzoek' ? 'gp-puls 1.6s ease-in-out infinite' : 'none' }}>
-                    {STATUS[x.status]}{volgende && x.status === 'uitvoering' ? ` · volgende: ${kortDag(volgende.dag)} ${volgende.titel}` : ''}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
       </div>
     )
   }
@@ -588,6 +657,14 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   )
 }
 
+const kaartVorm = {
+  boxSizing: 'border-box', minHeight: 74, padding: 16, borderRadius: 14, border: `1px solid ${G}33`, background: 'rgba(255,255,255,0.02)',
+  display: 'flex', gap: 14, alignItems: 'center',
+}
+const keuzeKnop = (isMobile) => ({
+  minWidth: isMobile ? 44 : 32, minHeight: isMobile ? 44 : 32, padding: 0, border: 'none', background: 'none', color: '#fff', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 13, fontWeight: 900, flexShrink: 0,
+})
 const balkStijl = {
   height: 44, padding: '0 18px', borderRadius: 999, background: '#000', color: '#fff', fontSize: 13, fontWeight: 900, boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
 }
