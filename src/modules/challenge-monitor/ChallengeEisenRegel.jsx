@@ -20,6 +20,7 @@ export function EisenLijst({ eisen, instelling = null, onZet = null }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 12px', fontSize: '0.75rem', fontWeight: 800, color: '#fff' }}>
         {eisen.regels.map(r => (
           <span key={r.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', color: r.gehaald ? '#10b981' : '#fff' }}>
+            {!r.gehaald && r.schema && (!r.schema.kan || !r.schema.opSchema) && <span title={r.schema.kan ? `Loopt achter: minstens ${r.schema.minimaal} verwacht` : 'Kan niet meer gehaald worden'} style={{ color: '#ef4444' }}>✕</span>}
             {r.label} {r.waarde}/{r.nodig}{r.gepland ? ` (+${r.gepland} gepland)` : ''}
             <button
               type="button"

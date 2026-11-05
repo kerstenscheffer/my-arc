@@ -46,10 +46,10 @@ const callKort = (iso) => {
   return `${d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }).replace(/\./g, '')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })}`
 }
 
-const metVerlengingLoos = (l, regel) => l.map(c => regel(c)).sort((a, b) => a.naam.localeCompare(b.naam))
-
-// Wat de challenge oplevert. De borg telt pas als winst als de verlenging betaald is.
-function rekenGeld(rijen) {
+// Wat de challenge oplevert. De borg telt pas als winst als de verlenging betaald is, of als de
+// challenge voorbij is en de klant niet geschikt is voor borg terug: dat geld blijft.
+// ctx.klantVan: sale-id → klantnaam, ctx.nietGeschikt: sale-id → true. Rekent alleen, schrijft niets.
+function rekenGeld(rijen, ctx) {
   const n = (x) => Number(x) || 0
   const challenges = rijen.filter(r => r.sale_kind === 'challenge' && n(r.order_value) > 0 && r.challenge_status !== 'uitgesteld')
   const verlengingen = rijen.filter(r => r.borg_movement_id && n(r.order_value) > 0)
@@ -59,29 +59,39 @@ function rekenGeld(rijen) {
   const openV = verlengingen.filter(v => !v.payment_received)
   const levend = challenges.filter(c => c.challenge_status !== 'terugbetaald')
   const zekerB = levend.filter(c => c.challenge_status === 'behouden' || borgVan.get(c.id)?.payment_received)
-  const toegezegdB = levend.filter(c => !zekerB.includes(c) && borgVan.has(c.id))
-  const onzekerB = levend.filter(c => !zekerB.includes(c) && !borgVan.has(c.id))
-  // Sales staan op Instagram-naam, soms dubbel ("jan_de_vries jan_de_vries").
+  const blijftB = levend.filter(c => !zekerB.includes(c) && ctx.nietGeschikt(c.id))
+  const toegezegdB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && borgVan.has(c.id))
+  const onzekerB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && !borgVan.has(c.id))
+  // Echte naam als de sale gekoppeld is. Anders de Instagram-naam, soms dubbel ("jan jan").
   const naam = (r) => {
+    const echt = ctx.klantVan(r.borg_movement_id || r.id)
+    if (echt) return echt
     const w = String(r.lead_name || 'Onbekend').trim().split(/\s+/)
     return w.length === 2 && w[0] === w[1] ? w[0] : w.join(' ')
   }
-  const regel = (r, extra = null) => ({ id: r.id, naam: naam(r), bedrag: n(r.order_value) + (extra ? n(extra.order_value) : 0), sub: dagKort(r.moved_at) })
-  // De verlenging van wie de borg hoort: borg + verlenging op één regel.
-  const metVerlenging = (l) => l.map(c => regel(c, borgVan.get(c.id))).sort((a, b) => a.naam.localeCompare(b.naam))
-  const koppelbaar = new Set(challenges.map(c => c.id))
-  const los = (l) => l.filter(v => !koppelbaar.has(v.borg_movement_id)).map(v => regel(v))
+  const regel = (r, sub = dagKort(r.moved_at), bedrag = n(r.order_value)) => ({ id: r.id, naam: naam(r), bedrag, sub })
+  const opNaam = (l) => l.sort((a, b) => a.naam.localeCompare(b.naam))
+  const borgPlus = (l) => l.map(c => regel(c, dagKort(c.moved_at), n(c.order_value) + n(borgVan.get(c.id)?.order_value)))
+  const zekerIds = new Set(zekerB.map(c => c.id))
+  const toegezegdIds = new Set(toegezegdB.map(c => c.id))
   return {
     lijsten: {
-      verkocht: metVerlengingLoos(levend, regel),
-      zeker: [...metVerlenging(zekerB), ...los(betaaldV)],
-      toegezegd: [...metVerlenging(toegezegdB), ...los(openV)],
-      onzeker: metVerlengingLoos(onzekerB, regel),
-      refund: metVerlengingLoos(challenges.filter(c => c.challenge_status === 'terugbetaald'), regel),
+      verkocht: opNaam(levend.map(c => regel(c))),
+      zeker: opNaam([
+        ...borgPlus(zekerB),
+        ...blijftB.map(c => regel(c, 'Niet geschikt')),
+        ...betaaldV.filter(v => !zekerIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
+      ]),
+      toegezegd: opNaam([
+        ...borgPlus(toegezegdB),
+        ...openV.filter(v => !toegezegdIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
+      ]),
+      onzeker: opNaam(onzekerB.map(c => regel(c))),
+      refund: opNaam(challenges.filter(c => c.challenge_status === 'terugbetaald').map(c => regel(c))),
     },
     aantal: levend.length,
     verkocht: som(levend),
-    zeker: som(zekerB) + som(betaaldV),
+    zeker: som(zekerB) + som(blijftB) + som(betaaldV),
     toegezegd: som(toegezegdB) + som(openV),
     onzeker: som(onzekerB),
     onzekerAantal: onzekerB.length,
@@ -142,7 +152,7 @@ export default function GinoDoorstap() {
   const [borgen, setBorgen] = useState([]) // open challenge-sales die al betaald zijn
   const [borgKeuze, setBorgKeuze] = useState({}) // client_id → gekozen borg
   const [coachId, setCoachId] = useState(null)
-  const [geld, setGeld] = useState(null)
+  const [saleRijen, setSaleRijen] = useState(null)
   const [eisen, setEisen] = useState({}) // client_id → stand van de zes eisen
   const [openEisen, setOpenEisen] = useState(null)
   const [openGetal, setOpenGetal] = useState(null)
@@ -181,7 +191,7 @@ export default function GinoDoorstap() {
     const isTest = (c) => { const e = String(c.email || '').toLowerCase(); return e.includes('test') || e === 'ks10k@gmail.com' || e === 'review@gmail.com' }
     const alle = (kl.data || []).filter(c => !isTest(c) && (laatste.get(c.id)?.status
       || (c.coaching_status !== 'ended' && ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_onbeperkt))))
-    if (!ch.error) setGeld(rekenGeld(ch.data || []))
+    if (!ch.error) setSaleRijen(ch.data || [])
     setInstellingen(await haalInstellingen().catch(() => new Map()))
     // Gestopt telt ook wie niet meer actief is, dus los van de klantenlijst hierboven.
     const { data: geeindigd } = await supabase.from('clients').select('id, first_name, last_name, email')
@@ -391,7 +401,19 @@ export default function GinoDoorstap() {
     doorstapGetal,
   ]
   const G = '#10b981'
-  const kolommen = metEisen ? '148px 104px 50px 36px 118px 70px 40px 26px' : '148px 104px 50px 118px 70px 40px 26px'
+  // Sale ↔ klant via de koppeling in client_challenge_instelling.
+  const klantVanSale = new Map()
+  for (const [clientId, i] of instellingen) if (i.sale_id) klantVanSale.set(i.sale_id, clientId)
+  const rijVan = new Map(rijen.map(x => [x.client_id, x]))
+  const geld = saleRijen && rekenGeld(saleRijen, {
+    klantVan: (saleId) => { const x = rijVan.get(klantVanSale.get(saleId)); return x ? naamVan(x.klant) : null },
+    nietGeschikt: (saleId) => {
+      const id = klantVanSale.get(saleId)
+      const e = id && eisen[id]
+      return !!e?.voorbij && borgOordeel(e, instellingen.get(id))?.geschikt === false
+    },
+  })
+  const kolommen = metEisen ? '148px 104px 50px 46px 118px 70px 40px 26px' : '148px 104px 50px 118px 70px 40px 26px'
   const dun = { background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none', maxWidth: '100%' }
 
   return (
@@ -445,7 +467,15 @@ export default function GinoDoorstap() {
                     {metEisen && (r.challenge ? (
                     <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', fontVariantNumeric: 'tabular-nums', color: eisen[r.client_id]?.alles ? G : colors.textPrimary }}>
                       {eisen[r.client_id] ? `${eisen[r.client_id].behaald}/${eisen[r.client_id].totaal}` : '…'}
-                      {borgOordeel(eisen[r.client_id], instellingen.get(r.client_id))?.geschikt === false && <span title="Niet geschikt voor borg terug" style={{ color: colors.danger }}> ✕</span>}
+                      {(() => {
+                        // Handmatig of na afloop telt het oordeel, daarvoor de schatting. Op pauze staat de klok stil: geen teken.
+                        const e = eisen[r.client_id]
+                        if (!e || r.gepauzeerd) return null
+                        const o = borgOordeel(e, instellingen.get(r.client_id))
+                        const ok = o ? o.geschikt : e.prognose?.ok
+                        if (ok == null) return null
+                        return <span title={o ? o.tekst : ok ? 'Lijkt het te halen' : (e.prognose.kanNog ? 'Loopt achter op schema' : 'Kan het niet meer halen')} style={{ color: ok ? G : colors.danger }}> {ok ? '✓' : '✕'}</span>
+                      })()}
                     </button>
                     ) : <span style={{ color: colors.textSecondary }}>—</span>)}
                     <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || (r.gepauzeerd ? 'Pauze' : r.status === 'betaald' ? 'Hoeft niet' : 'Nog niet nodig'))} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: r.eindcallNodig ? colors.danger : r.volgendeCall ? (r.naamChecken ? '#f59e0b' : G) : colors.textSecondary }}>

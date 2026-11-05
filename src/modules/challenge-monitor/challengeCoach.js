@@ -5,6 +5,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { EISEN, waardenUit, haalStand, allesGehaald } from './challengeEisen'
+import { prognose } from './challengePrognose'
 
 const CHALLENGE_DAGEN = 42
 
@@ -30,8 +31,11 @@ export async function haalEisen(client) {
     w.calls = Math.max(w.calls, Number(calls.gevoerd) || 0)
     stand.calls = w.calls
   }
+  const schatting = prognose(w, Object.fromEntries(EISEN.map(e => [e.key, e.nodig])), { start: venster.start_date, eind: venster.end_date })
   return {
+    prognose: schatting,
     regels: EISEN.map(e => ({
+      schema: schatting.regels[e.key],
       key: e.key, label: e.label, waarde: w[e.key], nodig: e.nodig, gehaald: w[e.key] >= e.nodig, uitleg: e.uitleg, info: e.info,
       ...(e.key === 'calls' && calls ? { gepland: Number(calls.gepland) || 0 } : null),
     })),
@@ -44,7 +48,7 @@ export async function haalEisen(client) {
 
 // Handmatige keuzes per klant (client_challenge_instelling). Geen rij = alles automatisch.
 export async function haalInstellingen(ids = null) {
-  let q = supabase.from('client_challenge_instelling').select('client_id, telt_niet_mee, borg_geschikt, reden')
+  let q = supabase.from('client_challenge_instelling').select('client_id, telt_niet_mee, borg_geschikt, reden, sale_id')
   if (ids) q = q.in('client_id', ids)
   const { data, error } = await q.then(r => r, e => ({ error: e }))
   if (error) throw error
