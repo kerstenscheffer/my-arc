@@ -33,6 +33,8 @@ import GinoKalender from './GinoKalender'
 import { useTijdPlek } from './tijdPlek'
 import Geldplan from './Geldplan'
 import { laadGeldplan, geldplanVoorGino } from './geldplanData'
+import { useNieuweMannen } from './useNieuweMannen'
+import { nieuweMannenVoorGino } from './nieuweMannenData'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
@@ -920,6 +922,8 @@ export default function BusinessOS({ isMobile }) {
   const week = useWeek()
   const { laad: laadWeek } = week
   useEffect(() => { if (blad === 'week') laadWeek() }, [blad, laadWeek])
+  // Laadt meteen: Kerstens hoofdcijfer gaat altijd mee in de context van Gino.
+  const mannen = useNieuweMannen()
   // Stem-modus: eerste klik zet aan (en ontgrendelt iOS), klik tijdens praten
   // stopt alleen, klik in stilte zet uit.
   const { aan: stemAan, spreekt, teruggevallen } = stem.useStem()
@@ -1263,6 +1267,7 @@ export default function BusinessOS({ isMobile }) {
           <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
+            nieuweMannen: nieuweMannenVoorGino(mannen.weken),
             geldplan: geldplanVoorGino(geldplan),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,

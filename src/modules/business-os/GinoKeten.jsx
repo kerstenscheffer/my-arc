@@ -43,7 +43,7 @@ const RIJEN = [
   { key: 'comments', label: 'Comments', Icon: MessageSquare, kleur: '#fff', content: c => c.comments, stap: true, lijst: { sorteer: 'comments', filter: p => p.comments != null } },
   { key: 'nieuw', label: 'Nieuwe leads', Icon: UserPlus, kleur: '#3b82f6', stat: 'Nieuwe leads' },
   { key: 'follow', label: 'Follow-ups', Icon: Send, kleur: '#f59e0b', stat: 'Follow-ups' },
-  { key: 'challenge', label: 'Challenge campagne', Icon: Megaphone, kleur: '#a855f7' },
+  { key: 'challenge', label: 'Campagne', Icon: Megaphone, kleur: '#a855f7' },
   { key: 'reacties', label: 'Reacties', Icon: MessageCircle, kleur: GROEN, stat: 'Reacties', stap: true },
   { key: 'voorgesteld', label: 'Voorgesteld', Icon: PhoneCall, kleur: '#a855f7', stat: 'Voorgesteld', stage: 'callProposed', stap: true },
   { key: 'ingepland', label: 'Ingepland', Icon: CalendarCheck, kleur: '#06b6d4', stat: 'Ingepland', stage: 'callScheduled', stap: true },
@@ -74,15 +74,16 @@ const VRAGEN = [
   { label: 'Wat doe ik deze week als eerste?', vraag: 'Kies op basis van de keten de 3 acties die deze week het meeste opleveren richting €10.000 per maand, op volgorde, met wat ik precies moet doen en hoe we zien of het werkt.' },
 ]
 
-// Klik op de naam van Nieuwe leads wisselt beide → mannen → vrouwen. De keuze onthoudt dit apparaat.
+// Klik op de naam van deze rijen wisselt beide → mannen → vrouwen. Per rij; dit apparaat onthoudt het.
+const GESLACHT_RIJEN = { nieuw: { mannen: 'nieuwMannen', vrouwen: 'nieuwVrouwen' }, challenge: { mannen: 'challengeMannen', vrouwen: 'challengeVrouwen' } }
 const GESLACHT = {
-  beide: { naam: 'Beide', Icon: VenusAndMars, kleur: '#fff', key: 'nieuw', volgende: 'mannen' },
-  mannen: { naam: 'Mannen', Icon: Mars, kleur: '#3b82f6', key: 'nieuwMannen', volgende: 'vrouwen' },
-  vrouwen: { naam: 'Vrouwen', Icon: Venus, kleur: '#ec4899', key: 'nieuwVrouwen', volgende: 'beide' },
+  beide: { naam: 'Beide', Icon: VenusAndMars, kleur: '#fff', volgende: 'mannen' },
+  mannen: { naam: 'Mannen', Icon: Mars, kleur: '#3b82f6', volgende: 'vrouwen' },
+  vrouwen: { naam: 'Vrouwen', Icon: Venus, kleur: '#ec4899', volgende: 'beide' },
 }
-const GESLACHT_KEY = 'myarc.keten.geslacht'
+const GESLACHT_KEY = 'myarc.keten.geslacht.per_rij'
 const leesGeslacht = () => {
-  try { const g = localStorage.getItem(GESLACHT_KEY); return GESLACHT[g] ? g : 'beide' } catch { return 'beide' }
+  try { return JSON.parse(localStorage.getItem(GESLACHT_KEY)) || {} } catch { return {} }
 }
 
 const ALLE_KEYS = RIJEN.map(r => r.key)
@@ -92,11 +93,18 @@ const leesStand = () => {
   try {
     const s = JSON.parse(localStorage.getItem(STAND))
     const keys = Array.isArray(s?.keys) ? s.keys.filter(k => RIJ_VAN[k]) : []
+    // Een nieuwe stat verschijnt vanzelf, na de stat die er standaard boven staat. Wat je zelf
+    // uitzette blijft uit: dat staat in `gezien`. Standen van vóór `gezien` kenden challenge nog niet.
+    const gezien = Array.isArray(s?.gezien) ? s.gezien : ALLE_KEYS.filter(k => k !== 'challenge')
+    for (const k of ALLE_KEYS) {
+      if (gezien.includes(k) || keys.includes(k)) continue
+      keys.splice(keys.indexOf(ALLE_KEYS[ALLE_KEYS.indexOf(k) - 1]) + 1, 0, k)
+    }
     return keys.length ? { actief: s.actief || null, keys } : null
   } catch { return null }
 }
 const bewaarStand = (actief, keys) => {
-  try { localStorage.setItem(STAND, JSON.stringify({ actief, keys })) } catch { /* privémodus */ }
+  try { localStorage.setItem(STAND, JSON.stringify({ actief, keys, gezien: ALLE_KEYS })) } catch { /* privémodus */ }
 }
 
 const isoLokaal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -117,12 +125,16 @@ const haalChallengeIds = () => {
     .catch(() => { challengeIds = null; return null })
   return challengeIds
 }
-async function telChallenge(s, e) {
+// Geslacht komt van de lead en niet van de campagnenaam: vóór 2 nov stonden er ook vrouwen
+// onder "challenge Man".
+async function telChallenge(s, e, geslacht = null) {
   const ids = await haalChallengeIds()
   if (!ids) return null
   if (!ids.length) return 0
-  const res = await supabase.from('lead_campaign_tags').select('id', { count: 'exact', head: true })
-    .in('campaign_id', ids).gte('tagged_at', s).lt('tagged_at', e).then(r => r, () => ({ error: true }))
+  let q = supabase.from('lead_campaign_tags').select(geslacht ? 'id, call_leads!inner(gender)' : 'id', { count: 'exact', head: true })
+    .in('campaign_id', ids).gte('tagged_at', s).lt('tagged_at', e)
+  if (geslacht) q = q.eq('call_leads.gender', geslacht)
+  const res = await q.then(r => r, () => ({ error: true }))
   return res.error ? null : res.count
 }
 
@@ -137,7 +149,7 @@ async function haalWeek(svc, coachId, van) {
   // Geslacht apart tellen op de server: dezelfde telling als newLeads, plus het filter.
   const telLeads = (g) => supabase.from('call_leads').select('id', { count: 'exact', head: true })
     .gte('created_at', s).lt('created_at', e).is('deleted_at', null).eq('gender', g).then(res => (res.error ? null : res.count), () => null)
-  const [act, fun, rx, cash, media, mannen, vrouwen, challenge] = await Promise.all([
+  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen] = await Promise.all([
     svc.getRangeActivity(coachId, s, e),
     svc.getRangeFunnelStats(coachId, s, e),
     svc.getRangeReactionStats(coachId, s, e),
@@ -146,6 +158,8 @@ async function haalWeek(svc, coachId, van) {
     telLeads('male'),
     telLeads('female'),
     telChallenge(s, e),
+    telChallenge(s, e, 'male'),
+    telChallenge(s, e, 'female'),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -161,6 +175,8 @@ async function haalWeek(svc, coachId, van) {
     if (r.deel) waarden[r.key] = waarden[r.deel[1]] > 0 ? Math.round((waarden[r.deel[0]] / waarden[r.deel[1]]) * 100) : null
   }
   waarden.challenge = challenge
+  waarden.challengeMannen = challengeMannen
+  waarden.challengeVrouwen = challengeVrouwen
   waarden.nieuwMannen = mannen
   waarden.nieuwVrouwen = vrouwen
   const week = { waarden, posts: m || [], fun }
@@ -318,10 +334,11 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const [melding, setMelding] = useState(null)
   const [sleepKey, setSleepKey] = useState(null)
   const [geslacht, setGeslacht] = useState(leesGeslacht)
-  const wisselGeslacht = () => {
-    const nieuw = GESLACHT[geslacht].volgende
+  const geslachtVan = (k) => (GESLACHT[geslacht[k]] ? geslacht[k] : 'beide')
+  const wisselGeslacht = (k) => {
+    const nieuw = { ...geslacht, [k]: GESLACHT[geslachtVan(k)].volgende }
     setGeslacht(nieuw)
-    try { localStorage.setItem(GESLACHT_KEY, nieuw) } catch { /* privémodus */ }
+    try { localStorage.setItem(GESLACHT_KEY, JSON.stringify(nieuw)) } catch { /* privémodus */ }
   }
   const romp = useRef(null)
   const keysNu = useRef(keys)
@@ -666,7 +683,9 @@ export default function GinoKeten({ isMobile, onVraag }) {
                 const sleept = sleepKey === key
                 // Om de rij een dikke witte lijn boven en onder: zo volg je een rij zonder te verspringen.
                 const lijn = ri % 2 === 0 ? { borderTop: LIJN, borderBottom: LIJN } : {}
-                const waardeKey = r.key === 'nieuw' ? GESLACHT[geslacht].key : r.key
+                const rijGeslacht = GESLACHT_RIJEN[r.key] ? geslachtVan(r.key) : null
+                const G = rijGeslacht && GESLACHT[rijGeslacht]
+                const waardeKey = rijGeslacht && rijGeslacht !== 'beide' ? GESLACHT_RIJEN[r.key][rijGeslacht] : r.key
                 const gem = gemiddelde({ ...r, key: waardeKey }, basis)
                 const Icon = r.Icon
                 return (
@@ -679,17 +698,17 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>
                         <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />
-                        {r.key === 'nieuw' ? (
+                        {G ? (
                           <button
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={wisselGeslacht}
-                            title={`${GESLACHT[geslacht].naam}. Klik om te wisselen. Bij een deel van de leads is het geslacht niet ingevuld, dus mannen plus vrouwen is minder dan beide.`}
-                            aria-label={`Nieuwe leads: ${GESLACHT[geslacht].naam}. Klik om te wisselen.`}
+                            onClick={() => wisselGeslacht(r.key)}
+                            title={`${G.naam}. Klik om te wisselen. Bij een deel van de leads is het geslacht niet ingevuld, dus mannen plus vrouwen is minder dan beide.`}
+                            aria-label={`${r.label}: ${G.naam}. Klik om te wisselen.`}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
                           >
                             {r.label}
-                            {(() => { const G = GESLACHT[geslacht]; return <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} /> })()}
+                            <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} />
                           </button>
                         ) : r.label}
                       </span>
