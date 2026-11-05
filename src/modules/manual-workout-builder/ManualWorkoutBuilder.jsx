@@ -357,6 +357,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
   }
 
+  const schatMinuten = (exercises) => Math.max(10, Math.round(exercises.reduce((n, e) => n + (Number(e.sets) || 3) * 2.5, 0) + 5))
+
   const addExercise = (exercise) => {
     if (!activeDay) return
     const newExercise = {
@@ -366,7 +368,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       type: exercise.type || 'compound', stretch: false, priority: 1, goalPriority: false,
       _isCustom: exercise._isCustom || false
     }
-    setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === activeDay ? { ...d, exercises: [...d.exercises, newExercise] } : d) }))
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== activeDay) return d
+        const exercises = [...d.exercises, newExercise]
+        return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      })
+    }))
     if (newExercise.equipment && !workoutPlan.equipment.includes(newExercise.equipment)) {
       setWorkoutPlan(prev => ({ ...prev, equipment: [...prev.equipment, newExercise.equipment] }))
     }
@@ -382,7 +391,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   }
 
   const deleteExercise = (dayId, exerciseId) => {
-    setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: d.exercises.filter(ex => ex.id !== exerciseId) } : d) }))
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== dayId) return d
+        const exercises = d.exercises.filter(ex => ex.id !== exerciseId)
+        return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      })
+    }))
   }
 
   const buildWeekStructure = () => {
