@@ -21,9 +21,11 @@ export function rekenGeld(rijen, ctx) {
   const openV = verlengingen.filter(v => !v.payment_received)
   const levend = challenges.filter(c => c.challenge_status !== 'terugbetaald')
   const zekerB = levend.filter(c => c.challenge_status === 'behouden' || borgVan.get(c.id)?.payment_received)
-  const blijftB = levend.filter(c => !zekerB.includes(c) && ctx.nietGeschikt(c.id))
-  const toegezegdB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && borgVan.has(c.id))
-  const onzekerB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && !borgVan.has(c.id))
+  const blijftB = levend.filter(c => !zekerB.includes(c) && c.payment_received && ctx.nietGeschikt(c.id))
+  // Nog niet betaald is nog geen borg: dat geld is toegezegd, net als in de maandgrafiek.
+  const nietBetaald = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && !c.payment_received)
+  const toegezegdB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && c.payment_received && borgVan.has(c.id))
+  const onzekerB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && c.payment_received && !borgVan.has(c.id))
   // Echte naam als de sale gekoppeld is. Anders de Instagram-naam, soms dubbel ("jan jan").
   const naam = (r) => {
     const echt = ctx.klantVan(r.borg_movement_id || r.id)
@@ -46,6 +48,7 @@ export function rekenGeld(rijen, ctx) {
       ]),
       toegezegd: opNaam([
         ...borgPlus(toegezegdB),
+        ...nietBetaald.map(c => regel(c, 'Nog niet betaald')),
         ...openV.filter(v => !toegezegdIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
       ]),
       onzeker: opNaam(onzekerB.map(c => regel(c))),
@@ -54,7 +57,7 @@ export function rekenGeld(rijen, ctx) {
     aantal: levend.length,
     verkocht: som(levend),
     zeker: som(zekerB) + som(blijftB) + som(betaaldV),
-    toegezegd: som(toegezegdB) + som(openV),
+    toegezegd: som(toegezegdB) + som(nietBetaald) + som(openV),
     onzeker: som(onzekerB),
     onzekerAantal: onzekerB.length,
     refund: som(challenges.filter(c => c.challenge_status === 'terugbetaald')),

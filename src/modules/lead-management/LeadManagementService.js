@@ -3458,6 +3458,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       })
 
       const now = new Date()
+      // Omgekeerde van uitEerder: wat in deze maand binnenkwam maar in een latere periode meetelt.
+      const naarLaterVan = (k) => {
+        const lijst = []
+        Object.keys(porties).forEach(j => {
+          if (j <= k) return
+          porties[j].forEach(q => { if (q.oudK === k) lijst.push({ naam: q.naam, bedrag: Math.round(q.omzet * 100) / 100, naar: j }) })
+        })
+        return lijst
+      }
       const months = []
       let totalOutstanding = 0
       for (let i = -monthsBehind; i < monthsAhead; i++) {
@@ -3472,6 +3481,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           const lasten = rij.vaste_lasten != null ? Number(rij.vaste_lasten) : Math.min(FIXED, omzet)
           const ads = rij.adspend != null ? Number(rij.adspend) : (adSpend[k] || 0)
           months.push({
+            naarLater: naarLaterVan(k),
             key: k,
             label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
             owed: bedrag, earned: bedrag, paid: bedrag, outstanding: 0,
@@ -3500,6 +3510,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         if (i <= 0) totalOutstanding += Math.max(0, outstanding)
         const revM = Math.round((revenue[k] || 0) * 100) / 100
         months.push({
+          naarLater: naarLaterVan(k),
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
           owed: owedM,

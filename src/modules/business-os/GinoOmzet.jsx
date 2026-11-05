@@ -94,6 +94,8 @@ function Bronnen({ maand, toegezegd, focus }) {
   const max = Math.max(1, ...BRONNEN.map(([k]) => per[k] || 0))
   const totaal = BRONNEN.reduce((t, [k]) => t + (per[k] || 0), 0)
   const bronFocus = focus && BRONNEN.some(([k]) => focus.has(k))
+  // Wat er van de challenge van deze maand al vaststaat; de rest kan nog terug.
+  const challengeZeker = Math.max(0, (per.challenge || 0) - (Number(maand?.challengeAmount) || 0))
   return (
     <div>
       {BRONNEN.map(([k, label], i) => {
@@ -109,8 +111,14 @@ function Bronnen({ maand, toegezegd, focus }) {
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{euro(v)}</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${(v / max) * 100}%`, borderRadius: 4, background: k === 'challenge' ? `${G}88` : G, boxShadow: v ? `0 0 10px ${G}88` : 'none', transformOrigin: 'left', animation: `go-balk .8s cubic-bezier(.2,.8,.2,1) ${300 + i * 80}ms both` }} />
+              {k === 'challenge' && challengeZeker > 0 && <div title={`${euro(challengeZeker)} winst`} style={{ float: 'left', height: '100%', width: `${(challengeZeker / max) * 100}%`, background: G }} />}
+              <div style={{ height: '100%', width: `${((k === 'challenge' ? v - challengeZeker : v) / max) * 100}%`, ...(k === 'challenge' ? { float: 'left' } : null), borderRadius: 4, background: k === 'challenge' ? `${G}73` : G, boxShadow: v ? `0 0 10px ${G}88` : 'none', transformOrigin: 'left', animation: `go-balk .8s cubic-bezier(.2,.8,.2,1) ${300 + i * 80}ms both` }} />
             </div>
+            {k === 'challenge' && v > 0 && (
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+                <span style={{ color: G, fontWeight: 800 }}>{euro(challengeZeker)} winst</span> · {euro(v - challengeZeker)} kan nog terug
+              </div>
+            )}
           </div>
         )
       })}
@@ -124,6 +132,10 @@ function Bronnen({ maand, toegezegd, focus }) {
 }
 
 // Uitbetaalperiode van de sleutel YYYY-MM: 26e van de maand ervoor t/m de 25e.
+const maandNaam = (k) => {
+  const [j, m] = String(k).split('-').map(Number)
+  return new Date(j, m - 1, 1).toLocaleDateString('nl-NL', { month: 'long' })
+}
 const periodeTekst = (k) => {
   const [j, m] = String(k).split('-').map(Number)
   const maand = (d) => d.toLocaleDateString('nl-NL', { month: 'short' })
@@ -185,6 +197,9 @@ function VerdelingInfo({ p, partner, jij, onSluit }) {
               </div>
             ))} />
         ))}
+        {(p.naarLater || []).map((x, i) => (
+          <InfoRegel key={`l${i}`} links={x.naam} rechts={euro(x.bedrag)} kleur={colors.textSecondary} onder={`Hier ontvangen, telt mee in ${maandNaam(x.naar)}`} />
+        ))}
         <InfoRegel links="Telt voor verdeling" rechts={euro(p.revenue)} dik />
         <InfoRegel links="Vaste lasten" onder="Gaan eerst van het bedrag af" rechts={`− ${euro(p.fixedCosts)}`} kleur={colors.textSecondary} />
         <InfoRegel links="Adspend" onder={p.adSpendBron === 'meta' ? 'Automatisch uit Meta' : null} rechts={`− ${euro(p.adSpend)}`} kleur={colors.textSecondary} />
@@ -193,7 +208,7 @@ function VerdelingInfo({ p, partner, jij, onSluit }) {
         <InfoRegel links={partner} rechts={euro(p.earned)} />
 
         <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.5, color: colors.textSecondary, marginTop: 8 }}>
-          Het bedrag links op het scherm is wat er deze kalendermaand binnenkwam. Open challenges staan hier niet tussen: een borg telt pas als de doorstap betaald is.
+          Het bedrag links op het scherm is wat er deze kalendermaand binnenkwam. Open challenges staan hier niet tussen. Een borg telt pas als de doorstap betaald is, of als de challenge voorbij is en de klant niet geschikt is voor borg terug. Hij telt dan in de lopende periode.
         </div>
       </div>
     </div>,
@@ -212,6 +227,8 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
     ['Te verdelen', p.netRevenue, G],
   ]
   const totaal = Math.max(1, (p.earned || 0) + jij)
+  const naarLater = p.naarLater || []
+  const laterTotaal = naarLater.reduce((t, x) => t + (Number(x.bedrag) || 0), 0)
   const aan = focus && focus.has('verdeling')
   return (
     <div style={aan ? { padding: 10, margin: -10, borderRadius: 12, boxShadow: `0 0 0 1px ${G}, 0 0 22px ${G}44`, background: `${G}0f` } : null}>
@@ -238,6 +255,11 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
           Waarvan {euro(p.uitEerder)} eerder ontvangen, telt nu mee
         </div>
       )}
+      {laterTotaal > 0.5 && (
+        <div title={naarLater.map(x => `${x.naam} ${euro(x.bedrag)}`).join(', ')} style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+          {euro(laterTotaal)} uit deze maand telt later mee: {[...new Set(naarLater.map(x => maandNaam(x.naar)))].join(', ')}
+        </div>
+      )}
       <div style={{ display: 'flex', height: 8, borderRadius: 5, overflow: 'hidden', margin: '10px 0 6px', background: 'rgba(255,255,255,0.06)' }}>
         <div style={{ width: `${(jij / totaal) * 100}%`, background: G, boxShadow: `0 0 10px ${G}`, transformOrigin: 'left', animation: 'go-balk .8s ease-out .6s both' }} />
         <div style={{ width: `${((p.earned || 0) / totaal) * 100}%`, background: 'rgba(255,255,255,0.55)', transformOrigin: 'left', animation: 'go-balk .8s ease-out .75s both' }} />
@@ -257,7 +279,12 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
 }
 
 function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
-  const max = Math.max(doel || 0, ...maanden.map(m => m.amount)) * 1.12 || 1
+  // Vol groen = winst. Halfgroen = challenge-borg die nog terug kan. Lichtgroen = toegezegd, nog niet binnen.
+  const delen = (m) => {
+    const onzeker = Math.min(m.amount, Number(m.challengeAmount) || 0)
+    return { zeker: m.amount - onzeker, onzeker, toegezegd: Number(m.pendingAmount) || 0 }
+  }
+  const max = Math.max(doel || 0, ...maanden.map(m => m.amount + (Number(m.pendingAmount) || 0))) * 1.12 || 1
   const H = Math.max(80, hoogte - 34)
   const yDoel = doel ? H - (doel / max) * H : null
   return (
@@ -267,13 +294,14 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
         </div>
       )}
       {maanden.map((m, i) => {
-        const h = Math.max(2, (m.amount / max) * H)
+        const d = delen(m)
+        const som = m.amount + d.toegezegd
+        const h = Math.max(2, (som / max) * H)
         const actief = m.key === gekozen
         const gedimd = focus && [...focus].some(f => /^\d{4}-\d{2}$/.test(f)) && !focus.has(m.key)
         const toekomst = !m.isPast && !m.isCurrent
-        const gehaald = doel && m.amount >= doel
         return (
-          <button key={m.key} type="button" onClick={() => onKies(m.key)} title={`${m.label}: ${euro(m.amount)}`} style={{
+          <button key={m.key} type="button" onClick={() => onKies(m.key)} title={`${m.label}: ${euro(d.zeker)} winst · ${euro(d.onzeker)} kan nog terug · ${euro(d.toegezegd)} toegezegd`} style={{
             flex: 1, minWidth: 0, height: '100%', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', opacity: gedimd ? 0.3 : 1, transition: 'opacity .4s',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 4,
           }}>
@@ -282,11 +310,16 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
             </span>
             <div style={{
               width: '100%', maxWidth: 46, height: h, borderRadius: '6px 6px 2px 2px',
-              background: toekomst ? `${G}10` : actief || m.isCurrent ? G : gehaald ? `${G}cc` : `${G}55`,
-              border: toekomst ? `1px dashed ${G}88` : 'none',
-              boxShadow: actief ? `0 0 18px ${G}, 0 0 0 1px ${G}` : m.isCurrent ? `0 0 14px ${G}88` : 'none',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              background: som ? 'transparent' : `${G}10`,
+              border: toekomst && !som ? `1px dashed ${G}88` : 'none',
+              boxShadow: actief ? `0 0 18px ${G}88, 0 0 0 1px ${G}` : 'none',
               transformOrigin: 'bottom', animation: `go-staaf .7s cubic-bezier(.2,.8,.2,1) ${i * 50}ms both`,
-            }} />
+            }}>
+              {d.toegezegd > 0 && <div style={{ flex: d.toegezegd, minHeight: 2, background: `${G}26` }} />}
+              {d.onzeker > 0 && <div style={{ flex: d.onzeker, minHeight: 2, background: `${G}73` }} />}
+              {d.zeker > 0 && <div style={{ flex: d.zeker, minHeight: 2, background: toekomst ? `${G}73` : G }} />}
+            </div>
             <span style={{ fontSize: 10, fontWeight: 800, color: actief ? G : 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
               {m.label.replace(/\.? \d{4}$/, '').slice(0, 3)}
             </span>
@@ -377,6 +410,11 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
       </div>
 
       <ChallengeStand isMobile={isMobile} />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 12, flexShrink: 0, fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>
+        {[[G, 'Winst'], [`${G}73`, 'Kan nog terug'], [`${G}26`, 'Toegezegd']].map(([k, t]) => (
+          <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span aria-hidden style={{ width: 9, height: 9, borderRadius: 2, background: k }} />{t}</span>
+        ))}
+      </div>
 
       <div style={{ flex: 1, minHeight: 150, marginTop: 18, opacity: focus && !focus.has('grafiek') && ![...focus].some(f => /^\d{4}-\d{2}$/.test(f)) ? 0.25 : 1, transition: 'opacity .4s' }}>
         <Maandgrafiek maanden={maanden} doel={doel} gekozen={gekozen} onKies={onKiesMaand} focus={focus} hoogte={Math.max(150, Math.min(220, hoogte - 250))} />
