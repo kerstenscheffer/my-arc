@@ -30,6 +30,7 @@ import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
 import GinoHerinnering from './GinoHerinnering'
 import GinoKalender from './GinoKalender'
+import { useTijdPlek } from './tijdPlek'
 import Geldplan from './Geldplan'
 import { laadGeldplan, geldplanVoorGino } from './geldplanData'
 import { bewaarOordeel } from './feedback'
@@ -895,6 +896,7 @@ export default function BusinessOS({ isMobile }) {
   const content = useContent()
   const { laad: laadContent } = content
   useEffect(() => { if (blad === 'content') laadContent() }, [blad, laadContent])
+  useTijdPlek(blad === 'content' ? 'contentpaneel' : null)
   // Preview van één post: deeplink #business-os:content=<id> (ook als Business
   // OS net pas opent) of een Bekijk-knop (event, hash blijft staan).
   const [previewId, setPreviewId] = useState(() => contentUitHash())

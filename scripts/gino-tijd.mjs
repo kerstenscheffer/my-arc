@@ -30,11 +30,13 @@ const NIET_MEETBAAR = /^(loginwindow|ScreenSaverEngine)$/
 const STIL_SEC = 180
 
 // Standaardindeling. Volgorde telt: eerste treffer wint.
+// MY ARC op het CoachHub-tabje. Business OS laat met tijdPlek.js in de hash zien
+// of de contentkalender of het Content-paneel openstaat; die gaan dus voor.
 const MYARC_TAB = [
-  [/leads|sales|funnel|ads|dm/, 'sales'],
-  [/checkin|client|klant|challenge|plan-wizard|ai-meals|meal|workout|supplement|calls|results|faq/, 'coaching'],
-  [/output|content/, 'content'],
-  [/business-os|productivity|command/, 'admin'],
+  [/^#(business-os[:?]content|output|content)/, 'content'],
+  [/^#(leads|sales|funnel|ads|dm)\b/, 'sales'],
+  [/^#(command|week-review|checkin|client|klant|challenge|plan-wizard|ai-meals|meal|workout|supplement|calls|results|faq|coachvids)/, 'coaching'],
+  [/^#(business-os|productivity|notifications-hub|app-versies|spots)/, 'admin'],
 ]
 const DOMEIN = [
   [/instagram\.com\/direct/, 'sales'],
@@ -81,12 +83,14 @@ async function voorsteApp() {
   return uit.match(/"LSDisplayName"="([^"]*)"/)?.[1] || null
 }
 
-function knipUrl(url) {
+export function knipUrl(url) {
   try {
     const u = new URL(url)
     const domein = u.hostname.replace(/^www\./, '') + (u.port && /localhost|127\./.test(u.hostname) ? `:${u.port}` : '')
     // MY ARC: de #tab zegt waar hij mee bezig is; elders het eerste padstuk.
-    const pad = u.hash ? u.hash.slice(0, 40) : (u.pathname.split('/').filter(Boolean)[0] ? `/${u.pathname.split('/').filter(Boolean)[0]}`.slice(0, 40) : '')
+    // Van de hash nooit ids of parameters bewaren (#client-view:<id> → #client-view).
+    const hash = u.hash.split(/[?=]/)[0].replace(/:[0-9a-f-]{8,}$/i, '')
+    const pad = hash ? hash.slice(0, 40) : (u.pathname.split('/').filter(Boolean)[0] ? `/${u.pathname.split('/').filter(Boolean)[0]}`.slice(0, 40) : '')
     return { domein, pad }
   } catch { return { domein: null, pad: null } }
 }

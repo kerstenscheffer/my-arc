@@ -28,6 +28,7 @@ import GinoContent from './GinoContent'
 import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand, typeLabel } from './contentStand'
 import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
+import { useTijdPlek } from './tijdPlek'
 import { StandChip } from './contentStatus'
 import GinoOmzet from './GinoOmzet'
 import GinoKeten from './GinoKeten'
@@ -152,6 +153,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const [bezig, setBezig] = useState(null)
   // Week (agenda, standaard), content (contentkalender) of omzet.
   const [weergave, setWeergave] = useState(['omzet', 'projecten', 'klanten', 'tijd', 'keten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
+  useTijdPlek(weergave === 'content' ? 'contentkalender' : null)
   const [projectId, setProjectId] = useState(verzoek?.project || null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
