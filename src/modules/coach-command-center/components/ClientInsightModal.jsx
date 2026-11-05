@@ -16,6 +16,7 @@ import { isOnbeperkt } from './trajectPeriode'
 import { KolomKop } from './insight/KolomKop'
 import TrajectModal from './TrajectModal'
 import DoorstapKeuze from './DoorstapKeuze'
+import ChallengeEisenRegel from '../../challenge-monitor/ChallengeEisenRegel'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import AgendaVenster, { MaaltijdVenster } from './AgendaVenster'
@@ -357,6 +358,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                             onClientUpdate={handleClientUpdate}
                             onTraject={(m) => { setLooptijdOpen(false); setTrajectModus(m) }}
                           />
+                          <div style={{ padding: '0 14px 8px' }}><ChallengeEisenRegel client={effectiveClient} /></div>
                         </div>
                       </>
                     )}
@@ -497,6 +499,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     onClientUpdate={handleClientUpdate}
                     onTraject={(m) => { setLooptijdOpen(false); setTrajectModus(m) }}
                   />
+                  <div style={{ padding: '0 14px 8px' }}><ChallengeEisenRegel client={effectiveClient} /></div>
                 </div>
               )}
               {/* ═══ MAANDELIJKSE CHECK BANNER (mobiel) ═══ */}
