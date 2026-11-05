@@ -68,7 +68,7 @@ async function laadPeriode(van, tot) {
     supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
-    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord')
+    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord, metricool_link')
       .eq('coach_id', user.id).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
     supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
@@ -97,7 +97,7 @@ async function laadPeriode(van, tot) {
     const label = typeLabel(c.type, c.autopilot_woord)
     items.push({
       id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, woord: c.autopilot_woord, dag: c.planned_date, tijd: c.planned_time || null,
-      titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink,
+      titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink, metricoolLink: c.metricool_link || null,
       sub: c.stand === 'mislukt' && c.autopilot_fout ? `${label || 'post'} · ${c.autopilot_fout}`
         : c.stand === 'ingepland' && c.autopilot_status ? `${label || 'post'} · ingepland voor ${c.planned_time || '14:00'}` : label,
       klaar: c.stand === 'gepost',

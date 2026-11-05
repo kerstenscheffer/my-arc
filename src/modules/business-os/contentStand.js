@@ -32,6 +32,19 @@ export const soortVanType = (t, woord) => {
 // Label bij een los item: 'magnet' voor een reel met woord, anders het type zelf.
 export const typeLabel = (t, woord) => (soortVanType(t, woord) === 'magnet' ? 'magnet' : t)
 
+// Wat één vakje (rij + dag) telt, zodat het getal en de klik-lijst altijd gelijk
+// zijn. Vandaag en later: alle geplande items. Verleden: alleen wat geplaatst of
+// mislukt is; een blijven liggen draft zie je daar via de dagkop.
+// los = geplaatst zonder gepland item (n uit Metricool/zelf ingevuld, geen rij
+// in content_items, dus ook niets om te openen).
+export function vakTelling(items, dag, vandaag, n = 0) {
+  const verleden = dag < vandaag
+  const telt = (items || []).filter(it => !verleden || it.stand === 'gepost' || it.stand === 'mislukt')
+  const gepost = telt.filter(it => it.stand === 'gepost').length
+  const los = dag > vandaag ? 0 : Math.max(0, n - gepost)
+  return { telt, los, getal: telt.length + los }
+}
+
 export async function laadContentStand(supabase, van, tot) {
   const [c, d, m, p, l] = await Promise.all([
     supabase.from('content_checklist').select('dag, soort, aantal').gte('dag', van).lte('dag', tot).then(r => r, leeg),
