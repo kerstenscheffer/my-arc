@@ -13,7 +13,7 @@ Standaard twee per week: dinsdag en donderdag om 18:00, aansluitend op het laats
 3. **Eén of een paar shorts:** `node scripts/reel-gino.mjs short <id> --datum <datum uit stap 1>` met Bash-timeout 600000.
    **Alle of veel shorts:** schrijf 8 captions en draai `node scripts/reel-gino.mjs reeks --ronde 1` met Bash-timeout 600000, daarna `--ronde 2` enzovoort (hetzelfde commando herhalen ziet de waakhond als vastlopen). Die doet de volgende 8 met caption en kiest zelf de datums. Herhaal tot `nog_open` 0 is. Een lopende run die stopt, kan later gewoon verder: klare shorts slaat hij over.
 
-Download, upload en concept zitten in deze commando's. Ze vragen geen toestemming.
+Download, upload, concept en de rij in de contentkalender zitten in deze commando's. Ze vragen geen toestemming. Staat er `kalender: fout…` in de uitvoer, draai dan `node scripts/reel-gino.mjs kalender`; dat zet ook handmatig verschoven datums terug naar concept.json.
 
 Geeft een commando een link of datum terug, dan is die short klaar: het script heeft al gecontroleerd dat het een concept is en dat de video compleet is. Kijk dus niet nog eens in Metricool na.
 

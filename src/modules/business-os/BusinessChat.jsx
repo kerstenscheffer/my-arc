@@ -58,7 +58,7 @@ import { contentUitHash, openContent } from './contentStatusData'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
-const MAX_BEELDEN = 3 // zoveel recente screenshots gaan mee naar de AI
+const MAX_BEELDEN = 10 // zoveel recente screenshots gaan mee naar de AI (de PA pakt er net zoveel)
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
 const TABS_BREED = 140 // breedte van de tabjes-slider op desktop: twee tabjes

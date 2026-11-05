@@ -697,8 +697,12 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
   }
   if (w.ctx) w.ctx.opdrachtId = rijId
   const berichten = (invoer?.berichten || []).slice(-20)
-  // Hervat Slim-gesprek: de sessie kent de rest al, alleen de nieuwe vraag.
-  const stuk = hervat ? berichten.slice(-1) : berichten
+  // Hervat Slim-gesprek: de sessie kent de rest al, alleen de nieuwe vraag. Die kan uit
+  // meerdere rijen bestaan: de chat geeft elke screenshot een eigen rij, en alleen de
+  // laatste heeft tekst. Met slice(-1) zag Gino daar maar de laatste screenshot van.
+  let vanaf = berichten.length - 1
+  while (vanaf > 0 && berichten[vanaf - 1].role === 'user' && berichten[vanaf - 1].afbeelding && !berichten[vanaf - 1].content) vanaf--
+  const stuk = hervat ? berichten.slice(Math.max(0, vanaf)) : berichten
   const gesprek = stuk
     .map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.afbeelding ? '[screenshot, zie bijgevoegde afbeelding] ' : ''}${b.content}`).join('\n\n')
   // Screenshots (2 nov 2026): gingen eerst altijd via de API (zwakkere Gino
@@ -706,7 +710,7 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
   const werk = await macWerkVoorChat()
   const BEELD_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
   const beelden = stuk.filter(b => b.role === 'user' && BEELD_TYPES.includes(b.afbeelding?.media_type) && typeof b.afbeelding?.data === 'string')
-    .slice(-3).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
+    .slice(-10).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
   const r = await new Promise((klaar) => {
     let deel = ''
     const stop = maakKlok((slimId ? 10 : 5) * 60 * 1000, () => w.p.kill('SIGTERM'))

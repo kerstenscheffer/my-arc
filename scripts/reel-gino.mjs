@@ -9,6 +9,7 @@
 //   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
 //   node scripts/reel-gino.mjs reeks                     de volgende 8 open shorts met caption, elk op de eerstvolgende di/do 18:00
 //   node scripts/reel-gino.mjs overzicht                 alle short-concepten met link, op datum
+//   node scripts/reel-gino.mjs kalender                  alle short-concepten in content_items (match op metricool_post_id); short en reeks doen dit per nieuw concept
 //
 // concept zet de reel ALTIJD als concept in Metricool (draft, geen autoPublish) en geeft de link.
 // Publiceren of echt inplannen kan dit script niet. Twee keer hetzelfde concept weigert het.
@@ -36,6 +37,7 @@ const TOOL = 'mcp__claude_ai_Metricool_Social_Media_Management__createScheduledP
 const TOOL_LEES = 'mcp__claude_ai_Metricool_Social_Media_Management__getBrandSettings' // alleen voor --droog
 const BUCKET = 'metricool-drafts'
 const SHORTS = path.join(THUIS, 'Gino', 'yt-shorts') // lijst.json + <id>/caption.txt + <id>/concept.json; niet in de repo (niet-openbare video's)
+const COACH = '5a0135ac-3188-499d-8682-ed6a179e5541'
 
 const uit = (x) => console.log(JSON.stringify(x, null, 1))
 const stop = (fout) => { uit({ fout }); process.exit(1) }
@@ -237,6 +239,45 @@ function schrijfOverzicht() {
   return tekst
 }
 
+// Short-concept → rij in de contentkalender. Autopilot_status/_video/_preview blijven leeg, dus de cron plaatst
+// hier niets en de stand is draft. Een bestaande rij krijgt alleen de Metricool-gegevens: status en notes blijven
+// staan, zodat een al gekoppelde post niet terugvalt naar planned. Datum komt uit concept.json (Amsterdamse kloktijd);
+// een hele `kalender`-ronde zet met de hand verschoven rijen dus terug, `short` raakt alleen zijn eigen rij.
+async function naarKalender(sb, ytId) {
+  const pad = path.join(SHORTS, ytId, 'concept.json')
+  const c = JSON.parse(fs.readFileSync(pad, 'utf8'))
+  const metricool = {
+    title: c.titel, planned_date: c.datum.slice(0, 10), planned_time: c.datum.slice(11, 16),
+    metricool_post_id: String(c.id), metricool_link: c.link,
+    metricool_at: fs.statSync(pad).mtime.toISOString(), // concept.json is geschreven op het moment dat Metricool het concept aanmaakte
+    updated_at: new Date().toISOString(),
+  }
+  const { data: bestaand, error: leesFout } = await sb.from('content_items').select('id')
+    .eq('coach_id', COACH).eq('metricool_post_id', metricool.metricool_post_id)
+  if (leesFout) throw new Error(leesFout.message)
+  if (bestaand.length) {
+    const { error } = await sb.from('content_items').update(metricool).in('id', bestaand.map(r => r.id))
+    if (error) throw new Error(error.message)
+    return 'bijgewerkt'
+  }
+  const { error } = await sb.from('content_items').insert({
+    ...metricool, coach_id: COACH, type: 'reel', status: 'planned', autopilot_woord: 'SPLIT',
+    notes: `Bron: https://www.youtube.com/watch?v=${ytId}`,
+  })
+  if (error) throw new Error(error.message)
+  return 'nieuw'
+}
+
+async function kalender() {
+  const sb = supabase()
+  const stand = { nieuw: 0, bijgewerkt: 0 }, fouten = []
+  const ids = shortLijst().map(s => s.id).filter(id => fs.existsSync(path.join(SHORTS, id, 'concept.json')))
+  for (const id of ids) {
+    try { stand[await naarKalender(sb, id)]++ } catch (e) { fouten.push({ id, fout: e.message }) }
+  }
+  uit({ concepten: ids.length, ...stand, fouten })
+}
+
 // Eigen proces per short: één mislukte houdt de rest niet tegen. Maximaal 8: past binnen de Bash-timeout.
 async function reeks() {
   const klaar = shortsOpen().filter(s => fs.existsSync(path.join(SHORTS, s.id, 'caption.txt'))).slice(0, 8)
@@ -245,7 +286,7 @@ async function reeks() {
     const r = await run(process.execPath, [new URL(import.meta.url).pathname, 'short', s.id, '--datum', volgendeDatums(1)[0]], { timeout: 4 * 60 * 1000 }).then(x => x.stdout, e => e.stdout || String(e.message))
     let u
     try { u = JSON.parse(r) } catch { u = { fout: r.slice(0, 300) } }
-    resultaat.push(u.fout ? { id: s.id, titel: s.titel, fout: u.fout } : { titel: s.titel, datum: u.datum })
+    resultaat.push(u.fout ? { id: s.id, titel: s.titel, fout: u.fout } : { titel: s.titel, datum: u.datum, kalender: u.kalender })
   }
   uit({ gedaan: resultaat, nog_open: shortsOpen().length })
 }
@@ -296,7 +337,9 @@ async function short(id) {
   fs.writeFileSync(klaarPad, JSON.stringify({ id: r.post.id, link, datum, titel: item.titel }, null, 1))
   if (volledig) fs.unlinkSync(mp4) // de Mac heeft weinig ruimte; opnieuw downloaden kan altijd
   schrijfOverzicht()
-  uit({ concept: r.post.id, titel: item.titel, link, datum, video_compleet_in_metricool: volledig })
+  // Het concept staat al in Metricool: een kalenderfout mag dat niet afbreken, `kalender` haalt het later in.
+  const inKalender = await naarKalender(supabase(), id).catch(e => `fout: ${e.message}`)
+  uit({ concept: r.post.id, titel: item.titel, link, datum, video_compleet_in_metricool: volledig, kalender: inKalender })
 }
 
 async function concept(b) {
@@ -332,6 +375,6 @@ async function concept(b) {
 }
 
 const cmd = args.shift()
-const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()), reeks, overzicht: async () => console.log(schrijfOverzicht()) }[cmd]
-if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00 | reeks | overzicht')
+const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()), reeks, kalender, overzicht: async () => console.log(schrijfOverzicht()) }[cmd]
+if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00 | reeks | kalender | overzicht')
 klus().catch(e => stop(String(e.stderr || e.message || e).slice(0, 800)))
