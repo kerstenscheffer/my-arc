@@ -59,6 +59,7 @@ import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 import { maakStilteKlok } from './gino-waakhond.mjs'
+import { maakKaartMelder } from './gino-kaart-melding.mjs'
 import { FAMILIE_NAAM, familieVan, leesTool, veiligeBash, veiligZelftest, vrijeBash } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
@@ -251,6 +252,7 @@ if (!veiligAan) console.error('gino-veilig zelftest faalt, alles krijgt weer een
 // Per Claude-proces een eigen sleutel → welke opdracht en welke klok erbij horen.
 const vraagProcessen = new Map()
 const openVragen = new Map() // rij-id → sluit(status)
+const kaartMelder = maakKaartMelder({ sb, coachId: () => gebruiker.id, fout: (t) => console.error(tijd(), t) })
 
 function nieuweVraagContext(opdrachtId = null, vraagMs = VRAAG_MS) {
   const ctx = { sleutel: crypto.randomBytes(24).toString('hex'), opdrachtId, klok: null, wacht: 0, vraagMs }
@@ -398,15 +400,12 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
     }
   }
 
-  // 3. Kaart in de chat + push naar alleen Kersten (bestaande coach-push: trigger op
-  // coach_notifications, ontvanger = coach_id; rij zonder client_id, type personal).
+  // 3. Kaart direct in de chat. Push pas als hij na 60 s nog open staat, max. 1 per 15 min
+  // (gino-kaart-melding.mjs; coach-push: trigger op coach_notifications, rij zonder client_id).
   const { data: rij, error } = await sb.from('business_os_toestemmingen').insert({ ...basis, patroon, status: 'wacht' }).select('id').single()
   if (error) return weigerTool(`Geweigerd: toestemming vragen lukte niet (${error.message}). Zet bij NODIG wat er nodig is.`)
   console.log(`${tijd()} ✋ toestemming gevraagd: ${basis.reden}`)
-  sb.from('coach_notifications').insert({
-    coach_id: gebruiker.id, type: 'personal', priority: 'high', title: 'Gino vraagt toestemming',
-    message: `${basis.reden}`.slice(0, 140), tags: ['gino'], action_data: { soort: 'gino_toestemming', toestemming_id: rij.id },
-  }).then(({ error: e }) => { if (e) console.error(tijd(), 'Push mislukt:', e.message) }, () => {})
+  kaartMelder.kaart(rij.id, basis.reden)
   sb.from('business_os_opdrachten').update({ voortgang: 'Wacht op je toestemming' }).eq('id', ctx.opdrachtId).eq('status', 'bezig').then(() => {}, () => {})
 
   const status = await wachtOpBesluit(ctx, rij.id, opGesloten)

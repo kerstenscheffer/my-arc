@@ -352,7 +352,34 @@ function MetLinks({ tekst }) {
   })
 }
 
-function Inkort({ tekst, achter }) {
+// Een antwoord per alinea, met achter de eerste regel een knopje dat alleen dat stuk voorleest.
+const MIN_VOORLEES = 25
+function Alineas({ tekst, sleutel, praatBron, onLees }) {
+  const blokken = String(tekst || '').split(/\n\s*\n/).filter(b => b.trim())
+  // Eén alinea: daar is de gewone herhaalknop al voor.
+  if (blokken.length < 2) return <MetLinks tekst={tekst} />
+  return blokken.map((blok, n) => {
+    const [eerste, ...rest] = blok.split('\n')
+    const bron = `alinea-${sleutel}-${n}`
+    const praat = praatBron === bron
+    return (
+      <div key={n} style={{ marginTop: n ? '1em' : 0 }}>
+        <MetLinks tekst={eerste} />
+        {blok.trim().length >= MIN_VOORLEES && (
+          <button type="button" onClick={() => onLees(blok, bron)} title={praat ? 'Stop' : 'Lees dit stuk voor'} aria-label={praat ? 'Stop' : 'Lees dit stuk voor'} style={{
+            background: 'none', border: 'none', padding: '0 4px', marginLeft: 2, cursor: 'pointer',
+            display: 'inline-flex', verticalAlign: '-2px', color: praat ? colors.success : colors.textSecondary,
+          }}>
+            <Volume2 size={13} className={praat ? 'bos-stip' : undefined} />
+          </button>
+        )}
+        {rest.length > 0 && <>{'\n'}<MetLinks tekst={rest.join('\n')} /></>}
+      </div>
+    )
+  })
+}
+
+function Inkort({ tekst, achter, alineas = null }) {
   const ref = useRef(null)
   const [lang, setLang] = useState(false)
   const [open, setOpen] = useState(false)
@@ -366,7 +393,7 @@ function Inkort({ tekst, achter }) {
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
       }}>
-        <MetLinks tekst={tekst} />
+        {alineas ? <Alineas tekst={tekst} {...alineas} /> : <MetLinks tekst={tekst} />}
         {achter && (open || !lang) && achter}
       </div>
       {(lang || open) && (
@@ -1945,6 +1972,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stopHerkenner()
     stem.herhaal(tekst, vraag)
   }
+  // Eén alinea voorlezen. Nog een klik op dezelfde = stoppen.
+  const leesAlinea = (blok, bron) => {
+    if (spreekt && spreekBron === bron) { stem.stop(); return }
+    stopHerkenner()
+    stem.leesVoor(blok, bron)
+  }
   const herhaalKnop = (tekst, vraag = null) => <Herhaal praat={spreekt} onKlik={() => herhaal(tekst, vraag)} />
 
   // tekst (optioneel): vraag van buitenaf (Mijn schermen); invoer en bijlagen blijven dan staan.
@@ -2236,7 +2269,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                       </div>
                     )
                   })}
-                  <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null} />
+                  <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null}
+                    alineas={stem.beschikbaar() ? { sleutel: `${actief.id}-${i}`, praatBron: spreekt ? spreekBron : null, onLees: leesAlinea } : null} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Kopieer tekst={b.content} />
