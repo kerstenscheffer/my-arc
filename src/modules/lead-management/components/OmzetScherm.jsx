@@ -22,6 +22,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, X, Target, List, Check } from 'lucide-react'
 import ChallengePaneel from './ChallengePaneel'
+import ChallengeStand from '../../business-os/ChallengeStand'
 
 const BRONNEN = [
   { id: 'coaching', label: 'Coaching', kleur: '#22d3ee' },
@@ -90,11 +91,12 @@ export default function OmzetScherm({
     for (const m of maanden) {
       const k = periodeVan(m.key, modus)
       let p = per.get(k)
-      if (!p) { p = { key: k, maanden: [], amount: 0, binnen: 0, pendingAmount: 0, perBron: {}, isPast: true, isCurrent: false }; per.set(k, p) }
+      if (!p) { p = { key: k, maanden: [], amount: 0, binnen: 0, pendingAmount: 0, challengeAmount: 0, perBron: {}, isPast: true, isCurrent: false }; per.set(k, p) }
       p.maanden.push(m.key)
       p.amount += m.amount || 0
       if (m.isPast || m.isCurrent) p.binnen += m.amount || 0
       p.pendingAmount += m.pendingAmount || 0
+      p.challengeAmount += m.challengeAmount || 0
       for (const [b, v] of Object.entries(m.perBron || {})) p.perBron[b] = (p.perBron[b] || 0) + v
       if (m.isCurrent) p.isCurrent = true
       if (!m.isPast) p.isPast = false
@@ -234,7 +236,9 @@ export default function OmzetScherm({
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 900, color: '#fff' }}>{b.label}</span>
                   <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
-                    {b.id === 'challenge' ? 'deelnemers bekijken' : `${aantal(b.id)} betaling${aantal(b.id) === 1 ? '' : 'en'}`}
+                    {b.id === 'challenge'
+                      ? (b.bedrag > 0 ? `${eur(Math.max(0, b.bedrag - (maand.challengeAmount || 0)))} vast · ${eur(Math.min(b.bedrag, maand.challengeAmount || 0))} kan nog terug` : 'deelnemers bekijken')
+                      : `${aantal(b.id)} betaling${aantal(b.id) === 1 ? '' : 'en'}`}
                   </span>
                 </span>
                 <span style={{ fontSize: '1.1rem', fontWeight: 900, color: b.bedrag > 0 ? '#fff' : 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
@@ -251,7 +255,7 @@ export default function OmzetScherm({
       <div style={kaart}>
         <div style={{ ...kop, marginBottom: 2 }}>{isOwner ? `Verdeling jij en ${partnerName}` : 'Jouw aandeel'}</div>
         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-          {modus === 'maand' ? `Uitbetaalperiode ${periodeTekst(gekozen)}` : `${maand.maanden.length} uitbetaalperiodes (26e t/m 25e)`} · telt voor verdeling {eur(ontvangen)}{verdeling?.uitEerder > 0.5 ? `, waarvan ${eur(verdeling.uitEerder)} eerder ontvangen` : ''}
+          {modus === 'maand' ? `Uitbetaalperiode ${periodeTekst(gekozen)}` : `${maand.maanden.length} uitbetaalperiodes (26e t/m 25e)`} · telt voor verdeling {eur(ontvangen)}{verdeling?.uitEerder > 0.5 ? `, waarvan ${eur(verdeling.uitEerder)} eerder ontvangen` : ''}{(verdeling?.naarLater || []).length ? ` · ${eur(verdeling.naarLater.reduce((t, x) => t + (Number(x.bedrag) || 0), 0))} van deze periode telt later mee` : ''}
         </div>
         {!verdeling ? (
           <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Nog niets te verdelen in deze periode.</div>
@@ -356,6 +360,9 @@ export default function OmzetScherm({
         )}
       </div>
 
+      {/* ── Challenge in totaal: dezelfde cijfers als in Business OS ── */}
+      <div style={kaart}><ChallengeStand isMobile={isMobile} /></div>
+
       {/* ── 4. Per maand ── */}
       <div style={kaart}>
         <div style={kop}>Per {modus}</div>
@@ -369,9 +376,12 @@ export default function OmzetScherm({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 10 }}>
           {BRONNEN.map(b => (
             <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: b.kleur }} />{b.label}
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: b.kleur }} />{b.id === 'challenge' ? 'Challenge, vast' : b.label}
             </span>
           ))}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: `${BRON.challenge.kleur}66` }} />Challenge, kan nog terug
+          </span>
         </div>
       </div>
 
@@ -562,7 +572,11 @@ function MaandGrafiek({ maanden, gekozen, onKies, doel, isMobile, label, naam })
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: isMobile ? 3 : 6, height: H }}>
         {maanden.map(m => {
           const aan = m.key === gekozen
-          const delen = BRONNEN.map(b => ({ kleur: b.kleur, waarde: m.perBron?.[b.id] || 0 })).filter(d => d.waarde > 0)
+          // Challenge in twee tinten: vol is van ons, licht kan nog terug.
+          const kanTerug = Math.min(m.perBron?.challenge || 0, m.challengeAmount || 0)
+          const delen = BRONNEN.flatMap(b => (b.id === 'challenge'
+            ? [{ kleur: b.kleur, waarde: (m.perBron?.challenge || 0) - kanTerug }, { kleur: `${b.kleur}66`, waarde: kanTerug }]
+            : [{ kleur: b.kleur, waarde: m.perBron?.[b.id] || 0 }])).filter(d => d.waarde > 0)
           const hoogte = ((m.amount || 0) / max) * H
           const pending = ((m.pendingAmount || 0) / max) * H
           return (

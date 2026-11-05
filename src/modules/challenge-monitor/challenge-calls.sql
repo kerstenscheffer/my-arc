@@ -8,7 +8,8 @@
 -- get_challenge_stand zelf blijft ongewijzigd, dus klanten zien hierdoor niets anders.
 --
 -- Namen: volledige naam, voornaam + eerste letter, of alleen de voornaam als er precies één
--- lopende klant zo heet. Security invoker: de RLS op beide tabellen blijft gelden.
+-- lopende klant zo heet. Security definer met coach-check: Marcel mag call_insights niet lezen,
+-- maar moet wel dezelfde telling zien. Er komen alleen aantallen en datums terug, geen inhoud.
 
 create or replace function public.challenge_naam_plat(t text)
 returns text language sql immutable as $$
@@ -19,11 +20,11 @@ $$;
 
 create or replace function public.get_challenge_calls(p_client_id uuid, p_start date, p_eind date)
 returns jsonb
-language sql stable security invoker set search_path = public as $$
+language sql stable security definer set search_path = public as $$
   with k as (
     select challenge_naam_plat(first_name) as voornaam, challenge_naam_plat(last_name) as achternaam,
            split_part(challenge_naam_plat(first_name), ' ', 1) as woord
-    from clients where id = p_client_id
+    from clients where id = p_client_id and rls_is_coach()
   ), u as (
     select k.*, trim(voornaam || ' ' || achternaam) as volledig,
       (select count(distinct challenge_naam_plat(c.first_name) || ' ' || challenge_naam_plat(c.last_name)) from clients c
