@@ -2601,7 +2601,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                             {klein.aan ? <Maximize2 size={15} /> : <Minimize2 size={15} />} <span style={{ flex: 1 }}>{klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}</span>
                           </button>
                         )}
-                        {klein && (
+                        {/* In het kleine blokje zit hiervoor een pijltje op de linkerrand. */}
+                        {klein && !klein.aan && (
                           <button onClick={() => { setMenu(false); klein.inklappen() }} style={menuRegel}>
                             <PanelRightClose size={15} /> <span style={{ flex: 1 }}>Inklappen naar zijkant</span>
                           </button>

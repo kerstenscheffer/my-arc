@@ -21,7 +21,7 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, CalendarDays } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays, ChevronLeft } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -1005,6 +1005,13 @@ export default function BusinessOS({ isMobile }) {
       try { localStorage.setItem('bos_mini', '1') } catch { /* privémodus */ }
     }
   }
+  // Het pijltje wijst naar links, dus daar komt de bol ook terecht.
+  const naarLinks = () => {
+    const p = binnenBeeld({ x: 0, y: miniPos?.y ?? 80 })
+    setMiniPos(p)
+    try { localStorage.setItem('bos_mini_pos', JSON.stringify(p)) } catch { /* privémodus */ }
+    zetZijkant(true)
+  }
   const wisselMini = () => {
     setMini((o) => {
       try { localStorage.setItem('bos_mini', o ? '0' : '1') } catch { /* privémodus */ }
@@ -1343,7 +1350,7 @@ export default function BusinessOS({ isMobile }) {
         } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
           <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
             <Reactor zonderNaam={isMini} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
-            {!isZij && <GinoHerinnering maat={isMini ? 64 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} />}
+            {!isZij && <GinoHerinnering maat={isMini ? 64 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini} onder={(miniPos?.y ?? 999) < 240} />}
           </div>
 
           {/* ── Chat: de ring praat ── */}
@@ -1384,6 +1391,16 @@ export default function BusinessOS({ isMobile }) {
               : null,
           }} />
           </div>
+          {/* Op de rand, zodat hij geen ruimte in het blokje kost. */}
+          {isMini && !isZij && (
+            <button type="button" onClick={naarLinks} aria-label="Inklappen naar links" title="Inklappen naar links" style={{
+              position: 'absolute', left: -11, top: '50%', transform: 'translateY(-50%)', zIndex: 7, width: 22, height: 22, padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '50%', color: '#fff', cursor: 'pointer',
+            }}>
+              <ChevronLeft size={14} strokeWidth={3} />
+            </button>
+          )}
         </div>
       </div>
 

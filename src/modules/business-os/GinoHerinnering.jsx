@@ -25,7 +25,9 @@ function morgen9() {
   return new Date(utc - (nl - utc)).toISOString()
 }
 
-export default function GinoHerinnering({ maat = 240, onPraat, isMobile = false }) {
+// kaart: in het kleine blokje is er geen ruimte voor tekst naast de bol. Dan een eigen kaartje
+// erboven, of eronder (onder) als het blokje bovenin het scherm staat.
+export default function GinoHerinnering({ maat = 240, onPraat, isMobile = false, kaart = false, onder = false }) {
   const [open, setOpen] = useState([])
   const [getypt, setGetypt] = useState(0)
   const gemeld = useRef(new Set())
@@ -101,6 +103,31 @@ export default function GinoHerinnering({ maat = 240, onPraat, isMobile = false 
   const rand = Math.round(maat * 0.04)   // bovenrand van de bol (buitenste streepjes)
   const lijn = maat >= 200 ? 46 : 32
   const klaarGetypt = getypt >= tekst.length
+  if (kaart) {
+    return (
+      <div key={huidig.id} role="alertdialog" aria-label="Herinnering van Gino" onClick={vraagMeldingen} style={{
+        position: 'absolute', left: 0, zIndex: 8, width: 380, maxWidth: 'calc(100vw - 32px)', padding: '10px 14px', boxSizing: 'border-box',
+        ...(onder ? { top: maat + 14 } : { bottom: maat + 14 }),
+        background: '#0a0a0a', border: `1px solid ${G}88`, borderRadius: 14, boxShadow: '0 14px 40px rgba(0,0,0,.7)', cursor: 'auto', userSelect: 'text',
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: G, marginBottom: 4 }}>
+          Gino · {nlTijd(huidig.moment)}{open.length > 1 ? ` · ${open.length} open` : ''}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.4, wordBreak: 'break-word' }}>{tekst}</div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+          <button type="button" className="gino-hk" onClick={gedaan} style={{ ...knop, color: G, opacity: 1 }}>
+            <Check size={13} /> Gedaan
+          </button>
+          <button type="button" className="gino-hk" onClick={() => later(3600e3)} style={knop}>
+            <Clock size={12} /> 1 uur
+          </button>
+          <button type="button" className="gino-hk" onClick={() => later(null)} style={knop}>
+            Morgen
+          </button>
+        </div>
+      </div>
+    )
+  }
   return (
     <div key={huidig.id} style={{ position: 'absolute', left: 0, top: 0, width: maat, height: maat, pointerEvents: 'none', zIndex: 5 }}>
       <style>{`
