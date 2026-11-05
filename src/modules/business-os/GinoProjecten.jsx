@@ -5,7 +5,9 @@
 // Mac (eigen data + web) en schrijft een plan: fases met stappen per dag en
 // KPI's met nulmeting (business_os_projecten). Hier:
 //   lijst  → kaarten met voortgangsring en volgende stap
-//   detail → KPI's, fases als tijdlijn met afvinkbare stappen, onderzoek lezen
+//   detail → KPI's, fases als rijen onder elkaar met afvinkbare stappen en, bij
+//     een fase.test, live cijfers + oordeel (testMeting.js); teksten achter een
+//     klik op de rij; onderzoek lezen
 //   "Presenteer" → Gino loopt het plan door met zijn stem (stem.leesVoor):
 //     per deel licht dat stuk op, de rest dimt, ondertitel onderin, en
 //     vanzelf door naar het volgende deel als hij uitgepraat is.
@@ -13,15 +15,16 @@
 //     (planned), de rest als productivity_tasks; status uitvoering.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause } from 'lucide-react'
 import * as stem from './stem'
+import { meetTest, vandaagIso } from './testMeting'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
 const STATUS = { onderzoek: 'Gino onderzoekt', plan: 'Plan klaar', uitvoering: 'Loopt', klaar: 'Klaar', gestopt: 'Gestopt' }
 const SOORT_ICOON = { content: Film, taak: CheckCircle2, call: Phone, leren: BookOpen }
-const vandaagIso = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+const TEST_TEKSTEN = [['waarom', 'Waarom'], ['hoe', 'Hoe'], ['hoeveel', 'Hoeveel'], ['verwachting', 'Verwachting'], ['meetdatum', 'Meetdatum']]
 const kortDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : '')
 const stappenVan = (p) => (p?.plan?.fases || []).flatMap(f => f.stappen || [])
 const spreekDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' }) : '')
@@ -39,7 +42,7 @@ function maakDia(p) {
     const st = f.stappen || []
     dia.push({
       focus: `fase-${i}`, stappen: st.slice(0, 2).map(x => x.id),
-      tekst: `Fase ${i + 1}: ${String(f.naam || '').replace(/^\d+\.\s*/, '')}, van ${spreekDag(f.van)} tot ${spreekDag(f.tot)}. ${f.doel ? `${f.doel}. ` : ''}${st[0] ? `Eerst: ${st[0].titel}.` : ''}${st[1] ? ` Daarna: ${st[1].titel}.` : ''}`,
+      tekst: `Fase ${i + 1}: ${String(f.naam || '').replace(/^\d+\.\s*/, '')}${f.van && f.tot ? `, van ${spreekDag(f.van)} tot ${spreekDag(f.tot)}` : ''}. ${f.doel ? `${f.doel}. ` : ''}${st[0] ? `Eerst: ${st[0].titel}.` : ''}${st[1] ? ` Daarna: ${st[1].titel}.` : ''}`,
     })
   })
   dia.push({ focus: 'acties', tekst: p.status === 'plan'
@@ -75,6 +78,153 @@ function Onderzoek({ tekst }) {
         return <div key={i}>{delen.map((d, j) => (j % 2 ? <b key={j} style={{ color: '#fff' }}>{d}</b> : d))}</div>
       })}
     </div>
+  )
+}
+
+const komma = (n, dec = 0) => Number(n).toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+
+function Cijfer({ waarde, label }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>{waarde}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{label}</div>
+    </div>
+  )
+}
+
+function OordeelPil({ tekst, uitslag }) {
+  const kleur = uitslag === 'Werkt' ? G : uitslag === 'Matig' ? '#f59e0b' : uitslag === 'Zwak' ? colors.danger : 'rgba(255,255,255,0.45)'
+  return (
+    <span style={{
+      flexShrink: 0, padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap',
+      border: `1.5px solid ${kleur}`, background: uitslag === 'Werkt' ? G : 'transparent', color: uitslag === 'Werkt' ? '#000' : '#fff',
+    }}>{tekst}</span>
+  )
+}
+
+// Eigen stand per rij: een fout of traag antwoord raakt de andere rijen niet.
+function useTestMeting(test, doel) {
+  const sleutel = JSON.stringify(test ?? null)
+  const [stand, setStand] = useState(null)
+  useEffect(() => {
+    const t = JSON.parse(sleutel)
+    if (!t) return
+    let weg = false
+    meetTest(supabase, t, doel).then(
+      uit => { if (!weg) setStand({ klaar: true, uit }) },
+      () => { if (!weg) setStand({ klaar: true, uit: null, fout: true }) },
+    )
+    return () => { weg = true }
+  }, [sleutel, doel])
+  return stand
+}
+
+function TestCijfers({ m, isMobile }) {
+  const fout = 'fout'
+  const mannen = m.geslachtFout || m.leads == null ? fout : m.mannen == null ? 'niet bekend' : komma(m.mannen)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(110px, max-content))', columnGap: 24, rowGap: 12, marginTop: 12 }}>
+      {!m.metIds && m.per10 != null && <Cijfer waarde={komma(m.per10, 1)} label="mannen per 10 posts" />}
+      {!m.metIds && m.nulmeting != null && <Cijfer waarde={komma(m.nulmeting, 1)} label="nulmeting" />}
+      {m.metIds && m.comments1000 != null && <Cijfer waarde={komma(m.comments1000, 1)} label="comments per 1.000 views" />}
+      <Cijfer waarde={m.posts == null ? fout : komma(m.posts)} label={m.postsOud == null ? 'posts' : `posts, ${komma(m.postsOud)} ≥ 7 dagen`} />
+      <Cijfer waarde={m.leads == null ? fout : komma(m.leads)} label={m.metIds ? 'leads heel woord' : 'leads'} />
+      <Cijfer waarde={mannen} label={m.metIds ? 'mannen heel woord' : 'mannen geschat'} />
+      {m.nodig != null && <Cijfer waarde={komma(Math.ceil(m.nodig))} label="posts per week nodig" />}
+    </div>
+  )
+}
+
+function FaseRij({ f, fi, doel, vandaag, isMobile, huidig, zetStap, spotStijl, vakRef }) {
+  const [open, setOpen] = useState(false)
+  const test = f.test && typeof f.test === 'object' ? f.test : null
+  const stand = useTestMeting(test, doel)
+  const m = test ? stand?.uit || null : null
+  const nu = f.van && f.tot && vandaag >= f.van && vandaag <= f.tot
+  const datum = f.van && f.tot ? (f.van === f.tot ? kortDag(f.van) : `${kortDag(f.van)} – ${kortDag(f.tot)}`) : kortDag(f.van || f.tot)
+  const woorden = Array.isArray(test?.woorden) ? test.woorden.join(', ') : ''
+  const sub = [woorden, test?.van && `vanaf ${kortDag(test.van)}`, test?.tot && `tot ${kortDag(test.tot)}`, datum].filter(Boolean).join(' · ')
+  const oordeel = !test ? null
+    : !stand ? 'Meten…'
+      : stand.fout ? 'Meting mislukt'
+        : !m ? 'Nog geen data'
+          : m.uitslag ? `Besluit · ${m.uitslag}` : m.niveau
+  const kanOpen = !!(test || f.doel)
+  const stappen = f.stappen || []
+  return (
+    // Spotlight op de buitenste laag, de intro-animatie binnenin
+    // (een animatie met fill 'both' zou de gedimde opacity overschrijven).
+    <div ref={vakRef} style={{ minWidth: 0, borderTop: fi ? `1px solid ${colors.borderSubtle}` : 'none', ...spotStijl }}>
+      <div style={{ animation: `gp-in .4s ease-out ${fi * 90}ms both`, padding: '16px 0', paddingLeft: nu ? 12 : 0, borderLeft: nu ? `3px solid ${G}` : 'none' }}>
+        <button type="button" disabled={!kanOpen} aria-expanded={kanOpen ? open : undefined} onClick={() => setOpen(o => !o)} style={{
+          display: 'block', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', color: '#fff',
+          fontFamily: 'inherit', cursor: kanOpen ? 'pointer' : 'default',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.25 }}>{f.naam}</div>
+              {sub && <div style={{ fontSize: 12, fontWeight: 700, color: nu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>{sub}</div>}
+            </div>
+            {oordeel && <OordeelPil tekst={oordeel} uitslag={m?.uitslag} />}
+            {kanOpen && <ChevronDown size={18} strokeWidth={2.6} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
+          </div>
+          {m && <TestCijfers m={m} isMobile={isMobile} />}
+        </button>
+
+        {open && kanOpen && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '120px minmax(0, 720px)', columnGap: 16, rowGap: isMobile ? 4 : 8, marginTop: 12, fontSize: 14, lineHeight: 1.45, animation: 'gp-in .2s ease-out both' }}>
+            {f.doel && <Tekstregel label="Doel" tekst={f.doel} isMobile={isMobile} />}
+            {test && TEST_TEKSTEN.map(([veld, label]) => <Tekstregel key={veld} label={label} tekst={veld === 'meetdatum' && /^\d{4}-\d{2}-\d{2}$/.test(String(test[veld] || '')) ? kortDag(test[veld]) : test[veld]} isMobile={isMobile} />)}
+            {test && <Tekstregel label="Oordeel" tekst="Onder 20 posts test, 20 tot 49 indicatie. Besluit vanaf 50 posts van minstens 7 dagen oud, over minimaal 14 dagen." isMobile={isMobile} />}
+            {m?.metIds && <Tekstregel label="Let op" tekst="Leads zijn per woord bekend, niet per post." isMobile={isMobile} />}
+          </div>
+        )}
+
+        {stappen.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(240px, 1fr))', columnGap: 16, marginTop: 8 }}>
+            {stappen.map(s => {
+              const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
+              const isNu = s.dag === vandaag
+              const achter = !s.klaar && s.dag && s.dag < vandaag
+              const meta = [isNu ? 'vandaag' : kortDag(s.dag), s.gepland_id ? 'ingepland' : ''].filter(Boolean).join(' · ')
+              return (
+                <button key={s.id} type="button" className="gp-stap" onClick={() => zetStap(s.id, !s.klaar)} aria-pressed={!!s.klaar}
+                  title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
+                  style={{
+                    display: 'flex', gap: 8, alignItems: 'center', minHeight: 44, padding: '4px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    textAlign: 'left', fontFamily: 'inherit', color: '#fff', minWidth: 0,
+                    background: huidig?.stappen?.includes(s.id) ? `${G}22` : isNu ? `${G}14` : 'transparent', transition: 'background .4s',
+                  }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                    border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.45)'}`, background: s.klaar ? G : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
+                  }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none', lineHeight: 1.3 }}>{s.titel}</span>
+                    {meta && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                        <Icoon size={12} strokeWidth={2.6} /> {meta}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Tekstregel({ label, tekst, isMobile }) {
+  const waarde = typeof tekst === 'number' ? String(tekst) : typeof tekst === 'string' ? tekst.trim() : ''
+  return (
+    <>
+      <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.7)', paddingTop: isMobile ? 4 : 2 }}>{label}</div>
+      <div style={{ fontWeight: 700, color: waarde ? '#fff' : 'rgba(255,255,255,0.5)', whiteSpace: 'pre-wrap' }}>{waarde || 'open'}</div>
+    </>
   )
 }
 
@@ -300,54 +450,12 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
               })}
             </div>
           )}
-          {/* Fases als tijdlijn */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `repeat(${Math.max(1, fases.length)}, minmax(0, 1fr))`, gap: 14, position: 'relative' }}>
-            {!isMobile && <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 9, height: 1, background: `linear-gradient(90deg, ${G}00, ${G}77, ${G}00)` }} />}
-            {fases.map((f, fi) => {
-              const nu = f.van && f.tot && vandaag >= f.van && vandaag <= f.tot
-              const fk = (f.stappen || []).filter(s => s.klaar).length
-              return (
-                // Spotlight op de buitenste laag, de intro-animatie binnenin
-                // (een animatie met fill 'both' zou de gedimde opacity overschrijven).
-                <div key={fi} ref={zet(`fase-${fi}`)} style={{ minWidth: 0, ...spot(`fase-${fi}`) }}>
-                <div style={{ animation: `gp-in .4s ease-out ${fi * 90}ms both` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, position: 'relative' }}>
-                    <span style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${G}`, background: nu ? G : '#000', boxShadow: nu ? `0 0 12px ${G}` : 'none', flexShrink: 0 }} />
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: nu ? G : 'rgba(255,255,255,0.5)' }}>{kortDag(f.van)} – {kortDag(f.tot)}</span>
-                  </div>
-                  <div style={{
-                    borderRadius: 14, padding: 12, border: `1px solid ${nu ? G : `${G}26`}`, background: nu ? `${G}0c` : 'rgba(255,255,255,0.015)',
-                    boxShadow: nu ? `0 0 24px ${G}22` : 'none',
-                  }}>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{f.naam}</div>
-                    {f.doel && <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '2px 0 8px' }}>{f.doel}</div>}
-                    <div style={{ fontSize: 11, fontWeight: 800, color: G, marginBottom: 6 }}>{fk}/{(f.stappen || []).length} klaar</div>
-                    {(f.stappen || []).map(s => {
-                      const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
-                      const isNu = s.dag === vandaag
-                      const achter = !s.klaar && s.dag && s.dag < vandaag
-                      return (
-                        <div key={s.id} className="gp-stap" title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
-                          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 4px', borderRadius: 8, background: huidig?.stappen?.includes(s.id) ? `${G}22` : isNu ? `${G}14` : 'transparent', transition: 'background .4s' }}>
-                          <button type="button" onClick={() => zetStap(s.id, !s.klaar)} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
-                            width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1, cursor: 'pointer', padding: 0,
-                            border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.35)'}`, background: s.klaar ? G : 'transparent',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
-                          }}>{s.klaar && <Check size={12} strokeWidth={3.5} />}</button>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 800, color: s.klaar ? 'rgba(255,255,255,0.45)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none', lineHeight: 1.3 }}>{s.titel}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 800, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                              <Icoon size={11} strokeWidth={2.6} /> {isNu ? 'vandaag' : kortDag(s.dag)}{s.gepland_id ? ' · ingepland' : ''}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                </div>
-              )
-            })}
+          {/* Fases als rijen onder elkaar */}
+          <div>
+            {fases.map((f, fi) => (
+              <FaseRij key={fi} f={f} fi={fi} doel={p.kpis?.[0]?.doel} vandaag={vandaag} isMobile={isMobile} huidig={huidig}
+                zetStap={zetStap} spotStijl={spot(`fase-${fi}`)} vakRef={zet(`fase-${fi}`)} />
+            ))}
           </div>
         </div>
       )}

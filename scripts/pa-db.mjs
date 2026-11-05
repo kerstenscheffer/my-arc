@@ -21,7 +21,10 @@
 //   node scripts/pa-db.mjs experiment-bij '{"id","status"?,"uitkomst"?,"eind_dag"?}'  bijwerken/afsluiten
 //   node scripts/pa-db.mjs experimenten              lopende + laatste 10 afgeronde
 //   node scripts/pa-db.mjs project-nieuw '{"titel","doel"}'   project + onderzoeksronde op de Mac
-//   node scripts/pa-db.mjs project-bij '{"id","status"?,"onderzoek"?,"plan"?,"kpis"?}'
+//   node scripts/pa-db.mjs project-bij '{"id","status"?,"onderzoek"?,"plan"?,"kpis"?,"doel"? (max 1000 tekens)}'
+//     plan.fases[].test (optioneel, maakt van de rij een test met live cijfers):
+//       { woorden: ["LIDL"], van: "YYYY-MM-DD", tot?: "YYYY-MM-DD", ig_ids?: ["…"], nulmeting_per_10?: getal,
+//         waarom?, hoe?, hoeveel?, verwachting?, meetdatum? }  lege tekstvelden tonen als open
 //   node scripts/pa-db.mjs projecten                 alle projecten (kort)
 //   node scripts/pa-db.mjs project "<id>"            één project volledig
 //   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'
@@ -245,6 +248,7 @@ if (cmd === 'lees') {
     velden.plan = pr.plan
   }
   if (Array.isArray(pr.kpis)) velden.kpis = pr.kpis
+  if (typeof pr.doel === 'string' && pr.doel.trim()) velden.doel = pr.doel.trim().slice(0, 1000)
   const { data, error } = await sb.from('business_os_projecten').update(velden).eq('id', pr.id).select('id')
   uit(error ? { fout: error.message } : { ok: !!data?.length })
 } else if (cmd === 'projecten') {
