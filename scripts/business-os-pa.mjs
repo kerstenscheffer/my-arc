@@ -59,7 +59,7 @@ import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 import { maakStilteKlok } from './gino-waakhond.mjs'
-import { FAMILIE_NAAM, familieVan, veiligeBash, veiligZelftest } from './gino-veilig.mjs'
+import { FAMILIE_NAAM, familieVan, leesTool, veiligeBash, veiligZelftest, vrijeFamilie } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -364,6 +364,11 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
   const cmd = tool === 'Bash' ? String(invoer?.command || '') : ''
   if (veiligAan && cmd && veiligeBash(cmd)) {
     console.log(`${tijd()} ✓ zonder vraag: ${maskeer(cmd).split('\n')[0].slice(0, 140)}`)
+    return toegestaan
+  }
+  // 5 nov 2026: lees-tools van vaste koppelingen en scripts/downloads die niets versturen.
+  if (veiligAan && (leesTool(tool) || (cmd && vrijeFamilie(cmd)))) {
+    console.log(`${tijd()} ✓ zonder vraag: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }
   // Eén keer toegestaan in deze opdracht: dezelfde soort hoeft niet nog eens.

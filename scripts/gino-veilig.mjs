@@ -7,6 +7,9 @@
 //   veiligeBash(cmd)  alleen lezen, of schrijven in ~/Gino of /tmp → geen kaart
 //   familieVan(cmd)   python, node -e, yt-dlp, curl, ffmpeg: één kaart per opdracht
 //
+//   vrijeFamilie(cmd) (5 nov) dezelfde families, maar zonder kaart als ze niets versturen
+//   leesTool(tool)    (5 nov) lees-tools van vaste koppelingen, zonder kaart
+//
 // Twijfel = null = gewoon een kaart. Niet herkend is nooit veilig.
 // Puur: geen database, geen netwerk. Testen: node scripts/gino-toestemming-test.mjs
 // Deze code-opdrachten mogen dit bestand niet aanpassen (deny-regel in de PA).
@@ -17,7 +20,8 @@ const ALTIJD_LEZEN = new Set([
   'ps', 'pgrep', 'mdfind', 'jq', 'pdftotext', 'pdfinfo', 'nl', 'seq', 'sleep', 'cd', 'date', 'sort', 'find', 'sed', 'awk',
 ])
 const GIT_LEZEN = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'check-ignore', 'ls-files', 'blame'])
-const PA_DB_LEZEN = new Set(['lees', 'schema', 'projecten', 'project', 'experimenten', 'herinneringen', 'geheugen', 'tijd'])
+// onthoud: Gino's eigen geheugen, raakt niets van klanten.
+const PA_DB_LEZEN = new Set(['lees', 'schema', 'projecten', 'project', 'experimenten', 'herinneringen', 'geheugen', 'tijd', 'onthoud'])
 const LUS_WOORDEN = new Set(['do', 'done', 'then', 'else', 'elif', 'fi', 'if', 'while', 'until'])
 const THUIS = '(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[\\w.-]+)'
 const VRIJE_MAP = new RegExp(`^["']?(?:/dev/null|/tmp/|/private/tmp/|${THUIS}/Gino/)`)
@@ -94,13 +98,19 @@ function segmentLeest(seg, ctx) {
   const tekst = (x) => { const q = x.match(/^Q(\d+)Q$/); return q ? ctx.hulp[Number(q[1])] : x }
   if (c === 'for') return rest[1] === 'in'
   if (c === 'mkdir' || c === 'touch') return rest.filter(a => !a.startsWith('-')).every(a => VRIJE_MAP.test(tekst(a)) && !tekst(a).includes('..'))
+  // Nakijken en bouwen: schrijft alleen naar dist. eslint --fix wijzigt code, dus dan een kaart.
+  if (c === 'npx') return rest[0] === 'eslint' && !rest.some(a => a.startsWith('--fix') || a.startsWith('--output-file') || a === '-o')
+  if (c === 'npm') return rest.length === 2 && rest[0] === 'run' && (rest[1] === 'build' || rest[1] === 'lint')
   if (!ALTIJD_LEZEN.has(c) && c !== 'git' && c !== 'node') return false
   if (c === 'git') {
     const a = [...rest]
     while (a[0] === '-C') a.splice(0, 2)
     return GIT_LEZEN.has(a[0]) && !a.includes('--output') && !a.some(x => x.startsWith('--output=') || x === '--ext-diff')
   }
-  if (c === 'node') return rest[0] === 'scripts/pa-db.mjs' && PA_DB_LEZEN.has(rest[1])
+  if (c === 'node') {
+    if (rest[0] === '--check') return rest.length === 2
+    return /^(?:\/Users\/[\w.-]+\/workapp\/)?scripts\/pa-db\.mjs$/.test(rest[0] || '') && PA_DB_LEZEN.has(rest[1])
+  }
   if (c === 'find') return !rest.some(a => /^-(exec|execdir|ok|okdir|delete|fprint|fprintf|fls)/.test(a))
   if (c === 'sort') return !rest.some(a => a === '-o' || a.startsWith('--output'))
   if (c === 'date') return !rest.some(a => a === '-s' || a === '--set')
@@ -153,6 +163,48 @@ export function familieVan(cmd) {
   return familie
 }
 
+// Wat een script of download naar buiten kan brengen of buiten de werkmappen kan
+// aanpassen. Staat dit erin, dan blijft het een kaart.
+const VERSTUURT_OF_SCHRIJFT = /\b(urllib|requests|httpx|aiohttp|socket|smtplib|ftplib|http\.client|shutil|fetch|axios|XMLHttpRequest|node:https?|require\(\s*['"]https?['"]|createClient|supabase)\b|\bopen\([^)\n]*,\s*['"][^'"]*[wax+]|\bos\.(rename|replace|mkdir|makedirs)\b|\bfs\.(write|append|rename|copy|mkdir|cp)\w*/
+const YT_DLP_RISICO = /--exec\b|--cookies\b|--cookies-from-browser\b|--config-locations?\b|--plugin-dirs\b|--netrc\b|--username\b|--password\b|--batch-file\b|(?:^|\s)-[au]\s/
+// Met curl mag alleen een vaste pagina opgehaald worden: geen login, geen eigen headers,
+// geen bestand schrijven en geen variabele in het adres (daarmee kan data naar buiten).
+const CURL_ADRES_RISICO = /\$|`/
+const CURL_RISICO = /--(header|cookie|cookie-jar|user|oauth2-bearer|config|output|remote-name|proxy|url-query|json)\b|(?:^|\s)-[a-zA-Z]*[HbcuKoOxJ][a-zA-Z]*\s/
+
+// De familie als die hier zonder kaart mag; anders null en dus de gewone kaart.
+export function vrijeFamilie(cmd) {
+  const familie = familieVan(cmd)
+  if (!familie) return null
+  const s = String(cmd)
+  if (familie === 'python' || familie === 'node') {
+    // Alleen code die hier zichtbaar is: de inhoud van een scriptbestand kunnen we niet nakijken.
+    if (/\bpython3?\s+(?!(?:-I\s+)?(?:-c\b|-(?:\s|$)))/.test(s) || /\bnode\s+(?:\/tmp|\/private\/tmp|~\/Gino)\//.test(s)) return null
+    return VERSTUURT_OF_SCHRIJFT.test(s) ? null : familie
+  }
+  if (familie === 'yt-dlp') return YT_DLP_RISICO.test(s) ? null : familie
+  // Curl: de "-o /dev/null"-check van een statuscode blijft toegestaan.
+  if (familie === 'curl') {
+    if (CURL_ADRES_RISICO.test(s)) return null
+    // Alleen de curl-delen: `| grep -o x` is geen curl-optie.
+    const delen = s.split(/\n|;|&&|\|\||\|/).filter(d => /^\s*curl\b/.test(d))
+    return delen.some(d => CURL_RISICO.test(d.replace(/-o\s+\/dev\/null/g, ''))) ? null : familie
+  }
+  // Zonder -y overschrijft ffmpeg niets dat er al staat.
+  if (familie === 'ffmpeg') return /(?:^|\s)-y(?:\s|$)/.test(s) ? null : familie
+  return null
+}
+
+// Alleen lezen, en alleen koppelingen die Kersten dagelijks gebruikt. Gmail en Zoom
+// staan hier bewust niet in: die bevatten klantinhoud, en execute_sql kan schrijven.
+const LEES_KOPPELING = /^mcp__claude_ai_(Metricool_Social_Media_Management|Google_Drive|Google_Calendar|Calendly|Supabase)__(?:[\w-]*-)?(get|list|search|read|suggest)(?=[_A-Z-]|$)/
+const NOOIT_LEESTOOL = /key|secret|token|download/i
+export function leesTool(tool) {
+  const naam = String(tool || '')
+  if (naam === 'WebSearch' || naam === 'WebFetch') return true
+  return LEES_KOPPELING.test(naam) && !NOOIT_LEESTOOL.test(naam)
+}
+
 export const FAMILIE_NAAM = {
   python: 'Python-scripts', node: 'losse Node-scripts', 'yt-dlp': 'YouTube ophalen', curl: 'webpagina’s ophalen', ffmpeg: 'video bewerken',
 }
@@ -186,8 +238,49 @@ const GEEN_FAMILIE = [
   `python3 -c "import subprocess"`, 'python3 x.py; curl http://x', 'rm x; python3 y.py', 'npm run release', 'node scripts/x.mjs', 'python3 x.py > src/a.py',
 ]
 
+const MOET_VRIJ = [
+  'npx eslint scripts/a.mjs && echo eslint-ok; node --check scripts/a.mjs && echo syntax-ok; TZ=Europe/Amsterdam date',
+  'npm run build', 'npm run lint',
+  `node /Users/k/workapp/scripts/pa-db.mjs onthoud '{"soort":"correctie","tekst":"klein beginnen"}'`,
+]
+const VRIJE_FAMILIE = [
+  ["cd ~/Gino; python3 -I - <<'E'\nimport json\nprint(1)\nE", 'python'],
+  ['node -e "console.log(1)"', 'node'],
+  ['yt-dlp --flat-playlist --print "%(id)s" "https://x"', 'yt-dlp'],
+  ['curl -s -o /dev/null -w "%{http_code}" "https://x"', 'curl'],
+  ['curl -s "https://x" | grep -o y', 'curl'],
+  ['ffmpeg -i a.mp4 /tmp/b.mp4', 'ffmpeg'],
+]
+const BLIJFT_KAART = [
+  'npx eslint --fix a.js', 'npx eslint a.js -o b', 'npx vite build', 'npm run release', 'npm install x', 'node --check a.js; rm a.js',
+  'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
+]
+const GEEN_VRIJE_FAMILIE = [
+  'python3 /tmp/x.py', 'cd ~/Gino; python3 -I x.py', 'node /tmp/x.mjs', "python3 - <<'E'\nimport urllib.request\nE", "python3 - <<'E'\nopen('x','w').write('y')\nE", 'node -e "fetch(1)"', 'node -e "fs.writeFileSync(1)"',
+  'yt-dlp --exec "rm x" https://x', 'yt-dlp --cookies-from-browser chrome https://x',
+  'curl -H "Authorization: x" https://x', 'curl -b a https://x', 'curl -u a:b https://x', 'curl -o /tmp/a https://x', 'curl -sO https://x',
+  'curl "https://x/?a=$(cat b)"', 'curl https://x/$HOME', 'curl -X POST https://x', 'ffmpeg -y -i a b',
+]
+const LEES_JA = [
+  'WebSearch', 'WebFetch', 'mcp__claude_ai_Metricool_Social_Media_Management__getScheduledPosts', 'mcp__claude_ai_Google_Drive__search_files',
+  'mcp__claude_ai_Google_Calendar__list_events', 'mcp__claude_ai_Calendly__meetings-list_events', 'mcp__claude_ai_Supabase__list_tables',
+]
+const LEES_NEE = [
+  'mcp__claude_ai_Supabase__execute_sql', 'mcp__claude_ai_Supabase__apply_migration', 'mcp__claude_ai_Supabase__get_publishable_keys',
+  'mcp__claude_ai_Metricool_Social_Media_Management__createScheduledPost', 'mcp__claude_ai_Metricool_Social_Media_Management__updateScheduledPost',
+  'mcp__claude_ai_Google_Drive__create_file', 'mcp__claude_ai_Google_Drive__download_file_content', 'mcp__claude_ai_Google_Calendar__create_event',
+  'mcp__claude_ai_Calendly__meetings-cancel_event', 'mcp__claude_ai_Gmail__get_thread', 'mcp__claude_ai_Gmail__search_threads',
+  'mcp__claude_ai_Zoom_for_Claude__search', 'mcp__claude_ai_Stripe__list_customers', 'Bash', 'Edit',
+]
+
 export function veiligZelftest() {
   const fouten = []
+  for (const c of MOET_VRIJ) if (veiligeBash(c) !== 'lezen') fouten.push(`moet zonder kaart: ${c}`)
+  for (const c of BLIJFT_KAART) if (veiligeBash(c)) fouten.push(`moet een kaart blijven: ${c}`)
+  for (const [c, f] of VRIJE_FAMILIE) if (vrijeFamilie(c) !== f) fouten.push(`vrije familie ${f}: ${c}`)
+  for (const c of GEEN_VRIJE_FAMILIE) if (vrijeFamilie(c)) fouten.push(`geen vrije familie: ${c}`)
+  for (const t of LEES_JA) if (!leesTool(t)) fouten.push(`lees-tool: ${t}`)
+  for (const t of LEES_NEE) if (leesTool(t)) fouten.push(`geen lees-tool: ${t}`)
   for (const c of MOET_VEILIG) if (veiligeBash(c) !== 'lezen') fouten.push(`moet veilig zijn: ${c}`)
   for (const c of MOET_VRAGEN) if (veiligeBash(c)) fouten.push(`mag niet zonder vraag: ${c}`)
   for (const [c, f] of FAMILIE) if (familieVan(c) !== f) fouten.push(`familie ${f}: ${c}`)
