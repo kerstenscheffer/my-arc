@@ -14,13 +14,14 @@
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback } from 'react'
+import { Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import TrajectModal from '../coach-command-center/components/TrajectModal'
-import { computePeriod } from '../coach-command-center/components/trajectPeriode'
+import { computePeriod, hervatTraject } from '../coach-command-center/components/trajectPeriode'
 import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
-import { haalEisen } from '../challenge-monitor/challengeCoach'
+import { haalEisen, haalInstellingen, zetInstelling, borgOordeel } from '../challenge-monitor/challengeCoach'
 
 const STATUS_KEUZE = [
   ['ja_mondeling', 'Ja'],
@@ -90,18 +91,19 @@ function rekenGeld(rijen) {
 
 // Een getal bovenaan. Klik = eronder een klein lijstje met wie erachter zit.
 function Getal({ label, waarde, sub, kleur, regels, open, onKlik, leeg = 'Niemand' }) {
+  // Minder op het scherm: de toelichting zit in de hover en bovenaan het lijstje.
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
-      <button type="button" aria-expanded={open} onClick={onKlik} style={{ display: 'block', width: '100%', padding: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+      <button type="button" aria-expanded={open} onClick={onKlik} title={sub || undefined} style={{ display: 'block', width: '100%', padding: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
         <div style={{ fontSize: '1.15rem', fontWeight: 900, color: kleur || colors.textPrimary, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, whiteSpace: 'nowrap' }}>{waarde}</div>
         <div style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textPrimary, marginTop: 3, whiteSpace: 'nowrap' }}>{label}</div>
-        {sub && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: colors.textSecondary, marginTop: 1, whiteSpace: 'nowrap' }}>{sub}</div>}
       </button>
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, width: 270, maxWidth: '86vw', maxHeight: 280, overflowY: 'auto', padding: '6px 10px',
           background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
         }}>
+          {sub && <div style={{ padding: '2px 0 4px', fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary }}>{sub}</div>}
           {regels.length === 0 && <div style={{ padding: '4px 0', fontSize: '0.78rem', fontWeight: 700, color: colors.textSecondary }}>{leeg}</div>}
           {regels.map((x, i) => (
             <div key={x.id || i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '3px 0', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
@@ -117,17 +119,16 @@ function Getal({ label, waarde, sub, kleur, regels, open, onKlik, leeg = 'Nieman
 }
 
 function WeekBalk({ week, weken }) {
-  if (!week || !weken) return <span style={{ color: colors.textSecondary }}>—</span>
+  if (!week || !weken) return null
   const aantal = Math.min(weken, 6)
   const vol = Math.round((week / weken) * aantal)
   return (
     <span title={`Week ${week} van ${weken}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span aria-hidden style={{ display: 'inline-flex', gap: 2 }}>
         {Array.from({ length: aantal }, (_, i) => (
-          <span key={i} style={{ width: 7, height: 7, borderRadius: 2, background: i < vol ? colors.textPrimary : 'rgba(255,255,255,0.16)' }} />
+          <span key={i} style={{ width: 6, height: 6, borderRadius: 1, background: i < vol ? colors.textPrimary : 'rgba(255,255,255,0.16)' }} />
         ))}
       </span>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{week}/{weken}</span>
     </span>
   )
 }
@@ -145,6 +146,8 @@ export default function GinoDoorstap() {
   const [eisen, setEisen] = useState({}) // client_id → stand van de zes eisen
   const [openEisen, setOpenEisen] = useState(null)
   const [openGetal, setOpenGetal] = useState(null)
+  const [instellingen, setInstellingen] = useState(() => new Map())
+  const [gestopt, setGestopt] = useState([]) // challenge-klanten van wie het traject is beëindigd
   const [soortFilter, setSoortFilter] = useState(leesFilter)
   const [looptijd, setLooptijd] = useState(null) // { id, start, weken } terwijl je hem aanpast
 
@@ -179,6 +182,12 @@ export default function GinoDoorstap() {
     const alle = (kl.data || []).filter(c => !isTest(c) && (laatste.get(c.id)?.status
       || (c.coaching_status !== 'ended' && ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_onbeperkt))))
     if (!ch.error) setGeld(rekenGeld(ch.data || []))
+    setInstellingen(await haalInstellingen().catch(() => new Map()))
+    // Gestopt telt ook wie niet meer actief is, dus los van de klantenlijst hierboven.
+    const { data: geeindigd } = await supabase.from('clients').select('id, first_name, last_name, email')
+      .eq('coaching_status', 'ended').eq('coaching_total_weeks', CHALLENGE_WEKEN)
+      .then(x => x, () => ({ data: [] }))
+    setGestopt((geeindigd || []).filter(c => !isTest(c) && !['ja_mondeling', 'betaald'].includes(laatste.get(c.id)?.status)))
 
     // Verlengingen van deze klanten: het bedrag dat nog moet komen, of al betaald is.
     const ids = alle.map(c => c.id)
@@ -268,6 +277,25 @@ export default function GinoDoorstap() {
     if (error) throw error
   }
 
+  // Pauze eraf. Staat als keuze in de Stand-dropdown, alleen bij wie op pauze staat.
+  const hervat = async (r) => {
+    setBezig(r.client_id); setFout(null)
+    try {
+      await hervatTraject(supabase, r.klant)
+      setEisen(o => { const n = { ...o }; delete n[r.client_id]; return n })
+      await laad()
+    } catch (e) { setFout(e.message || 'Hervatten mislukt') }
+    setBezig(null)
+  }
+
+  const zetKeuze = async (clientId, velden) => {
+    setFout(null)
+    try {
+      await zetInstelling(clientId, velden)
+      setInstellingen(await haalInstellingen())
+    } catch (e) { setFout(e.message || 'Opslaan mislukt') }
+  }
+
   const wijzig = async (clientId, klantCoach, status, pakket) => {
     setBezig(clientId); setFout(null)
     try {
@@ -324,8 +352,9 @@ export default function GinoDoorstap() {
   const bezet = new Set([...ja.map(r => r.sale?.borg_movement_id), ...Object.values(borgKeuze)].filter(Boolean))
   const zichtbaar = rijen.filter(r => soortFilter === 'alles' || (soortFilter === 'challenge' ? r.challenge : !r.challenge))
   const metEisen = soortFilter !== 'coaching'
-  const metStand = zichtbaar.filter(r => r.status)
-  const zeiJa = zichtbaar.filter(r => r.status === 'ja_mondeling' || r.status === 'betaald').length
+  // Door = echt betaald. Een mondeling ja telt pas als het geld binnen is.
+  const telt = (id) => !instellingen.get(id)?.telt_niet_mee
+  const zeiJa = zichtbaar.filter(r => r.status === 'betaald' && telt(r.client_id)).length
   const gesprekken = zichtbaar.filter(gesprekNodig).length
   const kiesSoort = (f) => {
     setSoortFilter(f); setOpenGetal(null)
@@ -333,47 +362,56 @@ export default function GinoDoorstap() {
   }
   const metDatum = (l, tekst) => l.map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: tekst(x) }))
   const eindTekst = (x) => (x.onbeperkt ? 'Onbeperkt' : dagKort(x.eind))
+  // Door tegen echt gestopt. Wie nog nadenkt of nog een gesprek moet hebben heeft nog niet
+  // besloten en telt niet mee. Gestopt = zei nee, of de challenge is beëindigd.
+  const nee = zichtbaar.filter(x => x.status === 'nee' && telt(x.client_id))
+  const beeindigd = soortFilter === 'coaching' ? [] : gestopt.filter(c => telt(c.id) && !nee.some(x => x.client_id === c.id))
+  const aantalGestopt = nee.length + beeindigd.length
+  const beslist = zeiJa + aantalGestopt
   const doorstapRegels = [
-    ...metStand.map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: { ja_mondeling: 'Ja', betaald: 'Betaald', denkt_na: 'Denkt na', nee: 'Nee' }[x.status] || x.status })),
-    ...zichtbaar.filter(gesprekNodig).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Gesprek nodig' })),
+    ...zichtbaar.filter(x => x.status === 'betaald' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Door' })),
+    ...nee.map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Gestopt' })),
+    ...beeindigd.map(c => ({ id: c.id, naam: naamVan(c), sub: 'Gestopt' })),
+    ...zichtbaar.filter(x => x.status === 'ja_mondeling' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: nog niet betaald' })),
+    ...zichtbaar.filter(x => x.status === 'denkt_na' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: denkt na' })),
+    ...zichtbaar.filter(gesprekNodig).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gesprek' })),
   ]
   const doorstapGetal = {
-    id: 'doorstap', label: 'Doorstap', waarde: metStand.length ? `${Math.round((zeiJa / metStand.length) * 100)}%` : '—',
-    sub: `${zeiJa} van ${metStand.length} ja${gesprekken ? ` · ${gesprekken} gesprek open` : ''}`, regels: doorstapRegels,
+    id: 'doorstap', label: 'Doorstap', waarde: beslist ? `${Math.round((zeiJa / beslist) * 100)}%` : '—',
+    sub: `${zeiJa} door · ${aantalGestopt} gestopt${gesprekken ? ` · ${gesprekken} gesprek open` : ''}`, regels: doorstapRegels,
   }
   // Coaching: geen borg, dus hier telt wie er loopt, wie bijna klaar is en wat er nog open staat.
   const openBedrag = zichtbaar.filter(x => x.sale)
   const coachingGetallen = [
     { id: 'lopend', label: 'Lopend', waarde: String(zichtbaar.length), sub: `${zichtbaar.filter(x => x.gepauzeerd).length} op pauze`, regels: metDatum(zichtbaar, eindTekst) },
-    (() => { const l = zichtbaar.filter(x => x.dagen != null && x.dagen >= 0 && x.dagen <= 30); return { id: 'eindigt', label: 'Eindigt binnen 30 dagen', waarde: String(l.length), kleur: '#f59e0b', regels: metDatum(l, eindTekst) } })(),
-    (() => { const l = zichtbaar.filter(x => x.dagen != null && x.dagen < 0 && !x.gepauzeerd); return { id: 'verlopen', label: 'Einde voorbij', waarde: String(l.length), kleur: l.length ? colors.danger : undefined, regels: metDatum(l, eindTekst) } })(),
-    (() => { const l = zichtbaar.filter(x => x.eindcallNodig); return { id: 'eindcall', label: 'Eindcall nodig', waarde: String(l.length), kleur: l.length ? colors.danger : undefined, regels: metDatum(l, eindTekst) } })(),
-    { id: 'open', label: 'Verlenging open', waarde: euro(openBedrag.reduce((t, x) => t + (Number(x.sale.order_value) || 0), 0)), regels: openBedrag.map(x => ({ id: x.client_id, naam: naamVan(x.klant), bedrag: Number(x.sale.order_value) || 0 })) },
+    (() => { const l = zichtbaar.filter(x => x.dagen != null && x.dagen >= 0 && x.dagen <= 30); return { id: 'eindigt', label: '< 30 dagen', waarde: String(l.length), kleur: '#f59e0b', regels: metDatum(l, eindTekst) } })(),
+    (() => { const l = zichtbaar.filter(x => x.dagen != null && x.dagen < 0 && !x.gepauzeerd); return { id: 'verlopen', label: 'Voorbij', waarde: String(l.length), kleur: l.length ? colors.danger : undefined, regels: metDatum(l, eindTekst) } })(),
+    (() => { const l = zichtbaar.filter(x => x.eindcallNodig); return { id: 'eindcall', label: 'Eindcall', waarde: String(l.length), kleur: l.length ? colors.danger : undefined, regels: metDatum(l, eindTekst) } })(),
+    { id: 'open', label: 'Open', waarde: euro(openBedrag.reduce((t, x) => t + (Number(x.sale.order_value) || 0), 0)), regels: openBedrag.map(x => ({ id: x.client_id, naam: naamVan(x.klant), bedrag: Number(x.sale.order_value) || 0 })) },
     doorstapGetal,
   ]
   const G = '#10b981'
-  const lijn = '1px solid rgba(255,255,255,0.1)'
-  const kolommen = metEisen ? '148px 48px 48px 92px 44px 138px 112px 46px 62px' : '148px 48px 62px 92px 138px 112px 46px 62px'
+  const kolommen = metEisen ? '148px 104px 50px 36px 118px 70px 40px 26px' : '148px 104px 50px 118px 70px 40px 26px'
   const dun = { background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none', maxWidth: '100%' }
 
   return (
     <div style={{ marginBottom: 24 }}>
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
       <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }`}</style>
-      <div style={{ paddingBottom: 12 }}>
+      <div style={{ paddingBottom: 8 }}>
         <select className="gd-stand" aria-label="Soort traject" value={soortFilter} onChange={e => kiesSoort(e.target.value)} style={{
-          height: 30, padding: '0 8px', borderRadius: 8, background: 'transparent', border: '1.5px solid #fff', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none',
+          height: 26, padding: 0, background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', outline: 'none',
         }}>
-          {SOORT_FILTERS.map(([k, l]) => <option key={k} value={k} style={{ background: '#0a0a0a', color: '#fff' }}>{l} ({rijen.filter(x => k === 'alles' || (k === 'challenge' ? x.challenge : !x.challenge)).length})</option>)}
+          {SOORT_FILTERS.map(([k, l]) => <option key={k} value={k} style={{ background: '#0a0a0a', color: '#fff' }}>{l}</option>)}
         </select>
       </div>
       {soortFilter === 'challenge' ? geld && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px 18px', paddingBottom: 14 }}>
           {[
             { id: 'verkocht', label: 'Verkocht', waarde: euro(geld.verkocht), sub: `${geld.aantal} challenges`, regels: geld.lijsten.verkocht },
-            { id: 'zeker', label: 'Zeker verdiend', waarde: euro(geld.zeker), kleur: G, regels: geld.lijsten.zeker },
+            { id: 'zeker', label: 'Zeker', waarde: euro(geld.zeker), kleur: G, regels: geld.lijsten.zeker },
             { id: 'toegezegd', label: 'Toegezegd', waarde: euro(geld.toegezegd), regels: geld.lijsten.toegezegd },
-            { id: 'onzeker', label: 'Nog onzeker', waarde: euro(geld.onzeker), sub: `${geld.onzekerAantal} borgen`, kleur: '#f59e0b', regels: geld.lijsten.onzeker },
+            { id: 'onzeker', label: 'Onzeker', waarde: euro(geld.onzeker), sub: `${geld.onzekerAantal} borgen`, kleur: '#f59e0b', regels: geld.lijsten.onzeker },
             { id: 'refund', label: 'Refunds', waarde: euro(geld.refund), regels: geld.lijsten.refund, leeg: 'Nog geen refunds geregistreerd' },
             doorstapGetal,
           ].map(k => <Getal key={k.id} {...k} open={openGetal === k.id} onKlik={() => setOpenGetal(o => (o === k.id ? null : k.id))} />)}
@@ -391,48 +429,50 @@ export default function GinoDoorstap() {
         <div style={{ overflowX: 'auto' }}>
           <div style={{ width: 'max-content' }}>
             <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, padding: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
-              <span>Klant</span><span>Start</span><span>Einde</span><span>Week</span>{metEisen && <span>Eisen</span>}<span>Eindcall</span><span>Stand</span><span style={{ textAlign: 'right' }}>Verl.</span><span />
+              <span /><span>Traject</span><span />{metEisen && <span>Eisen</span>}<span>Eindcall</span><span /><span /><span />
             </div>
             {zichtbaar.map((r) => {
               const nodig = gesprekNodig(r)
               const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
               return (
-                <div key={r.client_id} style={{ borderTop: lijn }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, alignItems: 'center', minHeight: 28, fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+                <div key={r.client_id}>
+                  <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, alignItems: 'center', minHeight: 25, fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                     <span title={r.pakket || undefined} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
-                    <span style={{ whiteSpace: 'nowrap', color: colors.textSecondary }}>{dagKort(r.start)}</span>
-                    <button type="button" onClick={() => openTraject(r)} title={`${r.dagen != null ? (r.dagen < 0 ? `${-r.dagen} dagen voorbij` : `Nog ${r.dagen} dagen`) : ''}. Klik: looptijd of verlenging aanpassen`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', whiteSpace: 'nowrap', color: r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary }}>{r.onbeperkt ? 'Onbeperkt' : dagKort(r.eind)}</button>
+                    <button type="button" onClick={() => openTraject(r)} title={`${r.dagen != null ? (r.dagen < 0 ? `${-r.dagen} dagen voorbij` : `Nog ${r.dagen} dagen`) : ''}. Klik: looptijd of verlenging aanpassen`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', whiteSpace: 'nowrap', color: r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary }}>{r.onbeperkt ? '∞' : <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}</button>
                     <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt} onClick={() => setLooptijd(o => (o?.id === r.client_id ? null : { id: r.client_id, start: r.klant.coaching_start_date || '', weken: r.klant.coaching_total_weeks || 6 }))} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
                       <WeekBalk week={r.week} weken={r.weken} />
                     </button>
                     {metEisen && (r.challenge ? (
                     <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', fontVariantNumeric: 'tabular-nums', color: eisen[r.client_id]?.alles ? G : colors.textPrimary }}>
                       {eisen[r.client_id] ? `${eisen[r.client_id].behaald}/${eisen[r.client_id].totaal}` : '…'}
+                      {borgOordeel(eisen[r.client_id], instellingen.get(r.client_id))?.geschikt === false && <span title="Niet geschikt voor borg terug" style={{ color: colors.danger }}> ✕</span>}
                     </button>
                     ) : <span style={{ color: colors.textSecondary }}>—</span>)}
-                    <span title={r.volgendeCall?.titel || undefined} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: r.eindcallNodig ? colors.danger : r.volgendeCall ? (r.naamChecken ? '#f59e0b' : G) : colors.textSecondary }}>
-                      {r.volgendeCall && !r.eindcallNodig ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : r.eindcallNodig ? (r.volgendeCall ? `Niet op tijd${r.naamChecken ? ' ?' : ''}` : 'Niet ingepland') : r.gepauzeerd ? 'Pauze' : r.status === 'betaald' ? 'Hoeft niet' : r.agendaBekend ? 'Nog niet nodig' : '—'}
+                    <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || (r.gepauzeerd ? 'Pauze' : r.status === 'betaald' ? 'Hoeft niet' : 'Nog niet nodig'))} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: r.eindcallNodig ? colors.danger : r.volgendeCall ? (r.naamChecken ? '#f59e0b' : G) : colors.textSecondary }}>
+                      {r.volgendeCall ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : r.eindcallNodig ? 'Geen' : ''}
                     </span>
                     {r.status === 'betaald' ? (
                       <span style={{ color: G }}>Betaald</span>
                     ) : (
                       <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={bezig === r.client_id}
-                        onChange={e => wijzig(r.client_id, r.coach_id, e.target.value, r.pakket)}
-                        style={{ ...dun, color: r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : nodig ? '#f59e0b' : colors.textPrimary }}>
-                        <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek nodig' : r.gepauzeerd ? 'Pauze' : 'Loopt'}</option>
+                        onChange={e => (e.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, e.target.value, r.pakket))}
+                        style={{ ...dun, appearance: 'none', WebkitAppearance: 'none', padding: 0, color: r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : nodig ? '#f59e0b' : colors.textPrimary }}>
+                        <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : '·'}</option>
                         {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
+                        {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
                       </select>
                     )}
-                    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bedrag ? colors.textPrimary : colors.textSecondary }}>{bedrag ? euro(bedrag) : '—'}</span>
+                    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bedrag ? colors.textPrimary : colors.textSecondary }}>{bedrag ? euro(bedrag) : ''}</span>
                     <span style={{ textAlign: 'right' }}>
                       {r.status === 'ja_mondeling' && (
                         <button type="button" disabled={bezig === r.client_id} onClick={() => betaald(r)}
                           onBlur={() => setBevestig(b => (b === r.client_id ? null : b))}
+                          title={bevestig === r.client_id ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label="Betaald"
                           style={{
-                            minHeight: 22, padding: '0 8px', borderRadius: 7, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                            background: colors.textPrimary, color: colors.bg, fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, padding: 0, borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: bevestig === r.client_id ? G : colors.textPrimary, color: colors.bg,
                           }}>
-                          {bevestig === r.client_id ? 'Zeker?' : 'Betaald'}
+                          <Check size={13} strokeWidth={3.2} />
                         </button>
                       )}
                     </span>
@@ -455,7 +495,7 @@ export default function GinoDoorstap() {
                       </div>
                     )
                   })()}
-                  {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={eisen[r.client_id]} /></div>}
+                  {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={eisen[r.client_id]} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
                   {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
                     <div style={{ padding: '0 0 5px' }}>
                       <select className="gd-stand" aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={{ ...dun, fontSize: '0.75rem', color: colors.textSecondary }}

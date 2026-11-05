@@ -35,7 +35,7 @@ const formatDate = (iso) => {
 }
 
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
-import { computePeriod, isOnbeperkt } from './trajectPeriode'
+import { computePeriod, hervatTraject, isOnbeperkt } from './trajectPeriode'
 import BetaalPauze from './BetaalPauze'
 
 // `menu`: alleen de acties als lijstje (dropdown onder de looptijd-lijn in de
@@ -142,21 +142,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     if (!client.coaching_paused_at) return
     setBusy(true)
     try {
-      const pausedDays = Math.max(0, Math.floor((Date.now() - new Date(client.coaching_paused_at).getTime()) / 86400000))
-      const newPausedTotal = (client.coaching_paused_days_total || 0) + pausedDays
-      const payload = {
-        coaching_status: 'active',
-        coaching_paused_at: null,
-        coaching_pause_reason: null,
-        coaching_paused_days_total: newPausedTotal,
-      }
-      const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
-      if (error) throw error
-      // Close the open audit row
-      await supabase.from('coaching_pauses')
-        .update({ resumed_at: new Date().toISOString() })
-        .eq('client_id', client.id)
-        .is('resumed_at', null)
+      const payload = await hervatTraject(supabase, client)
       onClientUpdate?.(payload)
     } catch (err) {
       console.error('Resume failed:', err); alert('Hervatten mislukt')

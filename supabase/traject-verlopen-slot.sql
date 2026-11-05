@@ -57,8 +57,10 @@ begin
   return n;
 end $$;
 
+-- security definer (5 nov 2026): de trigger draait als de coach die het traject wijzigt, en
+-- traject_einde is voor die rol dicht. Zonder dit faalde elke wijziging van looptijd of pauze.
 create or replace function public.traject_slot_los_bij_verlengen()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if new.account_locked_at is not null and new.account_locked_reason = 'Traject verlopen'
      and (new.coaching_onbeperkt

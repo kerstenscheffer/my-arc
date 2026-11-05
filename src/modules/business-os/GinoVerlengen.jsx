@@ -107,7 +107,8 @@ function Regel({ r, isMobile }) {
 }
 
 export default function GinoVerlengen({ isMobile = false }) {
-  const [open, setOpen] = useState(true)
+  // Dicht bij het openen: hetzelfde staat al in de lijst bovenaan. Klik om uit te klappen.
+  const [open, setOpen] = useState(false)
   const [rijen, setRijen] = useState(null)
   const [fout, setFout] = useState(null)
   const [filter, setFilter] = useState('actie')

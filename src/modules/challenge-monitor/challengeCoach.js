@@ -41,3 +41,30 @@ export async function haalEisen(client) {
     voorbij: venster.end_date < new Date().toLocaleDateString('sv-SE'),
   }
 }
+
+// Handmatige keuzes per klant (client_challenge_instelling). Geen rij = alles automatisch.
+export async function haalInstellingen(ids = null) {
+  let q = supabase.from('client_challenge_instelling').select('client_id, telt_niet_mee, borg_geschikt, reden')
+  if (ids) q = q.in('client_id', ids)
+  const { data, error } = await q.then(r => r, e => ({ error: e }))
+  if (error) throw error
+  return new Map((data || []).map(r => [r.client_id, r]))
+}
+
+export async function zetInstelling(clientId, velden) {
+  const { error } = await supabase.from('client_challenge_instelling')
+    .upsert({ client_id: clientId, ...velden, updated_at: new Date().toISOString() }, { onConflict: 'client_id' })
+    .then(r => r, e => ({ error: e }))
+  if (error) throw error
+}
+
+// Het oordeel over de borg: handmatig wint, anders de eisen zodra de challenge voorbij is.
+export function borgOordeel(eisen, instelling) {
+  const handmatig = instelling?.borg_geschikt
+  if (handmatig === true) return { tekst: 'Geschikt voor borg terug', geschikt: true, handmatig: true }
+  if (handmatig === false) return { tekst: 'Niet geschikt voor borg terug', geschikt: false, handmatig: true }
+  if (!eisen?.voorbij) return null
+  return eisen.alles
+    ? { tekst: 'Geschikt voor borg terug', geschikt: true, handmatig: false }
+    : { tekst: 'Niet geschikt voor borg terug', geschikt: false, handmatig: false }
+}
