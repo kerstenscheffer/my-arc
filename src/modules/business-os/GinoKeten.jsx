@@ -306,6 +306,56 @@ async function haalWeek(svc, coachId, van) {
   return week
 }
 
+// Piek-stip bij Nieuwe leads: één dag met minstens de helft van de week en minstens 200 leads,
+// alle geslachten samen. Zo lees je een geïmporteerde lading niet als recordweek.
+const PIEK_MIN = 200
+const PIEK_DEEL = 0.5
+const PIEK_KLEUR = '#f97316'
+const PORTIE = 1000 // Supabase kapt af op 1000 rijen
+const NL_DAG = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' })
+const NL_UUR = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', hour: 'numeric', hourCycle: 'h23' })
+// 00:00 in Amsterdam op die datum, los van de tijdzone van het apparaat.
+const nlMiddernacht = (iso) => {
+  const utc = new Date(`${iso}T00:00:00Z`)
+  return new Date(utc.getTime() - Number(NL_UUR.format(utc)) * 36e5)
+}
+const piekCache = new Map() // volle weken veranderen niet meer; mislukt ophalen komt er niet in
+
+// Geeft de piek van de week, null zonder piek of als het ophalen mislukt: dan gewoon geen stip.
+async function haalPiek(van) {
+  const sleutel = isoLokaal(van)
+  if (piekCache.has(sleutel)) return piekCache.get(sleutel)
+  const einde = new Date(van); einde.setDate(einde.getDate() + 7)
+  const s = nlMiddernacht(sleutel).toISOString(), e = nlMiddernacht(isoLokaal(einde)).toISOString()
+  const dagen = {}
+  const week = { n: 0, m: 0, v: 0 }
+  for (let vanaf = 0; ; vanaf += PORTIE) {
+    const res = await supabase.from('call_leads').select('created_at, gender')
+      .gte('created_at', s).lt('created_at', e).is('deleted_at', null)
+      .order('created_at').order('id').range(vanaf, vanaf + PORTIE - 1)
+      .then(r => r, fout => ({ error: fout }))
+    if (res.error || !res.data) return null
+    for (const l of res.data) {
+      const dag = NL_DAG.format(new Date(l.created_at))
+      const d = dagen[dag] ||= { dag, n: 0, m: 0, v: 0 }
+      d.n++; week.n++
+      if (l.gender === 'male') { d.m++; week.m++ }
+      if (l.gender === 'female') { d.v++; week.v++ }
+    }
+    if (res.data.length < PORTIE) break
+  }
+  const top = Object.values(dagen).sort((a, b) => b.n - a.n)[0]
+  const piek = top && top.n >= PIEK_MIN && top.n >= week.n * PIEK_DEEL ? { top, week } : null
+  if (einde <= new Date()) piekCache.set(sleutel, piek)
+  return piek
+}
+
+const piekRegel = ({ top, week }, stand) => {
+  const [deel, totaal, naam] = stand === 'mannen' ? [top.m, week.m, 'mannen'] : stand === 'vrouwen' ? [top.v, week.v, 'vrouwen'] : [top.n, week.n, 'leads']
+  const [j, m, d] = top.dag.split('-').map(Number)
+  return `${deel.toLocaleString('nl-NL')} van de ${totaal.toLocaleString('nl-NL')} ${naam} kwamen op ${kort(new Date(j, m - 1, d))} binnen.`
+}
+
 const postTijd = (t) => new Date(t).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // Volgorde en namen van de dropdowns; een onbekende soort komt er gewoon achteraan.
@@ -768,6 +818,47 @@ export default function GinoKeten({ isMobile, onVraag }) {
   }
   const oog = { display: 'flex', flexShrink: 0, marginLeft: 'auto', padding: '2px 0 2px 8px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }
 
+  // Piek-stip: alleen ophalen voor geladen weken met genoeg leads, en alleen als de rij in beeld staat.
+  const [pieken, setPieken] = useState({})
+  const [piekOpen, setPiekOpen] = useState(null)
+  const piekGestart = useRef(new Set())
+  const piekVak = useRef(null)
+  const nieuwInBeeld = zichtbareRijen.some(r => r.key === 'nieuw')
+  useEffect(() => {
+    if (!nieuwInBeeld) return
+    const open = kolommen.filter(k => !piekGestart.current.has(k.id) && perWeek[k.id]?.waarden.nieuw >= PIEK_MIN)
+    open.forEach(k => piekGestart.current.add(k.id))
+    ;(async () => {
+      for (const k of open) {
+        if (weg.current) return
+        const piek = await haalPiek(k.van).catch(() => null)
+        if (piek && !weg.current) setPieken(o => ({ ...o, [k.id]: piek }))
+      }
+    })()
+  }, [kolommen, perWeek, nieuwInBeeld])
+  useEffect(() => {
+    if (!piekOpen) return undefined
+    const buiten = (e) => { if (!e.target.closest?.('[data-piek]')) setPiekOpen(null) }
+    const sluit = () => setPiekOpen(null)
+    window.addEventListener('pointerdown', buiten)
+    window.addEventListener('resize', sluit)
+    return () => {
+      window.removeEventListener('pointerdown', buiten)
+      window.removeEventListener('resize', sluit)
+    }
+  }, [piekOpen])
+  const wisselPiek = (e, id) => {
+    const vak = piekVak.current?.getBoundingClientRect()
+    if (!vak) return
+    if (piekOpen?.id === id) { setPiekOpen(null); return }
+    const stip = e.currentTarget.getBoundingClientRect()
+    const breed = Math.min(300, vak.width - 8)
+    const links = Math.max(4, Math.min(stip.left - vak.left - breed / 2, vak.width - breed - 4))
+    // Onderaan het vak gaat de regel boven de stip staan.
+    const plek = stip.bottom - vak.top + 60 > vak.height ? { bottom: vak.bottom - stip.top + 4 } : { top: stip.bottom - vak.top + 4 }
+    setPiekOpen({ id, breed, links, plek })
+  }
+
   const NAAM_B = isMobile ? 118 : 170
   const LIJN = '1.5px solid #fff'
   const knop = (aan) => ({
@@ -794,7 +885,12 @@ export default function GinoKeten({ isMobile, onVraag }) {
         .gk-keten::-webkit-scrollbar-track { background: rgba(255,255,255,0.08); border-radius: 4px }
       `}</style>
       {detail && <Detail key={`${detail.rij.key}|${detail.kolom.id}`} open={detail} onSluit={() => setDetail(null)} isMobile={isMobile} />}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start' }}>
+      <div ref={piekVak} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start' }}>
+      {piekOpen && pieken[piekOpen.id] && (
+        <div data-piek role="status" style={{ ...paneel, top: undefined, ...piekOpen.plek, left: piekOpen.links, width: 'max-content', maxWidth: piekOpen.breed, padding: '6px 10px', fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.35 }}>
+          {piekRegel(pieken[piekOpen.id], geslachtVan('nieuw'))}
+        </div>
+      )}
       <div style={{ width: 'fit-content', maxWidth: '100%', maxHeight: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* Eén regel: de conclusie kort, daarnaast de knoppen. Breedte 0 + minWidth: de regel volgt de tabel. */}
         <div style={{ position: 'relative', width: 0, minWidth: '100%', boxSizing: 'border-box', flexShrink: 0, display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 4, paddingBottom: 8 }}>
@@ -935,7 +1031,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
         <div
           ref={schuif}
           className="gk-keten"
-          onScroll={bijEinde}
+          onScroll={() => { setPiekOpen(null); bijEinde() }}
           onMouseDown={sleepStart}
           onClickCapture={naSlepen}
           style={{ flex: '0 1 auto', minHeight: 0, overflow: 'auto', cursor: 'grab', userSelect: 'none' }}
@@ -1008,8 +1104,24 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       const klikbaar = !!week && (r.lijst || r.stage)
                       const actief = detail?.rij.key === r.key && detail?.kolom.id === k.id
                       const geenKleur = k.loopt || (r.postsKey && !(week?.waarden[r.postsKey] >= PER10_MIN_POSTS))
+                      const piek = r.key === 'nieuw' && week ? pieken[k.id] : null
+                      const piekTekst = piek ? piekRegel(piek, rijGeslacht) : null
                       return (
                         <td key={k.id} style={{ ...cel, ...lijn, ...kolLijn(ki), color: week ? kleurVan(r, v, gem, geenKleur) : 'rgba(255,255,255,0.3)' }}>
+                          {piek && (
+                            <button
+                              type="button"
+                              data-piek
+                              aria-label={piekTekst}
+                              aria-expanded={piekOpen?.id === k.id}
+                              title={isMobile ? undefined : piekTekst}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => wisselPiek(e, k.id)}
+                              style={{ display: 'inline-flex', verticalAlign: 'middle', background: 'none', border: 'none', cursor: 'pointer', padding: isMobile ? 10 : 5, margin: isMobile ? '-10px -6px -10px -10px' : '-5px -1px -5px -5px' }}
+                            >
+                              <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: PIEK_KLEUR }} />
+                            </button>
+                          )}
                           {klikbaar ? (
                             <button type="button" className="gk-klik" onClick={() => setDetail(actief ? null : { rij: r, kolom: k, week })} style={{
                               background: actief ? 'rgba(255,255,255,0.16)' : 'transparent', border: 'none', borderRadius: 5, padding: '0 4px', margin: '0 -4px',
