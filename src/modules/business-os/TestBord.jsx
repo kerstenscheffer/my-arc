@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { useTestMeting } from './useTestMeting'
-import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, bordStand, isDag, kolomVan, komma, kortDag, leesGetal, volgendeKolom } from './testBord.js'
+import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, STARTVRAGEN, VOORSTEL, VRAGEN, bordStand, isDag, kolomVan, komma, kortDag, leesGetal, suggestieVoor, veldLeeg, volgendeKolom } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -18,6 +18,7 @@ const MUTED = 'rgba(255,255,255,0.7)'
 const KOLOM_BREED = 260
 const KOLOM_GAT = 16
 const LABEL = { fontSize: 12, fontWeight: 700, color: MUTED }
+const VRAAG = { fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: 'rgba(255,255,255,0.5)' }
 const OORDEEL_UITLEG = 'Onder 20 posts test, 20 tot 49 indicatie. Besluit vanaf 50 posts van minstens 7 dagen oud, over minimaal 14 dagen.'
 
 // Ingeklapt per project en testnaam (uniek binnen een project; de index verschuift bij verwijderen).
@@ -44,11 +45,21 @@ function regelCijfer(b) {
   return m.posts == null || m.leads == null || m.geslachtFout ? 'fout' : 'Nog geen data'
 }
 
+// Grijs voorstel: staat pas in het echte veld na Overnemen.
+function Overnemen({ isMobile, onKlik }) {
+  return (
+    <button type="button" onClick={onKlik} style={{
+      flexShrink: 0, minHeight: isMobile ? 44 : 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
+      fontSize: 12, fontWeight: 800, color: G,
+    }}>Overnemen</button>
+  )
+}
+
 // Klik = bewerken. Leegmaken mag: dan telt het veld weer als open.
-function BordVeld({ label, waarde, soort, isMobile, onBewaar }) {
+function BordVeld({ label, waarde, soort, vraag, suggestie, isMobile, onBewaar }) {
   const [open, setOpen] = useState(false)
-  const leeg = waarde === undefined || waarde === null || waarde === ''
-  const getoond = leeg ? 'open'
+  const leeg = veldLeeg(waarde)
+  const getoond = leeg ? vraag
     : soort === 'dag' && isDag(waarde) ? kortDag(waarde)
       : soort === 'getal' && Number.isFinite(Number(waarde)) ? komma(waarde, Number.isInteger(Number(waarde)) ? 0 : 1)
         : String(waarde)
@@ -66,15 +77,22 @@ function BordVeld({ label, waarde, soort, isMobile, onBewaar }) {
   return (
     <div>
       <div style={LABEL}>{label}</div>
+      {/* Tijdens het typen blijft de vraag of suggestie zichtbaar. */}
+      {open && leeg && <div style={VRAAG}>{suggestie?.tekst || vraag}</div>}
       {open && soort === 'dag' ? (
         <DagInvoer begin={isDag(waarde) ? waarde : ''} label={label} onKlaar={sluit} />
       ) : open ? (
         <StapInvoer begin={leeg ? '' : soort === 'getal' ? String(waarde).replace('.', ',') : String(waarde)} label={label} isMobile={isMobile}
           inputMode={soort === 'getal' ? 'decimal' : undefined} onKlaar={sluit} />
+      ) : leeg && suggestie ? (
+        <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 10 }}>
+          <button type="button" onClick={() => setOpen(true)} style={{ ...VRAAG, minWidth: 0, minHeight: isMobile ? 28 : 20, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit', overflowWrap: 'anywhere' }}>{suggestie.tekst}</button>
+          <Overnemen isMobile={isMobile} onKlik={() => onBewaar(suggestie.waarde)} />
+        </div>
       ) : (
         <button type="button" onClick={() => setOpen(true)} style={{
-          display: 'block', width: '100%', minHeight: isMobile ? 28 : 20, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
-          fontSize: 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: leeg ? 'rgba(255,255,255,0.5)' : '#fff',
+          display: 'block', width: '100%', minHeight: isMobile ? 28 : 20, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit', overflowWrap: 'anywhere',
+          ...(leeg ? VRAAG : { fontSize: 14, fontWeight: 800, lineHeight: 1.3, color: '#fff' }),
         }}>{getoond}</button>
       )}
     </div>
@@ -112,7 +130,7 @@ function PlanBlok({ test, b, isMobile, zetVeld }) {
     <>
       <Groot>{b.planAantal} van {PLAN_VELDEN.length}</Groot>
       {PLAN_VELDEN.map(v => (
-        <BordVeld key={v.id} label={v.label} soort={v.soort} waarde={test[v.id]} isMobile={isMobile} onBewaar={w => zetVeld({ [v.id]: w })} />
+        <BordVeld key={v.id} label={v.label} soort={v.soort} waarde={test[v.id]} vraag={VRAGEN[v.id]} suggestie={suggestieVoor(test, v.id)} isMobile={isMobile} onBewaar={w => zetVeld({ [v.id]: w })} />
       ))}
     </>
   )
@@ -146,10 +164,19 @@ function MetenBlok({ b }) {
 function BesluitBlok({ test, b, isMobile, zetVeld }) {
   const voorstel = b.m?.uitslag ? VOORSTEL[b.m.uitslag] : null
   const voorstelNaam = BESLUITEN.find(([id]) => id === voorstel)?.[1]
+  const gekozen = BESLUITEN.some(([id]) => id === test.besluit)
+  const suggestie = gekozen ? null : suggestieVoor(test, 'besluit')
   return (
     <>
       {b.m && voorstelNaam && <div><OordeelPil tekst={`Voorstel: ${voorstelNaam}`} uitslag={b.m.uitslag} title={OORDEEL_UITLEG} /></div>}
       {b.m && !voorstelNaam && <div><OordeelPil tekst={b.m.niveau} title={OORDEEL_UITLEG} /></div>}
+      {!gekozen && !suggestie && <div style={VRAAG}>{VRAGEN.besluit}</div>}
+      {suggestie && (
+        <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 10 }}>
+          <span style={VRAAG}>{suggestie.tekst}</span>
+          <Overnemen isMobile={isMobile} onKlik={() => zetVeld({ besluit: suggestie.waarde })} />
+        </div>
+      )}
       <div style={{ position: 'relative' }}>
         <select value={BESLUITEN.some(([id]) => id === test.besluit) ? test.besluit : ''} aria-label="Besluit"
           onChange={e => zetVeld({ besluit: e.target.value || null })}
@@ -161,7 +188,7 @@ function BesluitBlok({ test, b, isMobile, zetVeld }) {
           {BESLUITEN.map(([id, naam]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>)}
         </select>
       </div>
-      <BordVeld label="Les" waarde={test.les} isMobile={isMobile} onBewaar={w => zetVeld({ les: w })} />
+      <BordVeld label="Les" waarde={test.les} vraag={VRAGEN.les} suggestie={suggestieVoor(test, 'les')} isMobile={isMobile} onBewaar={w => zetVeld({ les: w })} />
     </>
   )
 }
@@ -342,6 +369,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                       </div>
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                      {!stappen.some(s => kolomVan(s) === k.id) && STARTVRAGEN[k.id]?.map(v => <div key={v} style={VRAAG}>{v}</div>)}
                       {stappen.map((s, si) => (kolomVan(s) !== k.id ? null : (
                         <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord oplichten={huidig?.stappen?.includes(s.id)}
                           onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}

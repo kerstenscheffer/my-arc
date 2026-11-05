@@ -29,6 +29,10 @@
 //       stappen[].kolom: onderzoek | plan | maken | posten | meten | besluit (geen kolom = onderzoek)
 //       test erbij: wat, controlegroep, posts_doel (getal), besluit (meer|aanpassen|stoppen), les
 //       test mag leeg {} zijn; zonder test.van is de test niet gestart (Posten en Meten: Nog geen data)
+//       test.suggesties (optioneel): { wat?, nulmeting_per_10? (getal), controlegroep?, posts_doel? (getal), verwachting?,
+//         meetdatum? (YYYY-MM-DD), besluit? (meer|aanpassen|stoppen), les? }
+//         Grijs met knop Overnemen, alleen bij een leeg echt veld. Telt nergens mee (bordStand, x van 6, klaar-regels, meting):
+//         pas na Overnemen of zelf invullen staat de waarde in het echte veld.
 //   node scripts/pa-db.mjs projecten                 alle projecten (kort)
 //   node scripts/pa-db.mjs project "<id>"            één project volledig
 //   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'

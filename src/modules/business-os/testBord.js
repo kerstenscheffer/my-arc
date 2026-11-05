@@ -48,6 +48,50 @@ export const leesGetal = (t) => {
   return String(t).trim() !== '' && Number.isFinite(n) ? n : null
 }
 
+// Voorbeeldvraag bij een leeg veld zonder suggestie.
+export const VRAGEN = {
+  wat: 'Wat verandert er, en wat blijft gelijk?',
+  nulmeting_per_10: 'Wat is het cijfer nu?',
+  controlegroep: 'Waarmee vergelijken we?',
+  posts_doel: 'Hoeveel posts tot een besluit? (50 of meer over 2 weken)',
+  verwachting: 'Welke uitkomst noemen we werkt?',
+  meetdatum: 'Wanneer kijken we? (posts moeten 7 dagen oud zijn)',
+  besluit: 'Meer doen, aanpassen of stoppen?',
+  les: 'Wat weten we nu wat we niet wisten?',
+}
+
+// In een kolom zonder kaarten. Geen kaarten zelf: ze tellen nergens mee.
+export const STARTVRAGEN = {
+  onderzoek: ['Welk cijfer laat zien dat dit kan werken?'],
+  maken: ['Wat moet er geschoten en geschreven worden?'],
+  posten: ['Waar en wanneer gaat het online?'],
+}
+
+export const veldLeeg = (v) => v === undefined || v === null || String(v).trim() === ''
+
+// test.suggesties[id] → { waarde, tekst }: waarde gaat bij Overnemen in het echte veld, tekst staat op het scherm.
+// Null als het echte veld gevuld is, of als de suggestie in dat veld niet zou kloppen.
+// Harde regel: een suggestie telt nergens mee. bordStand en leesTest lezen test.suggesties nooit.
+export function suggestieVoor(test, id) {
+  if (!test || typeof test !== 'object' || !veldLeeg(test[id])) return null
+  const s = test.suggesties
+  const w = s && typeof s === 'object' ? s[id] : null
+  if ((typeof w !== 'string' && typeof w !== 'number') || veldLeeg(w)) return null
+  if (id === 'besluit') {
+    const keuze = BESLUITEN.find(([k]) => k === String(w).trim().toLowerCase())
+    return keuze ? { waarde: keuze[0], tekst: keuze[1] } : null
+  }
+  const soort = PLAN_VELDEN.find(v => v.id === id)?.soort
+  if (soort === 'getal') {
+    const n = leesGetal(w)
+    if (n == null || (id === 'posts_doel' && n <= 0)) return null
+    return { waarde: n, tekst: komma(n, Number.isInteger(n) ? 0 : 1) }
+  }
+  if (soort === 'dag') return isDag(w) ? { waarde: w, tekst: kortDag(w) } : null
+  const tekst = String(w).trim()
+  return { waarde: tekst, tekst }
+}
+
 // stand = uitkomst van useTestMeting: null zolang de meting loopt.
 export function bordStand({ stappen, test, stand, vandaag }) {
   const t = test && typeof test === 'object' ? test : {}
