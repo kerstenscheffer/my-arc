@@ -82,6 +82,10 @@ const UITKLAP = {
   magnets: { groep: (p) => (p.soort === 'magnet' && p.woord ? String(p.woord).trim().toUpperCase() : null), naam: (g) => g, leads: true },
 }
 const UITKLAP_KEY = 'myarc.keten.uitklap'
+// Leads per 10 posts onder elk woord. Staat standaard aan: alleen "uit" wordt bewaard, zo
+// verschijnt de rij ook in weergaven die al bestonden. Oudere app-versies negeren deze sleutel.
+const PER10_UIT = 'magnetsPer10Uit'
+const PER10_MIN_POSTS = 5 // minder posts in een week zegt te weinig: geen kleur en niet in het gemiddelde
 const leesUitklap = () => {
   try { const u = JSON.parse(localStorage.getItem(UITKLAP_KEY)); return u && typeof u === 'object' ? u : {} } catch { return {} }
 }
@@ -104,7 +108,7 @@ const STAND = 'myarc.keten.stand'
 const leesStand = () => {
   try {
     const s = JSON.parse(localStorage.getItem(STAND))
-    const keys = Array.isArray(s?.keys) ? s.keys.filter(k => RIJ_VAN[k]) : []
+    const keys = Array.isArray(s?.keys) ? s.keys.filter(k => RIJ_VAN[k] || k === PER10_UIT) : []
     // Een nieuwe stat verschijnt vanzelf, na de stat die er standaard boven staat. Wat je zelf
     // uitzette blijft uit: dat staat in `gezien`. Standen van vóór `gezien` kenden challenge nog niet.
     const gezien = Array.isArray(s?.gezien) ? s.gezien : ALLE_KEYS.filter(k => k !== 'challenge')
@@ -172,7 +176,7 @@ async function haalWeek(svc, coachId, van) {
     telChallenge(s, e),
     telChallenge(s, e, 'male'),
     telChallenge(s, e, 'female'),
-    supabase.rpc('get_keten_magnet_leads', { p_van: s, p_tot: e }).then(res => res.data || [], () => []),
+    supabase.rpc('get_keten_magnet_leads', { p_van: s, p_tot: e }).then(res => (res.error ? null : res.data || []), () => null),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -198,10 +202,22 @@ async function haalWeek(svc, coachId, van) {
       if (p.comments != null) waarden[`${k}:comments`] = (waarden[`${k}:comments`] || 0) + Number(p.comments)
     }
   }
-  for (const l of magnetLeads) {
+  for (const l of magnetLeads || []) {
     waarden[`magnets:${l.woord}:leads`] = l.totaal
     waarden[`magnets:${l.woord}:leadsMannen`] = l.mannen
     waarden[`magnets:${l.woord}:leadsVrouwen`] = l.vrouwen
+  }
+  // Leads per 10 posts. Wel posts en geen leads is 0; lukte de telling niet, dan een streepje.
+  if (magnetLeads) {
+    for (const sleutel of Object.keys(waarden)) {
+      const woord = sleutel.match(/^magnets:(.+):posts$/)?.[1]
+      if (!woord) continue
+      const k = `magnets:${woord}`
+      const per10 = (leads) => ((leads || 0) / waarden[sleutel]) * 10
+      waarden[`${k}:per10`] = per10(waarden[`${k}:leads`])
+      waarden[`${k}:per10Mannen`] = per10(waarden[`${k}:leadsMannen`])
+      waarden[`${k}:per10Vrouwen`] = per10(waarden[`${k}:leadsVrouwen`])
+    }
   }
   waarden.challenge = challenge
   waarden.challengeMannen = challengeMannen
@@ -300,6 +316,7 @@ const toon = (r, v) => {
   if (v == null) return '—'
   if (r.euro) return `€${Number(v).toLocaleString('nl-NL')}`
   if (r.deel) return `${v}%`
+  if (r.decimaal) return Number(v).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   return Number(v).toLocaleString('nl-NL')
 }
 
@@ -420,7 +437,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
   }
   const kiesWeergave = (id) => {
     const w = weergaven.find(x => x.id === id)
-    const nieuw = w ? w.keys.filter(k => RIJ_VAN[k]) : ALLE_KEYS
+    const nieuw = w ? w.keys.filter(k => RIJ_VAN[k] || k === PER10_UIT) : ALLE_KEYS
     setActief(w ? w.id : null)
     setKeys(nieuw.length ? nieuw : ALLE_KEYS)
     setMelding(null)
@@ -428,7 +445,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
   }
   const wisselStat = (k) => {
     // De laatste stat blijft staan: een lege tabel kun je niet meer lezen.
-    if (keys.includes(k) && keys.length === 1) return
+    if (keys.includes(k) && RIJ_VAN[k] && keys.filter(x => RIJ_VAN[x]).length === 1) return
     const nieuw = keys.includes(k) ? keys.filter(x => x !== k) : [...keys, k]
     setKeys(nieuw)
     legVast(nieuw)
@@ -578,6 +595,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
     return `hsl(${Math.round(GROEN_TINT * (1 - Math.min(1, slechter / ROOD_BIJ)))}, 80%, 52%)`
   }
 
+  const per10Label = `${{ beide: 'Leads', mannen: 'Mannen', vrouwen: 'Vrouwen' }[geslachtVan('magnetLeads')]} per 10 posts`
   // De groepen onder een uitgeklapte rij, de grootste eerst. Alleen wat er ook gepost is.
   const subRijen = (rij) => {
     const u = UITKLAP[rij]
@@ -598,6 +616,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
           { key: `${rij}:${g}:views`, label: 'Views', titel: `${u.naam(g)}: views`, sub: true, lijst: { sorteer: 'views', filter: metPost(g) } },
           { key: `${rij}:${g}:comments`, label: 'Comments', titel: `${u.naam(g)}: comments`, sub: true, lijst: { sorteer: 'comments', filter: metPost(g) } },
           ...(u.leads ? [{ key: `${rij}:${g}:leads`, label: 'Nieuwe leads', titel: `${u.naam(g)}: nieuwe leads`, sub: true, geslacht: 'magnetLeads', basis: `${rij}:${g}:leads` }] : []),
+          ...(u.leads && !keys.includes(PER10_UIT) ? [{ key: `${rij}:${g}:per10`, label: per10Label, titel: `${u.naam(g)}: ${per10Label.toLowerCase()}`, sub: true, geslacht: 'magnetLeads', basis: `${rij}:${g}:per10`, decimaal: true, postsKey: `${rij}:${g}:posts` }] : []),
         ] : []),
       ]
     }
@@ -613,7 +632,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
       ...(stil.length && uitklap[stilKlap] ? stil.flatMap(groepRijen) : []),
     ]
   }
-  const weergaveRijen = keys.flatMap((k) => {
+  const weergaveRijen = keys.filter(k => RIJ_VAN[k]).flatMap((k) => {
     const rij = RIJ_VAN[k]
     return UITKLAP[k] && uitklap[k] ? [rij, ...subRijen(k)] : [rij]
   })
@@ -737,6 +756,21 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       </button>
                     )
                   })}
+                  {(() => {
+                    const aan = !keys.includes(PER10_UIT)
+                    return (
+                      <button type="button" onClick={() => wisselStat(PER10_UIT)} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, minHeight: 32, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: aan ? '#fff' : 'rgba(255,255,255,0.55)', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, textAlign: 'left',
+                      }}>
+                        <span style={{
+                          width: 16, height: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4,
+                          background: aan ? '#fff' : 'transparent', border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.4)'}`,
+                        }}>{aan && <Check size={12} strokeWidth={3.5} color="#0a0a0a" />}</span>
+                        {per10Label}
+                      </button>
+                    )
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, paddingTop: 10, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
                   <input value={naam} onChange={(e) => setNaam(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') bewaarAlsNieuw() }}
@@ -818,7 +852,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
                 const waardeKey = !rijGeslacht || rijGeslacht === 'beide' ? r.key
                   : r.geslacht ? `${r.basis}${rijGeslacht === 'mannen' ? 'Mannen' : 'Vrouwen'}`
                     : GESLACHT_RIJEN[r.key][rijGeslacht]
-                const gem = gemiddelde({ ...r, key: waardeKey }, basis)
+                const gem = gemiddelde({ ...r, key: waardeKey }, r.postsKey ? basis.filter(w => w.waarden[r.postsKey] >= PER10_MIN_POSTS) : basis)
                 const Icon = r.Icon
                 return (
                   <tr key={r.key} data-rij={isSub ? undefined : r.key} style={sleept ? { background: 'rgba(255,255,255,0.14)' } : undefined}>
@@ -860,8 +894,9 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       const v = week ? week.waarden[waardeKey] : undefined
                       const klikbaar = !!week && (r.lijst || r.stage)
                       const actief = detail?.rij.key === r.key && detail?.kolom.id === k.id
+                      const geenKleur = k.loopt || (r.postsKey && !(week?.waarden[r.postsKey] >= PER10_MIN_POSTS))
                       return (
-                        <td key={k.id} style={{ ...cel, ...lijn, ...kolLijn(ki), color: week ? kleurVan(r, v, gem, k.loopt) : 'rgba(255,255,255,0.3)' }}>
+                        <td key={k.id} style={{ ...cel, ...lijn, ...kolLijn(ki), color: week ? kleurVan(r, v, gem, geenKleur) : 'rgba(255,255,255,0.3)' }}>
                           {klikbaar ? (
                             <button type="button" className="gk-klik" onClick={() => setDetail(actief ? null : { rij: r, kolom: k, week })} style={{
                               background: actief ? 'rgba(255,255,255,0.16)' : 'transparent', border: 'none', borderRadius: 5, padding: '0 4px', margin: '0 -4px',
