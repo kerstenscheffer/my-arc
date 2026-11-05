@@ -93,9 +93,9 @@ const PRIMARY_TABS = [
   { id: 'leads', label: 'Leads', icon: UserPlus },
   // Business OS staat sinds 30 okt 2026 in de onderbalk; Output, Productivity
   // en Agenda zijn naar het Meer-menu verhuisd.
-  // Alleen voor de teameigenaar (coach_teams.owner_id = Kersten), niet voor
-  // medewerkers als Marcel. De edge functions weigeren ze ook (403).
-  { id: 'business-os', label: 'Business OS', icon: Activity, alleenEigenaar: true }
+  // Eigenaar en teamleden. Teamleden (Marcel) krijgen een beperkte versie,
+  // zonder agenda en tijdregistratie; de edge function beperkt hun tools ook.
+  { id: 'business-os', label: 'Business OS', icon: Activity, alleenTeam: true }
 ]
 
 // ============================================
@@ -280,7 +280,8 @@ export default function CoachHub() {
   const [user, setUser] = useState(null)
   // null = nog onbekend; tot het antwoord er is blijft Business OS verborgen.
   const [isEigenaar, setIsEigenaar] = useState(null)
-  const primaireTabs = PRIMARY_TABS.filter(t => !t.alleenEigenaar || isEigenaar)
+  const [isTeamlid, setIsTeamlid] = useState(null)
+  const primaireTabs = PRIMARY_TABS.filter(t => !t.alleenTeam || isEigenaar || isTeamlid)
   
   // Timer state
   const [timerTask, setTimerTask] = useState(null)
@@ -410,10 +411,10 @@ export default function CoachHub() {
 
   // Geen eigenaar maar wel via #business-os (of het split-paneel) binnen: terug naar Command.
   useEffect(() => {
-    if (isEigenaar !== false) return
+    if (isEigenaar !== false || isTeamlid !== false) return
     if (activeTab === 'business-os') setHashTab('command')
     if (splitTab === 'business-os') setSplitTab(null)
-  }, [isEigenaar, activeTab, splitTab])
+  }, [isEigenaar, isTeamlid, activeTab, splitTab])
 
   const loadUser = async () => {
     try {
@@ -425,6 +426,8 @@ export default function CoachHub() {
       const { data: eigenTeam } = await db.supabase
         .from('coach_teams').select('id').eq('owner_id', currentUser.id).limit(1)
       setIsEigenaar(!!eigenTeam?.length)
+      const { data: stand } = await db.supabase.rpc('business_os_gebruik_stand').then(r => r, () => ({ data: null }))
+      setIsTeamlid(!!stand?.lid)
     } catch (error) {
       console.error('Failed to load user:', error)
     }
@@ -598,7 +601,7 @@ export default function CoachHub() {
           />
         )
       case 'business-os':
-        return isEigenaar ? <BusinessOS isMobile={isMobile} /> : null
+        return isEigenaar || isTeamlid ? <BusinessOS isMobile={isMobile} beperkt={!isEigenaar} /> : null
       case 'week-review':
         return <CoachWeekReview db={db} isMobile={isMobile} />
       case 'checkins':

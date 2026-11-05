@@ -202,6 +202,45 @@ const TOOLS = [{
   },
 }]
 
+// Teamleden (Marcel): lezen en content plannen, nooit wijzigen of code.
+const LID_LIMIET_USD = 30 // onder €30 per maand, ook bij een lagere dollarkoers
+const PRIJS_IN_USD = 2 // Sonnet 5.5, per miljoen tokens
+const PRIJS_UIT_USD = 10
+const LID_VERBODEN_SQL = /agenda|business_os_tijd|tijd_regels|time_log|productivity_/i
+const LID_TOOLS = [
+  ...TOOLS.filter((t: any) => ['zoek_klanten', 'bekijk_schema', 'lees_database'].includes(t.name)),
+  {
+    name: 'plan_content',
+    description: 'Zet content in de contentkalender van MY ARC. Met datum: ingepland. Zonder datum: idee. Schrijf hook en script zelf als Marcel de content aan jou uitbesteedt. Er wordt niets gepubliceerd.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              titel: { type: 'string' },
+              type: { type: 'string', enum: ['reel', 'story', 'post', 'carousel', 'video'] },
+              hook: { type: 'string' },
+              script: { type: 'string' },
+              datum: { type: 'string', description: 'YYYY-MM-DD' },
+              tijd: { type: 'string', description: 'HH:MM' },
+              notitie: { type: 'string' },
+            },
+            required: ['titel'],
+          },
+        },
+      },
+      required: ['items'],
+    },
+  },
+]
+const LID_SYSTEEM = `
+
+## Je praat nu met Marcel, niet met Kersten
+Marcel is de zakenpartner van Kersten. Spreek hem aan als Marcel. Hij mag cijfers, klanten en content lezen en content inplannen of aan jou uitbesteden met plan_content. Je kunt voor hem niets anders wijzigen en geen code bouwen; zeg dat kort als hij erom vraagt. Over Kerstens agenda en tijdregistratie geef je geen informatie.`
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (body: unknown, status = 200) =>
@@ -218,10 +257,18 @@ Deno.serve(async (req) => {
     if (rol !== 'coach' && rol !== 'both') return json({ error: 'Alleen voor coaches.' }, 403)
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return json({ error: 'Niet ingelogd.' }, 401)
-    // Alleen de teameigenaar (coach_teams.owner_id = Kersten). Medewerkers zoals
-    // Marcel krijgen 403 voordat er een betaalde API-aanroep gaat.
+    // Eigenaar (Kersten): alles. Teamlid (Marcel): lezen + content plannen, met
+    // maandlimiet. De limiet staat vóór de betaalde API-aanroep.
     const { data: eigenTeam } = await sb.from('coach_teams').select('id').eq('owner_id', user.id).limit(1)
-    if (!eigenTeam?.length) return json({ fout: 'alleen_eigenaar', error: 'Alleen voor de eigenaar.' }, 403)
+    const isEigenaar = !!eigenTeam?.length
+    if (!isEigenaar) {
+      const { data: stand } = await sb.rpc('business_os_gebruik_stand')
+      if (!stand?.lid) return json({ fout: 'alleen_eigenaar', error: 'Alleen voor het team.' }, 403)
+      if (Number(stand.kosten_usd) >= LID_LIMIET_USD) {
+        return json({ tekst: 'Je Gino-budget van deze maand is op. Volgende maand kan je weer verder, of vraag Kersten om meer.', acties: [] })
+      }
+    }
+    const mijnTools = isEigenaar ? TOOLS : LID_TOOLS
 
     const body = await req.json().catch(() => ({}))
     // Een gebruikersbericht mag een screenshot hebben: { afbeelding: { media_type,
@@ -264,6 +311,7 @@ Deno.serve(async (req) => {
       : '(nog geen skills)'
     const context = body.context ? JSON.stringify(body.context).slice(0, 4000) : ''
     const systeem = `${SYSTEEM}\n\n## Skills\n${skillTekst}`
+      + (isEigenaar ? '' : LID_SYSTEEM)
       + (context ? `\n\nCijfers uit Business OS op dit moment (JSON):\n${context}` : '')
 
     const vraagAI = async (messages: unknown[]) => {
@@ -274,11 +322,15 @@ Deno.serve(async (req) => {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: TOOLS, messages }),
+        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: mijnTools, messages }),
         signal: AbortSignal.timeout(90000),
       })
       const data = await r.json().catch(() => null)
       if (!r.ok) console.error('Anthropic-fout', r.status, JSON.stringify(data))
+      if (!isEigenaar && data?.usage) {
+        const kosten = ((data.usage.input_tokens || 0) * PRIJS_IN_USD + (data.usage.output_tokens || 0) * PRIJS_UIT_USD) / 1_000_000
+        await sb.rpc('business_os_gebruik_bij', { p_kosten_usd: kosten }).then((u: any) => u, (e: any) => console.error('gebruik', e))
+      }
       return r.ok ? data : null
     }
 
@@ -365,6 +417,15 @@ Deno.serve(async (req) => {
       const resultaten = []
       for (const blok of data.content.filter((b: any) => b.type === 'tool_use')) {
         let uitkomst = 'Onbekende tool'
+        // Tweede slot naast mijnTools: een teamlid voert alleen deze tools uit.
+        if (!isEigenaar && !LID_TOOLS.some((t: any) => t.name === blok.name)) {
+          resultaten.push({ type: 'tool_result', tool_use_id: blok.id, content: 'Dit mag alleen Kersten.' })
+          continue
+        }
+        if (blok.name === 'plan_content') {
+          const { data: aantal, error } = await sb.rpc('business_os_content_concept', { p_rijen: Array.isArray(blok.input?.items) ? blok.input.items : [] })
+          uitkomst = error ? 'Fout: ' + error.message : `${aantal} item(s) in de contentkalender gezet.`
+        }
         if (blok.name === 'zet_op_app_lijst') {
           const tekst = String(blok.input?.tekst || '').trim().slice(0, 4000)
           const { error } = tekst && user
@@ -412,8 +473,13 @@ Deno.serve(async (req) => {
           uitkomst = error ? 'Mislukt: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
         }
         if (blok.name === 'lees_database') {
-          const { data: rijen, error } = await sb.rpc('business_os_lees', { p_sql: String(blok.input?.sql || '') })
-          uitkomst = error ? 'Fout: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+          const sql = String(blok.input?.sql || '')
+          if (!isEigenaar && LID_VERBODEN_SQL.test(sql)) {
+            uitkomst = 'Agenda en tijdregistratie van Kersten zijn niet beschikbaar.'
+          } else {
+            const { data: rijen, error } = await sb.rpc('business_os_lees', { p_sql: sql })
+            uitkomst = error ? 'Fout: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+          }
         }
         if (blok.name === 'stel_wijziging_voor') {
           uitkomst = await wijzigingVoorstel(blok.input || {}, acties)

@@ -1361,7 +1361,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -1621,7 +1621,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     try { localStorage.setItem('business_os_route', n) } catch { /* geen opslag */ }
     return n
   })
-  const viaMac = route === 'mac' && paOnline
+  const viaMac = !beperkt && route === 'mac' && paOnline
 
   // Herstart-knop: vraagt de PA via het lokale loket om zichzelf te herstarten
   // (launchd start hem opnieuw), wacht tot hij weer antwoordt en ververst dan
@@ -2500,7 +2500,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               }} style={{
                 display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : `0 0 ${TABS_BREED}px`, overflowX: 'auto', marginLeft: isMobile ? 2 : 'auto',
               }}>
-                {gesprekken.map((g, gi) => {
+                {gesprekken.filter(g => !beperkt || !isEditor(g)).map((g, gi) => {
                   const aan = g.id === actief.id
                   const staat = tabStatus(g)
                   return (
@@ -2512,7 +2512,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         background: aan ? colors.surface : 'transparent',
                         color: aan ? colors.textPrimary : colors.textMuted, fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap',
                       }}>
-                      <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.naam}</span>
+                      <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{beperkt && g.naam === 'Code' ? 'Gino' : g.naam}</span>
                       <TabStatus staat={staat} nu={nu} />
                       {ongelezenPer[g.id] && (
                         <span className="bos-stip" style={{
@@ -2535,7 +2535,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               </div>
               <span onClick={() => setOpen(o => !o)} style={{ flex: isMobile ? 1 : '0 0 8px', minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
-              <button onClick={wisselRoute}
+              {!beperkt && <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
                   : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
                   : 'Mac gekozen, maar de PA draait niet: gaat nu via de API. Klik: altijd API'}
@@ -2550,8 +2550,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   boxShadow: viaMac ? `0 0 6px ${colors.success}88` : 'none',
                 }} />
                 {!isMobile && (herstart ? 'Herstart' : route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
-              </button>
-              {route === 'mac' && (
+              </button>}
+              {!beperkt && route === 'mac' && (
                 <button onClick={herstartPa} disabled={herstart || ergensBezig} title="PA op je Mac herstarten en scherm verversen"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 26, padding: 0, flexShrink: 0,
@@ -2667,7 +2667,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 </button>
               )}
               {/* Snel/Slim zichtbaar; foto, bestand, groot/klein, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
-              {!isEditor(actief) && <button onClick={wisselModus}
+              {!beperkt && !isEditor(actief) && <button onClick={wisselModus}
                 title={modus === 'slim'
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
                   : 'Snel: kort en vlot. Klik: Slim (Opus, denkt langer na)'}

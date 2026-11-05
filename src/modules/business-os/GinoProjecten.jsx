@@ -123,7 +123,7 @@ function TestCijfers({ m, isMobile }) {
   const fout = 'fout'
   const mannen = m.geslachtFout || m.leads == null ? fout : m.mannen == null ? 'niet bekend' : komma(m.mannen)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(110px, max-content))', columnGap: 24, rowGap: 12, marginTop: 12 }}>
+    <div style={{ ...(isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : { display: 'flex', flexWrap: 'wrap' }), columnGap: 24, rowGap: 12, marginTop: 12 }}>
       {!m.metIds && m.per10 != null && <Cijfer waarde={komma(m.per10, 1)} label="mannen per 10 posts" />}
       {!m.metIds && m.nulmeting != null && <Cijfer waarde={komma(m.nulmeting, 1)} label="nulmeting" />}
       {m.metIds && m.comments1000 != null && <Cijfer waarde={komma(m.comments1000, 1)} label="comments per 1.000 views" />}
@@ -168,7 +168,7 @@ function FaseRij({ f, fi, doel, vandaag, isMobile, huidig, zetStap, spotStijl, v
             {oordeel && <OordeelPil tekst={oordeel} uitslag={m?.uitslag} />}
             {kanOpen && <ChevronDown size={18} strokeWidth={2.6} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
           </div>
-          {m && <TestCijfers m={m} isMobile={isMobile} />}
+          {m && !(m.posts === 0 && m.leads === 0) && <TestCijfers m={m} isMobile={isMobile} />}
         </button>
 
         {open && kanOpen && (

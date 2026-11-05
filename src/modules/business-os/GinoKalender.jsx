@@ -61,24 +61,27 @@ const VOLGORDE = ['call', 'agenda', 'content', 'concept', 'taak', 'herinnering']
 
 const leeg = () => ({ data: null })
 
-async function laadPeriode(van, tot) {
+async function laadPeriode(van, tot, beperkt = false) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.id) return []
   const a = iso(van), b = iso(tot)
+  // Beperkt (Marcel): alleen de content van het team, geen agenda, calls of taken.
+  const team = beperkt ? await supabase.rpc('team_coach_ids', { p_coach_id: user.id }).then(r => r, leeg) : null
+  const coachIds = beperkt ? (Array.isArray(team.data) && team.data.length ? team.data : [user.id]) : [user.id]
   const [ag, ca, co, ta, he] = await Promise.all([
-    supabase.from('agenda_events').select('id, titel, start_at, end_at, hele_dag, soort, contact_naam')
+    beperkt ? leeg() : supabase.from('agenda_events').select('id, titel, start_at, end_at, hele_dag, soort, contact_naam')
       .gte('start_at', van.toISOString()).lt('start_at', tot.toISOString()).order('start_at').limit(500).then(r => r, leeg),
-    supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
+    beperkt ? leeg() : supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
     supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord, metricool_link')
-      .eq('coach_id', user.id).gte('planned_date', a).lt('planned_date', b)
+      .in('coach_id', coachIds).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
-    supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
+    beperkt ? leeg() : supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
       .eq('coach_id', user.id).eq('status', 'active')
       .or(`and(scheduled_date.gte.${a},scheduled_date.lt.${b}),and(deadline.gte.${a},deadline.lt.${b})`)
       .limit(300).then(r => r, leeg),
-    supabase.from('business_os_herinneringen').select('id, tekst, moment').is('klaar_at', null)
+    beperkt ? leeg() : supabase.from('business_os_herinneringen').select('id, tekst, moment').is('klaar_at', null)
       .gte('moment', van.toISOString()).lt('moment', tot.toISOString()).limit(200).then(r => r, leeg),
   ])
   const items = []
@@ -146,15 +149,18 @@ function GinoZegt({ tekst, onWeg }) {
   )
 }
 
-export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false }) {
+const BEPERKT_WEERGAVEN = ['content', 'keten', 'klanten']
+
+export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false, beperkt = false }) {
   const [maand, setMaand] = useState(() => maandVan(verzoek?.maand) || maandVan(verzoek?.dag) || new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [gekozen, setGekozen] = useState(verzoek?.dag || null)
   const [items, setItems] = useState(null)
   const [concept, setConcept] = useState(() => (Array.isArray(verzoek?.concept) ? verzoek.concept : []))
   const [bezig, setBezig] = useState(null)
   // Week (agenda, standaard), content (contentkalender) of omzet.
-  const [weergave, setWeergave] = useState(['omzet', 'projecten', 'klanten', 'tijd', 'keten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
-  useTijdPlek(weergave === 'content' ? 'contentkalender' : null)
+  const [weergave, zetWeergave] = useState(beperkt ? 'content' : ['omzet', 'projecten', 'klanten', 'tijd', 'keten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
+  const setWeergave = (w) => { if (!beperkt || BEPERKT_WEERGAVEN.includes(w)) zetWeergave(w) }
+  useTijdPlek(!beperkt && weergave === 'content' ? 'contentkalender' : null)
   const [projectId, setProjectId] = useState(verzoek?.project || null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
@@ -221,11 +227,11 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       setItems([])
       return
     }
-    if (weergave === 'week') setItems(await laadPeriode(anker, plusDagen(anker, 7)))
+    if (weergave === 'week') setItems(await laadPeriode(anker, plusDagen(anker, 7), beperkt))
     else {
       const eind = new Date(maand.getFullYear(), maand.getMonth() + 1, 0)
       const [lijst, st, perStand] = await Promise.all([
-        laadPeriode(maand, plusDagen(eind, 1)),
+        laadPeriode(maand, plusDagen(eind, 1), beperkt),
         laadContentStand(supabase, iso(maand), iso(eind)),
         laadStandPerDag(supabase, iso(maand), iso(eind)),
       ])
@@ -267,6 +273,16 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id || !lijst.length) return
     setBezig('plannen')
+    if (beperkt) {
+      const { error } = await supabase.rpc('business_os_content_concept', { p_rijen: lijst.map(c => ({
+        titel: String(c.titel || c.hook || 'Content'), hook: c.hook || null, type: c.type, datum: c.datum,
+      })) }).then(r => r, e => ({ error: e }))
+      setBezig(null)
+      if (error) return
+      setConcept(cs => cs.filter(c => !lijst.includes(c)))
+      laad()
+      return
+    }
     const rijenIn = lijst.map(c => ({
       coach_id: user.id, title: String(c.titel || c.hook || 'Content').slice(0, 200), hook: c.hook || null,
       type: ['reel', 'story', 'post', 'carousel', 'video'].includes(c.type) ? c.type : 'reel',
@@ -432,7 +448,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
             }}
           >
-            {['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten'].map(naam => (
+            {(beperkt ? ['Content', 'Keten', 'Klanten'] : ['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten']).map(naam => (
               <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
             ))}
           </select>

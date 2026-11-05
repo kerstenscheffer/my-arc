@@ -83,6 +83,9 @@ const ONDERDELEN = [
   ['agents', 'Agents'],
 ]
 
+// Niet voor teamleden: bevat agenda, privé geldplan of de Mac-agents.
+const BEPERKT_VERBORGEN = ['vandaag', 'geldplan', 'calls', 'agents']
+
 // Leesbare namen voor de cron-jobs. Onbekende jobs tonen hun eigen naam.
 const AGENTS = {
   'instagram-sync': 'Instagram-sync',
@@ -847,7 +850,7 @@ function Invoer({ label, waarde, onChange }) {
   )
 }
 
-export default function BusinessOS({ isMobile }) {
+export default function BusinessOS({ isMobile, beperkt = false }) {
   const [data, setData] = useState(null)
   const [fout, setFout] = useState(null)
   const [doel, setDoel] = useState(() => lees(DOEL_KEY, 10000))
@@ -1128,7 +1131,8 @@ export default function BusinessOS({ isMobile }) {
   if (fout) return <div style={{ background: C.bg, color: C.rood, padding: 24 }}>Business OS laadt niet: {fout}</div>
   if (!a) return <div style={{ background: C.bg, color: C.zacht, padding: 24, minHeight: '60vh', fontWeight: 700 }}>Laden…</div>
 
-  const agendaVandaag = Array.isArray(data.agendaVandaag) ? data.agendaVandaag : []
+  // Beperkt (Marcel): Kerstens agenda komt nergens in beeld en niet in Gino's context.
+  const agendaVandaag = !beperkt && Array.isArray(data.agendaVandaag) ? data.agendaVandaag : []
   const pctDoel = Math.min(100, a.omzet / doel * 100)
   const nodigPerDag = Math.max(0, doel - a.omzet) / Math.max(1, dagenInMaand - dagenVoorbij)
   const zw = a.zwakste[0]
@@ -1290,7 +1294,7 @@ export default function BusinessOS({ isMobile }) {
     }}>
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
-      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} title="Agenda" aria-pressed={!!kalender} style={{
+      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
         position: 'absolute', top: isMobile ? 12 : 16, right: (isMobile ? 12 : 20) + 48, zIndex: 20,
         width: 40, height: 40, borderRadius: '50%', border: `1px solid ${kalender ? colors.success : C.rand}`,
         background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
@@ -1315,7 +1319,7 @@ export default function BusinessOS({ isMobile }) {
               position: 'absolute', top: 48, right: 0, width: 240, background: '#0a0a0a',
               border: `1px solid ${C.rand}`, borderRadius: 14, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
             }}>
-              {ONDERDELEN.map(([k, titel]) => (
+              {ONDERDELEN.filter(([k]) => !beperkt || !BEPERKT_VERBORGEN.includes(k)).map(([k, titel]) => (
                 <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); setBlad(k) }}
                   onMouseEnter={e => { e.currentTarget.style.background = colors.surface }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
@@ -1339,7 +1343,7 @@ export default function BusinessOS({ isMobile }) {
       }}>
         {kalender && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }}>
-            <GinoKalender verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
+            <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
               onVraag={(t, o) => stuurRef.current?.(t, o)} />
           </div>
         )}
@@ -1366,7 +1370,7 @@ export default function BusinessOS({ isMobile }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat beperkt={beperkt} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
