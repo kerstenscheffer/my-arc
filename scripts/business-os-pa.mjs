@@ -1078,6 +1078,26 @@ async function planZoomSync() {
   })
 }
 
+// Metricool → contentkalender: elke 15 min scripts/metricool-kalender.mjs.
+// Mac uit of in slaap: de volgende ronde haalt het in. Mislukt: een uur wachten,
+// zodat een kapotte koppeling niet elk kwartier geld kost. Stand van de laatste
+// run: ~/Gino/metricool-sync/laatste.json, fouten in app_fouten (metricool-kalender).
+const mcSync = { bezig: false, nietVoor: 0 }
+async function planMetricool() {
+  if (!gebruiker || mcSync.bezig || Date.now() < mcSync.nietVoor) return
+  mcSync.bezig = true
+  const t = await versToken().catch(() => '')
+  if (!t) { mcSync.bezig = false; return }
+  const p = spawn('caffeinate', ['-i', 'node', 'scripts/metricool-kalender.mjs'], { cwd: MAP, stdio: 'ignore', env: { ...process.env, PA_ACCESS_TOKEN: t } })
+  p.on('error', () => { mcSync.bezig = false; mcSync.nietVoor = Date.now() + 3600 * 1000 })
+  p.on('close', (code) => {
+    mcSync.bezig = false
+    if (code === 0) return
+    console.log(`${tijd()} ✗ metricool-kalender`)
+    mcSync.nietVoor = Date.now() + 3600 * 1000
+  })
+}
+
 // Strategierondes: ochtend 08-10, avond 20-22 (zondag: weekreview). Eén per
 // venster per dag; staat de Mac dan uit, dan vervalt die ronde.
 async function planStrategie() {
@@ -1232,5 +1252,6 @@ setInterval(() => rondeCode().catch(fout), 5000)
 setInterval(() => rondeGroei().catch(fout), 60 * 1000)
 setInterval(() => planGroei().catch(fout), 10 * 60 * 1000)
 setInterval(() => planZoomSync().catch(fout), 5 * 60 * 1000)
+setInterval(() => planMetricool().catch(fout), 15 * 60 * 1000)
 // Gino's tijdmeter: elke minuut welke app/site voorop staat (scripts/gino-tijd.mjs).
 startTijdmeter(sb, () => gebruiker, (...x) => console.error(tijd(), ...x))

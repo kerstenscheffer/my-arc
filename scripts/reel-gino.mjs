@@ -240,26 +240,21 @@ function schrijfOverzicht() {
 }
 
 // Short-concept → rij in de contentkalender. Autopilot_status/_video/_preview blijven leeg, dus de cron plaatst
-// hier niets en de stand is draft. Een bestaande rij krijgt alleen de Metricool-gegevens: status en notes blijven
-// staan, zodat een al gekoppelde post niet terugvalt naar planned. Datum komt uit concept.json (Amsterdamse kloktijd);
-// een hele `kalender`-ronde zet met de hand verschoven rijen dus terug, `short` raakt alleen zijn eigen rij.
+// hier niets en de stand is draft. Een bestaande rij wordt niet aangeraakt: Metricool is leidend voor datum, tijd
+// en stand (scripts/metricool-kalender.mjs), dus deze ronde zet geen verschoven of verdwenen post terug.
 async function naarKalender(sb, ytId) {
   const pad = path.join(SHORTS, ytId, 'concept.json')
   const c = JSON.parse(fs.readFileSync(pad, 'utf8'))
   const metricool = {
     title: c.titel, planned_date: c.datum.slice(0, 10), planned_time: c.datum.slice(11, 16),
-    metricool_post_id: String(c.id), metricool_link: c.link,
+    metricool_post_id: String(c.id), metricool_link: c.link, metricool_stand: 'draft',
     metricool_at: fs.statSync(pad).mtime.toISOString(), // concept.json is geschreven op het moment dat Metricool het concept aanmaakte
     updated_at: new Date().toISOString(),
   }
   const { data: bestaand, error: leesFout } = await sb.from('content_items').select('id')
     .eq('coach_id', COACH).eq('metricool_post_id', metricool.metricool_post_id)
   if (leesFout) throw new Error(leesFout.message)
-  if (bestaand.length) {
-    const { error } = await sb.from('content_items').update(metricool).in('id', bestaand.map(r => r.id))
-    if (error) throw new Error(error.message)
-    return 'bijgewerkt'
-  }
+  if (bestaand.length) return 'bestond_al'
   const { error } = await sb.from('content_items').insert({
     ...metricool, coach_id: COACH, type: 'reel', status: 'planned', autopilot_woord: 'SPLIT',
     notes: `Bron: https://www.youtube.com/watch?v=${ytId}`,
@@ -270,7 +265,7 @@ async function naarKalender(sb, ytId) {
 
 async function kalender() {
   const sb = supabase()
-  const stand = { nieuw: 0, bijgewerkt: 0 }, fouten = []
+  const stand = { nieuw: 0, bestond_al: 0 }, fouten = []
   const ids = shortLijst().map(s => s.id).filter(id => fs.existsSync(path.join(SHORTS, id, 'concept.json')))
   for (const id of ids) {
     try { stand[await naarKalender(sb, id)]++ } catch (e) { fouten.push({ id, fout: e.message }) }
