@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check, Zap,
+  ChevronDown, ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check, Zap,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import GinoWeek from './GinoWeek'
@@ -413,15 +413,22 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           </div>
         )}
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', border: `1px solid ${G}33`, borderRadius: 999, padding: 2 }}>
-          {['week', 'content', 'omzet', 'tijd', 'projecten', 'klanten'].map(w => (
-            <button key={w} type="button" onClick={() => kiesWeergave(w)} style={{
-              border: 'none', borderRadius: 999, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase',
-              background: weergave === w ? `${G}22` : 'transparent', color: weergave === w ? G : 'rgba(255,255,255,0.5)',
-              boxShadow: weergave === w ? `0 0 10px ${G}33` : 'none',
-            }}>{w}</button>
-          ))}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <select
+            value={weergave}
+            onChange={(e) => kiesWeergave(e.target.value)}
+            aria-label="Weergave kiezen"
+            style={{
+              appearance: 'none', WebkitAppearance: 'none', height: 34, padding: '0 30px 0 14px', cursor: 'pointer',
+              background: 'transparent', border: `1px solid ${G}55`, borderRadius: 999, outline: 'none',
+              color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+            }}
+          >
+            {['Week', 'Content', 'Omzet', 'Tijd', 'Projecten', 'Klanten'].map(naam => (
+              <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
+            ))}
+          </select>
+          <ChevronDown size={14} strokeWidth={2.6} color={G} aria-hidden style={{ position: 'absolute', right: 11, top: 10, pointerEvents: 'none' }} />
         </div>
         {weergave !== 'projecten' && weergave !== 'klanten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
@@ -437,16 +444,9 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {notitie && <GinoZegt tekst={notitie} onWeg={() => { setNotitie(''); setFocus(null) }} />}
 
-      {/* Week: de agenda als HUD, met hoeken zoals een vizier */}
+      {/* Week: de agenda als HUD */}
       {weergave === 'week' && (
         <div ref={weekVak} style={{ position: 'relative', flex: 1, minHeight: 0, padding: '14px 14px 10px' }}>
-          {[['top', 'left'], ['top', 'right'], ['bottom', 'left'], ['bottom', 'right']].map(([v, h]) => (
-            <span key={v + h} aria-hidden style={{
-              position: 'absolute', [v]: 0, [h]: 0, width: 18, height: 18, pointerEvents: 'none',
-              [`border${v[0].toUpperCase() + v.slice(1)}`]: `1.5px solid ${G}`, [`border${h[0].toUpperCase() + h.slice(1)}`]: `1.5px solid ${G}`,
-              filter: `drop-shadow(0 0 4px ${G})`, animation: 'gk-op .5s ease-out both',
-            }} />
-          ))}
           <GinoWeek dagen={weekDagen} items={Object.values(perDag).flat()} onKies={setGekozen} uitlicht={focus ? [...focus].find(f => /^\d{4}-\d{2}-\d{2}$/.test(f)) || null : null} hoogte={Math.max(220, weekH - 24)} />
           {items === null && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
