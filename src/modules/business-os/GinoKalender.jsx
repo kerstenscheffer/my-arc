@@ -162,6 +162,26 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const setWeergave = (w) => { if (!beperkt || BEPERKT_WEERGAVEN.includes(w)) zetWeergave(w) }
   useTijdPlek(!beperkt && weergave === 'content' ? 'contentkalender' : null)
   const [projectId, setProjectId] = useState(verzoek?.project || null)
+  // Op smalle schermen zou de balk onder de zwevende knoppen schuiven: dan ruimte vrijhouden.
+  const kopRef = useRef(null)
+  const [kopRuimte, setKopRuimte] = useState({ links: 0, rechts: 0 })
+  useEffect(() => {
+    if (isMobile) return undefined
+    const meet = () => {
+      const paneel = kopRef.current?.parentElement?.getBoundingClientRect()
+      if (!paneel) return
+      const agenda = document.querySelector('[data-bos-agenda]')?.getBoundingClientRect()
+      const terug = document.querySelector('button[title="Terug"]')?.getBoundingClientRect()
+      const links = terug ? Math.max(0, Math.ceil(terug.right + 12 - paneel.left)) : 0
+      const rechts = agenda ? Math.max(0, Math.ceil(paneel.right - agenda.left + 12)) : 0
+      setKopRuimte(o => (o.links === links && o.rechts === rechts ? o : { links, rechts }))
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [isMobile, weergave])
+  // Plek in de kopbalk waar het open project zijn terugknop, titel en voortgang zet.
+  const [kopVak, setKopVak] = useState(null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
   // Wat Gino aanwijst + wat hij erbij zegt.
@@ -429,22 +449,25 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       `}</style>
 
       {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : 14, paddingBottom: isMobile ? 8 : 14, flexShrink: 0 }}>
+      {/* Desktop: vaste hoogte van 36, zodat hij op één lijn staat met de agendaknop rechtsboven. */}
+      <div ref={kopRef} style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : 10, paddingBottom: isMobile ? 8 : 0, flexShrink: 0, ...(isMobile ? null : { height: 36, marginBottom: 14, marginLeft: kopRuimte.links, marginRight: kopRuimte.rechts }) }}>
         {(weergave === 'week' || weergave === 'content') && (
           <div style={{ minWidth: 0, flexBasis: isMobile ? '100%' : 'auto', order: isMobile ? 9 : 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
             {weergave === 'week' ? `${telling.calls} calls · ` : ''}{telling.content} content gepland
             {telling.leegContent > 0 && <span style={{ color: '#fff' }}> · {telling.leegContent} dagen nog zonder content</span>}
           </div>
         )}
-        {!isMobile && <div style={{ flex: 1 }} />}
+        {weergave === 'projecten'
+          ? <div ref={setKopVak} style={{ flex: 1, minWidth: 0, display: 'flex', ...(isMobile ? { flexBasis: '100%', order: 9 } : null) }} />
+          : !isMobile && <div style={{ flex: 1 }} />}
         <div style={{ position: 'relative', flexShrink: 0, marginRight: isMobile ? 'auto' : 0 }}>
           <select
             value={weergave}
             onChange={(e) => kiesWeergave(e.target.value)}
             aria-label="Weergave kiezen"
             style={{
-              appearance: 'none', WebkitAppearance: 'none', height: 32, padding: '0 30px 0 11px', cursor: 'pointer',
-              background: 'transparent', border: '1.5px solid #fff', borderRadius: 9, outline: 'none',
+              appearance: 'none', WebkitAppearance: 'none', height: 36, padding: '0 32px 0 14px', cursor: 'pointer',
+              background: 'transparent', border: '1.5px solid #fff', borderRadius: 18, outline: 'none',
               color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
             }}
           >
@@ -452,7 +475,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
             ))}
           </select>
-          <ChevronDown size={14} strokeWidth={2.6} color="#fff" aria-hidden style={{ position: 'absolute', right: 10, top: 9, pointerEvents: 'none' }} />
+          <ChevronDown size={14} strokeWidth={2.6} color="#fff" aria-hidden style={{ position: 'absolute', right: 12, top: 11, pointerEvents: 'none' }} />
         </div>
         {weergave !== 'projecten' && weergave !== 'klanten' && weergave !== 'keten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
@@ -463,7 +486,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         </div>
         <button type="button" onClick={() => verzet(1)} aria-label="Volgende" style={rond}><ChevronRight size={16} strokeWidth={2.6} /></button>
         </>}
-        <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={{ ...rond, marginLeft: 6 }}><X size={16} strokeWidth={2.6} /></button>
+        <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={rond}><X size={16} strokeWidth={2.6} /></button>
       </div>
 
       {notitie && <GinoZegt tekst={notitie} onWeg={() => { setNotitie(''); setFocus(null) }} />}
@@ -491,7 +514,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Projecten: Gino's onderzoek en plannen */}
       {weergave === 'projecten' && (
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-          <GinoProjecten projectId={projectId} onKies={setProjectId} onVraag={onVraag} isMobile={isMobile} />
+          <GinoProjecten projectId={projectId} onKies={setProjectId} onVraag={onVraag} isMobile={isMobile} kopVak={kopVak} />
         </div>
       )}
 
@@ -572,7 +595,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
 
 const rond = {
-  width: 30, height: 30, borderRadius: '50%', border: `1px solid ${G}44`, background: 'transparent', color: '#fff',
+  width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff', background: 'transparent', color: '#fff',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
 }
 const bekijk = {

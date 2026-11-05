@@ -17,6 +17,7 @@
 //     (planned), de rest als productivity_tasks; status uitvoering.
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, Check, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
 import * as stem from './stem'
 import { vandaagIso } from './testMeting'
@@ -187,7 +188,7 @@ function Tekstregel({ label, tekst, isMobile }) {
   )
 }
 
-export default function GinoProjecten({ projectId = null, onKies, onVraag, isMobile = false }) {
+export default function GinoProjecten({ projectId = null, onKies, onVraag, isMobile = false, kopVak = null }) {
   const [lijst, setLijst] = useState(null)
   const [leest, setLeest] = useState(false)
   const [bezig, setBezig] = useState(false)
@@ -442,17 +443,20 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   return (
     <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {animaties}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, paddingBottom: 12 }}>
+      {/* Terug, titel en voortgang staan in de balk van de kalender (kopVak). */}
+      {(() => { const kop = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0, width: '100%', paddingBottom: kopVak ? 0 : 12 }}>
         <button type="button" onClick={() => { setLeest(false); onKies?.(null) }} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 12px 0 8px', borderRadius: 999,
-          border: `1px solid ${G}66`, background: `${G}14`, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, flexShrink: 0,
+          display: 'inline-flex', alignItems: 'center', gap: 4, height: 36, padding: '0 14px 0 10px', borderRadius: 999,
+          border: '1.5px solid #fff', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, flexShrink: 0,
         }}><ChevronLeft size={16} strokeWidth={2.6} /> Projecten</button>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>{p.titel}</div>
           <div title={p.doel} style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.doel}</div>
         </div>
-        {st.length > 0 && <Ring deel={klaar / st.length} grootte={44} kind={<span style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{klaar}/{st.length}</span>} />}
+        {st.length > 0 && <Ring deel={klaar / st.length} grootte={36} kind={<span style={{ fontSize: 10, fontWeight: 900, color: '#fff' }}>{klaar}/{st.length}</span>} />}
       </div>
+      ); return kopVak ? createPortal(kop, kopVak) : kop })()}
 
       {p.status === 'onderzoek' ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -499,7 +503,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
               return (
                 <Fragment key={f.bord === true ? `bord-${f.naam}` : fi}>
                   {f.bord === true
-                    ? <TestBord {...gedeeld} verplaats={verplaats} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
+                    ? <TestBord {...gedeeld} projectId={p.id} verplaats={verplaats} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
                     : <FaseRij {...gedeeld} />}
                   {fi === laatsteBord && <NieuweTest isMobile={isMobile} onNieuw={nieuweTest} />}
                 </Fragment>

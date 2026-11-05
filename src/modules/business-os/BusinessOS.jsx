@@ -1294,23 +1294,23 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
     }}>
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
-      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
-        position: 'absolute', top: isMobile ? 12 : 16, right: (isMobile ? 12 : 20) + 48, zIndex: 20,
-        width: 40, height: 40, borderRadius: '50%', border: `1px solid ${kalender ? colors.success : C.rand}`,
+      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
+        position: 'absolute', top: isMobile ? 12 : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
+        width: 36, height: 36, borderRadius: '50%', border: `1.5px solid ${kalender ? colors.success : '#fff'}`,
         background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: kalender ? `0 0 14px ${colors.success}55` : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <CalendarDays size={18} />
+        <CalendarDays size={16} strokeWidth={2.6} />
       </button>
 
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
-      <div style={{ position: 'absolute', top: isMobile ? 12 : 16, right: isMobile ? 12 : 20, zIndex: 20 }}>
+      <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
-          width: 40, height: 40, borderRadius: '50%', border: `1px solid ${C.rand}`,
+          width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff',
           background: menu ? colors.surface : 'transparent', color: C.wit, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <MoreHorizontal size={20} />
+          <MoreHorizontal size={16} strokeWidth={2.6} />
         </button>
         {menu && (
           <>
@@ -1342,7 +1342,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
         alignItems: 'center', justifyContent: 'flex-end',
       }}>
         {kalender && (
-          <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }}>
+          <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
               onVraag={(t, o) => stuurRef.current?.(t, o)} />
           </div>
