@@ -69,6 +69,18 @@ export function kolomVolgorde(stappen, kolom) {
   return [...metDag, ...rij.filter(({ s }) => !isDag(s?.dag))]
 }
 
+// Plek in de stappenlijst van de eerstvolgende open kaart van Kersten, over alle kolommen: vroegste dag,
+// zonder dag achteraan, bij gelijke dag de plan-volgorde. Geen open kaart van Kersten = -1.
+export function eerstvolgendeVanKersten(stappen) {
+  let beste = -1, besteDag = null
+  ;(stappen || []).forEach((s, si) => {
+    if (s?.klaar || s?.wie !== 'kersten') return
+    const dag = isDag(s.dag) ? s.dag : null
+    if (beste < 0 || (dag && (!besteDag || dag < besteDag))) { beste = si; besteDag = dag }
+  })
+  return beste
+}
+
 // Laatste dag van alle kaarten, ook die al klaar zijn. Geen datums = null.
 export const laatsteDag = (stappen) => (stappen || []).reduce((max, s) => (isDag(s?.dag) && s.dag > (max || '') ? s.dag : max), null)
 

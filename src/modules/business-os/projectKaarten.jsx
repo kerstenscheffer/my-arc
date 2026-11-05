@@ -148,7 +148,8 @@ function NotitieTekst({ tekst, klaar, isMobile, onBewerk }) {
 
 // Op het bord (opBord): volle kolombreedte, geen kader, eigenaar, datum en notitie (onWie, onDag, onNotitie),
 // en eventueel slepen (onSleepStart) en een pijltje naar de volgende kolom (onVolgende).
-export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg, opBord = false, onWie, onDag, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
+// witteRand: binnen de kaart getekend, dus de kaart verspringt niet en de slider knipt de rand niet af.
+export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, onKlaar, onTekst, onWeg, opBord = false, onWie, onDag, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
   const [titelOpen, setTitelOpen] = useState(false)
   const [notitieOpen, setNotitieOpen] = useState(false)
   const [datumOpen, setDatumOpen] = useState(false)
@@ -181,6 +182,7 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, o
         ...kaartMaat(isMobile, opBord), position: 'relative', boxSizing: 'border-box', display: 'flex', gap: 10, alignItems: 'flex-start', minHeight: metPijl && !isMobile ? 52 : 44, minWidth: 0,
         padding: `10px ${rechts}px 10px 10px`, borderRadius: 10, cursor: sleepbaar ? 'grab' : undefined,
         background: oplichten ? `${G}22` : isNu ? `${G}14` : opBord ? colors.surface : 'transparent',
+        ...(witteRand ? { outline: '1.5px solid #fff', outlineOffset: -1.5 } : {}),
       }}>
       <button type="button" onClick={onKlaar} aria-pressed={!!s.klaar} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
         flexShrink: 0, padding: rondMarge, margin: -rondMarge, border: 'none', background: 'none', cursor: 'pointer', display: 'flex',

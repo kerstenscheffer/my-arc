@@ -98,7 +98,29 @@ const isTijdelijk = (p) => {
   const pad = p.replace(/^['"]|['"]$/g, '')
   return TIJDELIJK.test(pad) && !pad.includes('..')
 }
+// Variabelen die in deze opdracht zelf op een tijdelijke map gezet worden: T=$(mktemp -d)
+// of T=/tmp/x. Alleen als het een echte, eenmalige toewijzing is: niet in een heredoc of
+// tussen quotes, en nooit een naam die al iets betekent (HOME, PWD).
+const VASTE_NAMEN = new Set(['HOME', 'PWD', 'OLDPWD', 'PATH', 'USER', 'TMPDIR', 'SHELL', 'IFS', 'LOGNAME', 'CDPATH'])
+export function tijdelijkeVars(cmd) {
+  const tekst = String(cmd || '').replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\2(?=\n|$)/g, '<<H$3')
+  const uit = new Map()
+  const toewijzing = /(^|[;&|\n]\s*)([A-Za-z_]\w*)=("?\$\(mktemp(?:\s+[-\w./%~]+)*\)"?|[^\s;&|"'`$()]+)(?=\s*(?:$|[;&|\n]))/g
+  for (const m of tekst.matchAll(toewijzing)) {
+    const naam = m[2]
+    const voor = tekst.slice(0, m.index)
+    if ((voor.match(/'/g) || []).length % 2 || (voor.match(/"/g) || []).length % 2) continue
+    if (VASTE_NAMEN.has(naam)) continue
+    if ((tekst.match(new RegExp(`(^|[^\\w$])${naam}=`, 'g')) || []).length !== 1) continue
+    if (new RegExp(`\\b(read|for|export|local|declare|unset)\\s[^;&|\\n]*\\b${naam}\\b`).test(tekst)) continue
+    const waarde = m[3].includes('mktemp') ? `/tmp/mktemp-${naam}` : m[3]
+    if (isTijdelijk(waarde)) uit.set(naam, waarde)
+  }
+  return uit
+}
+
 function verwijdertTeVeel(cmd) {
+  const vars = tijdelijkeVars(cmd)
   if (/\bgit\s+clean\b|\brimraf\b|\bxargs\b[^|;&]*\brm\b|-exec\s+(rm|shred|unlink)\b|\bdd\b[^|;&]*\bof=|\btruncate\s+-|\bfs\.(rm|rmSync|unlink|unlinkSync|rmdir|rmdirSync)\b|\bshutil\.rmtree\b|\bos\.(remove|unlink|rmdir)\b/.test(cmd)) return true
   // Relatief pad na "cd /tmp/...": ligt dan ook in de tijdelijke map.
   let inTijdelijk = false
@@ -109,7 +131,9 @@ function verwijdertTeVeel(cmd) {
     if (!woorden.length) continue
     if (VERWIJDER_CMD.test(woorden[0])) {
       const paden = woorden.slice(1).filter(w => !w.startsWith('-'))
-      const magWeg = (p) => isTijdelijk(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..'))
+      // Alleen de kale variabele: is hij toch leeg, dan krijgt rm geen pad en doet hij niets.
+      const kaleVar = (p) => vars.has(p.match(/^"?\$\{?(\w+)\}?"?$/)?.[1])
+      const magWeg = (p) => isTijdelijk(p) || kaleVar(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..'))
       if (!paden.length || !paden.every(magWeg)) return true
     }
     if (woorden[0] === 'find' && /\s-delete\b/.test(stuk)) {

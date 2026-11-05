@@ -345,7 +345,7 @@ function wachtOpBesluit(ctx, id, opGesloten) {
 function leesScript(pad) {
   try {
     const vol = path.resolve(MAP, String(pad).replace(/^~(?=\/)/, os.homedir()))
-    if (![`${MAP}/`, `${path.join(os.homedir(), 'Gino')}/`, '/tmp/', '/private/tmp/'].some(m => vol.startsWith(m))) return null
+    if (![`${MAP}/`, `${path.join(os.homedir(), 'Gino')}/`, '/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'].some(m => vol.startsWith(m))) return null
     return fs.statSync(vol).size < 500000 ? fs.readFileSync(vol, 'utf8') : null
   } catch { return null }
 }
@@ -380,7 +380,7 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
   // 5 nov 2026: lees-tools van vaste koppelingen, en opdrachten en scripts die niets versturen.
   // Monitor draait zelf een shell-opdracht: zelfde toets als Bash.
   const monitor = tool === 'Monitor' ? String(invoer?.command || '') : ''
-  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript)) || (monitor && vrijeBash(monitor, leesScript)))) {
+  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript, { repoSchrijven: !!ctx.repoSchrijven })) || (monitor && vrijeBash(monitor, leesScript, { repoSchrijven: !!ctx.repoSchrijven })))) {
     console.log(`${tijd()} ✓ zonder vraag: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }
@@ -584,6 +584,7 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
     ? `\n\nWat Kersten eerder besliste of corrigeerde (houd je hieraan):\n${geheugen.map(g => `- ${g.tekst}`).join('\n')}`
     : ''
   const ctx = toestemmingAan && rijId ? nieuweVraagContext(rijId) : null
+  if (ctx) ctx.repoSchrijven = true // een code-opdracht mag scripts laten schrijven in de repo; de chat niet
   const r = await claude([
     '-p', `${INSTRUCTIE}${ctx ? INSTRUCTIE_VRAGEN : ''}${regels}\n\nOpdracht:\n${opdracht}`,
     // Partial messages: ook denkwerk geeft tekens van leven aan de waakhond.

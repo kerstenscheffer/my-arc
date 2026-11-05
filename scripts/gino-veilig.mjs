@@ -16,7 +16,7 @@
 // Deze code-opdrachten mogen dit bestand niet aanpassen (deny-regel in de PA).
 
 import path from 'node:path'
-import { hardeBlokkade } from './gino-blokkade.mjs'
+import { hardeBlokkade, tijdelijkeVars } from './gino-blokkade.mjs'
 
 const ALTIJD_LEZEN = new Set([
   'ls', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'rg', 'cut', 'tr', 'uniq', 'pwd', 'which', 'stat', 'du', 'df',
@@ -28,7 +28,7 @@ const GIT_LEZEN = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'check-
 const PA_DB_LEZEN = new Set(['lees', 'schema', 'projecten', 'project', 'experimenten', 'herinneringen', 'geheugen', 'tijd', 'onthoud'])
 const LUS_WOORDEN = new Set(['do', 'done', 'then', 'else', 'elif', 'fi', 'if', 'while', 'until'])
 const THUIS = '(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[\\w.-]+)'
-const VRIJE_MAP = new RegExp(`^["']?(?:/dev/null|/tmp/|/private/tmp/|${THUIS}/Gino/)`)
+const VRIJE_MAP = new RegExp(`^["']?(?:/dev/null|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|(?:\\./)?node_modules/\\.cache/|${THUIS}/Gino/)`)
 const VEILIG_WOORD = /^[\w@%+=:,./~^-]+$/
 
 // Schrijven, verwijderen of versturen in een script: dan altijd een kaart.
@@ -182,7 +182,7 @@ export function familieVan(cmd) {
 
 // Wat een script of download naar buiten kan brengen of buiten de werkmappen kan
 // aanpassen. Staat dit erin, dan blijft het een kaart.
-const VERSTUURT_OF_SCHRIJFT = /\b(urllib|requests|httpx|aiohttp|socket|smtplib|ftplib|http\.client|shutil|fetch|axios|XMLHttpRequest|node:https?|require\(\s*['"]https?['"]|createClient|supabase)\b|\bopen\([^)\n]*,\s*['"][^'"]*[wax+]|\bos\.(rename|replace|mkdir|makedirs)\b|\bfs\.(write|append|rename|copy|mkdir|cp)\w*/
+const VERSTUURT_OF_SCHRIJFT = /\b(urllib|requests|httpx|aiohttp|socket|smtplib|ftplib|http\.client|shutil|fetch|axios|XMLHttpRequest|node:https?|require\(\s*['"]https?['"]|createClient|supabase)\b|\bopen\([^)\n]*,\s*['"][^'"]*[wax+]|\bos\.(rename|replace|mkdir|makedirs)\b|\bfs\.(write|append|rename|copy|mkdir|cp)\w*|\b(writeFile(Sync)?|appendFile(Sync)?|renameSync|copyFileSync|cpSync|mkdirSync|createWriteStream)\b/
 // Chrome-login mag (5 nov, op zijn verzoek), maar alleen richting YouTube; zie vrijeFamilie.
 const YT_DLP_RISICO = /--exec\b|--cookies(?!-from-browser)\b|--config-locations?\b|--plugin-dirs\b|--netrc\b|--username\b|--password\b|--batch-file\b|(?:^|\s)-[au]\s/
 // Met curl mag alleen een vaste pagina opgehaald worden: geen login, geen eigen headers,
@@ -190,8 +190,22 @@ const YT_DLP_RISICO = /--exec\b|--cookies(?!-from-browser)\b|--config-locations?
 const CURL_ADRES_RISICO = /\$|`/
 const CURL_RISICO = /--(header|cookie|cookie-jar|user|oauth2-bearer|config|output|remote-name|proxy|url-query|json)\b|(?:^|\s)-[a-zA-Z]*[HbcuKoOxJ][a-zA-Z]*\s/
 
-const EXTRA_LEZEN = new Set(['diff', 'comm', 'paste', 'column', 'tac', 'rev', 'fold', 'base64', 'strings', 'lsof', 'id', 'whoami', 'hostname', 'type', 'read', 'xxd', 'md5', 'shasum', 'plutil', 'export', '[['])
+const EXTRA_LEZEN = new Set(['mktemp', 'diff', 'comm', 'paste', 'column', 'tac', 'rev', 'fold', 'base64', 'strings', 'lsof', 'id', 'whoami', 'hostname', 'type', 'read', 'xxd', 'md5', 'shasum', 'plutil', 'export', '[['])
 const SED_SCHRIJFT = /\/[gipI0-9]*[we]\b|(^|;)\s*\d*[we]\s/
+
+// Schrijven naar een tijdelijke map telt nooit. Een code-opdracht mag ook de repo in (dat mag
+// hij met Edit al zonder kaart), behalve als de tekst iets noemt buiten zijn werkterrein.
+// De chat niet: die past niets aan.
+const BUITEN_WERK = /\.claude|\.zsh|\.bash|\.ssh|\.config|\.env|LaunchAgents|Library\/|gino-(blokkade|veilig|toestemming|waakhond)|homedir|process\.env\.HOME|expanduser|environ|\.\.\/|\/etc\/|\/usr\/|\$HOME|~\/|\/Users\/[^/\s'"`]+\/(?!workapp\b|Gino\b)/
+const TIJDELIJK_DOEL = `['"\`](?:/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|(?:\\./)?node_modules/\\.cache/)`
+const FS_NAAR_TIJDELIJK = new RegExp(`\\b(?:fs\\.)?(?:write|append|mkdir|copy|cp)\\w*\\(\\s*${TIJDELIJK_DOEL}`, 'g')
+const OPEN_NAAR_TIJDELIJK = new RegExp(`\\bopen\\(\\s*${TIJDELIJK_DOEL}`, 'g')
+let huidigeOpties = {}
+function metVrijSchrijven(tekst, opties = {}) {
+  const t = String(tekst).replace(FS_NAAR_TIJDELIJK, 'tijdelijk(').replace(OPEN_NAAR_TIJDELIJK, 'tijdelijk(')
+  if (!opties.repoSchrijven || BUITEN_WERK.test(t)) return t
+  return t.replace(/\bfs\.(write|append|rename|copy|mkdir|cp)\w*/g, 'repo').replace(/\b(writeFile(Sync)?|appendFile(Sync)?|renameSync|copyFileSync|cpSync|mkdirSync|createWriteStream)\b/g, 'repo').replace(/\bopen\([^)\n]*,\s*['"][^'"]*[wax+]/g, 'repo').replace(/\bos\.(mkdir|makedirs)\b/g, 'repo')
+}
 
 // Een script mag alleen zonder kaart als we de inhoud hebben nagelezen, plus wat het zelf
 // laadt. `lees(pad)` geeft de tekst of null. Zo omzeilt een los script de blokkades niet.
@@ -199,23 +213,40 @@ function scriptSchoon(pad, opdracht, lees, diepte = 0) {
   if (!pad || /[$`*]/.test(pad) || pad.includes('..') || diepte > 2) return false
   // In dezelfde opdracht geschreven: die tekst is al als geheel nagekeken.
   if (diepte === 0 && opdracht.includes(`> ${pad}`) && /<<-?\s*['"]?\w+/.test(opdracht)) return true
+  // Hier gebouwd uit de eigen code: daar mag hij ook met Edit al bij.
+  if (diepte === 0 && opdracht.includes(`--outfile=${pad}`)) return true
   const inhoud = lees?.(pad)
   if (typeof inhoud !== 'string') return false
-  if (hardeBlokkade('Bash', { command: inhoud }) || GEVAARLIJK.test(inhoud) || VERSTUURT_OF_SCHRIJFT.test(inhoud) || /\bimport\s*\(/.test(inhoud)) return false
+  if (hardeBlokkade('Bash', { command: inhoud }) || GEVAARLIJK.test(inhoud) || VERSTUURT_OF_SCHRIJFT.test(metVrijSchrijven(inhoud, huidigeOpties)) || /\bimport\s*\(/.test(inhoud)) return false
   for (const m of inhoud.matchAll(/(?:from\s+|require\(\s*|^\s*import\s+)['"](\.[^'"]+)['"]/gm)) {
     if (!scriptSchoon(path.posix.join(path.posix.dirname(pad), m[1]), opdracht, lees, diepte + 1)) return false
   }
   return true
 }
 
+// Eigen werk van Gino zonder kaart (5 nov): nakijken en bouwen, zijn eigen projectborden.
+const PA_DB_VRIJ = new Set(['project-bij', 'project-nieuw'])
+const UITVOER_VRIJ = /^(?:\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|(?:\.\/)?node_modules\/\.cache\/)/
+const uitvoerVrij = (rest, tekst) => rest.map(tekst).every(a => {
+  const m = a.match(/^--(?:outfile|outdir|out-file|out-dir)=(.+)$/)
+  return !m || (UITVOER_VRIJ.test(m[1]) && !m[1].includes('..'))
+})
+
 function vrijSegment(schoon, o, opdracht, lees) {
+  schoon = schoon.replace(/^\{\s+/, '')
   if (segmentLeest(schoon, o)) return true
   const w = woorden(schoon)
-  while (w.length && (LUS_WOORDEN.has(w[0]) || /^\w+=\S*$/.test(w[0]))) w.shift()
+  while (w.length && (LUS_WOORDEN.has(w[0]) || w[0] === '{' || w[0] === '}' || /^\w+=\S*$/.test(w[0]))) w.shift()
+  if (!w.length) return true
   const [c, ...rest] = w
   const tekst = (x) => { const q = x.match(/^Q(\d+)Q$/); return q ? o.hulp[Number(q[1])] : x }
   const voluit = rest.map(tekst).join(' ')
   if (EXTRA_LEZEN.has(c)) return true
+  if (c === 'set') return rest.every(a => /^[-+][euxo]+$|^pipefail$/.test(a))
+  // Is hardeBlokkade er niet over gevallen, dan gaat het alleen om tijdelijke mappen.
+  if (c === 'rm') return !hardeBlokkade('Bash', { command: opdracht })
+  if (c === 'npx' && rest[0] === 'vite') return rest[1] === 'build' && uitvoerVrij(rest, tekst)
+  if (c === 'npx' && rest[0] === 'esbuild') return uitvoerVrij(rest, tekst)
   if (c === 'sed') return !rest.some(a => /^(-i|--in-place)/.test(a)) && !rest.some(a => /^Q\d+Q$/.test(a) && SED_SCHRIJFT.test(tekst(a)))
   if (c === 'python' || c === 'python3') {
     const a = rest.filter(x => x !== '-I')
@@ -223,7 +254,8 @@ function vrijSegment(schoon, o, opdracht, lees) {
     return scriptSchoon(tekst(a[0] || ''), opdracht, lees)
   }
   if (c === 'node') {
-    if (rest[0] === '-e' || rest[0] === '-p') return true
+    if (rest[0] === '-e' || rest[0] === '-p' || rest[0] === '-' || /^--input-type=/.test(rest[0] || '')) return true
+    if (/^(?:\/Users\/[\w.-]+\/workapp\/)?scripts\/pa-db\.mjs$/.test(rest[0] || '') && (rest.length === 1 || PA_DB_VRIJ.has(rest[1]))) return true
     return scriptSchoon(tekst(rest[0] || ''), opdracht, lees)
   }
   if (c === 'yt-dlp') {
@@ -234,17 +266,28 @@ function vrijSegment(schoon, o, opdracht, lees) {
   // Curl: de "-o /dev/null"-check van een statuscode blijft toegestaan.
   if (c === 'curl') return !CURL_ADRES_RISICO.test(voluit) && !CURL_RISICO.test(` ${voluit.replace(/-o\s+\/dev\/null/g, '')}`)
   // Zonder -y overschrijft ffmpeg niets dat er al staat.
-  if (c === 'ffmpeg') return !rest.includes('-y')
+  // Met -y alleen als het resultaat in een werkmap komt.
+  if (c === 'ffmpeg') return !rest.includes('-y') || (VRIJE_MAP.test(tekst(rest[rest.length - 1] || '')) && !tekst(rest[rest.length - 1] || '').includes('..'))
   return false
 }
 
 // 'vrij' als de hele opdracht zonder kaart mag; anders null en dus de gewone kaart.
-export function vrijeBash(cmd, lees = null) {
-  const s = String(cmd || '')
-  if (GEVAARLIJK.test(s) || VERSTUURT_OF_SCHRIJFT.test(s)) return null
+// Variabelen die hier zelf op een tijdelijke map gezet zijn, tellen als dat pad.
+function vulVarsIn(cmd) {
+  let s = String(cmd || '')
+  for (const [naam, waarde] of tijdelijkeVars(s)) s = s.replace(new RegExp(`"\\$\\{?${naam}\\}?"|\\$\\{?${naam}\\}?(?!\\w)`, 'g'), waarde)
+  return s.replace(/\$PWD\//g, '')
+}
+
+// opties.repoSchrijven: alleen voor code-opdrachten, zie metVrijSchrijven.
+export function vrijeBash(cmd, lees = null, opties = {}) {
+  huidigeOpties = opties
+  const s = vulVarsIn(cmd)
+  const zonderMktemp = s.replace(/\bmktemp\s+-d\b/g, 'mktemp')
+  if (GEVAARLIJK.test(zonderMktemp) || VERSTUURT_OF_SCHRIJFT.test(metVrijSchrijven(s, opties))) return null
   const o = ontleed(s)
   if (!o || !o.tekst.trim()) return null
-  for (const b of o.subst) if (!vrijeBash(b, lees)) return null
+  for (const b of o.subst) if (!vrijeBash(b, lees, opties)) return null
   for (const seg of onderdelen(o.tekst)) {
     const schoon = zonderOmleiding(seg, o.hulp)
     if (schoon === null || !vrijSegment(schoon, o, s, lees)) return null
@@ -327,6 +370,26 @@ const VRIJE_FAMILIE = [
   ['D=/tmp/a; A=$D/b; node scripts/goed.mjs --bestand $A', 'variabele'],
   ['node scripts/pa-db.mjs schema c 2>&1 | head -60; ls a | wc -l; cat a | node -e "console.log(1)"', 'pijp'],
 ]
+// Vijf vormen uit de kaarten van 5 nov (repo = code-opdracht). Alles wat Kersten klikte zonder ooit af te wijzen.
+const EIGEN_WERK_VRIJ = [
+  'npx eslint a.jsx && echo OK; npx esbuild src/a.js --bundle --format=esm --log-level=error | node --input-type=module',
+  "T=$(mktemp -d) && node scripts/pa-db.mjs project abc > $T/p.json && cat > $T/t.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode $T/t.mjs; rm -rf $T",
+  "D=$(mktemp -d) && npx esbuild a.js --bundle --outfile=$D/b.mjs && node $D/b.mjs; rm -rf \"$D\"",
+  "cat > /tmp/b.mjs <<'EOF'\nimport fs from 'fs'\nfs.writeFileSync('/tmp/uit.json', '{}')\nEOF\nnode /tmp/b.mjs && node scripts/pa-db.mjs project-bij \"$(cat /tmp/uit.json)\"",
+  'cd ~/Gino/x && ffmpeg -y -loglevel error -i a.jpg /tmp/b.jpg; node scripts/pa-db.mjs 2>&1 | head -20; git status --short | head',
+  "C=node_modules/.cache/t && cat > $C/k.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode $C/k.mjs 2>&1 | tail -3",
+  "set -e\nT=$(mktemp -d /tmp/t.XXXXXX)\nnode -e 'console.log(1)' > \"$T/a\"\ncat \"$T/a\"",
+  "{ cat a.js; cat <<'EOF'\nconsole.log(1)\nEOF\n} | node --input-type=module",
+  'npx vite build 2>&1 | tail -2',
+]
+const EIGEN_WERK_REPO = ["python3 - <<'E'\nopen('src/a.js','w').write('x')\nE", "node - a <<'EOF'\nconst fs=require('fs');fs.writeFileSync(process.argv[2],'x')\nEOF"]
+const EIGEN_WERK_KAART = [
+  "cat > /tmp/a.mjs <<'E'\nimport { writeFileSync } from 'fs'\nimport os from 'os'\nwriteFileSync(os.homedir()+'/.zshrc','x')\nE\nnode /tmp/a.mjs",
+  "node -e \"require('fs').writeFileSync(require('os').homedir()+'/.zshrc','x')\"", "python3 - <<'E'\nopen('/Users/k/.ssh/config','w')\nE",
+  'HOME=/tmp/x; echo a > $HOME/.zshrc', "cat <<'E'\nX=/tmp/a\nE\necho a > $X/b", "echo 'a; X=/tmp/a; b'; echo a > $X/b", 'X=/tmp/a; X=/etc; echo a > $X/b',
+  'npx vite', 'npx esbuild a.js --outfile=src/b.js', 'npx esbuild a.js --outfile=/tmp/../b.js', 'ffmpeg -y -i a src/b.mp4', 'ffmpeg -y -i a /tmp/../b.mp4', 'node scripts/pa-db.mjs app-lijst x', 'node scripts/pa-db.mjs herinner x',
+  'npm run release', 'T=$(mktemp -d); node $T/onbekend.mjs', 'T=$(mktemp -d); curl https://x -o $T/a', "node -e \"fetch('https://x',{method:'POST'})\"", 'git push', 'set -e; git commit -m x',
+]
 const BLIJFT_KAART = [
   'npx eslint --fix a.js', 'npx eslint a.js -o b', 'npx vite build', 'npm run release', 'npm install x', 'node --check a.js; rm a.js',
   'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
@@ -359,6 +422,10 @@ export function veiligZelftest() {
   for (const c of BLIJFT_KAART) if (veiligeBash(c)) fouten.push(`moet een kaart blijven: ${c}`)
   for (const [c, f] of VRIJE_FAMILIE) if (!vrijeBash(c, stubLees)) fouten.push(`moet vrij zijn (${f}): ${c}`)
   for (const c of GEEN_VRIJE_FAMILIE) if (vrijeBash(c, stubLees)) fouten.push(`moet een kaart blijven: ${c}`)
+  for (const c of EIGEN_WERK_VRIJ) if (hardeBlokkade('Bash', { command: c }) || !vrijeBash(c, stubLees)) fouten.push(`eigen werk moet vrij: ${c}`)
+  for (const c of EIGEN_WERK_REPO) { if (!vrijeBash(c, stubLees, { repoSchrijven: true })) fouten.push(`code-opdracht mag dit: ${c}`); if (vrijeBash(c, stubLees)) fouten.push(`chat mag dit niet: ${c}`) }
+  for (const c of EIGEN_WERK_KAART) if (vrijeBash(c, stubLees, { repoSchrijven: true })) fouten.push(`moet een kaart blijven: ${c}`)
+  for (const [c, wel] of [['D=$(mktemp -d); rm -rf $D', false], ['rm -rf $HOME', true], ["cat <<'E'\nX=$(mktemp -d)\nE\nrm -rf $X", true], ['D=$(mktemp -d); rm -rf $D/..', true], ['D=$(mktemp -d); D=~; rm -rf $D', true], ["echo 'a; X=/tmp/b; c'; rm -rf $X", true]]) if (!!hardeBlokkade('Bash', { command: c }) !== wel) fouten.push(`rm met variabele: ${c}`)
   for (const t of LEES_JA) if (!leesTool(t)) fouten.push(`lees-tool: ${t}`)
   for (const t of LEES_NEE) if (leesTool(t)) fouten.push(`geen lees-tool: ${t}`)
   for (const c of MOET_VEILIG) if (veiligeBash(c) !== 'lezen') fouten.push(`moet veilig zijn: ${c}`)

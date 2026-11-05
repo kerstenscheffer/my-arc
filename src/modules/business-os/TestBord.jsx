@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Cijfer, DagInvoer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { useTestMeting } from './useTestMeting'
-import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, VRAGEN, bordStand, isDag, kolomVan, kolomVolgorde, komma, kortDag, laatsteDag, leesGetal, suggestieVoor, veldLeeg, volgendeKolom } from './testBord.js'
+import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, VRAGEN, bordStand, eerstvolgendeVanKersten, isDag, kolomVan, kolomVolgorde, komma, kortDag, laatsteDag, leesGetal, suggestieVoor, veldLeeg, volgendeKolom } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -180,6 +180,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
   const [ingeklapt, setIngeklapt] = useState(() => leesDicht(dichtSleutel(projectId, f.naam)))
   const [detailsOpen, setDetailsOpen] = useState(false)
   const klaarOp = laatsteDag(stappen)
+  const eerstvolgende = eerstvolgendeVanKersten(stappen)
   const zetVeld = (velden) => zetTest(fi, velden)
 
   // ── Slider ──
@@ -368,7 +369,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto', paddingTop: 12 }}>
                       <NieuweStap isMobile={isMobile} opBord onNieuw={t => nieuweStap(fi, t, k.id)} />
                       {kolomVolgorde(stappen, k.id).reverse().map(({ s, si }) => (
-                        <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord oplichten={huidig?.stappen?.includes(s.id)}
+                        <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord witteRand={si === eerstvolgende} oplichten={huidig?.stappen?.includes(s.id)}
                           onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
                           onWie={wie => zetKaart(s.id, { wie })} onDag={dag => zetKaart(s.id, { dag })} onNotitie={notitie => zetKaart(s.id, { notitie })}
                           onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
