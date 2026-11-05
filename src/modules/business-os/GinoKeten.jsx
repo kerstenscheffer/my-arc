@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Film, Sparkles, Eye, BarChart3, MessageSquare, UserPlus, Send, MessageCircle, PhoneCall, CalendarCheck, Calendar,
-  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2,
+  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2, Mars, Venus, VenusAndMars, Megaphone,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LeadManagementService from '../lead-management/LeadManagementService'
@@ -43,6 +43,7 @@ const RIJEN = [
   { key: 'comments', label: 'Comments', Icon: MessageSquare, kleur: '#fff', content: c => c.comments, stap: true, lijst: { sorteer: 'comments', filter: p => p.comments != null } },
   { key: 'nieuw', label: 'Nieuwe leads', Icon: UserPlus, kleur: '#3b82f6', stat: 'Nieuwe leads' },
   { key: 'follow', label: 'Follow-ups', Icon: Send, kleur: '#f59e0b', stat: 'Follow-ups' },
+  { key: 'challenge', label: 'Challenge campagne', Icon: Megaphone, kleur: '#a855f7' },
   { key: 'reacties', label: 'Reacties', Icon: MessageCircle, kleur: GROEN, stat: 'Reacties', stap: true },
   { key: 'voorgesteld', label: 'Voorgesteld', Icon: PhoneCall, kleur: '#a855f7', stat: 'Voorgesteld', stage: 'callProposed', stap: true },
   { key: 'ingepland', label: 'Ingepland', Icon: CalendarCheck, kleur: '#06b6d4', stat: 'Ingepland', stage: 'callScheduled', stap: true },
@@ -73,6 +74,17 @@ const VRAGEN = [
   { label: 'Wat doe ik deze week als eerste?', vraag: 'Kies op basis van de keten de 3 acties die deze week het meeste opleveren richting €10.000 per maand, op volgorde, met wat ik precies moet doen en hoe we zien of het werkt.' },
 ]
 
+// Klik op de naam van Nieuwe leads wisselt beide → mannen → vrouwen. De keuze onthoudt dit apparaat.
+const GESLACHT = {
+  beide: { naam: 'Beide', Icon: VenusAndMars, kleur: '#fff', key: 'nieuw', volgende: 'mannen' },
+  mannen: { naam: 'Mannen', Icon: Mars, kleur: '#3b82f6', key: 'nieuwMannen', volgende: 'vrouwen' },
+  vrouwen: { naam: 'Vrouwen', Icon: Venus, kleur: '#ec4899', key: 'nieuwVrouwen', volgende: 'beide' },
+}
+const GESLACHT_KEY = 'myarc.keten.geslacht'
+const leesGeslacht = () => {
+  try { const g = localStorage.getItem(GESLACHT_KEY); return GESLACHT[g] ? g : 'beide' } catch { return 'beide' }
+}
+
 const ALLE_KEYS = RIJEN.map(r => r.key)
 const RIJ_VAN = Object.fromEntries(RIJEN.map(r => [r.key, r]))
 const STAND = 'myarc.keten.stand'
@@ -96,6 +108,24 @@ const weekNr = (d) => {
 }
 const kort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '')
 
+// Alle challenge-campagnes samen (challenge Man, Challenge vrouw). Een week telt wie die
+// week aan zo'n campagne is gekoppeld, net als "Getagd" in de campagnekaarten.
+let challengeIds = null
+const haalChallengeIds = () => {
+  challengeIds ||= supabase.from('outreach_campaigns').select('id').ilike('name', '%challenge%')
+    .then(res => { if (res.error) throw res.error; return res.data.map(c => c.id) })
+    .catch(() => { challengeIds = null; return null })
+  return challengeIds
+}
+async function telChallenge(s, e) {
+  const ids = await haalChallengeIds()
+  if (!ids) return null
+  if (!ids.length) return 0
+  const res = await supabase.from('lead_campaign_tags').select('id', { count: 'exact', head: true })
+    .in('campaign_id', ids).gte('tagged_at', s).lt('tagged_at', e).then(r => r, () => ({ error: true }))
+  return res.error ? null : res.count
+}
+
 // Volle weken veranderen niet meer; de lopende week halen we elke keer vers op.
 const cache = new Map()
 
@@ -104,12 +134,18 @@ async function haalWeek(svc, coachId, van) {
   if (cache.has(sleutel)) return cache.get(sleutel)
   const tot = new Date(van); tot.setDate(tot.getDate() + 7)
   const s = van.toISOString(), e = tot.toISOString()
-  const [act, fun, rx, cash, media] = await Promise.all([
+  // Geslacht apart tellen op de server: dezelfde telling als newLeads, plus het filter.
+  const telLeads = (g) => supabase.from('call_leads').select('id', { count: 'exact', head: true })
+    .gte('created_at', s).lt('created_at', e).is('deleted_at', null).eq('gender', g).then(res => (res.error ? null : res.count), () => null)
+  const [act, fun, rx, cash, media, mannen, vrouwen, challenge] = await Promise.all([
     svc.getRangeActivity(coachId, s, e),
     svc.getRangeFunnelStats(coachId, s, e),
     svc.getRangeReactionStats(coachId, s, e),
     svc.getRangeCashCollected(coachId, s, e),
     supabase.from('content_ig_media').select('id, tijd, soort, woord, views, comments, tekst').gte('dag', isoLokaal(van)).lt('dag', isoLokaal(tot)).limit(1000).then(r => r, () => ({ data: null })),
+    telLeads('male'),
+    telLeads('female'),
+    telChallenge(s, e),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -124,6 +160,9 @@ async function haalWeek(svc, coachId, van) {
   for (const r of RIJEN) {
     if (r.deel) waarden[r.key] = waarden[r.deel[1]] > 0 ? Math.round((waarden[r.deel[0]] / waarden[r.deel[1]]) * 100) : null
   }
+  waarden.challenge = challenge
+  waarden.nieuwMannen = mannen
+  waarden.nieuwVrouwen = vrouwen
   const week = { waarden, posts: m || [], fun }
   if (tot <= new Date()) cache.set(sleutel, week)
   return week
@@ -278,6 +317,12 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const [naam, setNaam] = useState('')
   const [melding, setMelding] = useState(null)
   const [sleepKey, setSleepKey] = useState(null)
+  const [geslacht, setGeslacht] = useState(leesGeslacht)
+  const wisselGeslacht = () => {
+    const nieuw = GESLACHT[geslacht].volgende
+    setGeslacht(nieuw)
+    try { localStorage.setItem(GESLACHT_KEY, nieuw) } catch { /* privémodus */ }
+  }
   const romp = useRef(null)
   const keysNu = useRef(keys)
   const gestart = useRef(new Set())
@@ -621,7 +666,8 @@ export default function GinoKeten({ isMobile, onVraag }) {
                 const sleept = sleepKey === key
                 // Om de rij een dikke witte lijn boven en onder: zo volg je een rij zonder te verspringen.
                 const lijn = ri % 2 === 0 ? { borderTop: LIJN, borderBottom: LIJN } : {}
-                const gem = gemiddelde(r, basis)
+                const waardeKey = r.key === 'nieuw' ? GESLACHT[geslacht].key : r.key
+                const gem = gemiddelde({ ...r, key: waardeKey }, basis)
                 const Icon = r.Icon
                 return (
                   <tr key={r.key} data-rij={r.key} style={sleept ? { background: 'rgba(255,255,255,0.14)' } : undefined}>
@@ -633,12 +679,24 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>
                         <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />
-                        {r.label}
+                        {r.key === 'nieuw' ? (
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={wisselGeslacht}
+                            title={`${GESLACHT[geslacht].naam}. Klik om te wisselen. Bij een deel van de leads is het geslacht niet ingevuld, dus mannen plus vrouwen is minder dan beide.`}
+                            aria-label={`Nieuwe leads: ${GESLACHT[geslacht].naam}. Klik om te wisselen.`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
+                          >
+                            {r.label}
+                            {(() => { const G = GESLACHT[geslacht]; return <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} /> })()}
+                          </button>
+                        ) : r.label}
                       </span>
                     </td>
                     {kolommen.map((k, ki) => {
                       const week = perWeek[k.id]
-                      const v = week ? week.waarden[r.key] : undefined
+                      const v = week ? week.waarden[waardeKey] : undefined
                       const klikbaar = !!week && (r.lijst || r.stage)
                       const actief = detail?.rij.key === r.key && detail?.kolom.id === k.id
                       return (
