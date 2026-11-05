@@ -21,7 +21,8 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, CalendarDays, ChevronLeft } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays, ChevronLeft, RefreshCw } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -1292,6 +1293,19 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
       padding: isMobile ? '12px 16px 8px' : '20px 24px 12px',
     }}>
+      {/* ── Herladen: nieuwe code van Gino meteen ophalen. Niet in de native app:
+          daar komt een live-bundel pas aan na opnieuw openen (liveUpdate.js). ── */}
+      {!Capacitor.isNativePlatform() && (
+        <button type="button" onClick={() => window.location.reload()} data-bos-herlaad title="Herladen" aria-label="Herladen" style={{
+          position: 'absolute', top: isMobile ? 12 : 20, right: (isMobile ? 12 : 20) + 92, zIndex: 20,
+          width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff',
+          background: 'transparent', color: C.wit, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <RefreshCw size={16} strokeWidth={2.6} />
+        </button>
+      )}
+
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
       <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{

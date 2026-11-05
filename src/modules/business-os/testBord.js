@@ -60,12 +60,17 @@ export const VRAGEN = {
   les: 'Wat weten we nu wat we niet wisten?',
 }
 
-// In een kolom zonder kaarten. Geen kaarten zelf: ze tellen nergens mee.
-export const STARTVRAGEN = {
-  onderzoek: ['Welk cijfer laat zien dat dit kan werken?'],
-  maken: ['Wat moet er geschoten en geschreven worden?'],
-  posten: ['Waar en wanneer gaat het online?'],
+// De kaarten van een kolom in looprichting (eerste onderaan het scherm): op dag oplopend, daarna
+// die zonder dag, beide in plan-volgorde. Een nieuwe kaart staat achteraan het plan en komt dus bovenop.
+// si = plek in de stappenlijst.
+export function kolomVolgorde(stappen, kolom) {
+  const rij = (stappen || []).map((s, si) => ({ s, si })).filter(({ s }) => kolomVan(s) === kolom)
+  const metDag = rij.filter(({ s }) => isDag(s?.dag)).sort((a, b) => a.s.dag.localeCompare(b.s.dag))
+  return [...metDag, ...rij.filter(({ s }) => !isDag(s?.dag))]
 }
+
+// Laatste dag van alle kaarten, ook die al klaar zijn. Geen datums = null.
+export const laatsteDag = (stappen) => (stappen || []).reduce((max, s) => (isDag(s?.dag) && s.dag > (max || '') ? s.dag : max), null)
 
 export const veldLeeg = (v) => v === undefined || v === null || String(v).trim() === ''
 

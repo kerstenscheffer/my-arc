@@ -170,7 +170,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     const meet = () => {
       const paneel = kopRef.current?.parentElement?.getBoundingClientRect()
       if (!paneel) return
-      const agenda = document.querySelector('[data-bos-agenda]')?.getBoundingClientRect()
+      const agenda = document.querySelector('[data-bos-herlaad], [data-bos-agenda]')?.getBoundingClientRect()
       const terug = document.querySelector('button[title="Terug"]')?.getBoundingClientRect()
       const links = terug ? Math.max(0, Math.ceil(terug.right + 12 - paneel.left)) : 0
       const rechts = agenda ? Math.max(0, Math.ceil(paneel.right - agenda.left + 12)) : 0

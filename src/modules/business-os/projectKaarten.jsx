@@ -5,7 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BookOpen, Check, CheckCircle2, ChevronRight, ChevronUp, Film, Phone, Plus, X } from 'lucide-react'
-import { kortDag } from './testBord.js'
+import { isDag, kortDag } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -71,6 +71,31 @@ export function StapInvoer({ begin = '', label, isMobile, onKlaar, fontGrootte =
   )
 }
 
+// Enter of klikken buiten = klaar, Escape = annuleren. onKlaar krijgt de nieuwe dag,
+// '' als een bestaande dag is leeggemaakt, of null als er niets is veranderd.
+export function DagInvoer({ begin, label, onKlaar, fontGrootte = 16 }) {
+  const [dag, setDag] = useState(begin)
+  const afgerond = useRef(false)
+  const rond = (bewaren) => {
+    if (afgerond.current) return
+    afgerond.current = true
+    onKlaar(bewaren && dag !== begin ? dag : null)
+  }
+  return (
+    <input type="date" autoFocus value={dag} aria-label={label}
+      onChange={e => setDag(e.target.value)}
+      onBlur={() => rond(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') { e.preventDefault(); rond(true) }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rond(false) }
+      }}
+      style={{
+        display: 'block', width: '100%', boxSizing: 'border-box', padding: 0, border: 'none', borderBottom: `1.5px solid ${G}`, outline: 'none', colorScheme: 'dark',
+        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: fontGrootte, fontWeight: 800,
+      }} />
+  )
+}
+
 // Kleine knop in de onderste regel van een bordkaart. Op de telefoon 44 hoog, maar die extra
 // hoogte valt alleen in de witruimte onder de kaart: een tik op de titel erboven blijft de titel.
 const rijKnop = (isMobile) => ({
@@ -121,12 +146,13 @@ function NotitieTekst({ tekst, klaar, isMobile, onBewerk }) {
   )
 }
 
-// Op het bord (opBord): volle kolombreedte, geen kader, eigenaar en notitie (onWie, onNotitie),
+// Op het bord (opBord): volle kolombreedte, geen kader, eigenaar, datum en notitie (onWie, onDag, onNotitie),
 // en eventueel slepen (onSleepStart) en een pijltje naar de volgende kolom (onVolgende).
-export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg, opBord = false, onWie, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
+export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg, opBord = false, onWie, onDag, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
   const [titelOpen, setTitelOpen] = useState(false)
   const [notitieOpen, setNotitieOpen] = useState(false)
-  const bewerkt = titelOpen || notitieOpen
+  const [datumOpen, setDatumOpen] = useState(false)
+  const bewerkt = titelOpen || notitieOpen || datumOpen
   const notitie = opBord && typeof s.notitie === 'string' ? s.notitie.trim() : ''
   const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
   const isNu = s.dag === vandaag
@@ -138,7 +164,7 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, o
   const rechts = isMobile ? (metPijl ? 76 : 40) : 28
   const sleepbaar = !!onSleepStart && !bewerkt
   const metaRegel = meta && (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', ...(opBord ? { marginTop: isMobile ? 4 : 2, lineHeight: '16px' } : { marginTop: 2 }) }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
       <Icoon size={12} strokeWidth={2.6} /> {meta}
     </span>
   )
@@ -186,8 +212,24 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, o
         {opBord ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 12 }}>
             <Eigenaar wie={s.wie} isMobile={isMobile} onWie={onWie} />
-            {metaRegel}
-            {!notitie && !notitieOpen && (
+            {datumOpen ? (
+              <div style={{ flex: '1 1 100%', marginTop: 4 }}>
+                <DagInvoer begin={isDag(s.dag) ? s.dag : ''} label="Datum" fontGrootte={isMobile ? 16 : 13}
+                  onKlaar={d => { setDatumOpen(false); if (d !== null) onDag(d) }} />
+              </div>
+            ) : isDag(s.dag) ? (
+              <button type="button" onClick={() => setDatumOpen(true)} aria-label={`Datum: ${kortDag(s.dag)}. Wijzig`} style={{
+                ...rijKnop(isMobile), color: achter ? '#f59e0b' : isNu ? G : s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', fontVariantNumeric: 'tabular-nums',
+              }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icoon size={12} strokeWidth={2.6} /> {kortDag(s.dag)}</span>
+              </button>
+            ) : (
+              <button type="button" className="gp-bordnieuw" onClick={() => setDatumOpen(true)} style={{ ...rijKnop(isMobile), fontWeight: 700 }}>+ Datum</button>
+            )}
+            {s.gepland_id && !datumOpen && (
+              <span style={{ padding: `${isMobile ? 4 : 2}px 0 0`, fontSize: 12, fontWeight: 700, lineHeight: '16px', color: 'rgba(255,255,255,0.7)' }}>ingepland</span>
+            )}
+            {!notitie && !notitieOpen && !datumOpen && (
               <button type="button" className="gp-stapweg" onClick={() => setNotitieOpen(true)} style={{
                 ...rijKnop(isMobile), color: '#fff', ...(isMobile ? { opacity: 0.7 } : {}),
               }}>+ Notitie</button>

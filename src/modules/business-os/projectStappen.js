@@ -36,7 +36,7 @@ export const wijzigStap = (id, velden) => (plan) => {
   return true
 }
 
-// Eigenaar en notitie op het bord. Leeg (null of '') haalt het veld weg.
+// Eigenaar, notitie en datum op het bord. Leeg (null of '') haalt het veld weg.
 export const zetKaartVelden = (id, velden) => (plan) => {
   const hit = zoekStap(plan, id)
   if (!hit) return false
@@ -76,7 +76,7 @@ export const zetStapTerug = ({ plek, stap, si, naId }) => (plan) => {
 
 // ── Testbord (fase.bord) ──
 
-// Naar een andere kolom: onderaan die kolom.
+// Naar een andere kolom: achteraan het plan. Zonder dag komt de kaart dus bovenop de stapel (zie kolomVolgorde).
 export const verplaatsStap = (id, kolom) => (plan) => {
   const hit = zoekStap(plan, id)
   if (!hit) return false

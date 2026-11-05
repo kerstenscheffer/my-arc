@@ -1,14 +1,14 @@
 // src/modules/business-os/TestBord.jsx
 //
-// Eén test als horizontale kanban (fase.bord === true): zes vaste kolommen als slider,
-// elk met een eigen kop (fasebalk + naam) die meeschuift. Regels staan in testBord.js,
-// opslaan in GinoProjecten (via projectStappen.js, opnieuw lezen vlak voor schrijven).
+// Eén test als horizontale kanban (fase.bord === true): zes vaste kolommen als slider, met alleen
+// kaarten die van onder naar boven lopen. Plan, meting en besluit staan in het blok Details onder de naam.
+// Regels staan in testBord.js, opslaan in GinoProjecten (via projectStappen.js, opnieuw lezen vlak voor schrijven).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
+import { Cijfer, DagInvoer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { useTestMeting } from './useTestMeting'
-import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, STARTVRAGEN, VOORSTEL, VRAGEN, bordStand, isDag, kolomVan, komma, kortDag, leesGetal, suggestieVoor, veldLeeg, volgendeKolom } from './testBord.js'
+import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, VRAGEN, bordStand, isDag, kolomVan, kolomVolgorde, komma, kortDag, laatsteDag, leesGetal, suggestieVoor, veldLeeg, volgendeKolom } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -32,7 +32,7 @@ const schrijfDicht = (sleutel, dicht) => {
   } catch { /* privé-venster */ }
 }
 
-// Het cijfer van de ingeklapte regel: hetzelfde als in de kolom Meten. Een mislukte meting is fout, geen "geen data".
+// Het cijfer van de ingeklapte regel: hetzelfde als onder Meten in Details. Een mislukte meting is fout, geen "geen data".
 function regelCijfer(b) {
   if (!b.gestart) return 'Nog geen data'
   if (b.mislukt) return 'fout'
@@ -99,30 +99,7 @@ function BordVeld({ label, waarde, soort, vraag, suggestie, isMobile, onBewaar }
   )
 }
 
-function DagInvoer({ begin, label, onKlaar }) {
-  const [dag, setDag] = useState(begin)
-  const afgerond = useRef(false)
-  const rond = (bewaren) => {
-    if (afgerond.current) return
-    afgerond.current = true
-    onKlaar(bewaren && dag !== begin ? dag : null)
-  }
-  return (
-    <input type="date" autoFocus value={dag} aria-label={label}
-      onChange={e => setDag(e.target.value)}
-      onBlur={() => rond(true)}
-      onKeyDown={e => {
-        if (e.key === 'Enter') { e.preventDefault(); rond(true) }
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rond(false) }
-      }}
-      style={{
-        display: 'block', width: '100%', boxSizing: 'border-box', padding: 0, border: 'none', borderBottom: `1.5px solid ${G}`, outline: 'none', colorScheme: 'dark',
-        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: 16, fontWeight: 800,
-      }} />
-  )
-}
-
-const Groot = ({ children }) => <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>{children}</div>
+const Groot =({ children }) => <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>{children}</div>
 const GeenData = () => <Groot>Nog geen data</Groot>
 
 function PlanBlok({ test, b, isMobile, zetVeld }) {
@@ -201,6 +178,8 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
   const [naamOpen, setNaamOpen] = useState(false)
   const [bevestig, setBevestig] = useState(false)
   const [ingeklapt, setIngeklapt] = useState(() => leesDicht(dichtSleutel(projectId, f.naam)))
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const klaarOp = laatsteDag(stappen)
   const zetVeld = (velden) => zetTest(fi, velden)
 
   // ── Slider ──
@@ -288,7 +267,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
             style={{ ...pijl, ...(isMobile ? { width: 44, height: 44 } : {}) }}>
             <ChevronDown size={18} strokeWidth={2.8} style={{ transform: ingeklapt ? 'rotate(-90deg)' : 'none', transition: 'transform .2s ease' }} />
           </button>
-          <div style={{ minWidth: 0, flex: 1, ...(ingeklapt && !naamOpen ? { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 12, rowGap: 2 } : {}) }}>
+          <div style={{ minWidth: 0, flex: 1, ...(!naamOpen ? { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 12, rowGap: 2 } : {}) }}>
             {naamOpen ? (
               <StapInvoer begin={f.naam || ''} label="Testnaam" isMobile={isMobile} fontGrootte={18} onKlaar={bewaarNaam} />
             ) : (
@@ -297,6 +276,9 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                 fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.25,
                 ...(ingeklapt ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { overflowWrap: 'anywhere' }),
               }}>{f.naam}</button>
+            )}
+            {klaarOp && !naamOpen && (
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>Klaar op {kortDag(klaarOp)}</span>
             )}
             {ingeklapt && !naamOpen && (
               <span style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: 10, fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
@@ -329,8 +311,30 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
         {/* Kolommen. 0fr → 1fr geeft een korte overgang zonder de hoogte te hoeven meten. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: ingeklapt ? '0fr' : '1fr', transition: 'grid-template-rows .2s ease' }}>
           <div inert={ingeklapt} style={{ minWidth: 0, minHeight: 0, overflow: 'hidden', opacity: ingeklapt ? 0 : 1, visibility: ingeklapt ? 'hidden' : 'visible', transition: 'opacity .2s ease, visibility .2s' }}>
+            <button type="button" onClick={() => setDetailsOpen(o => !o)} aria-expanded={detailsOpen} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: isMobile ? 44 : 28, padding: 0, border: 'none', background: 'none', color: '#fff', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+            }}>
+              <ChevronDown size={14} strokeWidth={2.8} style={{ transform: detailsOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .2s ease' }} />
+              Details
+            </button>
+            {detailsOpen && (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: isMobile ? 24 : KOLOM_GAT, marginTop: 8, marginBottom: 12 }}>
+                {[
+                  ['Plan', <PlanBlok key="plan" test={test} b={b} isMobile={isMobile} zetVeld={zetVeld} />],
+                  ['Posten', <PostenBlok key="posten" b={b} />],
+                  ['Meten', <MetenBlok key="meten" b={b} />],
+                  ['Besluit', <BesluitBlok key="besluit" test={test} b={b} isMobile={isMobile} zetVeld={zetVeld} />],
+                ].map(([naam, blok]) => (
+                  <div key={naam} style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+                    <h5 style={{ margin: 0, fontSize: 15, fontWeight: 900, lineHeight: 1.3, color: '#fff' }}>{naam}</h5>
+                    {blok}
+                  </div>
+                ))}
+              </div>
+            )}
             <div ref={slider} className="gp-bord" onScroll={meetRand} onDragOver={overSlider} style={{
-              display: 'flex', alignItems: 'flex-start', gap: KOLOM_GAT, marginTop: 12, overflowX: 'auto', overflowY: 'hidden',
+              display: 'flex', alignItems: 'stretch', gap: KOLOM_GAT, marginTop: 12, overflowX: 'auto', overflowY: 'hidden',
               scrollSnapType: snap, overscrollBehaviorX: 'contain', WebkitOverflowScrolling: 'touch',
             }}>
               {KOLOMMEN.map(k => {
@@ -352,7 +356,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                       if (kolomVan(stappen.find(s => s.id === id)) !== k.id) verplaats(id, k.id)
                     }}
                     style={{
-                      flex: '0 0 auto', width: isMobile ? '84vw' : KOLOM_BREED, boxSizing: 'border-box', scrollSnapAlign: 'start', minHeight: 120, borderRadius: 12,
+                      flex: '0 0 auto', display: 'flex', flexDirection: 'column', width: isMobile ? '84vw' : KOLOM_BREED, boxSizing: 'border-box', scrollSnapAlign: 'start', minHeight: 120, borderRadius: 12,
                       background: dropKolom === k.id ? `${G}14` : 'transparent', transition: 'background .15s',
                     }}>
                     {/* Kop: balk en naam horen bij elkaar. De status zit in de balkkleur, voor schermlezers in het label. */}
@@ -360,24 +364,16 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                       <span aria-hidden style={{ display: 'block', height: 6, borderRadius: 3, marginBottom: 6, background: klaar ? G : nu ? ORANJE : GRIJS, transition: 'background .3s' }} />
                       {k.naam}
                     </h4>
-                    {['plan', 'posten', 'meten', 'besluit'].includes(k.id) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-                        {k.id === 'plan' && <PlanBlok test={test} b={b} isMobile={isMobile} zetVeld={zetVeld} />}
-                        {k.id === 'posten' && <PostenBlok b={b} />}
-                        {k.id === 'meten' && <MetenBlok b={b} />}
-                        {k.id === 'besluit' && <BesluitBlok test={test} b={b} isMobile={isMobile} zetVeld={zetVeld} />}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                      {!stappen.some(s => kolomVan(s) === k.id) && STARTVRAGEN[k.id]?.map(v => <div key={v} style={VRAAG}>{v}</div>)}
-                      {stappen.map((s, si) => (kolomVan(s) !== k.id ? null : (
+                    {/* Stapel onderaan de kolom: + Kaart bovenop, eerste stap onderaan. */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto', paddingTop: 12 }}>
+                      <NieuweStap isMobile={isMobile} opBord onNieuw={t => nieuweStap(fi, t, k.id)} />
+                      {kolomVolgorde(stappen, k.id).reverse().map(({ s, si }) => (
                         <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord oplichten={huidig?.stappen?.includes(s.id)}
                           onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
-                          onWie={wie => zetKaart(s.id, { wie })} onNotitie={notitie => zetKaart(s.id, { notitie })}
+                          onWie={wie => zetKaart(s.id, { wie })} onDag={dag => zetKaart(s.id, { dag })} onNotitie={notitie => zetKaart(s.id, { notitie })}
                           onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
                           onSleepStart={!isMobile && s.id ? () => sleepStart(s.id) : null} onSleepEind={sleepEind} />
-                      )))}
-                      <NieuweStap isMobile={isMobile} opBord onNieuw={t => nieuweStap(fi, t, k.id)} />
+                      ))}
                     </div>
                   </div>
                 )
