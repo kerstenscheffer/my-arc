@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Film, Sparkles, Eye, BarChart3, MessageSquare, UserPlus, Send, MessageCircle, PhoneCall, CalendarCheck, Calendar,
-  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2, Mars, Venus, VenusAndMars, Megaphone, ChevronRight,
+  Phone, Trophy, Euro, Wallet, UserX, PhoneOff, XCircle, Percent, X, ChevronDown, Filter, GripVertical, Check, Trash2, Mars, Venus, VenusAndMars, Megaphone, ChevronRight, EyeOff,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LeadManagementService from '../lead-management/LeadManagementService'
@@ -314,31 +314,40 @@ function gemiddelde(r, weken) {
   return metWaarde.length ? metWaarde.reduce((t, w) => t + w.waarden[r.key], 0) / metWaarde.length : null
 }
 
-// Laatste 3 volle weken tegen de 4 weken daarvoor.
-function conclusie(volle) {
+// Laatste 3 volle weken tegen de 4 weken daarvoor, over de rijen die nu in beeld staan.
+// sleutelVan: welke waarde een rij nu toont (bv. alleen mannen).
+function conclusie(volle, keys, sleutelVan) {
   if (volle.length < 5) return null
   const nu = volle.slice(0, 3), toen = volle.slice(3, 7)
   const verschil = (r) => {
-    const a = gemiddelde(r, toen), b = gemiddelde(r, nu)
-    return a > 0 && b != null ? { r, oud: a, nieuw: b, pct: Math.round(((b - a) / a) * 100) } : null
+    const rij = { ...r, key: sleutelVan(r) }
+    const a = gemiddelde(rij, toen), b = gemiddelde(rij, nu)
+    if (!(a > 0) || b == null) return null
+    const pct = Math.round(((b - a) / a) * 100)
+    // Bij no-shows en dergelijke is meer juist slechter.
+    return { r, oud: a, nieuw: b, pct, slechter: r.omgekeerd ? pct : -pct }
   }
-  const stappen = RIJEN.filter(r => r.stap).map(verschil).filter(Boolean).sort((x, y) => x.pct - y.pct)
-  const grootste = stappen[0]
-  if (!grootste || grootste.pct >= 0) return { tekst: 'Geen stap in de keten is gedaald tegenover de 4 weken daarvoor.' }
-  const rij = (k) => RIJEN.find(r => r.key === k)
-  const close = verschil(rij('close'))
-  const calls = verschil(rij('gevoerd'))
-  const sales = gemiddelde(rij('sales'), nu), order = gemiddelde(rij('order'), nu)
-  // Wat de gemiste calls kosten: tegen de close en orderwaarde van nu.
-  const extra = calls && calls.pct < 0 && close && sales > 0
+  const zichtbaar = keys.map(k => RIJ_VAN[k]).filter(Boolean)
+  const stappen = zichtbaar.map(verschil).filter(Boolean).sort((x, y) => y.slechter - x.slechter)
+  if (!stappen.length || stappen[0].slechter <= 0) return { tekst: 'Geen van deze stats is slechter dan de 4 weken daarvoor.' }
+  const close = verschil(RIJ_VAN.close)
+  const calls = verschil(RIJ_VAN.gevoerd)
+  const sales = gemiddelde(RIJ_VAN.sales, nu), order = gemiddelde(RIJ_VAN.order, nu)
+  // Wat de gemiste calls kosten, tegen de close en orderwaarde van nu. Alleen als de calls in beeld staan.
+  const extra = keys.includes('gevoerd') && calls && calls.pct < 0 && close && sales > 0
     ? Math.round((calls.oud - calls.nieuw) * (close.nieuw / 100) * (order / sales) / 10) * 10
     : null
+  const daling = stappen.filter(d => d.slechter >= 15).slice(0, 4)
   return {
-    daling: stappen.filter(s => s.pct <= -15).slice(0, 3),
-    close,
+    grootste: stappen[0],
+    daling,
+    close: keys.includes('close') && !daling.some(d => d.r.key === 'close') ? close : null,
     extra,
   }
 }
+
+// -58%, of 59% → 43% bij een rij die zelf al een percentage is.
+const verschilTekst = (d) => (d.r.deel ? `${Math.round(d.oud)}% → ${Math.round(d.nieuw)}%` : `${d.pct > 0 ? '+' : ''}${d.pct}%`)
 
 export default function GinoKeten({ isMobile, onVraag }) {
   const [aantal, setAantal] = useState(WEKEN)
@@ -364,6 +373,10 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const [sleepKey, setSleepKey] = useState(null)
   const [geslacht, setGeslacht] = useState(leesGeslacht)
   const geslachtVan = (k) => (GESLACHT[geslacht[k]] ? geslacht[k] : 'beide')
+  // Rijen die even weg zijn. Bewust niet bewaard: dit is voor een snelle check en raakt je
+  // weergave niet. Verversen zet alles terug.
+  const [verborgen, setVerborgen] = useState(() => new Set())
+  const [verborgenOpen, setVerborgenOpen] = useState(false)
   const [uitklap, setUitklap] = useState(leesUitklap)
   const wisselUitklap = (k) => {
     const nieuw = { ...uitklap, [k]: !uitklap[k] }
@@ -517,7 +530,12 @@ export default function GinoKeten({ isMobile, onVraag }) {
   const volle = kolommen.filter(k => !k.loopt && perWeek[k.id]).map(k => ({ ...k, waarden: perWeek[k.id].waarden }))
   // Vaste basis, anders verschieten de kleuren elke keer als je verder terug schuift.
   const basis = volle.slice(0, WEKEN - 1)
-  const zin = kolommen.slice(0, 8).every(k => perWeek[k.id]) ? conclusie(volle) : null
+  // De zin volgt wat er in beeld staat: de gekozen stats en het gekozen geslacht.
+  const sleutelVan = (rij) => {
+    const g = GESLACHT_RIJEN[rij.key] ? geslachtVan(rij.key) : 'beide'
+    return g === 'beide' ? rij.key : GESLACHT_RIJEN[rij.key][g]
+  }
+  const zin = kolommen.slice(0, 8).every(k => perWeek[k.id]) ? conclusie(volle, keys.filter(k => !verborgen.has(k)), sleutelVan) : null
 
   const meerWeken = () => setAantal(a => Math.min(MAX_WEKEN, a + STAP))
   const bijEinde = () => {
@@ -571,17 +589,52 @@ export default function GinoKeten({ isMobile, onVraag }) {
       }
     }
     const metPost = (g) => (p) => u.groep(p) === g
-    return Object.keys(posts).sort((a, b) => posts[b] - posts[a]).flatMap((g) => [
-      { key: `${rij}:${g}:posts`, label: u.naam(g), kop: true, lijst: { sorteer: 'tijd', filter: metPost(g) } },
-      { key: `${rij}:${g}:views`, label: 'Views', titel: `${u.naam(g)}: views`, sub: true, lijst: { sorteer: 'views', filter: metPost(g) } },
-      { key: `${rij}:${g}:comments`, label: 'Comments', titel: `${u.naam(g)}: comments`, sub: true, lijst: { sorteer: 'comments', filter: metPost(g) } },
-      ...(u.leads ? [{ key: `${rij}:${g}:leads`, label: 'Nieuwe leads', sub: true, geslacht: 'magnetLeads', basis: `${rij}:${g}:leads` }] : []),
-    ])
+    // Elke groep start dicht: alleen de naam met het aantal posts. Klik = de stats eronder.
+    const groepRijen = (g) => {
+      const klap = `${rij}:${g}`
+      return [
+        { key: `${rij}:${g}:posts`, label: u.naam(g), kop: true, klap, lijst: { sorteer: 'tijd', filter: metPost(g) } },
+        ...(uitklap[klap] ? [
+          { key: `${rij}:${g}:views`, label: 'Views', titel: `${u.naam(g)}: views`, sub: true, lijst: { sorteer: 'views', filter: metPost(g) } },
+          { key: `${rij}:${g}:comments`, label: 'Comments', titel: `${u.naam(g)}: comments`, sub: true, lijst: { sorteer: 'comments', filter: metPost(g) } },
+          ...(u.leads ? [{ key: `${rij}:${g}:leads`, label: 'Nieuwe leads', titel: `${u.naam(g)}: nieuwe leads`, sub: true, geslacht: 'magnetLeads', basis: `${rij}:${g}:leads` }] : []),
+        ] : []),
+      ]
+    }
+    const groepen = Object.keys(posts).sort((a, b) => posts[b] - posts[a])
+    // Niet gepost in de laatste 8 volle weken: samen op één dichte regel.
+    const recent = volle.slice(0, 8)
+    const isRecent = (g) => recent.some(k => k.waarden[`${rij}:${g}:posts`] > 0)
+    const stil = groepen.filter(g => !isRecent(g))
+    const stilKlap = `${rij}:__stil`
+    return [
+      ...groepen.filter(isRecent).flatMap(groepRijen),
+      ...(stil.length ? [{ key: stilKlap, label: `Niet gepost, laatste 8 weken (${stil.length})`, kop: true, klap: stilKlap, leeg: true }] : []),
+      ...(stil.length && uitklap[stilKlap] ? stil.flatMap(groepRijen) : []),
+    ]
   }
   const weergaveRijen = keys.flatMap((k) => {
     const rij = RIJ_VAN[k]
     return UITKLAP[k] && uitklap[k] ? [rij, ...subRijen(k)] : [rij]
   })
+
+  // De stats onder een groep gaan mee weg als de groep zelf verborgen is.
+  const kopVan = (r) => r.key.replace(/:[^:]+$/, ':posts')
+  const zichtbareRijen = weergaveRijen.filter(r => !verborgen.has(r.key) && !(r.sub && verborgen.has(kopVan(r))))
+  const verborgenRijen = weergaveRijen.filter(r => verborgen.has(r.key))
+  const wisselZicht = (e, r) => {
+    // Shift-klik: alleen deze rij blijft staan (met zijn eigen stats eronder).
+    if (e.shiftKey) {
+      setVerborgen(new Set(weergaveRijen.filter(x => x.key !== r.key && !(x.sub && kopVan(x) === r.key)).map(x => x.key)))
+      return
+    }
+    setVerborgen((o) => {
+      const n = new Set(o)
+      if (n.has(r.key)) n.delete(r.key); else n.add(r.key)
+      return n
+    })
+  }
+  const oog = { display: 'flex', flexShrink: 0, marginLeft: 'auto', padding: '2px 0 2px 8px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }
 
   const NAAM_B = isMobile ? 150 : 170
   const LIJN = '1.5px solid #fff'
@@ -617,7 +670,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
             <div style={{ position: isMobile ? 'static' : 'relative', minWidth: 0, flex: '0 1 auto' }}>
               <button type="button" aria-expanded={tekstOpen} onClick={() => wissel('tekst')} style={{ ...knop(tekstOpen), maxWidth: '100%', paddingLeft: 0, flexShrink: 1 }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {zin.tekst || (zin.daling?.length ? <>Grootste daling: {zin.daling[0].r.label.toLowerCase()} <span style={{ color: ROOD }}>{zin.daling[0].pct}%</span></> : 'Geen grote dalingen')}
+                  {zin.tekst || <>{zin.grootste.r.omgekeerd ? 'Grootste stijging' : 'Grootste daling'}: {zin.grootste.r.label.toLowerCase()} <span style={{ color: ROOD }}>{verschilTekst(zin.grootste)}</span></>}
                 </span>
                 <ChevronDown size={14} strokeWidth={2.8} style={{ flexShrink: 0, transform: tekstOpen ? 'rotate(180deg)' : 'none' }} />
               </button>
@@ -626,7 +679,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', paddingBottom: 6 }}>Laatste 3 weken tegen de 4 ervoor</div>
                   {zin.daling?.map(d => (
                     <div key={d.r.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                      <span>{d.r.label}</span><span style={{ color: ROOD, fontVariantNumeric: 'tabular-nums' }}>{d.pct}%</span>
+                      <span>{d.r.label}</span><span style={{ color: ROOD, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{verschilTekst(d)}</span>
                     </div>
                   ))}
                   {zin.close && (
@@ -754,7 +807,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
               </tr>
             </thead>
             <tbody ref={romp}>
-              {weergaveRijen.map((r, ri) => {
+              {zichtbareRijen.map((r, ri) => {
                 const sleept = sleepKey === r.key
                 const isSub = r.kop || r.sub
                 // Om de rij een dikke witte lijn boven en onder: zo volg je een rij zonder te verspringen.
@@ -774,16 +827,16 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       onMouseDown={(e) => e.stopPropagation()}
                       style={{ ...cel, ...lijn, ...plak, background: sleept ? '#2a2a2a' : '#000', padding: '4px 8px 4px 0', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.85)', cursor: sleept ? 'grabbing' : 'grab' }}
                     >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingLeft: r.kop ? 20 : r.sub ? 34 : 0, ...(r.kop ? { color: '#fff', fontWeight: 900 } : r.sub ? { color: 'rgba(255,255,255,0.7)', fontWeight: 600 } : {}) }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: r.kop ? 20 : r.sub ? 34 : 0, ...(r.kop ? { color: '#fff', fontWeight: 900 } : r.sub ? { color: 'rgba(255,255,255,0.7)', fontWeight: 600 } : {}) }}>
                         {!isSub && <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>}
                         {Icon && <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />}
-                        {UITKLAP[r.key] ? (
-                          <button type="button" aria-expanded={!!uitklap[r.key]} onPointerDown={(e) => e.stopPropagation()} onClick={() => wisselUitklap(r.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
+                        {UITKLAP[r.key] || r.klap ? (
+                          <button type="button" aria-expanded={!!uitklap[r.klap || r.key]} onPointerDown={(e) => e.stopPropagation()} onClick={() => wisselUitklap(r.klap || r.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
                             {r.label}
-                            <ChevronRight size={14} strokeWidth={2.8} color="#fff" style={{ flexShrink: 0, transform: uitklap[r.key] ? 'rotate(90deg)' : 'none' }} />
+                            <ChevronRight size={14} strokeWidth={2.8} color="#fff" style={{ flexShrink: 0, transform: uitklap[r.klap || r.key] ? 'rotate(90deg)' : 'none' }} />
                           </button>
                         ) : null}
-                        {UITKLAP[r.key] ? null : G ? (
+                        {UITKLAP[r.key] || r.klap ? null : G ? (
                           <button
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
@@ -796,9 +849,13 @@ export default function GinoKeten({ isMobile, onVraag }) {
                             <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} />
                           </button>
                         ) : r.label}
+                        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} even verbergen`} title="Even verbergen. Shift-klik: alleen deze laten staan." style={oog}>
+                          <Eye size={14} strokeWidth={2.4} />
+                        </button>
                       </span>
                     </td>
                     {kolommen.map((k, ki) => {
+                      if (r.leeg) return <td key={k.id} style={{ ...cel, ...lijn, ...kolLijn(ki) }} />
                       const week = perWeek[k.id]
                       const v = week ? week.waarden[waardeKey] : undefined
                       const klikbaar = !!week && (r.lijst || r.stage)
@@ -817,6 +874,33 @@ export default function GinoKeten({ isMobile, onVraag }) {
                   </tr>
                 )
               })}
+              {verborgenRijen.length > 0 && (
+                <tr>
+                  <td style={{ ...cel, ...plak, padding: '8px 8px 4px 0', textAlign: 'left' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
+                      <button type="button" aria-expanded={verborgenOpen} onClick={() => setVerborgenOpen(o => !o)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
+                        Verborgen ({verborgenRijen.length})
+                        <ChevronRight size={14} strokeWidth={2.8} style={{ transform: verborgenOpen ? 'rotate(90deg)' : 'none' }} />
+                      </button>
+                      <button type="button" onClick={() => { setVerborgen(new Set()); setVerborgenOpen(false) }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: GROEN, font: 'inherit' }}>Alles tonen</button>
+                    </span>
+                  </td>
+                  <td colSpan={kolommen.length} />
+                </tr>
+              )}
+              {verborgenOpen && verborgenRijen.map(r => (
+                <tr key={`v-${r.key}`}>
+                  <td style={{ ...cel, ...plak, padding: '4px 8px 4px 0', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {r.titel || r.label}
+                      <button type="button" onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} weer tonen`} title="Weer tonen" style={{ ...oog, color: '#fff' }}>
+                        <EyeOff size={14} strokeWidth={2.4} />
+                      </button>
+                    </span>
+                  </td>
+                  <td colSpan={kolommen.length} />
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
