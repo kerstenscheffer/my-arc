@@ -299,38 +299,6 @@ function Herhaal({ onKlik, praat }) {
   )
 }
 
-// Terugblik onderaan het gesprek: 2-4 zinnen 'waar ging dit over en wat staat
-// open', met een luidspreker die hem door Gino laat voorlezen (nogmaals = stop).
-// Geen label: een zacht groen lijntje links zegt genoeg.
-function Terugblik({ tekst, praat, onKlik }) {
-  return (
-    <div style={{
-      display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 8, padding: '6px 0 2px 10px',
-      borderLeft: `2px solid ${colors.success}66`,
-    }}>
-      <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 600, color: colors.textSecondary }}>{tekst}</div>
-      {stem.beschikbaar() && (
-        <button onClick={onKlik} title={praat ? 'Stop' : 'Laat Gino dit voorlezen'} aria-label={praat ? 'Stop' : 'Laat Gino dit voorlezen'}
-          style={{
-            background: 'none', border: 'none', padding: 2, cursor: 'pointer', display: 'flex', flexShrink: 0,
-            color: praat ? colors.success : colors.textSecondary,
-          }}>
-          <Volume2 size={14} className={praat ? 'bos-stip' : undefined} />
-        </button>
-      )}
-    </div>
-  )
-}
-// Laadstaat van de terugblik: alleen een zacht ademend licht, geen tekst.
-const TerugblikLicht = () => (
-  <div aria-hidden style={{ marginTop: 8, padding: '8px 0 6px 10px', borderLeft: `2px solid ${colors.success}33` }}>
-    <span style={{
-      display: 'block', height: 6, width: '45%', borderRadius: 999, color: colors.success,
-      background: `${colors.success}40`, animation: 'bos-licht 1.8s ease-in-out infinite',
-    }} />
-  </div>
-)
-
 // Lange antwoorden ingekort tonen (~6 regels) met 'meer' / 'minder'.
 // achter: element direct achter de laatste zin (ingeklapt: naast 'meer').
 const MAX_REGELS = 6
@@ -651,70 +619,6 @@ const leesGesprekken = () => {
   } catch { /* nog niets */ }
   // Eerste keer: het bestaande gesprek (en zijn Slim-sessie) wordt 'Code'.
   return metEditor([nieuwTabje('Code', leesGesprek(), lees('business_os_gesprek_id')), nieuwTabje('Strategie')])
-}
-
-// ── Terugblik per gesprek (30 okt 2026) ──
-// Gemaakt door business-os-chat (de API-route van Gino, niet via de Mac: dan
-// zou hij als opdracht in de robot-regel en de tabjes-status verschijnen).
-// Bewaard in localStorage per tabje: { tekst, tot, sleutel }. tot = tijd van het
-// laatste bericht waar hij op rust; sleutel verandert alleen bij een nieuw
-// bericht, dus opnieuw maken kost alleen tokens als er echt iets bij kwam.
-// De tijd staat er als WANNEER in en wordt bij het tonen ingevuld ('een uur
-// geleden'), zodat een bewaarde terugblik niet veroudert.
-const TERUGBLIK_KEY = 'bos_terugblikken'
-const leesTerugblikken = () => {
-  try { return JSON.parse(localStorage.getItem(TERUGBLIK_KEY)) || {} } catch { return {} }
-}
-// Berichten van vóór 30 okt hebben geen 'op': dan het tabje als tijd en de lengte als sleutel.
-const terugblikBasis = (g) => {
-  const l = g?.berichten[g.berichten.length - 1]
-  if (!l) return null
-  return { tot: l.op || g.bijgewerkt, sleutel: l.op ? String(l.op) : `${g.berichten.length}:${(l.content || '').length}` }
-}
-const geleden = (ms) => {
-  const min = Math.round((Date.now() - ms) / 60000)
-  if (min < 2) return 'net'
-  if (min < 60) return `${min} minuten geleden`
-  const uur = Math.round(min / 60)
-  if (uur < 24) return uur === 1 ? 'een uur geleden' : `${uur} uur geleden`
-  const dag = Math.round(uur / 24)
-  if (dag === 1) return 'gisteren'
-  if (dag < 14) return `${dag} dagen geleden`
-  return `${Math.round(dag / 7)} weken geleden`
-}
-const tijdVan = (ms) => new Date(ms).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-const vulTerugblikIn = (tb) => tb.tekst.replace(/WANNEER/g, (_, i) => {
-  const w = geleden(tb.tot)
-  return i === 0 || /[.!?]\s*$/.test(tb.tekst.slice(0, i)) ? w[0].toUpperCase() + w.slice(1) : w
-})
-async function maakTerugblik(g) {
-  const regels = g.berichten.slice(-14).map(b => {
-    const wie = b.role === 'user' ? 'Kersten' : 'Gino'
-    const wanneer = b.op ? ` (${tijdVan(b.op)}, ${geleden(b.op)})` : ''
-    const acties = (b.acties || []).filter(a => a && typeof a === 'object').map(a =>
-      `[${a.soort}${a.uitgevoerd ? ', uitgevoerd' : a.afgewezen ? ', afgewezen' : ''}] ${kort(a.tekst || a.uitleg || '', 120)}`)
-    return `${wie}${wanneer}: ${kort((b.content || '').trim() || '[screenshot]', 450)}${acties.length ? `\n${acties.join('\n')}` : ''}`
-  })
-  let verloop = regels.join('\n\n')
-  if (verloop.length > 6000) verloop = `(eerder deel weggelaten)\n${verloop.slice(-6000)}`
-  const vraag = `Hieronder het gesprek '${g.naam}' tussen Kersten en jou (Gino). Nu is het ${tijdVan(Date.now())}.\n\n---\n${verloop}\n---\n\n`
-    + 'Schrijf een terugblik van 2 tot 4 korte zinnen die onderaan dit gesprek komt, zodat Kersten bij terugkomen meteen weet waar het over ging. '
-    + 'Spreektaal Nederlands, tegen Kersten (je), alsof je het hem even vertelt. '
-    + "Eerste zin: wat er speelde, en begin die zin letterlijk met het woord WANNEER in hoofdletters (dat vervang ik door bijvoorbeeld 'Een uur geleden'). "
-    + 'Daarna: wat er besloten of klaargezet is, en wat nu openstaat of de volgende stap is. '
-    + 'Geen gedachtestreepjes, geen emoji, geen opsomming, geen kopjes, geen markdown. Gebruik geen tools en voer niets uit: geef alleen de terugblik.'
-  try {
-    const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten: [{ role: 'user', content: vraag }] } })
-    if (error || data?.error || !data?.tekst) throw new Error(data?.error || error?.message || 'leeg antwoord')
-    const tekst = zonderMarkdown(data.tekst)
-      .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
-      .replace(/\s*[–—]\s*/g, ', ').replace(/\s+-\s+/g, ', ')
-      .replace(/\s+/g, ' ').trim()
-    return tekst || null
-  } catch (e) {
-    console.error('[terugblik] maken mislukt:', e?.message || e)
-    return null
-  }
 }
 
 // Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
@@ -1998,43 +1902,6 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     onderaan.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
 
-  // Terugblik: maken bij openen of wisselen van tabje, alleen als er sinds de
-  // vorige een nieuw bericht is. Tijdens het doorpraten niet bij elk antwoord
-  // opnieuw (tokens); een verouderde terugblik wordt dan gewoon niet getoond.
-  const [terugblikken, setTerugblikken] = useState(leesTerugblikken)
-  const terugblikkenRef = useRef(terugblikken)
-  terugblikkenRef.current = terugblikken
-  const [terugblikLaadt, setTerugblikLaadt] = useState({})
-  const terugblikLoopt = useRef({})
-  useEffect(() => {
-    const bestaat = new Set(gesprekken.map(g => g.id))
-    schrijf(TERUGBLIK_KEY, JSON.stringify(Object.fromEntries(Object.entries(terugblikken).filter(([id]) => bestaat.has(id)))))
-  }, [terugblikken, gesprekken])
-  useEffect(() => {
-    if (!open) return
-    const g = gesprekkenRef.current.find(x => x.id === actiefRef.current)
-    const basis = terugblikBasis(g)
-    if (!basis || terugblikLoopt.current[g.id] || terugblikkenRef.current[g.id]?.sleutel === basis.sleutel) return
-    terugblikLoopt.current[g.id] = true
-    setTerugblikLaadt(l => ({ ...l, [g.id]: true }))
-    maakTerugblik(g).then(tekst => {
-      if (tekst) setTerugblikken(t => ({ ...t, [g.id]: { tekst, tot: basis.tot, sleutel: basis.sleutel } }))
-    }).finally(() => {
-      terugblikLoopt.current[g.id] = false
-      setTerugblikLaadt(l => ({ ...l, [g.id]: false }))
-    })
-  }, [open, actief.id, dbKlaar])
-  const basisNu = terugblikBasis(actief)
-  const terugblik = basisNu && terugblikken[actief.id]?.sleutel === basisNu.sleutel ? terugblikken[actief.id] : null
-  const terugblikTekst = terugblik ? vulTerugblikIn(terugblik) : ''
-  const terugblikBron = `terugblik-${actief.id}`
-  const terugblikPraat = spreekt && spreekBron === terugblikBron
-  const leesTerugblikVoor = () => {
-    if (terugblikPraat) { stem.stop(); return }
-    stopHerkenner()
-    stem.leesVoor(terugblikTekst, terugblikBron)
-  }
-
   // Halve tekst terwijl Gino via de Mac typt (per tabje).
   const deel = deelPer[actief.id] || ''
   // Voorleestekst: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
@@ -2390,9 +2257,6 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
             {bezig && deel && (
               <div style={{ ...TEKST, fontWeight: 500, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{deel}</div>
             )}
-            {gesprek.length > 0 && !bezig && (terugblik
-              ? <Terugblik tekst={terugblikTekst} praat={terugblikPraat} onKlik={leesTerugblikVoor} />
-              : terugblikLaadt[actief.id] ? <TerugblikLicht /> : null)}
           </div>
         )}
 

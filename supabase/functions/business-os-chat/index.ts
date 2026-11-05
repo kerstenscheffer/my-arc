@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
     let beelden = 0
     const berichten = (Array.isArray(body.berichten) ? body.berichten : [])
       .filter((b: any) => (b.role === 'user' || b.role === 'assistant') && (tekstVan(b).trim() || geldigBeeld(b)))
-      .slice(-20)
+      .slice(-10) // minder geschiedenis = goedkoper; via de Mac geldt dit niet
       .reverse()
       .map((b: any) => {
         // Maximaal 3 screenshots (de nieuwste); oudere gaan als tekst door.
@@ -310,11 +310,24 @@ Deno.serve(async (req) => {
       ? (skills || []).map((k: any) => `### ${k.naam}\nWanneer: ${k.wanneer}\n${k.instructies}`).join('\n\n')
       : '(nog geen skills)'
     const context = body.context ? JSON.stringify(body.context).slice(0, 4000) : ''
-    const systeem = `${SYSTEEM}\n\n## Skills\n${skillTekst}`
-      + (isEigenaar ? '' : LID_SYSTEEM)
-      + (context ? `\n\nCijfers uit Business OS op dit moment (JSON):\n${context}` : '')
+    // Caching: instructie + tools blijven gelijk en worden bewaard. De cijfers
+    // veranderen per vraag en staan daarom in een los blok erachter.
+    const systeem: any[] = [{
+      type: 'text',
+      text: `${SYSTEEM}\n\n## Skills\n${skillTekst}` + (isEigenaar ? '' : LID_SYSTEEM),
+      cache_control: { type: 'ephemeral' },
+    }]
+    if (context) systeem.push({ type: 'text', text: `Cijfers uit Business OS op dit moment (JSON):\n${context}` })
+    // Tweede bewaarpunt op het nieuwste bericht: zo betaalt elke tool-ronde de
+    // vorige rondes niet opnieuw vol. De lijst zelf blijft ongemoeid, zodat er
+    // nooit meer dan twee bewaarpunten meegaan.
+    const metBewaarpunt = (messages: any[]) => messages.map((m, i) => {
+      if (i !== messages.length - 1) return m
+      const blokken = typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content
+      return { ...m, content: blokken.map((b: any, j: number) => (j === blokken.length - 1 ? { ...b, cache_control: { type: 'ephemeral' } } : b)) }
+    })
 
-    const vraagAI = async (messages: unknown[]) => {
+    const vraagAI = async (messages: any[]) => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -322,13 +335,17 @@ Deno.serve(async (req) => {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: mijnTools, messages }),
+        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: mijnTools, messages: metBewaarpunt(messages) }),
         signal: AbortSignal.timeout(90000),
       })
       const data = await r.json().catch(() => null)
       if (!r.ok) console.error('Anthropic-fout', r.status, JSON.stringify(data))
       if (!isEigenaar && data?.usage) {
-        const kosten = ((data.usage.input_tokens || 0) * PRIJS_IN_USD + (data.usage.output_tokens || 0) * PRIJS_UIT_USD) / 1_000_000
+        const u = data.usage
+        const kosten = ((u.input_tokens || 0) * PRIJS_IN_USD
+          + (u.cache_creation_input_tokens || 0) * PRIJS_IN_USD * 1.25
+          + (u.cache_read_input_tokens || 0) * PRIJS_IN_USD * 0.1
+          + (u.output_tokens || 0) * PRIJS_UIT_USD) / 1_000_000
         await sb.rpc('business_os_gebruik_bij', { p_kosten_usd: kosten }).then((u: any) => u, (e: any) => console.error('gebruik', e))
       }
       return r.ok ? data : null
@@ -470,7 +487,7 @@ Deno.serve(async (req) => {
         }
         if (blok.name === 'bekijk_schema') {
           const { data: rijen, error } = await sb.rpc('business_os_schema', { p_tabel: blok.input?.tabel || null })
-          uitkomst = error ? 'Mislukt: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+          uitkomst = error ? 'Mislukt: ' + error.message : JSON.stringify(rijen).slice(0, 15000)
         }
         if (blok.name === 'lees_database') {
           const sql = String(blok.input?.sql || '')
@@ -478,7 +495,7 @@ Deno.serve(async (req) => {
             uitkomst = 'Agenda en tijdregistratie van Kersten zijn niet beschikbaar.'
           } else {
             const { data: rijen, error } = await sb.rpc('business_os_lees', { p_sql: sql })
-            uitkomst = error ? 'Fout: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+            uitkomst = error ? 'Fout: ' + error.message : JSON.stringify(rijen).slice(0, 15000)
           }
         }
         if (blok.name === 'stel_wijziging_voor') {
