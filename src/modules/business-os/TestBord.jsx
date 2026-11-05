@@ -1,10 +1,10 @@
 // src/modules/business-os/TestBord.jsx
 //
 // Eén test als horizontale kanban (fase.bord === true): zes vaste kolommen als slider, met alleen
-// kaarten die van onder naar boven lopen. Plan, meting en besluit staan in het blok Details onder de naam.
+// kaarten die van boven naar beneden lopen. Plan, meting en besluit staan in het blok Details onder de naam.
 // Regels staan in testBord.js, opslaan in GinoProjecten (via projectStappen.js, opnieuw lezen vlak voor schrijven).
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Cijfer, DagInvoer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { useTestMeting } from './useTestMeting'
@@ -17,6 +17,8 @@ const GRIJS = 'rgba(255,255,255,0.14)'
 const MUTED = 'rgba(255,255,255,0.7)'
 const KOLOM_BREED = 260
 const KOLOM_GAT = 16
+const KAART_GAT = 8
+const LIJN_LINKS = 19 // midden van het vinkje (10 padding + 10 straal) min de halve lijndikte
 const LABEL = { fontSize: 12, fontWeight: 700, color: MUTED }
 const VRAAG = { fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: 'rgba(255,255,255,0.5)' }
 const OORDEEL_UITLEG = 'Onder 20 posts test, 20 tot 49 indicatie. Besluit vanaf 50 posts van minstens 7 dagen oud, over minimaal 14 dagen.'
@@ -341,6 +343,8 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
               {KOLOMMEN.map(k => {
                 const klaar = b.klaar[k.id], nu = b.huidig === k.id
                 const volgende = volgendeKolom(k.id)
+                const kaarten = kolomVolgorde(stappen, k.id)
+                const laatsteKlaar = kaarten.map(({ s }) => !!s.klaar).lastIndexOf(true)
                 return (
                   <div key={k.id} ref={el => { if (el) kolomVak.current[k.id] = el }}
                     onDragOver={e => {
@@ -365,16 +369,23 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                       <span aria-hidden style={{ display: 'block', height: 6, borderRadius: 3, marginBottom: 6, background: klaar ? G : nu ? ORANJE : GRIJS, transition: 'background .3s' }} />
                       {k.naam}
                     </h4>
-                    {/* Stapel onderaan de kolom: + Kaart bovenop, eerste stap onderaan. */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto', paddingTop: 12 }}>
-                      <NieuweStap isMobile={isMobile} opBord onNieuw={t => nieuweStap(fi, t, k.id)} />
-                      {kolomVolgorde(stappen, k.id).reverse().map(({ s, si }) => (
-                        <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord witteRand={si === eerstvolgende} oplichten={huidig?.stappen?.includes(s.id)}
-                          onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
-                          onWie={wie => zetKaart(s.id, { wie })} onDag={dag => zetKaart(s.id, { dag })} onNotitie={notitie => zetKaart(s.id, { notitie })}
-                          onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
-                          onSleepStart={!isMobile && s.id ? () => sleepStart(s.id) : null} onSleepEind={sleepEind} />
+                    {/* Stapel direct onder de kop: eerste stap bovenaan, + Kaart onderaan.
+                        De lijn staat alleen in de gaten tussen de kaarten: sommige kaarten zijn doorzichtig (vandaag),
+                        en een doorlopende lijn zou daar door de kaart heen schijnen. Hij loopt op de hartlijn van het vinkje. */}
+                    <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 12 }}>
+                      {kaarten.map(({ s, si }, i) => (
+                        <Fragment key={s.id || `plek-${si}`}>
+                          {i > 0 && <span aria-hidden style={{ flexShrink: 0, width: 2, height: KAART_GAT, marginLeft: LIJN_LINKS, pointerEvents: 'none', background: i <= laatsteKlaar ? G : GRIJS }} />}
+                          <StapKaart s={s} vandaag={vandaag} isMobile={isMobile} opBord witteRand={si === eerstvolgende} oplichten={huidig?.stappen?.includes(s.id)}
+                            onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
+                            onWie={wie => zetKaart(s.id, { wie })} onDag={dag => zetKaart(s.id, { dag })} onNotitie={notitie => zetKaart(s.id, { notitie })}
+                            onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
+                            onSleepStart={!isMobile && s.id ? () => sleepStart(s.id) : null} onSleepEind={sleepEind} />
+                        </Fragment>
                       ))}
+                      <div style={{ marginTop: kaarten.length ? KAART_GAT : 0 }}>
+                        <NieuweStap isMobile={isMobile} opBord onNieuw={t => nieuweStap(fi, t, k.id)} />
+                      </div>
                     </div>
                   </div>
                 )

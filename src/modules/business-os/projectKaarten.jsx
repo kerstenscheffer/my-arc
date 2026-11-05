@@ -228,6 +228,9 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
             ) : (
               <button type="button" className="gp-bordnieuw" onClick={() => setDatumOpen(true)} style={{ ...rijKnop(isMobile), fontWeight: 700 }}>+ Datum</button>
             )}
+            {s.vast && !s.klaar && !datumOpen && (
+              <span style={{ padding: `${isMobile ? 4 : 2}px 0 0`, fontSize: 12, fontWeight: 800, lineHeight: '16px', color: '#f59e0b' }}>Vast</span>
+            )}
             {s.gepland_id && !datumOpen && (
               <span style={{ padding: `${isMobile ? 4 : 2}px 0 0`, fontSize: 12, fontWeight: 700, lineHeight: '16px', color: 'rgba(255,255,255,0.7)' }}>ingepland</span>
             )}

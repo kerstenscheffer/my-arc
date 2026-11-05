@@ -60,8 +60,8 @@ export const VRAGEN = {
   les: 'Wat weten we nu wat we niet wisten?',
 }
 
-// De kaarten van een kolom in looprichting (eerste onderaan het scherm): op dag oplopend, daarna
-// die zonder dag, beide in plan-volgorde. Een nieuwe kaart staat achteraan het plan en komt dus bovenop.
+// De kaarten van een kolom in looprichting (eerste bovenaan het scherm): op dag oplopend, daarna
+// die zonder dag, beide in plan-volgorde. Een nieuwe kaart staat achteraan het plan en komt dus onderaan.
 // si = plek in de stappenlijst.
 export function kolomVolgorde(stappen, kolom) {
   const rij = (stappen || []).map((s, si) => ({ s, si })).filter(({ s }) => kolomVan(s) === kolom)

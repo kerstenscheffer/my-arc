@@ -29,6 +29,8 @@
 //       stappen[].kolom: onderzoek | plan | maken | posten | meten | besluit (geen kolom = onderzoek)
 //       stappen[].wie (optioneel): kersten | gino. stappen[].notitie (optioneel): tekst, mag meerdere regels.
 //         Alleen zichtbaar op het bord. Tellen nergens mee (bordStand, klaar-regels, meting).
+//       stappen[].vast (optioneel): true = de takenronde kreeg de kaart niet af, reden staat in notitie. Oranje label Vast op het bord.
+//         Veld weghalen (kaart met "vast":null) en de kaart doet weer mee.
 //       test erbij: wat, controlegroep, posts_doel (getal), besluit (meer|aanpassen|stoppen), les
 //       test mag leeg {} zijn; zonder test.van is de test niet gestart (Posten en Meten: Nog geen data)
 //       test.suggesties (optioneel): { wat?, nulmeting_per_10? (getal), controlegroep?, posts_doel? (getal), verwachting?,
@@ -38,6 +40,12 @@
 //   node scripts/pa-db.mjs projecten                 alle projecten (kort)
 //   node scripts/pa-db.mjs project "<id>"            één project volledig
 //   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'
+//   node scripts/pa-db.mjs kaart '{"project_id","stap_id","klaar"?,"vast"? (true|null),"notitie"? (komt onder de bestaande)}'
+//     leest het plan vlak ervoor opnieuw en wijzigt alleen die kaart
+//   node scripts/pa-db.mjs taken-droog [YYYY-MM-DD]  welke kaarten de takenronde zou pakken en waarom andere niet; voert niets uit
+//     Takenronde (business-os-pa.mjs, planTaken): elke 30 min een rij soort groei met invoer.ronde = taken en invoer.kaarten,
+//     alleen als er geen loopt en er kaarten zijn. Regels: scripts/takenronde.mjs. Open kaart van wie gino, dag vandaag of eerder,
+//     zonder vast, geen open kaart van wie kersten met een eerdere dag in dezelfde fase; max 3 per ronde.
 //   node scripts/pa-db.mjs tijd [van] [tot]          Kerstens gemeten tijd per dag/categorie/uur + grootste bronnen (standaard laatste 7 dagen)
 //   node scripts/pa-db.mjs tijd-regel '{"patroon","categorie"}'   indeling bijsturen (app, domein, #tab of titel bevat patroon); werkt terug in de tijd
 //   node scripts/pa-db.mjs tijd-regel-weg "patroon"
@@ -54,6 +62,7 @@ import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { createClient } from '@supabase/supabase-js'
+import { kiesTaken, leesLopendeProjecten, vandaagNL, wijzigKaart } from './takenronde.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const env = Object.fromEntries(
@@ -281,6 +290,17 @@ if (cmd === 'lees') {
   for (const f of p.plan?.fases || []) for (const s of f.stappen || []) if (s.id === st.stap_id) { s.klaar = !!st.klaar; gevonden = true }
   const { error } = await sb.from('business_os_projecten').update({ plan: p.plan, updated_at: new Date().toISOString() }).eq('id', st.project_id)
   uit(error ? { fout: error.message } : { ok: gevonden })
+} else if (cmd === 'kaart') {
+  let k
+  try { k = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  if (!k.project_id || !k.stap_id) { uit({ fout: 'project_id en stap_id zijn verplicht' }); process.exit(1) }
+  const { ok, gevonden } = await wijzigKaart(sb, k.project_id, k.stap_id, k)
+  uit(ok ? { ok: true } : { fout: gevonden ? 'Opslaan mislukt, plan veranderde steeds' : 'Kaart niet gevonden' })
+} else if (cmd === 'taken-droog') {
+  const vandaag = arg || vandaagNL()
+  const { data, error } = await leesLopendeProjecten(sb)
+  if (error) { uit({ fout: error.message }); process.exit(1) }
+  uit({ vandaag, ...kiesTaken(data, vandaag) })
 } else if (cmd === 'experiment') {
   // Strategie zet zelf proeven op: wat doen we, wat verwachten we, hoe meten we.
   let e

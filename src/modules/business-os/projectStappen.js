@@ -76,7 +76,7 @@ export const zetStapTerug = ({ plek, stap, si, naId }) => (plan) => {
 
 // ── Testbord (fase.bord) ──
 
-// Naar een andere kolom: achteraan het plan. Zonder dag komt de kaart dus bovenop de stapel (zie kolomVolgorde).
+// Naar een andere kolom: achteraan het plan. Zonder dag komt de kaart dus onderaan de stapel (zie kolomVolgorde).
 export const verplaatsStap = (id, kolom) => (plan) => {
   const hit = zoekStap(plan, id)
   if (!hit) return false
