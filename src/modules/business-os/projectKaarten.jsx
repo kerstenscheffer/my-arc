@@ -4,7 +4,7 @@
 // het testbord (TestBord): kaart, invoerveld, + Kaart, oordeelpil en cijfer.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BookOpen, Check, CheckCircle2, ChevronRight, Film, Phone, Plus, X } from 'lucide-react'
+import { BookOpen, Check, CheckCircle2, ChevronRight, ChevronUp, Film, Phone, Plus, X } from 'lucide-react'
 import { kortDag } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
@@ -33,7 +33,8 @@ export function OordeelPil({ tekst, uitslag, title }) {
 
 // Enter of klikken buiten = klaar, Escape = annuleren. onKlaar krijgt de nieuwe tekst,
 // '' als een bestaande tekst is leeggemaakt, of null als er niets op te slaan valt.
-export function StapInvoer({ begin = '', label, isMobile, onKlaar, fontGrootte = 14, inputMode }) {
+// Meerregelig: Enter is een nieuwe regel en regels blijven staan; klaar is dan alleen klikken buiten.
+export function StapInvoer({ begin = '', label, isMobile, onKlaar, fontGrootte = 14, inputMode, meerregelig = false }) {
   const [tekst, setTekst] = useState(begin)
   const veld = useRef(null)
   const afgerond = useRef(false)
@@ -51,29 +52,82 @@ export function StapInvoer({ begin = '', label, isMobile, onKlaar, fontGrootte =
   const rond = (bewaren) => {
     if (afgerond.current) return
     afgerond.current = true
-    const schoon = tekst.replace(/\s+/g, ' ').trim()
+    const schoon = meerregelig ? tekst.trim() : tekst.replace(/\s+/g, ' ').trim()
     if (bewaren && !schoon && begin) onKlaar('')
-    else onKlaar(bewaren && schoon && tekst !== begin ? schoon : null)
+    else onKlaar(bewaren && schoon && tekst !== begin && schoon !== begin ? schoon : null)
   }
   return (
     <textarea ref={veld} rows={1} value={tekst} aria-label={label} inputMode={inputMode}
       onChange={e => setTekst(e.target.value)}
       onBlur={() => rond(true)}
       onKeyDown={e => {
-        if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); rond(true) }
+        if (e.key === 'Enter' && !meerregelig && !e.nativeEvent.isComposing) { e.preventDefault(); rond(true) }
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rond(false) }
       }}
       style={{
         display: 'block', boxSizing: 'content-box', width: '100%', padding: 0, border: 'none', borderBottom: `1.5px solid ${G}`, outline: 'none', resize: 'none', overflow: 'hidden',
-        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: isMobile ? Math.max(16, fontGrootte) : fontGrootte, fontWeight: 800, lineHeight: 1.3,
+        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: isMobile ? Math.max(16, fontGrootte) : fontGrootte, fontWeight: meerregelig ? 600 : 800, lineHeight: 1.3,
       }} />
   )
 }
 
-// Op het bord (opBord): volle kolombreedte, geen kader, en eventueel slepen (onSleepStart)
-// en een pijltje naar de volgende kolom (onVolgende).
-export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg, opBord = false, onVolgende, onSleepStart, onSleepEind }) {
-  const [bewerkt, setBewerkt] = useState(false)
+// Kleine knop in de onderste regel van een bordkaart. Op de telefoon 44 hoog, maar die extra
+// hoogte valt alleen in de witruimte onder de kaart: een tik op de titel erboven blijft de titel.
+const rijKnop = (isMobile) => ({
+  display: 'flex', alignItems: 'flex-start', flexShrink: 0, padding: `${isMobile ? 4 : 2}px 0 0`, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  fontSize: 12, fontWeight: 800, lineHeight: '16px', ...(isMobile ? { minHeight: 44, marginBottom: -18 } : {}),
+})
+
+// Jij of Gino. Geen (bekende) wie: alleen bij hover, op de telefoon altijd.
+function Eigenaar({ wie, isMobile, onWie }) {
+  if (wie !== 'kersten' && wie !== 'gino') {
+    return (
+      <button type="button" className="gp-stapweg" onClick={() => onWie('gino')} aria-label="Eigenaar: geen. Zet op Gino" style={{
+        ...rijKnop(isMobile), color: '#fff', ...(isMobile ? { opacity: 0.7 } : {}),
+      }}>+ Gino</button>
+    )
+  }
+  const vanGino = wie === 'gino'
+  return (
+    <button type="button" onClick={() => onWie(vanGino ? 'kersten' : 'gino')} aria-label={`Eigenaar: ${vanGino ? 'Gino' : 'jij'}. Wissel`} style={{
+      ...rijKnop(isMobile), color: vanGino ? G : '#fff',
+    }}>{vanGino ? 'Gino' : 'Jij'}</button>
+  )
+}
+
+// Past de notitie niet op 2 regels, dan klapt de eerste klik uit en bewerkt de tweede. Anders bewerkt de eerste.
+function NotitieTekst({ tekst, klaar, isMobile, onBewerk }) {
+  const [uit, setUit] = useState(false)
+  return (
+    <div style={{ marginTop: 2 }}>
+      <button type="button" aria-expanded={uit || undefined}
+        onClick={e => {
+          const el = e.currentTarget.firstChild
+          if (!uit && el.scrollHeight > el.clientHeight + 1) setUit(true)
+          else onBewerk()
+        }}
+        style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{
+          fontSize: 12, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: `rgba(255,255,255,${klaar ? 0.5 : 0.7})`,
+          ...(uit ? { display: 'block' } : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+        }}>{tekst}</span>
+      </button>
+      {uit && (
+        <button type="button" onClick={() => setUit(false)} aria-label="Notitie inklappen" style={{
+          width: isMobile ? 44 : 20, height: isMobile ? 44 : 20, padding: 0, border: 'none', background: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
+        }}><ChevronUp size={14} strokeWidth={2.8} /></button>
+      )}
+    </div>
+  )
+}
+
+// Op het bord (opBord): volle kolombreedte, geen kader, eigenaar en notitie (onWie, onNotitie),
+// en eventueel slepen (onSleepStart) en een pijltje naar de volgende kolom (onVolgende).
+export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg, opBord = false, onWie, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
+  const [titelOpen, setTitelOpen] = useState(false)
+  const [notitieOpen, setNotitieOpen] = useState(false)
+  const bewerkt = titelOpen || notitieOpen
+  const notitie = opBord && typeof s.notitie === 'string' ? s.notitie.trim() : ''
   const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
   const isNu = s.dag === vandaag
   const achter = !s.klaar && s.dag && s.dag < vandaag
@@ -83,6 +137,11 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, o
   // Telefoon: pijltje naast het kruisje. Desktop: eronder, dus de tekst houdt zijn breedte.
   const rechts = isMobile ? (metPijl ? 76 : 40) : 28
   const sleepbaar = !!onSleepStart && !bewerkt
+  const metaRegel = meta && (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', ...(opBord ? { marginTop: isMobile ? 4 : 2, lineHeight: '16px' } : { marginTop: 2 }) }}>
+      <Icoon size={12} strokeWidth={2.6} /> {meta}
+    </span>
+  )
   return (
     <div className={opBord ? 'gp-stap gp-opbord' : 'gp-stap'} title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
       draggable={sleepbaar || undefined}
@@ -107,20 +166,34 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, o
         }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
       </button>
       <div style={{ minWidth: 0, flex: 1 }}>
-        {bewerkt ? (
+        {titelOpen ? (
           <StapInvoer begin={s.titel || ''} label="Stap" isMobile={isMobile}
-            onKlaar={t => { setBewerkt(false); if (t) onTekst(t) }} />
+            onKlaar={t => { setTitelOpen(false); if (t) onTekst(t) }} />
         ) : (
-          <button type="button" onClick={() => setBewerkt(true)} style={{
+          <button type="button" onClick={() => setTitelOpen(true)} style={{
             display: 'block', width: '100%', minHeight: 18, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
             fontSize: 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none',
           }}>{s.titel}</button>
         )}
-        {meta && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-            <Icoon size={12} strokeWidth={2.6} /> {meta}
-          </span>
-        )}
+        {notitieOpen ? (
+          <div style={{ marginTop: 4 }}>
+            <StapInvoer begin={notitie} label="Notitie" isMobile={isMobile} fontGrootte={12} meerregelig
+              onKlaar={t => { setNotitieOpen(false); if (t !== null) onNotitie(t) }} />
+          </div>
+        ) : notitie ? (
+          <NotitieTekst tekst={notitie} klaar={s.klaar} isMobile={isMobile} onBewerk={() => setNotitieOpen(true)} />
+        ) : null}
+        {opBord ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 12 }}>
+            <Eigenaar wie={s.wie} isMobile={isMobile} onWie={onWie} />
+            {metaRegel}
+            {!notitie && !notitieOpen && (
+              <button type="button" className="gp-stapweg" onClick={() => setNotitieOpen(true)} style={{
+                ...rijKnop(isMobile), color: '#fff', ...(isMobile ? { opacity: 0.7 } : {}),
+              }}>+ Notitie</button>
+            )}
+          </div>
+        ) : metaRegel}
       </div>
       {!bewerkt && (
         <button type="button" className="gp-stapweg" onClick={onWeg} aria-label="Verwijderen" style={{

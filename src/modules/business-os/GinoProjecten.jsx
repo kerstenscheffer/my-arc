@@ -21,7 +21,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, Check, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
 import * as stem from './stem'
 import { vandaagIso } from './testMeting'
-import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetStapTerug } from './projectStappen'
+import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetKaartVelden, zetStapTerug } from './projectStappen'
 import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { komma, kortDag } from './testBord.js'
 import { useTestMeting } from './useTestMeting'
@@ -299,9 +299,11 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   const zetStap = (stapId, klaar) => wijzigPlan(wijzigStap(stapId, { klaar }))
   const zetStapTekst = (stapId, titel) => wijzigPlan(wijzigStap(stapId, { titel }))
+  const zetKaart = (stapId, velden) => wijzigPlan(zetKaartVelden(stapId, velden))
+  // Een kolom meegegeven = een kaart op het bord: die is standaard van Gino.
   const nieuweStap = (fi, titel, kolom) => wijzigPlan(voegStapToe(
     { fi, naam: p.plan.fases[fi].naam },
-    { id: nieuweStapId(), titel, soort: 'taak', klaar: false, ...(kolom ? { kolom } : {}) },
+    { id: nieuweStapId(), titel, soort: 'taak', klaar: false, ...(kolom ? { kolom, wie: 'gino' } : {}) },
   ))
   const plekVan = (fi) => ({ fi, naam: p.plan.fases[fi].naam })
   const verplaats = (stapId, kolom) => wijzigPlan(verplaatsStap(stapId, kolom))
@@ -503,7 +505,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
               return (
                 <Fragment key={f.bord === true ? `bord-${f.naam}` : fi}>
                   {f.bord === true
-                    ? <TestBord {...gedeeld} projectId={p.id} verplaats={verplaats} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
+                    ? <TestBord {...gedeeld} projectId={p.id} verplaats={verplaats} zetKaart={zetKaart} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
                     : <FaseRij {...gedeeld} />}
                   {fi === laatsteBord && <NieuweTest isMobile={isMobile} onNieuw={nieuweTest} />}
                 </Fragment>

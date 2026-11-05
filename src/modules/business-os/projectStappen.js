@@ -36,6 +36,18 @@ export const wijzigStap = (id, velden) => (plan) => {
   return true
 }
 
+// Eigenaar en notitie op het bord. Leeg (null of '') haalt het veld weg.
+export const zetKaartVelden = (id, velden) => (plan) => {
+  const hit = zoekStap(plan, id)
+  if (!hit) return false
+  const stap = hit.fase.stappen[hit.si]
+  for (const [veld, waarde] of Object.entries(velden)) {
+    if (waarde === null || waarde === '' || waarde === undefined) delete stap[veld]
+    else stap[veld] = waarde
+  }
+  return true
+}
+
 export const verwijderStap = (id) => (plan) => {
   const hit = zoekStap(plan, id)
   if (hit) hit.fase.stappen.splice(hit.si, 1)

@@ -27,6 +27,8 @@
 //         waarom?, hoe?, hoeveel?, verwachting?, meetdatum? }  lege tekstvelden tonen als open
 //     plan.fases[].bord: true maakt van de fase een test met kanban (TestBord.jsx, regels in testBord.js).
 //       stappen[].kolom: onderzoek | plan | maken | posten | meten | besluit (geen kolom = onderzoek)
+//       stappen[].wie (optioneel): kersten | gino. stappen[].notitie (optioneel): tekst, mag meerdere regels.
+//         Alleen zichtbaar op het bord. Tellen nergens mee (bordStand, klaar-regels, meting).
 //       test erbij: wat, controlegroep, posts_doel (getal), besluit (meer|aanpassen|stoppen), les
 //       test mag leeg {} zijn; zonder test.van is de test niet gestart (Posten en Meten: Nog geen data)
 //       test.suggesties (optioneel): { wat?, nulmeting_per_10? (getal), controlegroep?, posts_doel? (getal), verwachting?,

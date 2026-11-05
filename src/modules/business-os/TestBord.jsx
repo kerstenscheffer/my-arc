@@ -193,7 +193,7 @@ function BesluitBlok({ test, b, isMobile, zetVeld }) {
   )
 }
 
-export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, huidig, spotStijl, vakRef, zetStap, zetStapTekst, nieuweStap, stapWeg, verplaats, zetTest, hernoem, verwijder }) {
+export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, huidig, spotStijl, vakRef, zetStap, zetStapTekst, nieuweStap, stapWeg, verplaats, zetKaart, zetTest, hernoem, verwijder }) {
   const test = f.test && typeof f.test === 'object' ? f.test : {}
   const stappen = f.stappen || []
   const stand = useTestMeting(test, doel)
@@ -373,6 +373,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                       {stappen.map((s, si) => (kolomVan(s) !== k.id ? null : (
                         <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} opBord oplichten={huidig?.stappen?.includes(s.id)}
                           onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
+                          onWie={wie => zetKaart(s.id, { wie })} onNotitie={notitie => zetKaart(s.id, { notitie })}
                           onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
                           onSleepStart={!isMobile && s.id ? () => sleepStart(s.id) : null} onSleepEind={sleepEind} />
                       )))}
