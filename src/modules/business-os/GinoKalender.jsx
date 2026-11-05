@@ -149,7 +149,7 @@ function GinoZegt({ tekst, onWeg }) {
   )
 }
 
-const BEPERKT_WEERGAVEN = ['content', 'keten', 'klanten']
+const BEPERKT_WEERGAVEN = ['content', 'keten', 'omzet', 'klanten']
 
 export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false, beperkt = false }) {
   const [maand, setMaand] = useState(() => maandVan(verzoek?.maand) || maandVan(verzoek?.dag) || new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -448,7 +448,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
             }}
           >
-            {(beperkt ? ['Content', 'Keten', 'Klanten'] : ['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten']).map(naam => (
+            {(beperkt ? ['Content', 'Keten', 'Omzet', 'Klanten'] : ['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten']).map(naam => (
               <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
             ))}
           </select>

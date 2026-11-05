@@ -5,7 +5,8 @@
 // Mac (eigen data + web) en schrijft een plan: fases met stappen per dag en
 // KPI's met nulmeting (business_os_projecten). Hier:
 //   lijst  → kaarten met voortgangsring en volgende stap
-//   detail → KPI's, fases als rijen onder elkaar met afvinkbare stappen en, bij
+//   detail → KPI's, fases als rijen onder elkaar met stappen als kaartjes (afvinken,
+//     tekst aanpassen, verwijderen, toevoegen; opslaan via projectStappen.js) en, bij
 //     een fase.test, live cijfers + oordeel (testMeting.js); teksten achter een
 //     klik op de rij; onderzoek lezen
 //   "Presenteer" → Gino loopt het plan door met zijn stem (stem.leesVoor):
@@ -14,10 +15,11 @@
 //   "Plan goedkeuren & inplannen" → content-stappen als content_items
 //     (planned), de rest als productivity_tasks; status uitvoering.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause, Plus } from 'lucide-react'
 import * as stem from './stem'
 import { meetTest, vandaagIso } from './testMeting'
+import { kopieVanPlan, nieuweStapId, schrijfPlan, verwijderStap, voegStapToe, wijzigStap, zetStapTerug } from './projectStappen'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -135,7 +137,113 @@ function TestCijfers({ m, isMobile }) {
   )
 }
 
-function FaseRij({ f, fi, doel, vandaag, isMobile, huidig, zetStap, spotStijl, vakRef }) {
+// Enter of klikken buiten = klaar, Escape = annuleren. onKlaar krijgt de nieuwe tekst,
+// of null als er niets op te slaan valt (geannuleerd, leeg of ongewijzigd).
+function StapInvoer({ begin = '', label, isMobile, onKlaar }) {
+  const [tekst, setTekst] = useState(begin)
+  const veld = useRef(null)
+  const afgerond = useRef(false)
+  useLayoutEffect(() => {
+    const el = veld.current
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [tekst])
+  useEffect(() => {
+    const el = veld.current
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [])
+  // Na Enter of Escape verdwijnt het veld en kan er nog een blur volgen: maar één keer afronden.
+  const rond = (bewaren) => {
+    if (afgerond.current) return
+    afgerond.current = true
+    const schoon = tekst.replace(/\s+/g, ' ').trim()
+    onKlaar(bewaren && schoon && tekst !== begin ? schoon : null)
+  }
+  return (
+    <textarea ref={veld} rows={1} value={tekst} aria-label={label}
+      onChange={e => setTekst(e.target.value)}
+      onBlur={() => rond(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); rond(true) }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rond(false) }
+      }}
+      style={{
+        display: 'block', boxSizing: 'content-box', width: '100%', padding: 0, border: 'none', borderBottom: `1.5px solid ${G}`, outline: 'none', resize: 'none', overflow: 'hidden',
+        background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: isMobile ? 16 : 14, fontWeight: 800, lineHeight: 1.3,
+      }} />
+  )
+}
+
+const kaartMaat = (isMobile) => (isMobile ? { width: '100%' } : { width: 240, maxWidth: '100%' })
+
+function StapKaart({ s, vandaag, isMobile, oplichten, onKlaar, onTekst, onWeg }) {
+  const [bewerkt, setBewerkt] = useState(false)
+  const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
+  const isNu = s.dag === vandaag
+  const achter = !s.klaar && s.dag && s.dag < vandaag
+  const meta = [isNu ? 'vandaag' : kortDag(s.dag), s.gepland_id ? 'ingepland' : ''].filter(Boolean).join(' · ')
+  const rondMarge = isMobile ? 12 : 4
+  return (
+    <div className="gp-stap" title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
+      style={{
+        ...kaartMaat(isMobile), position: 'relative', boxSizing: 'border-box', display: 'flex', gap: 10, alignItems: 'flex-start', minHeight: 44, minWidth: 0,
+        padding: `10px ${isMobile ? 40 : 28}px 10px 10px`, borderRadius: 10,
+        background: oplichten ? `${G}22` : isNu ? `${G}14` : 'transparent',
+      }}>
+      <button type="button" onClick={onKlaar} aria-pressed={!!s.klaar} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
+        flexShrink: 0, padding: rondMarge, margin: -rondMarge, border: 'none', background: 'none', cursor: 'pointer', display: 'flex',
+      }}>
+        <span style={{
+          width: 20, height: 20, borderRadius: '50%', boxSizing: 'border-box',
+          border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.45)'}`, background: s.klaar ? G : 'transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
+        }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
+      </button>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {bewerkt ? (
+          <StapInvoer begin={s.titel || ''} label="Stap" isMobile={isMobile}
+            onKlaar={t => { setBewerkt(false); if (t) onTekst(t) }} />
+        ) : (
+          <button type="button" onClick={() => setBewerkt(true)} style={{
+            display: 'block', width: '100%', minHeight: 18, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
+            fontSize: 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none',
+          }}>{s.titel}</button>
+        )}
+        {meta && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+            <Icoon size={12} strokeWidth={2.6} /> {meta}
+          </span>
+        )}
+      </div>
+      {!bewerkt && (
+        <button type="button" className="gp-stapweg" onClick={onWeg} aria-label="Verwijderen" style={{
+          position: 'absolute', top: isMobile ? 4 : 6, right: isMobile ? 4 : 6, width: isMobile ? 36 : 20, height: isMobile ? 36 : 20, padding: 0, border: 'none', borderRadius: 6,
+          background: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(isMobile ? { opacity: 1 } : {}),
+        }}><X size={14} strokeWidth={2.8} /></button>
+      )}
+    </div>
+  )
+}
+
+function NieuweStap({ isMobile, onNieuw }) {
+  const [open, setOpen] = useState(false)
+  if (open) {
+    return (
+      <div className="gp-stap" style={{ ...kaartMaat(isMobile), boxSizing: 'border-box', minHeight: 44, padding: 10, borderRadius: 10 }}>
+        <StapInvoer label="Nieuwe stap" isMobile={isMobile} onKlaar={t => { setOpen(false); if (t) onNieuw(t) }} />
+      </div>
+    )
+  }
+  return (
+    <button type="button" className="gp-nieuw" onClick={() => setOpen(true)} style={{
+      ...(isMobile ? { width: '100%' } : { width: 96 }), minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+      borderRadius: 10, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+    }}><Plus size={14} strokeWidth={2.8} /> Stap</button>
+  )
+}
+
+function FaseRij({ f, fi, doel, vandaag, isMobile, huidig, zetStap, zetStapTekst, nieuweStap, stapWeg, spotStijl, vakRef }) {
   const [open, setOpen] = useState(false)
   const test = f.test && typeof f.test === 'object' ? f.test : null
   const stand = useTestMeting(test, doel)
@@ -180,39 +288,13 @@ function FaseRij({ f, fi, doel, vandaag, isMobile, huidig, zetStap, spotStijl, v
           </div>
         )}
 
-        {stappen.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(240px, 1fr))', columnGap: 16, marginTop: 8 }}>
-            {stappen.map(s => {
-              const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
-              const isNu = s.dag === vandaag
-              const achter = !s.klaar && s.dag && s.dag < vandaag
-              const meta = [isNu ? 'vandaag' : kortDag(s.dag), s.gepland_id ? 'ingepland' : ''].filter(Boolean).join(' · ')
-              return (
-                <button key={s.id} type="button" className="gp-stap" onClick={() => zetStap(s.id, !s.klaar)} aria-pressed={!!s.klaar}
-                  title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
-                  style={{
-                    display: 'flex', gap: 8, alignItems: 'center', minHeight: 44, padding: '4px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    textAlign: 'left', fontFamily: 'inherit', color: '#fff', minWidth: 0,
-                    background: huidig?.stappen?.includes(s.id) ? `${G}22` : isNu ? `${G}14` : 'transparent', transition: 'background .4s',
-                  }}>
-                  <span style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.45)'}`, background: s.klaar ? G : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
-                  }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none', lineHeight: 1.3 }}>{s.titel}</span>
-                    {meta && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                        <Icoon size={12} strokeWidth={2.6} /> {meta}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: 8, marginTop: 12 }}>
+          {stappen.map((s, si) => (
+            <StapKaart key={s.id || `plek-${si}`} s={s} vandaag={vandaag} isMobile={isMobile} oplichten={huidig?.stappen?.includes(s.id)}
+              onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)} />
+          ))}
+          <NieuweStap isMobile={isMobile} onNieuw={t => nieuweStap(fi, t)} />
+        </div>
       </div>
     </div>
   )
@@ -303,13 +385,69 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   }
   const zet = (sleutel) => (el) => { if (el) vakken.current[sleutel] = el }
 
-  const zetStap = async (stapId, klaar) => {
-    if (!p) return
-    const plan = JSON.parse(JSON.stringify(p.plan || {}))
-    for (const f of plan.fases || []) for (const s of f.stappen || []) if (s.id === stapId) s.klaar = klaar
-    setLijst(l => l.map(x => (x.id === p.id ? { ...x, plan } : x)))
-    await supabase.from('business_os_projecten').update({ plan, updated_at: new Date().toISOString() }).eq('id', p.id).then(r => r, () => null)
+  // ── Stappen bewerken ──
+  // Op het scherm direct zichtbaar; op de achtergrond één voor één opslaan. Wat je
+  // ziet = laatste stand uit de database + wat nog onderweg is, dus een mislukte
+  // wijziging valt vanzelf terug zonder andere wijzigingen mee te nemen.
+  const schrijfRij = useRef(Promise.resolve())
+  const onderweg = useRef([])
+  const bevestigd = useRef({})
+  const [opslaanFout, setOpslaanFout] = useState(0)
+  const [weg, setWeg] = useState([])   // zojuist verwijderd, voor Ongedaan maken
+
+  const toonPlan = useCallback((pid) => {
+    const plan = kopieVanPlan(bevestigd.current[pid])
+    for (const o of onderweg.current) if (o.pid === pid) o.wijzig(plan)
+    setLijst(l => l?.map(x => (x.id === pid ? { ...x, plan } : x)))
+  }, [])
+
+  const wijzigPlan = (wijzig) => {
+    const pid = p.id
+    if (!onderweg.current.some(o => o.pid === pid)) bevestigd.current[pid] = p.plan
+    const o = { pid, wijzig }
+    onderweg.current.push(o)
+    toonPlan(pid)
+    const klaar = schrijfRij.current.then(async () => {
+      const uit = await schrijfPlan(supabase, pid, wijzig).then(r => r, () => ({ ok: false, plan: null }))
+      if (uit.plan) bevestigd.current[pid] = uit.plan
+      onderweg.current = onderweg.current.filter(x => x !== o)
+      toonPlan(pid)
+      if (!uit.ok) setOpslaanFout(Date.now())
+      return uit.ok
+    })
+    schrijfRij.current = klaar
+    return klaar
   }
+
+  const zetStap = (stapId, klaar) => wijzigPlan(wijzigStap(stapId, { klaar }))
+  const zetStapTekst = (stapId, titel) => wijzigPlan(wijzigStap(stapId, { titel }))
+  const nieuweStap = (fi, titel) => wijzigPlan(voegStapToe(
+    { fi, naam: p.plan.fases[fi].naam },
+    { id: nieuweStapId(), titel, soort: 'taak', klaar: false },
+  ))
+  const stapWeg = async (fi, si) => {
+    const fase = p.plan.fases[fi]
+    const stap = fase.stappen[si]
+    const item = { pid: p.id, terug: zetStapTerug({ plek: { fi, naam: fase.naam }, stap, si, naId: fase.stappen[si - 1]?.id }) }
+    setWeg(w => [...w, item])
+    if (!await wijzigPlan(verwijderStap(stap.id))) setWeg(w => w.filter(x => x !== item))
+  }
+  const ongedaanMaken = () => {
+    const item = weg.findLast(x => x.pid === p?.id)
+    if (!item) return
+    setWeg(w => w.filter(x => x !== item))
+    wijzigPlan(item.terug)
+  }
+  useEffect(() => {
+    if (!weg.length) return
+    const t = setTimeout(() => setWeg([]), 5000)
+    return () => clearTimeout(t)
+  }, [weg])
+  useEffect(() => {
+    if (!opslaanFout) return
+    const t = setTimeout(() => setOpslaanFout(0), 4000)
+    return () => clearTimeout(t)
+  }, [opslaanFout])
 
   const inplannen = async () => {
     if (!p) return
@@ -349,8 +487,14 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
       @keyframes gp-in { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
       @keyframes gp-radar { to { transform: rotate(360deg) } }
       @keyframes gp-puls { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
-      .gp-stap { transition: background .15s }
-      .gp-stap:hover { background: rgba(255,255,255,0.04) }
+      .gp-stap { border: 1px solid rgba(255,255,255,0.12); transition: background .4s, border-color .15s }
+      .gp-stap:hover, .gp-stap:focus-within { border-color: rgba(255,255,255,0.28) }
+      .gp-stapweg { opacity: 0; transition: opacity .15s }
+      .gp-stap:hover .gp-stapweg, .gp-stapweg:focus-visible { opacity: .7 }
+      .gp-stapweg:hover { opacity: 1 !important }
+      @media (hover: none) { .gp-stapweg { opacity: .7 } }
+      .gp-nieuw { border: 1px dashed rgba(255,255,255,0.22); color: rgba(255,255,255,0.7); transition: color .15s, border-color .15s }
+      .gp-nieuw:hover { border-color: ${G}; color: #fff }
       .gp-kaart { transition: box-shadow .2s, transform .2s }
       .gp-kaart:hover { box-shadow: 0 0 0 1px ${G}, 0 0 24px ${G}44; transform: translateY(-2px) }
     `}</style>
@@ -454,9 +598,22 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
           <div>
             {fases.map((f, fi) => (
               <FaseRij key={fi} f={f} fi={fi} doel={p.kpis?.[0]?.doel} vandaag={vandaag} isMobile={isMobile} huidig={huidig}
-                zetStap={zetStap} spotStijl={spot(`fase-${fi}`)} vakRef={zet(`fase-${fi}`)} />
+                zetStap={zetStap} zetStapTekst={zetStapTekst} nieuweStap={nieuweStap} stapWeg={stapWeg}
+                spotStijl={spot(`fase-${fi}`)} vakRef={zet(`fase-${fi}`)} />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Stap verwijderd of opslaan mislukt */}
+      {(opslaanFout > 0 || weg.some(x => x.pid === p.id)) && (
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 56, zIndex: 20, display: 'flex', justifyContent: 'center', gap: 8, pointerEvents: 'none' }}>
+          {opslaanFout > 0 && (
+            <span role="alert" style={{ ...balkStijl, border: `1.5px solid ${colors.danger}`, display: 'inline-flex', alignItems: 'center' }}>Opslaan mislukt</span>
+          )}
+          {weg.some(x => x.pid === p.id) && (
+            <button type="button" onClick={ongedaanMaken} style={{ ...balkStijl, border: `1.5px solid ${G}`, cursor: 'pointer', fontFamily: 'inherit', pointerEvents: 'auto' }}>Ongedaan maken</button>
+          )}
         </div>
       )}
 
@@ -519,6 +676,9 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   )
 }
 
+const balkStijl = {
+  height: 44, padding: '0 18px', borderRadius: 999, background: '#000', color: '#fff', fontSize: 13, fontWeight: 900, boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+}
 const bedien = {
   width: 30, height: 30, borderRadius: '50%', border: `1px solid ${G}44`, background: 'transparent', color: '#fff',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0,
