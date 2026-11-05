@@ -36,6 +36,7 @@ import GinoProjecten from './GinoProjecten'
 import GinoTijd from './GinoTijd'
 import CheckinRonde from './CheckinRonde'
 import GinoDoorstap from './GinoDoorstap'
+import GinoVerlengen from './GinoVerlengen'
 import LeadManagementService from '../lead-management/LeadManagementService'
 import { colors } from '../../ui/tokens'
 
@@ -483,6 +484,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         <div className="gk-scroll" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 2px' : '0 4px' }}>
           <GinoDoorstap />
           <CheckinRonde onVraagGino={(t) => onVraag?.(t, { tab: 'klanten' })} />
+          <GinoVerlengen isMobile={isMobile} />
         </div>
       )}
 

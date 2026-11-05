@@ -14,7 +14,7 @@ function nepDb(meldingen = []) {
   const sb = {
     from(tabel) {
       const b = {
-        select: () => b, order: () => b, limit: () => b,
+        select: () => b, order: () => b, limit: () => b, contains: () => b,
         eq(k, w) { if (tabel === 'business_os_toestemmingen' && k === 'id') b.id = w; return b },
         maybeSingle: () => b,
         insert(r) { meldingen.push({ ...r, created_at: new Date().toISOString() }); b.isInsert = true; return b },

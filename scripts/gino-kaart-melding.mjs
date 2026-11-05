@@ -12,6 +12,9 @@
 export const MELD_TITEL = 'Gino vraagt toestemming'
 export const MELD_NA_MS = 60 * 1000
 export const MELD_AFSTAND_MS = 15 * 60 * 1000
+// Alleen rijen van deze regeling tellen mee voor de afstand; de oude kwamen per kaart.
+// Tekst, geen boolean: action_data gaat mee in de push.
+const REGELING = 'na60s'
 
 export function maakKaartMelder({ sb, coachId, fout = () => {}, naMs = MELD_NA_MS, afstandMs = MELD_AFSTAND_MS }) {
   let laatste = 0
@@ -19,7 +22,7 @@ export function maakKaartMelder({ sb, coachId, fout = () => {}, naMs = MELD_NA_M
 
   async function laatsteMelding() {
     const { data, error } = await sb.from('coach_notifications').select('created_at')
-      .eq('coach_id', coachId()).eq('title', MELD_TITEL)
+      .eq('coach_id', coachId()).eq('title', MELD_TITEL).contains('action_data', { regeling: REGELING })
       .order('created_at', { ascending: false }).limit(1)
       .then(r => r, (e) => ({ error: e }))
     if (error) fout(`Laatste melding lezen mislukt: ${error.message}`)
@@ -37,7 +40,7 @@ export function maakKaartMelder({ sb, coachId, fout = () => {}, naMs = MELD_NA_M
 
     const { error: e } = await sb.from('coach_notifications').insert({
       coach_id: coachId(), type: 'personal', priority: 'high', title: MELD_TITEL,
-      message: `${reden}`.slice(0, 140), tags: ['gino'], action_data: { soort: 'gino_toestemming', toestemming_id: id },
+      message: `${reden}`.slice(0, 140), tags: ['gino'], action_data: { soort: 'gino_toestemming', toestemming_id: id, regeling: REGELING },
     }).then(r => r, (x) => ({ error: x }))
     if (e) return fout(`Push mislukt: ${e.message}`)
     laatste = Date.now()
