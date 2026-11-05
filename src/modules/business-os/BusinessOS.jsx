@@ -203,7 +203,7 @@ const REACTOR_CSS = `
   }
 `
 
-function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik }) {
+function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik, zonderNaam = false, klikTitel = null }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
   // Eenmalige overgang bij wisselen van de stem: .ontwaakt (aan) of .dooft (uit).
@@ -221,7 +221,7 @@ function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div className={klassen} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto', cursor: 'pointer' }}
-        role="button" tabIndex={0} title={`Gino, stem ${stemAan ? 'uit' : 'aan'}zetten`} aria-pressed={stemAan}
+        role="button" tabIndex={0} title={klikTitel || `Gino, stem ${stemAan ? 'uit' : 'aan'}zetten`} aria-pressed={stemAan}
         aria-label={`Gino, stem ${stemAan ? 'aan' : 'uit'}${praat ? '. Gino praat' : bezig ? '. Gino denkt na' : ''}`}
         onClick={onKlik} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlik() } }}>
         <style>{REACTOR_CSS}</style>
@@ -287,6 +287,7 @@ function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik }) {
         }} />
       </div>
       {/* naam onder de bol; een melding vervangt hem even */}
+      {(!zonderNaam || melding) && (
       <div role="status" style={{
         ...LABEL, fontSize: labelMaat, letterSpacing: melding ? '0.04em' : '0.42em', textTransform: melding ? 'none' : 'uppercase',
         marginTop: maat >= 200 ? 10 : 6, height: 16, lineHeight: '16px', whiteSpace: 'nowrap', pointerEvents: 'none',
@@ -294,6 +295,7 @@ function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik }) {
       }}>
         {melding || 'Gino'}
       </div>
+      )}
     </div>
   )
 }
@@ -982,6 +984,77 @@ export default function BusinessOS({ isMobile }) {
   const [podiumEl, setPodiumEl] = useState(null)
   const podiumOpen = !kalender && !!visueel
   const boven = !!kalender || podiumOpen
+  // Klein venster: bol en chatbalk samen in een sleepbaar blokje, zodat de pagina de ruimte
+  // krijgt. Blijft hetzelfde element, dus een lopend gesprek of de stem gaat gewoon door.
+  const [mini, setMini] = useState(() => { try { return localStorage.getItem('bos_mini') === '1' } catch { return false } })
+  const [miniPos, setMiniPos] = useState(() => { try { return JSON.parse(localStorage.getItem('bos_mini_pos')) } catch { return null } })
+  const miniVak = useRef(null)
+  const miniSleep = useRef(false)
+  const binnenBeeld = useCallback((p) => {
+    const el = miniVak.current
+    const b = el?.offsetWidth || 760, h = el?.offsetHeight || 110
+    return { x: Math.max(8, Math.min(window.innerWidth - b - 8, p.x)), y: Math.max(8, Math.min(window.innerHeight - h - 8, p.y)) }
+  }, [])
+  // Zijkant: alleen de bol tegen de rand van het scherm. Klik = terug naar het blokje.
+  const [zijkant, setZijkant] = useState(() => { try { return localStorage.getItem('bos_zijkant') === '1' } catch { return false } })
+  const zetZijkant = (aan) => {
+    setZijkant(aan)
+    try { localStorage.setItem('bos_zijkant', aan ? '1' : '0') } catch { /* privémodus */ }
+    if (!aan) {
+      setMini(true)
+      try { localStorage.setItem('bos_mini', '1') } catch { /* privémodus */ }
+    }
+  }
+  const wisselMini = () => {
+    setMini((o) => {
+      try { localStorage.setItem('bos_mini', o ? '0' : '1') } catch { /* privémodus */ }
+      return !o
+    })
+  }
+  // Eerste keer onderin het midden; en altijd terug in beeld als het venster kleiner wordt.
+  useEffect(() => {
+    if ((!mini && !zijkant) || isMobile) return undefined
+    const pas = () => setMiniPos(p => binnenBeeld(p || { x: (window.innerWidth - (miniVak.current?.offsetWidth || 760)) / 2, y: window.innerHeight - 130 }))
+    pas()
+    window.addEventListener('resize', pas)
+    return () => window.removeEventListener('resize', pas)
+  }, [mini, zijkant, isMobile, binnenBeeld])
+  // Overal in de balk vastpakken. Typen, knoppen en links blijven gewoon werken, en de bol blijft
+  // klikbaar: pas na 4 pixels bewegen is het slepen.
+  const sleepMini = (e) => {
+    if (e.button !== 0 || !miniPos) return
+    const t = e.target
+    if (t.closest('textarea, input, select, a')) return
+    if (t.closest('button') && !t.closest('[data-sleep-ok]')) return
+    if (t !== miniVak.current && !t.closest('[data-sleep-ok], [data-sleep-balk]')) return
+    const beginX = e.clientX, beginY = e.clientY
+    const dx = beginX - miniPos.x, dy = beginY - miniPos.y
+    let laatste = miniPos
+    miniSleep.current = false
+    const beweeg = (m) => {
+      if (!miniSleep.current && Math.hypot(m.clientX - beginX, m.clientY - beginY) < 4) return
+      miniSleep.current = true
+      laatste = binnenBeeld({ x: m.clientX - dx, y: m.clientY - dy })
+      setMiniPos(laatste)
+    }
+    const los = () => {
+      window.removeEventListener('pointermove', beweeg)
+      window.removeEventListener('pointerup', los)
+      window.removeEventListener('pointercancel', los)
+      try { localStorage.setItem('bos_mini_pos', JSON.stringify(laatste)) } catch { /* privémodus */ }
+    }
+    window.addEventListener('pointermove', beweeg)
+    window.addEventListener('pointerup', los)
+    window.addEventListener('pointercancel', los)
+  }
+  // Na slepen geen klik op wat er toevallig onder de muis lag (de bol zet anders de stem om).
+  const naMiniSleep = (e) => {
+    if (miniSleep.current) { e.stopPropagation(); e.preventDefault(); miniSleep.current = false }
+  }
+  const isZij = zijkant && !isMobile
+  const isMini = (mini || isZij) && !isMobile
+  // Links of rechts: de helft van het scherm waar hij het laatst stond.
+  const zijLinks = isZij && !!miniPos && miniPos.x + 40 < (typeof window !== 'undefined' ? window.innerWidth / 2 : 0)
   // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
   const maxMaat = boven ? (isMobile ? 84 : 132) : (isMobile ? 160 : 240)
   const maat = ruimte
@@ -1257,14 +1330,26 @@ export default function BusinessOS({ isMobile }) {
           <div ref={setPodiumEl} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }} />
         )}
         {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
-        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0 }}>
-          <div style={{ position: 'relative' }}>
-            <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
-            <GinoHerinnering maat={maat} isMobile={isMobile} onPraat={setHerinnertPraat} />
+        <div ref={miniVak} onPointerDown={isMini ? sleepMini : undefined} onClickCapture={isMini ? naMiniSleep : undefined} style={isZij ? {
+          cursor: 'grab', userSelect: 'none',
+          position: 'fixed', top: miniPos?.y ?? 80, zIndex: 60, ...(zijLinks ? { left: 0, borderRadius: '0 18px 18px 0' } : { right: 0, borderRadius: '18px 0 0 18px' }),
+          display: 'flex', padding: 6, boxSizing: 'border-box',
+          background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
+        } : isMini ? {
+          cursor: 'grab', userSelect: 'none',
+          position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, width: 'min(760px, calc(100vw - 16px))',
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
+          background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
+        } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
+          <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
+            <Reactor zonderNaam={isMini} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+            {!isZij && <GinoHerinnering maat={isMini ? 64 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} />}
           </div>
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
+          {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
+          <div style={isZij ? { display: 'none' } : isMini ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
+          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
@@ -1298,6 +1383,7 @@ export default function BusinessOS({ isMobile }) {
               ? week.rijen.map(r => ({ input: r.label, dezeWeek: r.totaal, weekdoel: r.weekdoel, vorigeWeek: r.vorige, daggoalsGehaald: r.doel ? r.gehaald : null }))
               : null,
           }} />
+          </div>
         </div>
       </div>
 

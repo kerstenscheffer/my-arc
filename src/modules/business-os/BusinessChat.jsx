@@ -45,7 +45,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -1260,7 +1260,8 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 // Over zijn tijd/productiviteit: het tijdscherm (Gino's tijdmeter).
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28 }) {
+// klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2296,10 +2297,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
 
         {/* Toestemmingsvragen van Gino: blijven staan ook als de berichten dicht zijn */}
         <ToestemmingKaarten onOpen={setKaartenOpen} />
-        <div ref={balk} style={{ position: 'relative' }}>
+        <div ref={balk} data-sleep-balk="" style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
-          <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
+          {/* In het kleine blokje hoort deze regel in de kaart zelf, anders steekt hij erbuiten. */}
+          <div style={klein?.aan ? { position: 'relative', marginBottom: 4 } : { position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
             {/* Op de Mac: alle opdrachten voluit, hoe lang al, en Stop */}
             {macOpen && macWerk.length > 0 && (
               <div data-mac-werk style={{
@@ -2556,13 +2558,14 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
-              {!isEditor(actief) && (
-                <button onClick={() => bestandKiezer.current?.click()} title="Bestand bijvoegen (pdf, csv, Excel, txt, foto; max 20 MB)"
-                  aria-label="Bestand bijvoegen" style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
-                  <Paperclip size={17} strokeWidth={2.5} />
+              {/* In Editor is er geen ⋯-menu, dus daar blijft groot/klein een los knopje. */}
+              {isEditor(actief) && klein && (
+                <button onClick={klein.wissel} title={klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'} aria-label={klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}
+                  style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
+                  {klein.aan ? <Maximize2 size={15} strokeWidth={2.5} /> : <Minimize2 size={15} strokeWidth={2.5} />}
                 </button>
               )}
-              {/* Snel/Slim zichtbaar; foto, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
+              {/* Snel/Slim zichtbaar; foto, bestand, groot/klein, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
               {!isEditor(actief) && <button onClick={wisselModus}
                 title={modus === 'slim'
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
@@ -2590,6 +2593,19 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         <button onClick={() => { setMenu(false); kiezer.current?.click() }} style={menuRegel}>
                           <ImagePlus size={15} /> <span style={{ flex: 1 }}>Foto of screenshot</span>
                         </button>
+                        <button onClick={() => { setMenu(false); bestandKiezer.current?.click() }} title="pdf, csv, Excel, txt, foto; max 20 MB" style={menuRegel}>
+                          <Paperclip size={15} /> <span style={{ flex: 1 }}>Bestand bijvoegen</span>
+                        </button>
+                        {klein && (
+                          <button onClick={() => { setMenu(false); klein.wissel() }} style={menuRegel}>
+                            {klein.aan ? <Maximize2 size={15} /> : <Minimize2 size={15} />} <span style={{ flex: 1 }}>{klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}</span>
+                          </button>
+                        )}
+                        {klein && (
+                          <button onClick={() => { setMenu(false); klein.inklappen() }} style={menuRegel}>
+                            <PanelRightClose size={15} /> <span style={{ flex: 1 }}>Inklappen naar zijkant</span>
+                          </button>
+                        )}
                         <button onClick={() => { setMenu(false); setToonEerder(true) }} style={menuRegel}>
                           <History size={15} /> <span style={{ flex: 1 }}>Eerdere gesprekken</span>
                         </button>
