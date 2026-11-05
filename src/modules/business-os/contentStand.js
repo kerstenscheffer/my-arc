@@ -20,8 +20,17 @@ const MC_KOLOM = { reel: 'reels', foto: 'fotos', story: 'stories' }
 export const sleutel = (dag, soort) => `${dag}|${soort}`
 const leeg = () => ({ data: null })
 
-// Geplande content (content_items.type) → rij in de kalender.
-export const soortVanType = (t) => (t === 'story' ? 'story' : t === 'post' || t === 'carousel' ? 'foto' : 'reel')
+// Geplande content (content_items.type + autopilot_woord) → rij in de kalender.
+// Een reel met comment-woord is een magnet; in de database blijft type 'reel',
+// want daar leunen Metricool-sync en publiceren op.
+export const soortVanType = (t, woord) => {
+  if (t === 'story') return 'story'
+  if (t === 'post' || t === 'carousel') return 'foto'
+  return t === 'reel' && String(woord ?? '').trim() ? 'magnet' : 'reel'
+}
+
+// Label bij een los item: 'magnet' voor een reel met woord, anders het type zelf.
+export const typeLabel = (t, woord) => (soortVanType(t, woord) === 'magnet' ? 'magnet' : t)
 
 export async function laadContentStand(supabase, van, tot) {
   const [c, d, m, p, l] = await Promise.all([

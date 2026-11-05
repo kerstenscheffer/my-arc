@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { metStand, contentLink, isTestItem, testInstagram, CONTENT_GEWIJZIGD, kortGetal } from './contentStatusData'
 import { StandChip } from './contentStatus'
+import { typeLabel } from './contentStand'
 
 const G = colors.success
 const PREVIEW_BUCKET = 'content-varianten'
@@ -167,7 +168,7 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: G }}>
-                {moment(it)}{st ? ` · ${LABEL[st] || st}` : ''}{it.type ? ` · ${it.type}` : ''}
+                {moment(it)}{st ? ` · ${LABEL[st] || st}` : ''}{it.type ? ` · ${typeLabel(it.type, it.autopilot_woord)}` : ''}
               </div>
               {bewerk != null ? (
                 <textarea value={bewerk} onChange={e => setBewerk(e.target.value)} rows={3} autoFocus style={{

@@ -9,6 +9,7 @@
 // soort: call | agenda | content | concept | taak | herinnering
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
@@ -73,6 +74,14 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
   const scrollRef = useRef(null)
   // Muis op een afspraak: vergrote kaart met de volledige titel.
   const [lens, setLens] = useState(null)
+  // Welke dag zijn lijst open heeft. Klik ergens anders sluit hem.
+  const [openDag, setOpenDag] = useState(null)
+  useEffect(() => {
+    if (!openDag) return undefined
+    const dicht = () => setOpenDag(null)
+    document.addEventListener('click', dicht)
+    return () => document.removeEventListener('click', dicht)
+  }, [openDag])
   const vandaag = iso(nu)
   const nuMin = nu.getHours() * 60 + nu.getMinutes()
 
@@ -93,7 +102,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
   }, [perDag])
   const maxDag = Math.max(4, ...Object.values(perDag).map(d => d.totaal))
 
-  const KOP = 84 // wijzer + losse chips
+  const KOP = 68 // wijzer + dropdown met wat er gepland staat
   const ruimteH = Math.max(160, hoogte - KOP)
   // Lens: uren met korte afspraken (calls, losse blokken) krijgen de ruimte,
   // lege uren en lange blokken (een hele dag Paviljoen) worden smal.
@@ -191,33 +200,45 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
           const getimed = lanen(perDag[k].getimed)
           const isVandaag = k === vandaag
           const verleden = k < vandaag
+          const open = openDag === k
           return (
             <div key={k} className="gw-dag" onClick={() => onKies?.(k)} style={{
               position: 'relative', cursor: 'pointer', padding: '0 3px', borderRadius: 12, transition: 'opacity .4s',
-              opacity: uitlicht ? (k === uitlicht ? 1 : 0.28) : verleden ? 0.5 : 1,
+              // Open: boven de andere kolommen en niet gedimd, anders valt de lijst eronder.
+              opacity: open ? 1 : uitlicht ? (k === uitlicht ? 1 : 0.28) : verleden ? 0.5 : 1,
+              ...(open ? { zIndex: 30 } : {}),
               ...(k === uitlicht ? { boxShadow: `0 0 0 1.5px ${G}, 0 0 28px ${G}55`, background: `${G}10`, animation: 'gw-aanwijs 1.6s ease-in-out 3' } : {}),
             }}>
               {/* kop: wijzer + losse dingen van die dag (content, taken) */}
               <div style={{ height: KOP, position: 'sticky', top: 0, zIndex: 5, background: '#000', margin: '0 -4px', padding: '0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, animation: `gw-in .4s ease-out ${di * 60}ms both` }}>
                 <Wijzer deel={totaal / maxDag} dag={DAGLETTER[d.getDay()]} nr={d.getDate()} vandaag={isVandaag} vertraging={200 + di * 80} />
-                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden', maxHeight: 38 }}>
-                  {los.slice(0, 3).map(it => {
-                    const groen = it.soort === 'content' || it.soort === 'concept'
-                    return (
-                      <span key={it.id} title={it.titel} style={{
-                        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        fontSize: 9.5, fontWeight: 800, padding: '1px 6px', borderRadius: 999, letterSpacing: '.03em',
-                        color: groen ? G : 'rgba(255,255,255,0.65)',
-                        border: it.soort === 'concept' ? `1px dashed ${G}` : `1px solid ${groen ? `${G}66` : 'rgba(255,255,255,0.15)'}`,
-                        background: it.soort === 'content' ? `${G}14` : 'transparent',
-                        boxShadow: it.soort === 'content' ? `0 0 8px ${G}33` : 'none',
+                {los.length > 0 && (
+                  <div style={{ position: 'relative', maxWidth: '100%' }}>
+                    <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpenDag(open ? null : k) }} style={{
+                      display: 'flex', alignItems: 'center', gap: 3, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
+                      background: open ? `${G}22` : 'transparent', border: `1px solid ${G}55`, color: '#fff',
+                      fontFamily: 'inherit', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+                    }}>
+                      {los.length} gepland
+                      <ChevronDown size={11} strokeWidth={3} color={G} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none' }} />
+                    </button>
+                    {open && (
+                      <div onClick={(e) => e.stopPropagation()} style={{
+                        position: 'absolute', top: 24, [di >= dagen.length - 2 ? 'right' : 'left']: 0, width: 240, maxHeight: 260, overflowY: 'auto',
+                        background: '#0a0a0a', border: `1px solid ${G}55`, borderRadius: 12, padding: 4, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
                       }}>
-                        {it.soort === 'concept' ? '+ ' : it.soort === 'content' ? '◆ ' : ''}{it.titel}
-                      </span>
-                    )
-                  })}
-                  {los.length > 3 && <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>+{los.length - 3}</span>}
-                </div>
+                        {los.map(it => (
+                          <button key={it.id} type="button" onClick={() => { setOpenDag(null); onKies?.(k) }} style={{
+                            display: 'block', width: '100%', padding: '7px 9px', background: 'transparent', border: 'none', borderRadius: 8,
+                            color: '#fff', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, textAlign: 'left', lineHeight: 1.3, cursor: 'pointer',
+                          }}>
+                            {it.soort === 'concept' ? '+ ' : ''}{it.titel}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* tijdlijn van de dag */}

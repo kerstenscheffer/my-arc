@@ -37,6 +37,7 @@ import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
+import { typeLabel } from './contentStand'
 import { metStand, laadStandPerDag, standVoorGino, STANDEN, STAND_KLEUR, zonderTest, contentLink, contentUitHash, openContent, CONTENT_OPEN, CONTENT_GEWIJZIGD } from './contentStatusData'
 import ContentPreview from './ContentPreview'
 import { StandChip, StandLegenda } from './contentStatus'
@@ -605,7 +606,7 @@ function ContentItem({ it, c }) {
           {it.title || 'Zonder titel'}
         </span>
         {it.type && (
-          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{it.type}</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{typeLabel(it.type, it.autopilot_woord)}</span>
         )}
         {it.stand ? <StandChip stand={it.stand} views={it.views} /> : STATUS_LABEL[it.status] && (
           <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{STATUS_LABEL[it.status]}</span>

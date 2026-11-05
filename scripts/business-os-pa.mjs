@@ -59,7 +59,7 @@ import { createClient } from '@supabase/supabase-js'
 import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 import { maakStilteKlok } from './gino-waakhond.mjs'
-import { FAMILIE_NAAM, familieVan, leesTool, veiligeBash, veiligZelftest, vrijeFamilie } from './gino-veilig.mjs'
+import { FAMILIE_NAAM, familieVan, leesTool, veiligeBash, veiligZelftest, vrijeBash } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -339,6 +339,15 @@ function wachtOpBesluit(ctx, id, opGesloten) {
   })
 }
 
+// Een script nalezen vóór het zonder kaart mag draaien. Alleen uit de repo, ~/Gino of /tmp.
+function leesScript(pad) {
+  try {
+    const vol = path.resolve(MAP, String(pad).replace(/^~(?=\/)/, os.homedir()))
+    if (![`${MAP}/`, `${path.join(os.homedir(), 'Gino')}/`, '/tmp/', '/private/tmp/'].some(m => vol.startsWith(m))) return null
+    return fs.statSync(vol).size < 500000 ? fs.readFileSync(vol, 'utf8') : null
+  } catch { return null }
+}
+
 // Het hele besluit. Geeft terug wat Claude Code verwacht: allow met de originele
 // invoer, of deny met een boodschap die Gino leest.
 async function besluitTool(ctx, tool, invoer, opGesloten) {
@@ -366,8 +375,8 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
     console.log(`${tijd()} ✓ zonder vraag: ${maskeer(cmd).split('\n')[0].slice(0, 140)}`)
     return toegestaan
   }
-  // 5 nov 2026: lees-tools van vaste koppelingen en scripts/downloads die niets versturen.
-  if (veiligAan && (leesTool(tool) || (cmd && vrijeFamilie(cmd)))) {
+  // 5 nov 2026: lees-tools van vaste koppelingen, en opdrachten en scripts die niets versturen.
+  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript)))) {
     console.log(`${tijd()} ✓ zonder vraag: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }

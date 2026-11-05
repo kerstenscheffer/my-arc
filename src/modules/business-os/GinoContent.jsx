@@ -72,7 +72,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
     for (const [k, lijst] of Object.entries(perDag || {})) {
       for (const it of lijst) {
         if (it.soort !== 'content' && it.soort !== 'concept') continue
-        const s = soortVanType(it.type)
+        const s = soortVanType(it.type, it.woord)
         const v = (p[sleutel(k, s)] ||= { draft: 0, ingepland: 0, gepost: 0, mislukt: 0, concept: 0 })
         if (it.soort === 'concept') v.concept++
         else v[it.stand || 'draft']++

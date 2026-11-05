@@ -7,12 +7,16 @@
 //   veiligeBash(cmd)  alleen lezen, of schrijven in ~/Gino of /tmp → geen kaart
 //   familieVan(cmd)   python, node -e, yt-dlp, curl, ffmpeg: één kaart per opdracht
 //
-//   vrijeFamilie(cmd) (5 nov) dezelfde families, maar zonder kaart als ze niets versturen
+//   vrijeBash(cmd, lees) (5 nov) ook scripts, downloads en samengestelde opdrachten, zolang
+//                     ze niets versturen of schrijven; scripts worden eerst nagelezen
 //   leesTool(tool)    (5 nov) lees-tools van vaste koppelingen, zonder kaart
 //
 // Twijfel = null = gewoon een kaart. Niet herkend is nooit veilig.
 // Puur: geen database, geen netwerk. Testen: node scripts/gino-toestemming-test.mjs
 // Deze code-opdrachten mogen dit bestand niet aanpassen (deny-regel in de PA).
+
+import path from 'node:path'
+import { hardeBlokkade } from './gino-blokkade.mjs'
 
 const ALTIJD_LEZEN = new Set([
   'ls', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'rg', 'cut', 'tr', 'uniq', 'pwd', 'which', 'stat', 'du', 'df',
@@ -173,32 +177,66 @@ const YT_DLP_RISICO = /--exec\b|--cookies(?!-from-browser)\b|--config-locations?
 const CURL_ADRES_RISICO = /\$|`/
 const CURL_RISICO = /--(header|cookie|cookie-jar|user|oauth2-bearer|config|output|remote-name|proxy|url-query|json)\b|(?:^|\s)-[a-zA-Z]*[HbcuKoOxJ][a-zA-Z]*\s/
 
-// De familie als die hier zonder kaart mag; anders null en dus de gewone kaart.
-export function vrijeFamilie(cmd) {
-  const familie = familieVan(cmd)
-  if (!familie) return null
-  const s = String(cmd)
-  if (familie === 'python' || familie === 'node') {
-    // Alleen code die hier zichtbaar is: de inhoud van een scriptbestand kunnen we niet nakijken.
-    if (/\bpython3?\s+(?!(?:-I\s+)?(?:-c\b|-(?:\s|$)))/.test(s) || /\bnode\s+(?:\/tmp|\/private\/tmp|~\/Gino)\//.test(s)) return null
-    return VERSTUURT_OF_SCHRIJFT.test(s) ? null : familie
+const EXTRA_LEZEN = new Set(['diff', 'comm', 'paste', 'column', 'tac', 'rev', 'fold', 'base64', 'strings', 'lsof', 'id', 'whoami', 'hostname', 'type', 'read', 'xxd', 'md5', 'shasum', 'plutil', 'export', '[['])
+const SED_SCHRIJFT = /\/[gipI0-9]*[we]\b|(^|;)\s*\d*[we]\s/
+
+// Een script mag alleen zonder kaart als we de inhoud hebben nagelezen, plus wat het zelf
+// laadt. `lees(pad)` geeft de tekst of null. Zo omzeilt een los script de blokkades niet.
+function scriptSchoon(pad, opdracht, lees, diepte = 0) {
+  if (!pad || /[$`*]/.test(pad) || pad.includes('..') || diepte > 2) return false
+  // In dezelfde opdracht geschreven: die tekst is al als geheel nagekeken.
+  if (diepte === 0 && opdracht.includes(`> ${pad}`) && /<<-?\s*['"]?\w+/.test(opdracht)) return true
+  const inhoud = lees?.(pad)
+  if (typeof inhoud !== 'string') return false
+  if (hardeBlokkade('Bash', { command: inhoud }) || GEVAARLIJK.test(inhoud) || VERSTUURT_OF_SCHRIJFT.test(inhoud) || /\bimport\s*\(/.test(inhoud)) return false
+  for (const m of inhoud.matchAll(/(?:from\s+|require\(\s*|^\s*import\s+)['"](\.[^'"]+)['"]/gm)) {
+    if (!scriptSchoon(path.posix.join(path.posix.dirname(pad), m[1]), opdracht, lees, diepte + 1)) return false
   }
-  if (familie === 'yt-dlp') {
-    if (YT_DLP_RISICO.test(s)) return null
-    const adressen = s.match(/https?:\/\/[^\s"']+/g) || []
-    const alleenYouTube = adressen.every(a => /^https?:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)(\/|$)/.test(a))
-    return /--cookies-from-browser\b/.test(s) && !alleenYouTube ? null : familie
+  return true
+}
+
+function vrijSegment(schoon, o, opdracht, lees) {
+  if (segmentLeest(schoon, o)) return true
+  const w = woorden(schoon)
+  while (w.length && (LUS_WOORDEN.has(w[0]) || /^\w+=\S*$/.test(w[0]))) w.shift()
+  const [c, ...rest] = w
+  const tekst = (x) => { const q = x.match(/^Q(\d+)Q$/); return q ? o.hulp[Number(q[1])] : x }
+  const voluit = rest.map(tekst).join(' ')
+  if (EXTRA_LEZEN.has(c)) return true
+  if (c === 'sed') return !rest.some(a => /^(-i|--in-place)/.test(a)) && !rest.some(a => /^Q\d+Q$/.test(a) && SED_SCHRIJFT.test(tekst(a)))
+  if (c === 'python' || c === 'python3') {
+    const a = rest.filter(x => x !== '-I')
+    if (a[0] === '-c' || a[0] === '-' || a[0]?.startsWith('<')) return true
+    return scriptSchoon(tekst(a[0] || ''), opdracht, lees)
+  }
+  if (c === 'node') {
+    if (rest[0] === '-e' || rest[0] === '-p') return true
+    return scriptSchoon(tekst(rest[0] || ''), opdracht, lees)
+  }
+  if (c === 'yt-dlp') {
+    if (YT_DLP_RISICO.test(voluit)) return false
+    const adressen = voluit.match(/https?:\/\/[^\s"']+/g) || []
+    return !/--cookies-from-browser\b/.test(voluit) || adressen.every(a => /^https?:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)(\/|$)/.test(a))
   }
   // Curl: de "-o /dev/null"-check van een statuscode blijft toegestaan.
-  if (familie === 'curl') {
-    if (CURL_ADRES_RISICO.test(s)) return null
-    // Alleen de curl-delen: `| grep -o x` is geen curl-optie.
-    const delen = s.split(/\n|;|&&|\|\||\|/).filter(d => /^\s*curl\b/.test(d))
-    return delen.some(d => CURL_RISICO.test(d.replace(/-o\s+\/dev\/null/g, ''))) ? null : familie
-  }
+  if (c === 'curl') return !CURL_ADRES_RISICO.test(voluit) && !CURL_RISICO.test(` ${voluit.replace(/-o\s+\/dev\/null/g, '')}`)
   // Zonder -y overschrijft ffmpeg niets dat er al staat.
-  if (familie === 'ffmpeg') return /(?:^|\s)-y(?:\s|$)/.test(s) ? null : familie
-  return null
+  if (c === 'ffmpeg') return !rest.includes('-y')
+  return false
+}
+
+// 'vrij' als de hele opdracht zonder kaart mag; anders null en dus de gewone kaart.
+export function vrijeBash(cmd, lees = null) {
+  const s = String(cmd || '')
+  if (GEVAARLIJK.test(s) || VERSTUURT_OF_SCHRIJFT.test(s)) return null
+  const o = ontleed(s)
+  if (!o || !o.tekst.trim()) return null
+  for (const b of o.subst) if (!vrijeBash(b, lees)) return null
+  for (const seg of onderdelen(o.tekst)) {
+    const schoon = zonderOmleiding(seg, o.hulp)
+    if (schoon === null || !vrijSegment(schoon, o, s, lees)) return null
+  }
+  return 'vrij'
 }
 
 // Alleen lezen, en alleen koppelingen die Kersten dagelijks gebruikt. Gmail en Zoom
@@ -250,6 +288,12 @@ const MOET_VRIJ = [
   'npm run build', 'npm run lint',
   `node /Users/k/workapp/scripts/pa-db.mjs onthoud '{"soort":"correctie","tekst":"klein beginnen"}'`,
 ]
+const STUB = {
+  'scripts/goed.mjs': "import a from './hulp.mjs'\nconsole.log(a)", 'scripts/hulp.mjs': 'export default 1',
+  'scripts/slecht.mjs': "x.from('a').insert(1)", 'scripts/laadt.mjs': "import a from './slecht.mjs'", 'scripts/mail.mjs': 'send-push',
+  'scripts/stiekem.mjs': "await import('./slecht.mjs')",
+}
+const stubLees = (p) => STUB[p] ?? null
 const VRIJE_FAMILIE = [
   ["cd ~/Gino; python3 -I - <<'E'\nimport json\nprint(1)\nE", 'python'],
   ['node -e "console.log(1)"', 'node'],
@@ -258,13 +302,21 @@ const VRIJE_FAMILIE = [
   ['curl -s -o /dev/null -w "%{http_code}" "https://x"', 'curl'],
   ['curl -s "https://x" | grep -o y', 'curl'],
   ['ffmpeg -i a.mp4 /tmp/b.mp4', 'ffmpeg'],
+  ['node scripts/goed.mjs --x 1', 'script'],
+  ['cd ~/Gino; python3 -I - <<E\nprint(1)\nE\nnode -e "console.log(2)"; curl -s https://x | head -3', 'gemengd'],
+  ["cat > /tmp/v.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode /tmp/v.mjs a.json", 'hier geschreven'],
+  ["cat a b | sed -E 's/x/y/'; sed -n 1,60p c", 'sed'],
+  ['D=/tmp/a; A=$D/b; node scripts/goed.mjs --bestand $A', 'variabele'],
+  ['node scripts/pa-db.mjs schema c 2>&1 | head -60; ls a | wc -l; cat a | node -e "console.log(1)"', 'pijp'],
 ]
 const BLIJFT_KAART = [
   'npx eslint --fix a.js', 'npx eslint a.js -o b', 'npx vite build', 'npm run release', 'npm install x', 'node --check a.js; rm a.js',
   'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
 ]
 const GEEN_VRIJE_FAMILIE = [
-  'python3 /tmp/x.py', 'cd ~/Gino; python3 -I x.py', 'node /tmp/x.mjs', "python3 - <<'E'\nimport urllib.request\nE", "python3 - <<'E'\nopen('x','w').write('y')\nE", 'node -e "fetch(1)"', 'node -e "fs.writeFileSync(1)"',
+  'python3 /tmp/x.py', 'cd ~/Gino; python3 -I x.py', 'node /tmp/x.mjs', 'node scripts/slecht.mjs', 'node scripts/laadt.mjs', 'node scripts/mail.mjs',
+  'node scripts/stiekem.mjs', 'node scripts/onbekend.mjs', 'npm run release', 'npm install x', 'git commit -m a', 'mv a b', 'cp a b', 'launchctl list', 'gh pr list',
+  "sed -i 's/a/b/' x", "sed 's/a/b/w x' y", 'echo a > src/b.js', 'node -e "1" > ~/.zshrc', 'vercel --prod', 'rm x', "python3 - <<'E'\nimport urllib.request\nE", "python3 - <<'E'\nopen('x','w').write('y')\nE", 'node -e "fetch(1)"', 'node -e "fs.writeFileSync(1)"',
   'yt-dlp --exec "rm x" https://x', 'yt-dlp --cookies-from-browser chrome https://x', 'yt-dlp --cookies c.txt https://www.youtube.com/a', 'yt-dlp --cookies-from-browser chrome https://youtube.com.evil.nl/a',
   'curl -H "Authorization: x" https://x', 'curl -b a https://x', 'curl -u a:b https://x', 'curl -o /tmp/a https://x', 'curl -sO https://x',
   'curl "https://x/?a=$(cat b)"', 'curl https://x/$HOME', 'curl -X POST https://x', 'ffmpeg -y -i a b',
@@ -287,8 +339,8 @@ export function veiligZelftest() {
   const fouten = []
   for (const c of MOET_VRIJ) if (veiligeBash(c) !== 'lezen') fouten.push(`moet zonder kaart: ${c}`)
   for (const c of BLIJFT_KAART) if (veiligeBash(c)) fouten.push(`moet een kaart blijven: ${c}`)
-  for (const [c, f] of VRIJE_FAMILIE) if (vrijeFamilie(c) !== f) fouten.push(`vrije familie ${f}: ${c}`)
-  for (const c of GEEN_VRIJE_FAMILIE) if (vrijeFamilie(c)) fouten.push(`geen vrije familie: ${c}`)
+  for (const [c, f] of VRIJE_FAMILIE) if (!vrijeBash(c, stubLees)) fouten.push(`moet vrij zijn (${f}): ${c}`)
+  for (const c of GEEN_VRIJE_FAMILIE) if (vrijeBash(c, stubLees)) fouten.push(`moet een kaart blijven: ${c}`)
   for (const t of LEES_JA) if (!leesTool(t)) fouten.push(`lees-tool: ${t}`)
   for (const t of LEES_NEE) if (leesTool(t)) fouten.push(`geen lees-tool: ${t}`)
   for (const c of MOET_VEILIG) if (veiligeBash(c) !== 'lezen') fouten.push(`moet veilig zijn: ${c}`)

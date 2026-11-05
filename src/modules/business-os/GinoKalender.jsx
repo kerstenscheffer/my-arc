@@ -26,7 +26,7 @@ import { supabase } from '../../lib/supabase'
 import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
 import GinoAutopilot from './GinoAutopilot'
-import { laadContentStand } from './contentStand'
+import { laadContentStand, typeLabel } from './contentStand'
 import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
 import { StandChip } from './contentStatus'
 import GinoOmzet from './GinoOmzet'
@@ -68,7 +68,7 @@ async function laadPeriode(van, tot) {
     supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
-    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout')
+    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord')
       .eq('coach_id', user.id).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
     supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
@@ -93,13 +93,16 @@ async function laadPeriode(van, tot) {
   }))
   // Stand (draft/ingepland/gepost/mislukt) uit content_items_status.
   // Testrijen ('__test…') tellen nergens mee.
-  ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => items.push({
-    id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
-    titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink,
-    sub: c.stand === 'mislukt' && c.autopilot_fout ? `${c.type || 'post'} · ${c.autopilot_fout}`
-      : c.stand === 'ingepland' && c.autopilot_status ? `${c.type || 'post'} · ingepland voor ${c.planned_time || '14:00'}` : c.type,
-    klaar: c.stand === 'gepost',
-  }))
+  ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => {
+    const label = typeLabel(c.type, c.autopilot_woord)
+    items.push({
+      id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, woord: c.autopilot_woord, dag: c.planned_date, tijd: c.planned_time || null,
+      titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink,
+      sub: c.stand === 'mislukt' && c.autopilot_fout ? `${label || 'post'} · ${c.autopilot_fout}`
+        : c.stand === 'ingepland' && c.autopilot_status ? `${label || 'post'} · ingepland voor ${c.planned_time || '14:00'}` : label,
+      klaar: c.stand === 'gepost',
+    })
+  })
   ;(ta.data || []).forEach(t => items.push({
     id: `t${t.id}`, soort: 'taak', dag: t.scheduled_date || t.deadline, tijd: null,
     titel: t.title, sub: t.deadline && t.deadline !== t.scheduled_date ? 'deadline' : null,
@@ -383,7 +386,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
   return (
     <div style={{
-      position: 'relative', width: '100%', maxWidth: 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
+      // De week even breed als Google Agenda; de andere weergaven zijn smal beter te lezen.
+      position: 'relative', width: '100%', maxWidth: weergave === 'week' && !isMobile ? 'min(1600px, calc(100vw - 48px))' : 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
       transformOrigin: '50% 100%', animation: 'gk-op .55s cubic-bezier(.2,.8,.2,1) both',
     }}>
       <style>{`
