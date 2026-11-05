@@ -22,8 +22,19 @@ export async function haalEisen(client) {
   const stand = await haalStand({ supabase }, venster)
   if (!stand) return null
   const w = waardenUit(stand)
+  // Calls uit Zoom en je agenda: client_calls wordt niet meer gevuld. Lukt dat niet, dan de oude telling.
+  const { data: calls } = await supabase.rpc('get_challenge_calls', {
+    p_client_id: venster.client_id, p_start: venster.start_date, p_eind: venster.end_date,
+  }).then(res => res, () => ({ data: null }))
+  if (calls) {
+    w.calls = Math.max(w.calls, Number(calls.gevoerd) || 0)
+    stand.calls = w.calls
+  }
   return {
-    regels: EISEN.map(e => ({ key: e.key, label: e.label, waarde: w[e.key], nodig: e.nodig, gehaald: w[e.key] >= e.nodig })),
+    regels: EISEN.map(e => ({
+      key: e.key, label: e.label, waarde: w[e.key], nodig: e.nodig, gehaald: w[e.key] >= e.nodig, uitleg: e.uitleg, info: e.info,
+      ...(e.key === 'calls' && calls ? { gepland: Number(calls.gepland) || 0 } : null),
+    })),
     behaald: EISEN.filter(e => w[e.key] >= e.nodig).length,
     totaal: EISEN.length,
     alles: allesGehaald(stand),

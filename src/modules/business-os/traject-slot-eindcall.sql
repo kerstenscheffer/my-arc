@@ -61,7 +61,7 @@ language sql stable as $$
       and public.traject_plat(e.titel) not like 'plan check%'
   )
   select k.id,
-         trim(regexp_replace(k.first_name || case when coalesce(k.last_name, '') like '%@%' then ''
+         trim(regexp_replace(coalesce(k.first_name, '') || case when coalesce(k.last_name, '') like '%@%' then ''
                                                   else ' ' || coalesce(k.last_name, '') end, '\s+', ' ', 'g')),
          k.email, k.coach_id, k.einde,
          coalesce((select d.status from public.client_doorstap d where d.client_id = k.id
