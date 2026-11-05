@@ -1067,6 +1067,8 @@ export default function BusinessOS({ isMobile }) {
   }
   const isZij = zijkant && !isMobile
   const isMini = (mini || isZij) && !isMobile
+  // Telefoon met agenda of beeld open: bol klein naast de balk, anders houdt de pagina maar de helft over.
+  const telefoonKlein = isMobile && boven
   // Links of rechts: de helft van het scherm waar hij het laatst stond.
   const zijLinks = isZij && !!miniPos && miniPos.x + 40 < (typeof window !== 'undefined' ? window.innerWidth / 2 : 0)
   // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
@@ -1355,16 +1357,16 @@ export default function BusinessOS({ isMobile }) {
           position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, width: 'min(760px, calc(100vw - 16px))',
           display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
-        } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
+        } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
           <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
-            <Reactor zonderNaam={isMini} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
-            {!isZij && <GinoHerinnering maat={isMini ? 64 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini} onder={(miniPos?.y ?? 999) < 240} />}
+            <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+            {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
           </div>
 
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
-          <div style={isZij ? { display: 'none' } : isMini ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
+          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),

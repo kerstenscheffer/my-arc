@@ -413,15 +413,15 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       `}</style>
 
       {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 14, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : 14, paddingBottom: isMobile ? 8 : 14, flexShrink: 0 }}>
         {(weergave === 'week' || weergave === 'content') && (
-          <div style={{ minWidth: 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+          <div style={{ minWidth: 0, flexBasis: isMobile ? '100%' : 'auto', order: isMobile ? 9 : 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
             {weergave === 'week' ? `${telling.calls} calls · ` : ''}{telling.content} content gepland
             {telling.leegContent > 0 && <span style={{ color: '#fff' }}> · {telling.leegContent} dagen nog zonder content</span>}
           </div>
         )}
-        <div style={{ flex: 1 }} />
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+        {!isMobile && <div style={{ flex: 1 }} />}
+        <div style={{ position: 'relative', flexShrink: 0, marginRight: isMobile ? 'auto' : 0 }}>
           <select
             value={weergave}
             onChange={(e) => kiesWeergave(e.target.value)}
@@ -440,7 +440,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         </div>
         {weergave !== 'projecten' && weergave !== 'klanten' && weergave !== 'keten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
-        <div style={{ minWidth: isMobile ? 104 : 140, textAlign: 'center', fontSize: isMobile ? 15 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
+        <div style={{ minWidth: isMobile ? 72 : 140, whiteSpace: 'nowrap', textAlign: 'center', fontSize: isMobile ? 13 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
           {weergave === 'week' || weergave === 'tijd' ? weekTitel
             : weergave === 'omzet' ? (omzetHuidig ? new Date(`${omzetHuidig}-15T12:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }) : '')
             : `${maandNaam} ${maand.getFullYear()}`}
@@ -455,7 +455,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Week: de agenda als HUD */}
       {weergave === 'week' && (
         <div ref={weekVak} style={{ position: 'relative', flex: 1, minHeight: 0, padding: '14px 14px 10px' }}>
-          <GinoWeek dagen={weekDagen} items={Object.values(perDag).flat()} onKies={setGekozen} uitlicht={focus ? [...focus].find(f => /^\d{4}-\d{2}-\d{2}$/.test(f)) || null : null} hoogte={Math.max(220, weekH - 24)} />
+          <GinoWeek isMobile={isMobile} dagen={weekDagen} items={Object.values(perDag).flat()} onKies={setGekozen} uitlicht={focus ? [...focus].find(f => /^\d{4}-\d{2}-\d{2}$/.test(f)) || null : null} hoogte={Math.max(220, weekH - 24)} />
           {items === null && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
               <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gk-draai 1.2s linear infinite' }} />
@@ -482,7 +482,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Klanten: de check-in ronde over de volle breedte; Gino-vragen lopen via het Klanten-tabje */}
       {weergave === 'klanten' && (
         <div className="gk-scroll" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 2px' : '0 4px' }}>
-          <GinoDoorstap />
+          <GinoDoorstap isMobile={isMobile} />
           <CheckinRonde onVraagGino={(t) => onVraag?.(t, { tab: 'klanten' })} />
           <GinoVerlengen isMobile={isMobile} />
         </div>
@@ -521,7 +521,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       )}
 
       {/* Onder het overzicht: Gino's voorstellen of samen plannen, dan de lijn naar de bol */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
+      <div style={{ display: isMobile && weergave !== 'content' ? 'none' : 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
         {weergave === 'tijd' ? (
           <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
             onClick={() => onVraag?.(`Kijk naar mijn tijd van de week van ${weekTitel}: waar valt winst te halen?`)}>

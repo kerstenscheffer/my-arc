@@ -63,7 +63,7 @@ function Wijzer({ deel, dag, nr, vandaag, vertraging }) {
 }
 
 // uitlicht: 'YYYY-MM-DD' die Gino aanwijst; die kolom gloeit, de rest dimt.
-export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuProp = null, uitlicht = null }) {
+export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuProp = null, uitlicht = null, isMobile = false }) {
   const [nu, setNu] = useState(() => nuProp || new Date())
   useEffect(() => {
     if (nuProp) return
@@ -219,12 +219,12 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
                       background: open ? `${G}22` : 'transparent', border: `1px solid ${G}55`, color: '#fff',
                       fontFamily: 'inherit', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
                     }}>
-                      {los.length} gepland
+                      {los.length}{isMobile ? '' : ' gepland'}
                       <ChevronDown size={11} strokeWidth={3} color={G} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none' }} />
                     </button>
                     {open && (
                       <div onClick={(e) => e.stopPropagation()} style={{
-                        position: 'absolute', top: 24, [di >= dagen.length - 2 ? 'right' : 'left']: 0, width: 240, maxHeight: 260, overflowY: 'auto',
+                        ...(isMobile ? { position: 'fixed', left: 12, right: 12, top: 170 } : { position: 'absolute', top: 24, [di >= dagen.length - 2 ? 'right' : 'left']: 0, width: 240 }), maxHeight: 260, overflowY: 'auto',
                         background: '#0a0a0a', border: `1px solid ${G}55`, borderRadius: 12, padding: 4, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
                       }}>
                         {los.map(it => (

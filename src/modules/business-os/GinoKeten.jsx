@@ -768,7 +768,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
   }
   const oog = { display: 'flex', flexShrink: 0, marginLeft: 'auto', padding: '2px 0 2px 8px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }
 
-  const NAAM_B = isMobile ? 150 : 170
+  const NAAM_B = isMobile ? 118 : 170
   const LIJN = '1.5px solid #fff'
   const knop = (aan) => ({
     display: 'flex', alignItems: 'center', gap: 5, minHeight: 30, padding: '0 7px', cursor: 'pointer', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0,
@@ -974,8 +974,8 @@ export default function GinoKeten({ isMobile, onVraag }) {
                       onMouseDown={(e) => e.stopPropagation()}
                       style={{ ...cel, ...lijn, ...plak, background: sleept ? '#2a2a2a' : '#000', padding: '4px 8px 4px 0', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.85)', cursor: sleept ? 'grabbing' : 'grab' }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: r.kop ? 20 : r.sub ? 34 : 0, ...(r.kop ? { color: '#fff', fontWeight: 900 } : r.sub ? { color: 'rgba(255,255,255,0.7)', fontWeight: 600 } : {}) }}>
-                        {!isSub && <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: r.kop ? (isMobile ? 8 : 20) : r.sub ? (isMobile ? 16 : 34) : 0, ...(isMobile ? { fontSize: 12, whiteSpace: 'normal' } : null), ...(r.kop ? { color: '#fff', fontWeight: 900 } : r.sub ? { color: 'rgba(255,255,255,0.7)', fontWeight: 600 } : {}) }}>
+                        {!isSub && !isMobile && <span data-greep aria-hidden style={{ display: 'flex', touchAction: 'none', padding: isMobile ? '4px 4px 4px 0' : 0, color: 'rgba(255,255,255,0.45)' }}><GripVertical size={14} strokeWidth={2.4} /></span>}
                         {Icon && <Icon size={15} strokeWidth={2.4} color={r.kleur} style={{ flexShrink: 0 }} />}
                         {UITKLAP[r.key] || r.klap ? (
                           <button type="button" aria-expanded={!!uitklap[r.klap || r.key]} onPointerDown={(e) => e.stopPropagation()} onClick={() => wisselUitklap(r.klap || r.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
@@ -996,9 +996,9 @@ export default function GinoKeten({ isMobile, onVraag }) {
                             <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} />
                           </button>
                         ) : r.label}
-                        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} even verbergen`} title={r.overal ? (statsUit.has(r.overal) ? "Weer tonen bij elke magnet" : "Bij elke magnet verbergen") : "Even verbergen. Shift-klik: alleen deze laten staan."} style={oog}>
+                        {!isMobile && <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} even verbergen`} title={r.overal ? (statsUit.has(r.overal) ? "Weer tonen bij elke magnet" : "Bij elke magnet verbergen") : "Even verbergen. Shift-klik: alleen deze laten staan."} style={oog}>
                           {r.overal && statsUit.has(r.overal) ? <EyeOff size={14} strokeWidth={2.4} color="#fff" /> : <Eye size={14} strokeWidth={2.4} />}
-                        </button>
+                        </button>}
                       </span>
                     </td>
                     {kolommen.map((k, ki) => {

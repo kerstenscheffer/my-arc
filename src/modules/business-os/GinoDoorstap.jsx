@@ -143,7 +143,7 @@ function WeekBalk({ week, weken }) {
   )
 }
 
-export default function GinoDoorstap() {
+export default function GinoDoorstap({ isMobile = false }) {
   const [rijen, setRijen] = useState(null)
   const [fout, setFout] = useState(null)
   const [bezig, setBezig] = useState(null)
@@ -432,7 +432,23 @@ export default function GinoDoorstap() {
   return (
     <div style={{ marginBottom: 24 }}>
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
-      <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }`}</style>
+      {/* Telefoon: eerst naam, stand, bedrag en vinkje; daaronder traject, week, eisen en eindcall. */}
+      <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }
+        .gd-rij { display: flex !important; flex-wrap: wrap; column-gap: 6px; row-gap: 2px }
+        .gd-rij > * { min-width: 0 }
+        .gd-rij > :nth-child(1) { order: 1; flex: 1 1 calc(100% - 180px) }
+        .gd-rij > :nth-child(2) { order: 5; flex: 0 0 112px }
+        .gd-rij > :nth-child(3) { order: 6; flex: 0 0 44px }
+        .gd-rij > :nth-child(4) { order: 8; flex: 1 1 0; text-align: right }
+        .gd-rij > :nth-child(5) { order: 2; flex: 0 0 92px; text-align: right }
+        .gd-rij > :nth-child(6) { order: 3; flex: 0 0 40px }
+        .gd-rij > :nth-child(7) { order: 4; flex: 0 0 24px }
+        .gd-met > :nth-child(4) { order: 7; flex: 0 0 44px; text-align: left }
+        .gd-met > :nth-child(5) { order: 8; flex: 1 1 0; text-align: right }
+        .gd-met > :nth-child(6) { order: 2; flex: 0 0 92px; text-align: right }
+        .gd-met > :nth-child(7) { order: 3; flex: 0 0 40px }
+        .gd-met > :nth-child(8) { order: 4; flex: 0 0 24px }
+        .gd-rij select.gd-stand { width: 100%; text-align: right; text-align-last: right; transform: scale(0.82); transform-origin: right center }`}</style>
       <div style={{ paddingBottom: 8 }}>
         <select className="gd-stand" aria-label="Soort traject" value={soortFilter} onChange={e => kiesSoort(e.target.value)} style={{
           height: 26, padding: 0, background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', outline: 'none',
@@ -441,7 +457,7 @@ export default function GinoDoorstap() {
         </select>
       </div>
       {soortFilter === 'challenge' ? geld && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px 18px', paddingBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))', gap: isMobile ? '10px 8px' : '12px 18px', paddingBottom: 14 }}>
           {[
             { id: 'verkocht', label: 'Verkocht', waarde: euro(geld.verkocht), sub: `${geld.aantal} challenges`, regels: geld.lijsten.verkocht },
             { id: 'zeker', label: 'Zeker', waarde: euro(geld.zeker), kleur: G, regels: geld.lijsten.zeker },
@@ -452,7 +468,7 @@ export default function GinoDoorstap() {
           ].map(k => <Getal key={k.id} {...k} open={openGetal === k.id} onKlik={() => setOpenGetal(o => (o === k.id ? null : k.id))} />)}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px 18px', paddingBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))', gap: isMobile ? '10px 8px' : '12px 18px', paddingBottom: 14 }}>
           {coachingGetallen.map(k => <Getal key={k.id} {...k} open={openGetal === k.id} onKlik={() => setOpenGetal(o => (o === k.id ? null : k.id))} />)}
         </div>
       )}
@@ -461,9 +477,9 @@ export default function GinoDoorstap() {
       {zichtbaar.length === 0 && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.textSecondary }}>Niemand in deze lijst.</div>}
 
       {zichtbaar.length > 0 && (
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ width: 'max-content' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, padding: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
+        <div style={{ overflowX: isMobile ? 'visible' : 'auto' }}>
+          <div style={{ width: isMobile ? '100%' : 'max-content' }}>
+            <div style={{ display: isMobile ? 'none' : 'grid', gridTemplateColumns: kolommen, gap: 8, padding: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
               <span /><button type="button" onClick={wisselSorteer} title={eindOplopend ? 'Eerstvolgend einde bovenaan. Klik: omdraaien' : 'Laatste einde bovenaan. Klik: omdraaien'} style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>Traject {eindOplopend ? '↑' : '↓'}</button><span />{metEisen && <span>Eisen</span>}<span>Eindcall</span><span /><span /><span />
             </div>
             {zichtbaar.map((r) => {
@@ -471,7 +487,7 @@ export default function GinoDoorstap() {
               const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
               return (
                 <div key={r.client_id}>
-                  <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, alignItems: 'center', minHeight: 25, fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+                  <div className={isMobile ? (metEisen ? 'gd-rij gd-met' : 'gd-rij') : undefined} style={{ ...(isMobile ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto auto', gridAutoFlow: 'row', columnGap: 8, rowGap: 2, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.08)' } : { display: 'grid', gridTemplateColumns: kolommen, gap: 8, minHeight: 25 }), alignItems: 'center', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                     <span title={r.pakket || undefined} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
                     <button type="button" onClick={() => openTraject(r)} title={`${r.dagen != null ? (r.dagen < 0 ? `${-r.dagen} dagen voorbij` : `Nog ${r.dagen} dagen`) : ''}. Klik: looptijd of verlenging aanpassen`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', whiteSpace: 'nowrap', color: r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary }}>{r.onbeperkt ? '∞' : <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}</button>
                     <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt} onClick={() => setLooptijd(o => (o?.id === r.client_id ? null : { id: r.client_id, start: r.klant.coaching_start_date || '', weken: r.klant.coaching_total_weeks || 6 }))} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
