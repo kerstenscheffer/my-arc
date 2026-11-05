@@ -1364,7 +1364,7 @@ export default function BusinessOS({ isMobile }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),

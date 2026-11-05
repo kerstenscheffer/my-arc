@@ -45,7 +45,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -1361,7 +1361,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2714,6 +2714,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         {gesprek.length > 0 && (
                           <button onClick={() => { setMenu(false); leegGesprek() }} style={menuRegel}>
                             <SquarePen size={15} /> <span style={{ flex: 1 }}>Nieuw gesprek</span>
+                          </button>
+                        )}
+                        {onNotities && (
+                          <button onClick={() => { setMenu(false); onNotities() }} style={menuRegel}>
+                            <StickyNote size={15} /> <span style={{ flex: 1 }}>Notities</span>
                           </button>
                         )}
                         <button onClick={() => { setMenu(false); setToonRegels(true) }} style={menuRegel}>
