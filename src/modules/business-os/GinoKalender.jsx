@@ -426,8 +426,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             onChange={(e) => kiesWeergave(e.target.value)}
             aria-label="Weergave kiezen"
             style={{
-              appearance: 'none', WebkitAppearance: 'none', height: 34, padding: '0 30px 0 14px', cursor: 'pointer',
-              background: 'transparent', border: `1px solid ${G}55`, borderRadius: 999, outline: 'none',
+              appearance: 'none', WebkitAppearance: 'none', height: 32, padding: '0 30px 0 11px', cursor: 'pointer',
+              background: 'transparent', border: '1.5px solid #fff', borderRadius: 9, outline: 'none',
               color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
             }}
           >
@@ -435,7 +435,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
             ))}
           </select>
-          <ChevronDown size={14} strokeWidth={2.6} color={G} aria-hidden style={{ position: 'absolute', right: 11, top: 10, pointerEvents: 'none' }} />
+          <ChevronDown size={14} strokeWidth={2.6} color="#fff" aria-hidden style={{ position: 'absolute', right: 10, top: 9, pointerEvents: 'none' }} />
         </div>
         {weergave !== 'projecten' && weergave !== 'klanten' && weergave !== 'keten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
@@ -467,7 +467,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Keten: van content tot geld, per week */}
       {weergave === 'keten' && (
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-          <GinoKeten isMobile={isMobile} />
+          <GinoKeten isMobile={isMobile} onVraag={onVraag} />
         </div>
       )}
 
@@ -525,12 +525,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             onClick={() => onVraag?.(`Kijk naar mijn tijd van de week van ${weekTitel}: waar valt winst te halen?`)}>
             <Sparkles size={13} /> Waar zit de winst?
           </button>
-        ) : weergave === 'keten' ? (
-          <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
-            onClick={() => onVraag?.('Kijk naar de keten van de laatste 8 weken, van content tot geld: waar zit het lek, wat is de waarschijnlijke oorzaak en wat moeten we eerst fixen? Noem een oorzaak een vermoeden als je hem niet kunt bewijzen.')}>
-            <Sparkles size={13} /> Waar zit het lek?
-          </button>
-        ) : weergave === 'omzet' || weergave === 'projecten' ? null : concept.length > 0 ? (
+        ) : weergave === 'omzet' || weergave === 'projecten' || weergave === 'keten' ? null : concept.length > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 800, color: G }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
             <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen(concept)} style={{ ...link, color: G, opacity: 1 }}>

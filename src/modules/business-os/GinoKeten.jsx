@@ -59,6 +59,20 @@ const RIJEN = [
   { key: 'close', label: 'Gevoerd → sale', Icon: Percent, kleur: '#fff', deel: ['sales', 'gevoerd'], stap: true },
 ]
 
+// Vragen aan Gino op weg naar €10.000 per maand. Het antwoord komt in de chat.
+const VRAAG_REGEL = 'Gebruik echte cijfers, zeg per punt wat we nu moeten doen, en noem een oorzaak een vermoeden als je hem niet kunt bewijzen.'
+const VRAGEN = [
+  { label: 'Waar zit het lek?', vraag: 'Kijk naar de keten van de laatste weken, van content tot geld: waar zit het lek, wat is de waarschijnlijke oorzaak en wat moeten we eerst fixen?' },
+  { label: 'Wat is de kortste route naar €10K?', vraag: 'Reken terug van €10.000 omzet per maand naar sales, gevoerde calls, ingeplande calls, reacties en views per week. Waar staan we nu, en welke stap geeft het meeste geld als we hem verbeteren?' },
+  { label: 'Wat is elke stap waard in euro’s?', vraag: 'Wat levert gemiddeld één reactie, één voorgestelde call, één ingeplande call en één gevoerde call op in euro’s? Wat is dus 1% beter per stap waard per maand?' },
+  { label: 'Welke magnets leveren echt sales?', vraag: 'Zet de magnets per woord naast elkaar over de laatste 90 dagen: views, comments, leads, calls, sales en omzet. Welke moeten we meer posten en welke kunnen weg?' },
+  { label: 'Waarom daalt mijn close?', vraag: 'Waarom gaat gevoerd naar sale omlaag? Kijk naar de redenen bij sale verloren en naar de calls van de laatste weken. Welke bezwaren komen terug, en wat kan ik in de call anders doen?' },
+  { label: 'Waarom zeggen leads nee tegen een call?', vraag: 'Bekijk voorgesteld, ingepland en afgewezen van de laatste weken en de redenen bij afgewezen. Waarom zeggen leads nee, en wat moet er in de DM anders?' },
+  { label: 'Welke leads moeten we nu benaderen?', vraag: 'Welke groep leads levert per bericht de meeste calls en sales: nieuw of oud, man of vrouw, per magnet? Hoeveel leads zitten er nog in de beste groep, en wie benaderen we deze week?' },
+  { label: 'Hoeveel komt er zeker binnen deze maand?', vraag: 'Hoeveel geld komt er deze en volgende maand zeker binnen uit termijnen en openstaande betalingen, hoeveel nieuwe omzet is er dan nog nodig voor €10.000, en hoeveel sales is dat?' },
+  { label: 'Wat doe ik deze week als eerste?', vraag: 'Kies op basis van de keten de 3 acties die deze week het meeste opleveren richting €10.000 per maand, op volgorde, met wat ik precies moet doen en hoe we zien of het werkt.' },
+]
+
 const ALLE_KEYS = RIJEN.map(r => r.key)
 const RIJ_VAN = Object.fromEntries(RIJEN.map(r => [r.key, r]))
 const STAND = 'myarc.keten.stand'
@@ -242,7 +256,7 @@ function conclusie(volle) {
   }
 }
 
-export default function GinoKeten({ isMobile }) {
+export default function GinoKeten({ isMobile, onVraag }) {
   const [aantal, setAantal] = useState(WEKEN)
   const kolommen = useMemo(() => {
     const m = maandagVan(new Date())
@@ -257,7 +271,10 @@ export default function GinoKeten({ isMobile }) {
   const [keys, setKeys] = useState(() => leesStand()?.keys || ALLE_KEYS)
   const [actief, setActief] = useState(() => leesStand()?.actief || null)
   const [weergaven, setWeergaven] = useState([])
-  const [kiezerOpen, setKiezerOpen] = useState(false)
+  // Welk klapmenu boven de tabel open staat: 'tekst', 'menu', 'kiezer' of 'vragen'. Eén tegelijk.
+  const [klap, setKlap] = useState(null)
+  const tekstOpen = klap === 'tekst', menuOpen = klap === 'menu', kiezerOpen = klap === 'kiezer', vragenOpen = klap === 'vragen'
+  const wissel = (w) => setKlap(o => (o === w ? null : w))
   const [naam, setNaam] = useState('')
   const [melding, setMelding] = useState(null)
   const [sleepKey, setSleepKey] = useState(null)
@@ -435,8 +452,14 @@ export default function GinoKeten({ isMobile }) {
   }
 
   const NAAM_B = isMobile ? 150 : 170
-  const kolLijn = (i) => (i % 2 === 0 ? { borderLeft: '1.5px solid #fff', borderRight: '1.5px solid #fff' } : {})
-  const kop = { position: 'sticky', top: 0, zIndex: 2, background: '#000', padding: '0 8px 6px 10px', textAlign: 'right', whiteSpace: 'nowrap', minWidth: 68 }
+  const LIJN = '1.5px solid #fff'
+  const knop = (aan) => ({
+    display: 'flex', alignItems: 'center', gap: 5, minHeight: 30, padding: '0 7px', cursor: 'pointer', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0,
+    background: aan ? 'rgba(255,255,255,0.14)' : 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+  })
+  const paneel = { position: 'absolute', top: 'calc(100% + 4px)', zIndex: 6, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, boxShadow: '0 14px 40px rgba(0,0,0,0.7)' }
+  const kolLijn = (i) => (i % 2 === 0 ? { borderLeft: LIJN, borderRight: LIJN } : {})
+  const kop = { position: 'sticky', top: 0, zIndex: 2, background: '#000', padding: '6px 8px 6px 10px', textAlign: 'right', whiteSpace: 'nowrap', minWidth: 68 }
   const cel = {
     padding: '4px 8px 4px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 800,
     fontVariantNumeric: 'tabular-nums',
@@ -454,81 +477,120 @@ export default function GinoKeten({ isMobile }) {
         .gk-keten::-webkit-scrollbar-track { background: rgba(255,255,255,0.08); border-radius: 4px }
       `}</style>
       {detail && <Detail key={`${detail.rij.key}|${detail.kolom.id}`} open={detail} onSluit={() => setDetail(null)} isMobile={isMobile} />}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-        {zin && (
-          <div style={{ padding: '0 0 14px', flexShrink: 0, fontSize: isMobile ? 13 : 14, fontWeight: 800, color: '#fff', lineHeight: 1.45 }}>
-            {zin.tekst || (
-              <>
-                Laatste 3 weken tegen de 4 ervoor:{' '}
-                {zin.daling?.length
-                  ? zin.daling.map((s, i) => <span key={s.r.key}>{i > 0 ? ', ' : ''}{s.r.label.toLowerCase()} <span style={{ color: ROOD }}>{s.pct}%</span></span>)
-                  : 'geen grote dalingen'}
-                {zin.close && <>. Gevoerd → sale van {Math.round(zin.close.oud)}% naar {Math.round(zin.close.nieuw)}%</>}
-                {zin.extra > 0 && <>. Evenveel gevoerde calls als eerder is ongeveer <span style={{ color: GROEN }}>€{zin.extra.toLocaleString('nl-NL')} per week</span> meer</>}.
-              </>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ width: 'fit-content', maxWidth: '100%', maxHeight: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Eén regel: de conclusie kort, daarnaast de knoppen. Breedte 0 + minWidth: de regel volgt de tabel. */}
+        <div style={{ position: 'relative', width: 0, minWidth: '100%', boxSizing: 'border-box', flexShrink: 0, display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 4, paddingBottom: 8 }}>
+          {zin && (
+            <div style={{ position: isMobile ? 'static' : 'relative', minWidth: 0, flex: '0 1 auto' }}>
+              <button type="button" aria-expanded={tekstOpen} onClick={() => wissel('tekst')} style={{ ...knop(tekstOpen), maxWidth: '100%', paddingLeft: 0, flexShrink: 1 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {zin.tekst || (zin.daling?.length ? <>Grootste daling: {zin.daling[0].r.label.toLowerCase()} <span style={{ color: ROOD }}>{zin.daling[0].pct}%</span></> : 'Geen grote dalingen')}
+                </span>
+                <ChevronDown size={14} strokeWidth={2.8} style={{ flexShrink: 0, transform: tekstOpen ? 'rotate(180deg)' : 'none' }} />
+              </button>
+              {tekstOpen && !zin.tekst && (
+                <div style={{ ...paneel, left: 0, width: 'min(360px, 100%)', minWidth: isMobile ? 0 : 320, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', paddingBottom: 6 }}>Laatste 3 weken tegen de 4 ervoor</div>
+                  {zin.daling?.map(d => (
+                    <div key={d.r.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                      <span>{d.r.label}</span><span style={{ color: ROOD, fontVariantNumeric: 'tabular-nums' }}>{d.pct}%</span>
+                    </div>
+                  ))}
+                  {zin.close && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                      <span>Gevoerd → sale</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round(zin.close.oud)}% → {Math.round(zin.close.nieuw)}%</span>
+                    </div>
+                  )}
+                  {zin.extra > 0 && (
+                    <div style={{ marginTop: 6, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.14)', fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.4 }}>
+                      Evenveel gevoerde calls als eerder: ongeveer <span style={{ color: GROEN }}>€{zin.extra.toLocaleString('nl-NL')} per week</span> meer
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ position: isMobile ? 'static' : 'relative', flexShrink: 0 }}>
+            <button type="button" aria-expanded={menuOpen} onClick={() => wissel('menu')} style={{ ...knop(menuOpen), maxWidth: 200 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{weergaven.find(w => w.id === actief)?.naam || 'Alle stats'}</span>
+              <ChevronDown size={14} strokeWidth={2.8} style={{ flexShrink: 0, transform: menuOpen ? 'rotate(180deg)' : 'none' }} />
+            </button>
+            {menuOpen && (
+              <div style={{ ...paneel, left: 0, minWidth: 180, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
+                {[{ id: null, naam: 'Alle stats' }, ...weergaven].map(w => (
+                  <button key={w.id || 'alles'} type="button" onClick={() => { kiesWeergave(w.id); wissel(null) }} style={{
+                    display: 'block', width: '100%', minHeight: 34, padding: '0 10px', background: (actief || null) === w.id ? 'rgba(255,255,255,0.14)' : 'transparent', border: 'none', borderRadius: 7,
+                    color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800, textAlign: 'left', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}>{w.naam}</button>
+                ))}
+              </div>
             )}
           </div>
-        )}
-        {/* Weergave kiezen en stats aan of uit */}
-        <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 10 }}>
-          <div style={{ position: 'relative', minWidth: 0 }}>
-            <select value={actief || ''} onChange={(e) => kiesWeergave(e.target.value || null)} aria-label="Weergave kiezen" style={{
-              appearance: 'none', WebkitAppearance: 'none', height: 34, maxWidth: 220, padding: '0 28px 0 12px', cursor: 'pointer', outline: 'none',
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 10, color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
-            }}>
-              <option value="" style={{ background: '#0a0a0a' }}>Alle stats</option>
-              {weergaven.map(w => <option key={w.id} value={w.id} style={{ background: '#0a0a0a' }}>{w.naam}</option>)}
-            </select>
-            <ChevronDown size={14} strokeWidth={2.6} color="#fff" aria-hidden style={{ position: 'absolute', right: 9, top: 10, pointerEvents: 'none' }} />
+          <div style={{ position: isMobile ? 'static' : 'relative', flexShrink: 0 }}>
+            <button type="button" aria-expanded={kiezerOpen} onClick={() => wissel('kiezer')} style={knop(kiezerOpen)}>
+              <Filter size={14} strokeWidth={2.6} /> Stats kiezen
+            </button>
+            {kiezerOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 6, width: isMobile ? '100%' : 420, maxHeight: 340, overflowY: 'auto', padding: 12,
+                background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '2px 12px' }}>
+                  {RIJEN.map(r => {
+                    const aan = keys.includes(r.key)
+                    return (
+                      <button key={r.key} type="button" onClick={() => wisselStat(r.key)} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, minHeight: 32, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: aan ? '#fff' : 'rgba(255,255,255,0.55)', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, textAlign: 'left',
+                      }}>
+                        <span style={{
+                          width: 16, height: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4,
+                          background: aan ? '#fff' : 'transparent', border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.4)'}`,
+                        }}>{aan && <Check size={12} strokeWidth={3.5} color="#0a0a0a" />}</span>
+                        {r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8, paddingTop: 10, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+                  <input value={naam} onChange={(e) => setNaam(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') bewaarAlsNieuw() }}
+                    maxLength={60} placeholder="Naam van deze weergave" style={{
+                      flex: 1, minWidth: 0, height: 34, padding: '0 10px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9,
+                      color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, outline: 'none',
+                    }} />
+                  <button type="button" onClick={bewaarAlsNieuw} disabled={!naam.trim()} style={{
+                    height: 34, padding: '0 12px', background: '#fff', border: '1px solid #fff', borderRadius: 9, color: '#0a0a0a', cursor: naam.trim() ? 'pointer' : 'default',
+                    opacity: naam.trim() ? 1 : 0.5, fontFamily: 'inherit', fontSize: 13, fontWeight: 900, flexShrink: 0,
+                  }}>Opslaan</button>
+                  {actief && (
+                    <button type="button" onClick={verwijderWeergave} aria-label="Deze weergave verwijderen" title="Deze weergave verwijderen" style={{
+                      width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9, color: '#fff',
+                    }}><Trash2 size={14} /></button>
+                  )}
+                </div>
+                {melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: ROOD }}>{melding}</div>}
+                {actief && !melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>Wijzigingen in deze weergave worden vanzelf bewaard.</div>}
+              </div>
+            )}
           </div>
-          <button type="button" aria-expanded={kiezerOpen} onClick={() => setKiezerOpen(o => !o)} style={{
-            display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', cursor: 'pointer', borderRadius: 10,
-            background: kiezerOpen ? 'rgba(255,255,255,0.14)' : 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#fff',
-            fontFamily: 'inherit', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
-          }}>
-            <Filter size={14} strokeWidth={2.6} /> Stats kiezen
-          </button>
-          {kiezerOpen && (
-            <div style={{
-              position: 'absolute', top: 40, left: 0, zIndex: 6, width: 'min(420px, 100%)', maxHeight: 340, overflowY: 'auto', padding: 12,
-              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '2px 12px' }}>
-                {RIJEN.map(r => {
-                  const aan = keys.includes(r.key)
-                  return (
-                    <button key={r.key} type="button" onClick={() => wisselStat(r.key)} style={{
-                      display: 'flex', alignItems: 'center', gap: 8, minHeight: 32, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
-                      color: aan ? '#fff' : 'rgba(255,255,255,0.55)', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, textAlign: 'left',
-                    }}>
-                      <span style={{
-                        width: 16, height: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4,
-                        background: aan ? '#fff' : 'transparent', border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.4)'}`,
-                      }}>{aan && <Check size={12} strokeWidth={3.5} color="#0a0a0a" />}</span>
-                      {r.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 8, paddingTop: 10, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
-                <input value={naam} onChange={(e) => setNaam(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') bewaarAlsNieuw() }}
-                  maxLength={60} placeholder="Naam van deze weergave" style={{
-                    flex: 1, minWidth: 0, height: 34, padding: '0 10px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9,
-                    color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, outline: 'none',
-                  }} />
-                <button type="button" onClick={bewaarAlsNieuw} disabled={!naam.trim()} style={{
-                  height: 34, padding: '0 12px', background: '#fff', border: '1px solid #fff', borderRadius: 9, color: '#0a0a0a', cursor: naam.trim() ? 'pointer' : 'default',
-                  opacity: naam.trim() ? 1 : 0.5, fontFamily: 'inherit', fontSize: 13, fontWeight: 900, flexShrink: 0,
-                }}>Opslaan</button>
-                {actief && (
-                  <button type="button" onClick={verwijderWeergave} aria-label="Deze weergave verwijderen" title="Deze weergave verwijderen" style={{
-                    width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 9, color: '#fff',
-                  }}><Trash2 size={14} /></button>
-                )}
-              </div>
-              {melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: ROOD }}>{melding}</div>}
-              {actief && !melding && <div style={{ paddingTop: 8, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>Wijzigingen in deze weergave worden vanzelf bewaard.</div>}
+          {onVraag && (
+            <div style={{ position: isMobile ? 'static' : 'relative', flexShrink: 0 }}>
+              <button type="button" aria-expanded={vragenOpen} onClick={() => wissel('vragen')} style={knop(vragenOpen)}>
+                <Sparkles size={14} strokeWidth={2.6} /> Waar zit het lek?
+                <ChevronDown size={14} strokeWidth={2.8} style={{ flexShrink: 0, transform: vragenOpen ? 'rotate(180deg)' : 'none' }} />
+              </button>
+              {vragenOpen && (
+                <div style={{ ...paneel, left: 0, width: isMobile ? '100%' : 320, maxHeight: 340, overflowY: 'auto', padding: 4 }}>
+                  {VRAGEN.map(v => (
+                    <button key={v.label} type="button" onClick={() => { wissel(null); onVraag(`${v.vraag} ${VRAAG_REGEL}`) }} style={{
+                      display: 'block', width: '100%', minHeight: 36, padding: '6px 10px', background: 'transparent', border: 'none', borderRadius: 7,
+                      color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800, textAlign: 'left', lineHeight: 1.3, cursor: 'pointer',
+                    }}>{v.label}</button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -538,7 +600,7 @@ export default function GinoKeten({ isMobile }) {
           onScroll={bijEinde}
           onMouseDown={sleepStart}
           onClickCapture={naSlepen}
-          style={{ flex: 1, minHeight: 0, overflow: 'auto', cursor: 'grab', userSelect: 'none' }}
+          style={{ flex: '0 1 auto', minHeight: 0, overflow: 'auto', cursor: 'grab', userSelect: 'none' }}
         >
           {/* Zo smal als de cijfers toelaten: over de volle breedte lees je een rij niet meer door. */}
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: 'max-content' }}>
@@ -558,7 +620,7 @@ export default function GinoKeten({ isMobile }) {
                 const r = RIJ_VAN[key]
                 const sleept = sleepKey === key
                 // Om de rij een dikke witte lijn boven en onder: zo volg je een rij zonder te verspringen.
-                const lijn = ri % 2 === 0 ? { borderTop: '1.5px solid #fff', borderBottom: '1.5px solid #fff' } : {}
+                const lijn = ri % 2 === 0 ? { borderTop: LIJN, borderBottom: LIJN } : {}
                 const gem = gemiddelde(r, basis)
                 const Icon = r.Icon
                 return (
@@ -596,6 +658,7 @@ export default function GinoKeten({ isMobile }) {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </>
   )
