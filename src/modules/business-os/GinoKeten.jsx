@@ -219,6 +219,25 @@ async function haalWeek(svc, coachId, van) {
       waarden[`${k}:per10Vrouwen`] = per10(waarden[`${k}:leadsVrouwen`])
     }
   }
+  // Totaal van alle magnets, voor de rij "Totaal" bovenaan de uitklap. Een lead met twee
+  // magnets telt hier twee keer mee, net als onder de losse woorden.
+  const metTotaal = m?.filter(p => p.soort === 'magnet' && p.woord) || []
+  if (m) {
+    waarden['magnetsTotaal:posts'] = metTotaal.length
+    waarden['magnetsTotaal:views'] = som(metTotaal, 'views')
+    waarden['magnetsTotaal:comments'] = som(metTotaal, 'comments')
+  }
+  if (magnetLeads) {
+    const tel = (k) => magnetLeads.reduce((t, l) => t + (Number(l[k]) || 0), 0)
+    waarden['magnetsTotaal:leads'] = tel('totaal')
+    waarden['magnetsTotaal:leadsMannen'] = tel('mannen')
+    waarden['magnetsTotaal:leadsVrouwen'] = tel('vrouwen')
+    if (metTotaal.length) {
+      waarden['magnetsTotaal:per10'] = (tel('totaal') / metTotaal.length) * 10
+      waarden['magnetsTotaal:per10Mannen'] = (tel('mannen') / metTotaal.length) * 10
+      waarden['magnetsTotaal:per10Vrouwen'] = (tel('vrouwen') / metTotaal.length) * 10
+    }
+  }
   waarden.challenge = challenge
   waarden.challengeMannen = challengeMannen
   waarden.challengeVrouwen = challengeVrouwen
@@ -394,6 +413,7 @@ export default function GinoKeten({ isMobile, onVraag }) {
   // weergave niet. Verversen zet alles terug.
   const [verborgen, setVerborgen] = useState(() => new Set())
   const [verborgenOpen, setVerborgenOpen] = useState(false)
+  const [statsUit, setStatsUit] = useState(() => new Set())
   const [uitklap, setUitklap] = useState(leesUitklap)
   const wisselUitklap = (k) => {
     const nieuw = { ...uitklap, [k]: !uitklap[k] }
@@ -626,7 +646,20 @@ export default function GinoKeten({ isMobile, onVraag }) {
     const isRecent = (g) => recent.some(k => k.waarden[`${rij}:${g}:posts`] > 0)
     const stil = groepen.filter(g => !isRecent(g))
     const stilKlap = `${rij}:__stil`
+    // Totaal van alle woorden. Een oogje hier zet die stat bij elke magnet tegelijk uit.
+    const isMagnet = (p) => p.soort === 'magnet' && !!p.woord
+    const totaalKlap = 'magnetsTotaal'
+    const totaalRijen = u.leads ? [
+      { key: 'magnetsTotaal:posts', label: 'Totaal', titel: 'Alle magnets', kop: true, klap: totaalKlap, lijst: { sorteer: 'tijd', filter: isMagnet } },
+      ...(uitklap[totaalKlap] ? [
+        { key: 'magnetsTotaal:views', label: 'Views', titel: 'Alle magnets: views', sub: true, overal: 'views', lijst: { sorteer: 'views', filter: isMagnet } },
+        { key: 'magnetsTotaal:comments', label: 'Comments', titel: 'Alle magnets: comments', sub: true, overal: 'comments', lijst: { sorteer: 'comments', filter: isMagnet } },
+        { key: 'magnetsTotaal:leads', label: 'Nieuwe leads', titel: 'Alle magnets: nieuwe leads', sub: true, overal: 'leads', geslacht: 'magnetLeads', basis: 'magnetsTotaal:leads' },
+        ...(!keys.includes(PER10_UIT) ? [{ key: 'magnetsTotaal:per10', label: per10Label, titel: `Alle magnets: ${per10Label.toLowerCase()}`, sub: true, overal: 'per10', geslacht: 'magnetLeads', basis: 'magnetsTotaal:per10', decimaal: true, postsKey: 'magnetsTotaal:posts' }] : []),
+      ] : []),
+    ] : []
     return [
+      ...totaalRijen,
       ...groepen.filter(isRecent).flatMap(groepRijen),
       ...(stil.length ? [{ key: stilKlap, label: `Niet gepost, laatste 8 weken (${stil.length})`, kop: true, klap: stilKlap, leeg: true }] : []),
       ...(stil.length && uitklap[stilKlap] ? stil.flatMap(groepRijen) : []),
@@ -639,9 +672,19 @@ export default function GinoKeten({ isMobile, onVraag }) {
 
   // De stats onder een groep gaan mee weg als de groep zelf verborgen is.
   const kopVan = (r) => r.key.replace(/:[^:]+$/, ':posts')
-  const zichtbareRijen = weergaveRijen.filter(r => !verborgen.has(r.key) && !(r.sub && verborgen.has(kopVan(r))))
+  // Uit via Totaal: weg onder elk woord. De rij in Totaal zelf blijft staan om hem terug te zetten.
+  const uitOveral = (r) => r.sub && !r.overal && r.key.startsWith('magnets:') && statsUit.has(r.key.split(':').pop())
+  const zichtbareRijen = weergaveRijen.filter(r => !verborgen.has(r.key) && !(r.sub && verborgen.has(kopVan(r))) && !uitOveral(r))
   const verborgenRijen = weergaveRijen.filter(r => verborgen.has(r.key))
   const wisselZicht = (e, r) => {
+    if (r.overal) {
+      setStatsUit((o) => {
+        const n = new Set(o)
+        if (n.has(r.overal)) n.delete(r.overal); else n.add(r.overal)
+        return n
+      })
+      return
+    }
     // Shift-klik: alleen deze rij blijft staan (met zijn eigen stats eronder).
     if (e.shiftKey) {
       setVerborgen(new Set(weergaveRijen.filter(x => x.key !== r.key && !(x.sub && kopVan(x) === r.key)).map(x => x.key)))
@@ -883,8 +926,8 @@ export default function GinoKeten({ isMobile, onVraag }) {
                             <G.Icon size={15} strokeWidth={2.8} color={G.kleur} style={{ flexShrink: 0 }} />
                           </button>
                         ) : r.label}
-                        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} even verbergen`} title="Even verbergen. Shift-klik: alleen deze laten staan." style={oog}>
-                          <Eye size={14} strokeWidth={2.4} />
+                        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => wisselZicht(e, r)} aria-label={`${r.titel || r.label} even verbergen`} title={r.overal ? (statsUit.has(r.overal) ? "Weer tonen bij elke magnet" : "Bij elke magnet verbergen") : "Even verbergen. Shift-klik: alleen deze laten staan."} style={oog}>
+                          {r.overal && statsUit.has(r.overal) ? <EyeOff size={14} strokeWidth={2.4} color="#fff" /> : <Eye size={14} strokeWidth={2.4} />}
                         </button>
                       </span>
                     </td>

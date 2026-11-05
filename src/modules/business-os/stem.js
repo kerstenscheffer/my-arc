@@ -68,6 +68,31 @@ function meldTerugval(e) {
 }
 const MAX_STUK = 200
 
+// Meelezen (5 nov 2026): waar de stem nu is in de uitgesproken tekst. Binnen een stuk is
+// dat een schatting op basis van de afspeeltijd; bij elk nieuw stuk loopt hij weer gelijk.
+let schoonNu = null
+let positie = null
+let stukVanaf = 0, stukBegin = 0, stukLengte = 0
+const positieLuisteraars = new Set()
+const zetPositie = (at) => {
+  const nieuw = at == null || !schoonNu ? null : { schoon: schoonNu, at }
+  if (!nieuw && !positie) return
+  positie = nieuw
+  positieLuisteraars.forEach(f => f())
+}
+const startStuk = (stuk) => {
+  if (!schoonNu) return
+  const i = schoonNu.indexOf(stuk, stukVanaf)
+  if (i < 0) return
+  stukBegin = i
+  stukLengte = stuk.length
+  stukVanaf = i + stuk.length
+  zetPositie(i)
+}
+const eindePositie = () => { schoonNu = null; zetPositie(null) }
+const abonneerPositie = (f) => { positieLuisteraars.add(f); return () => positieLuisteraars.delete(f) }
+export const useVoorleesPositie = () => useSyncExternalStore(abonneerPositie, () => positie, () => positie)
+
 // ── Browser-provider ──
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
 
@@ -134,6 +159,8 @@ const browser = {
       if (stem) u.voice = stem
       u.rate = 1.05
       u.pitch = pitch
+      u.onstart = () => startStuk(stuk)
+      u.onboundary = (e) => zetPositie(stukBegin + (e.charIndex || 0))
       if (i === stukken.length - 1) u.onend = klaar
       u.onerror = klaar
       return u
@@ -248,7 +275,8 @@ function haalMetLimiet(tekst, afbreker) {
 function speel(url, mijn) {
   const a = speler()
   return new Promise((ja, nee) => {
-    const klaar = (fout) => { a.onended = a.onerror = null; fout ? nee(fout) : ja() }
+    const klaar = (fout) => { a.onended = a.onerror = a.ontimeupdate = null; fout ? nee(fout) : ja() }
+    a.ontimeupdate = () => { if (a.duration > 0) zetPositie(stukBegin + stukLengte * (a.currentTime / a.duration)) }
     a.onended = () => klaar()
     a.onerror = () => klaar(stemFout('afspelen', `mediafout ${a.error?.code || ''}`.trim()))
     a.src = url
@@ -301,6 +329,7 @@ const elevenlabs = {
           volgende = haal(i + 1)
           volgende.catch(() => {}) // fout komt pas bij await; geen 'unhandled rejection' tussendoor
         }
+        startStuk(stukken[i])
         await speel(url, mijn)
         if (!actueel()) return
       }
@@ -323,7 +352,7 @@ const elevenlabs = {
   stop() {
     elRonde++
     ruimOp()
-    if (audio) { audio.onended = audio.onerror = null; audio.pause() }
+    if (audio) { audio.onended = audio.onerror = audio.ontimeupdate = null; audio.pause() }
     browser.stop()
   },
 }
@@ -428,6 +457,7 @@ export function ontgrendel() {
 export function stop() {
   if (!beschikbaar()) return
   provider.stop()
+  eindePositie()
   if (stand.spreekt) zet({ spreekt: false, bron: null })
 }
 
@@ -444,7 +474,9 @@ export function spreek(tekst, { bewaar = false, vraag = null, heel = false, bron
   const stukken = provider.knip(schoon)
   if (!stukken.length) return
   zet({ spreekt: true, bron })
-  provider.spreek(stukken, () => zet({ spreekt: false, bron: null }), bewaar ? schoon : null)
+  schoonNu = schoon
+  stukVanaf = 0
+  provider.spreek(stukken, () => { eindePositie(); zet({ spreekt: false, bron: null }) }, bewaar ? schoon : null)
 }
 
 // Herhaalknop: speelt het antwoord opnieuw af, ook als de stem uit staat.

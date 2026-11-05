@@ -44,7 +44,7 @@
 // met ChatGPT (OpenAI API) praat, alleen tekst (geen Mac-route, geen screenshots).
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
-import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
@@ -352,37 +352,122 @@ function MetLinks({ tekst }) {
   })
 }
 
-// Een antwoord per alinea, met achter de eerste regel een knopje dat alleen dat stuk voorleest.
-const MIN_VOORLEES = 25
-function Alineas({ tekst, sleutel, praatBron, onLees }) {
-  const blokken = String(tekst || '').split(/\n\s*\n/).filter(b => b.trim())
-  // Eén alinea: daar is de gewone herhaalknop al voor.
-  if (blokken.length < 2) return <MetLinks tekst={tekst} />
-  return blokken.map((blok, n) => {
-    const [eerste, ...rest] = blok.split('\n')
-    const bron = `alinea-${sleutel}-${n}`
+// ── Antwoord van Gino netjes tonen, en meelezen met de stem ──
+// Sterretjes worden vet, pijltjes een echte lijst, een regel die helemaal vet is een kopje.
+const LIJST_REGEL = /^\s*(→|->|=>|•|-|\*(?!\*))\s+/
+const KOP_REGEL = /^\s*(?:#{1,6}\s*)?(?:\*\*)?(.+?)(?:\*\*)?\s*$/
+const isKop = (r) => /^\s*#{1,6}\s/.test(r) || /^\s*\*\*[^*]+\*\*:?\s*$/.test(r)
+
+// **vet** eruit: de platte tekst plus welke stukken vet zijn.
+function leesVet(regel) {
+  let plat = ''
+  const vet = []
+  regel.split('**').forEach((stuk, i) => {
+    if (i % 2 === 1 && stuk) vet.push([plat.length, plat.length + stuk.length])
+    plat += stuk
+  })
+  return { plat, vet }
+}
+
+// Elke regel in zinnen, met waar die zin in de uitgesproken tekst zit.
+function ontleedAntwoord(tekst) {
+  return String(tekst || '').split(/\n\s*\n/).filter(b => b.trim()).map((blok) => ({
+    blok,
+    regels: blok.split('\n').filter(r => r.trim()).map((ruw) => {
+      const kop = isKop(ruw)
+      const lijst = !kop && LIJST_REGEL.test(ruw)
+      const inhoud = kop ? ruw.match(KOP_REGEL)[1].replace(/^\**|\**:?$/g, '') : ruw.replace(LIJST_REGEL, '')
+      const { plat, vet } = leesVet(inhoud)
+      const zinnen = [...plat.matchAll(/.+?(?:[.!?…]+(?=\s|$)|$)/g)].map(m => ({ van: m.index, tot: m.index + m[0].length }))
+      return { kop, lijst, plat, vet, zinnen }
+    }),
+  }))
+}
+
+// Zoekt de zinnen op in de uitgesproken tekst. Telt alleen als dit bericht het grootste deel
+// is van wat er gezegd wordt; anders leest hij een ander bericht voor.
+function plaatsInSpraak(blokken, schoon) {
+  const plek = new Map()
+  let vanaf = 0, gevonden = 0
+  blokken.forEach((b, bi) => b.regels.forEach((r, ri) => r.zinnen.forEach((z, zi) => {
+    const zin = stem.spreekbaar(r.plat.slice(z.van, z.tot)).replace(/[.!?:;…]+$/, '')
+    if (zin.length < 2) return
+    const i = schoon.indexOf(zin, vanaf)
+    if (i < 0) return
+    plek.set(`${bi}-${ri}-${zi}`, [i, i + zin.length])
+    vanaf = i + zin.length
+    gevonden += zin.length
+  })))
+  return gevonden >= schoon.length * 0.6 ? plek : null
+}
+
+function ZinTekst({ regel, zin, actief, actiefRef }) {
+  const stukken = []
+  let p = zin.van
+  for (const [v, t] of regel.vet) {
+    if (t <= p || v >= zin.tot) continue
+    if (v > p) stukken.push([regel.plat.slice(p, v), false])
+    stukken.push([regel.plat.slice(Math.max(v, p), Math.min(t, zin.tot)), true])
+    p = Math.min(t, zin.tot)
+  }
+  if (p < zin.tot) stukken.push([regel.plat.slice(p, zin.tot), false])
+  return (
+    <span ref={actief ? actiefRef : null} style={actief ? { background: 'rgba(16,185,129,0.28)', color: '#fff', borderRadius: 4, boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone', padding: '1px 2px', margin: '0 -2px' } : undefined}>
+      {stukken.map(([t, vet], i) => (vet
+        ? <strong key={i} style={{ fontWeight: 800, color: '#fff' }}><MetLinks tekst={t} /></strong>
+        : <MetLinks key={i} tekst={t} />))}
+    </span>
+  )
+}
+
+function GinoTekst({ tekst, sleutel, praatBron, onLees, actieveZin, plek, actiefRef }) {
+  const blokken = useMemo(() => ontleedAntwoord(tekst), [tekst])
+  return blokken.map((b, bi) => {
+    const bron = `alinea-${sleutel}-${bi}`
     const praat = praatBron === bron
     return (
-      <div key={n} style={{ marginTop: n ? '1em' : 0 }}>
-        <MetLinks tekst={eerste} />
-        {blok.trim().length >= MIN_VOORLEES && (
-          <button type="button" onClick={() => onLees(blok, bron)} title={praat ? 'Stop' : 'Lees dit stuk voor'} aria-label={praat ? 'Stop' : 'Lees dit stuk voor'} style={{
-            background: 'none', border: 'none', padding: '0 4px', marginLeft: 2, cursor: 'pointer',
-            display: 'inline-flex', verticalAlign: '-2px', color: praat ? colors.success : colors.textSecondary,
+      <div key={bi} style={{ marginTop: bi ? '0.85em' : 0 }}>
+        {b.regels.map((r, ri) => (
+          <div key={ri} style={{
+            display: r.lijst ? 'flex' : 'block', gap: 7, marginTop: ri ? (r.kop ? '0.5em' : '0.3em') : 0,
+            ...(r.kop ? { fontWeight: 900, color: '#fff', fontSize: '1.03em' } : null),
           }}>
-            <Volume2 size={13} className={praat ? 'bos-stip' : undefined} />
-          </button>
-        )}
-        {rest.length > 0 && <>{'\n'}<MetLinks tekst={rest.join('\n')} /></>}
+            {r.lijst && <span aria-hidden style={{ color: colors.success, fontWeight: 800, flexShrink: 0 }}>→</span>}
+            <span style={{ minWidth: 0 }}>
+              {r.zinnen.map((z, zi) => <ZinTekst key={zi} regel={r} zin={z} actief={!!plek && actieveZin === `${bi}-${ri}-${zi}`} actiefRef={actiefRef} />)}
+              {ri === 0 && onLees && blokken.length > 1 && b.blok.trim().length >= MIN_VOORLEES && (
+                <button type="button" onClick={() => onLees(b.blok, bron)} title={praat ? 'Stop' : 'Lees dit stuk voor'} aria-label={praat ? 'Stop' : 'Lees dit stuk voor'} style={{
+                  background: 'none', border: 'none', padding: '0 4px', marginLeft: 2, cursor: 'pointer',
+                  display: 'inline-flex', verticalAlign: '-2px', color: praat ? colors.success : colors.textSecondary,
+                }}>
+                  <Volume2 size={13} className={praat ? 'bos-stip' : undefined} />
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
       </div>
     )
   })
 }
+const MIN_VOORLEES = 25
 
 function Inkort({ tekst, achter, alineas = null }) {
   const ref = useRef(null)
   const [lang, setLang] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [openGezet, setOpen] = useState(false)
+  // Meelezen: wordt dit bericht voorgelezen, welke zin is aan de beurt?
+  const positie = stem.useVoorleesPositie()
+  const blokken = useMemo(() => (alineas ? ontleedAntwoord(tekst) : null), [alineas ? tekst : null]) // eslint-disable-line react-hooks/exhaustive-deps
+  const plek = useMemo(() => (blokken && positie?.schoon ? plaatsInSpraak(blokken, positie.schoon) : null), [blokken, positie?.schoon])
+  let actieveZin = null
+  if (plek) for (const [k, [, t]] of plek) { if (positie.at < t) { actieveZin = k; break } }
+  // Tijdens voorlezen staat het hele bericht open, anders valt de zin weg onder "meer".
+  const open = openGezet || !!plek
+  const actiefRef = useRef(null)
+  useEffect(() => {
+    if (actieveZin) actiefRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [actieveZin])
   useLayoutEffect(() => {
     const el = ref.current
     if (el && !open) setLang(el.scrollHeight > el.clientHeight + 2)
@@ -390,21 +475,22 @@ function Inkort({ tekst, achter, alineas = null }) {
   return (
     <>
       <div ref={ref} style={{
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        whiteSpace: alineas ? 'normal' : 'pre-wrap', wordBreak: 'break-word',
+        ...(alineas ? { fontSize: '0.86rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.88)' } : null),
         ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
       }}>
-        {alineas ? <Alineas tekst={tekst} {...alineas} /> : <MetLinks tekst={tekst} />}
+        {alineas ? <GinoTekst tekst={tekst} {...alineas} actieveZin={actieveZin} plek={plek} actiefRef={actiefRef} /> : <MetLinks tekst={tekst} />}
         {achter && (open || !lang) && achter}
       </div>
-      {(lang || open) && (
+      {(lang || openGezet) && !plek && (
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button onClick={() => setOpen(o => !o)} style={{
             background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'inherit',
             color: colors.success, fontWeight: 800, fontSize: '0.75rem',
           }}>
-            {open ? 'minder' : 'meer'}
+            {openGezet ? 'minder' : 'meer'}
           </button>
-          {lang && !open && achter}
+          {lang && !openGezet && achter}
         </div>
       )}
     </>
@@ -2271,7 +2357,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     )
                   })}
                   <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null}
-                    alineas={stem.beschikbaar() ? { sleutel: `${actief.id}-${i}`, praatBron: spreekt ? spreekBron : null, onLees: leesAlinea } : null} />
+                    alineas={{ sleutel: `${actief.id}-${i}`, praatBron: spreekt ? spreekBron : null, onLees: stem.beschikbaar() ? leesAlinea : null }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Kopieer tekst={b.content} />
