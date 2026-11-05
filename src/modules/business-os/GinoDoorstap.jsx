@@ -22,6 +22,7 @@ import { computePeriod, hervatTraject } from '../coach-command-center/components
 import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
 import { haalEisen, haalInstellingen, zetInstelling, borgOordeel } from '../challenge-monitor/challengeCoach'
+import { rekenGeld } from './challengeGeld'
 
 const STATUS_KEUZE = [
   ['ja_mondeling', 'Ja'],
@@ -44,59 +45,6 @@ const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`)
 const callKort = (iso) => {
   const d = new Date(iso)
   return `${d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }).replace(/\./g, '')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })}`
-}
-
-// Wat de challenge oplevert. De borg telt pas als winst als de verlenging betaald is, of als de
-// challenge voorbij is en de klant niet geschikt is voor borg terug: dat geld blijft.
-// ctx.klantVan: sale-id → klantnaam, ctx.nietGeschikt: sale-id → true. Rekent alleen, schrijft niets.
-function rekenGeld(rijen, ctx) {
-  const n = (x) => Number(x) || 0
-  const challenges = rijen.filter(r => r.sale_kind === 'challenge' && n(r.order_value) > 0 && r.challenge_status !== 'uitgesteld')
-  const verlengingen = rijen.filter(r => r.borg_movement_id && n(r.order_value) > 0)
-  const borgVan = new Map(verlengingen.map(v => [v.borg_movement_id, v]))
-  const som = (l) => l.reduce((t, r) => t + n(r.order_value), 0)
-  const betaaldV = verlengingen.filter(v => v.payment_received)
-  const openV = verlengingen.filter(v => !v.payment_received)
-  const levend = challenges.filter(c => c.challenge_status !== 'terugbetaald')
-  const zekerB = levend.filter(c => c.challenge_status === 'behouden' || borgVan.get(c.id)?.payment_received)
-  const blijftB = levend.filter(c => !zekerB.includes(c) && ctx.nietGeschikt(c.id))
-  const toegezegdB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && borgVan.has(c.id))
-  const onzekerB = levend.filter(c => !zekerB.includes(c) && !blijftB.includes(c) && !borgVan.has(c.id))
-  // Echte naam als de sale gekoppeld is. Anders de Instagram-naam, soms dubbel ("jan jan").
-  const naam = (r) => {
-    const echt = ctx.klantVan(r.borg_movement_id || r.id)
-    if (echt) return echt
-    const w = String(r.lead_name || 'Onbekend').trim().split(/\s+/)
-    return w.length === 2 && w[0] === w[1] ? w[0] : w.join(' ')
-  }
-  const regel = (r, sub = dagKort(r.moved_at), bedrag = n(r.order_value)) => ({ id: r.id, naam: naam(r), bedrag, sub })
-  const opNaam = (l) => l.sort((a, b) => a.naam.localeCompare(b.naam))
-  const borgPlus = (l) => l.map(c => regel(c, dagKort(c.moved_at), n(c.order_value) + n(borgVan.get(c.id)?.order_value)))
-  const zekerIds = new Set(zekerB.map(c => c.id))
-  const toegezegdIds = new Set(toegezegdB.map(c => c.id))
-  return {
-    lijsten: {
-      verkocht: opNaam(levend.map(c => regel(c))),
-      zeker: opNaam([
-        ...borgPlus(zekerB),
-        ...blijftB.map(c => regel(c, 'Niet geschikt')),
-        ...betaaldV.filter(v => !zekerIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
-      ]),
-      toegezegd: opNaam([
-        ...borgPlus(toegezegdB),
-        ...openV.filter(v => !toegezegdIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
-      ]),
-      onzeker: opNaam(onzekerB.map(c => regel(c))),
-      refund: opNaam(challenges.filter(c => c.challenge_status === 'terugbetaald').map(c => regel(c))),
-    },
-    aantal: levend.length,
-    verkocht: som(levend),
-    zeker: som(zekerB) + som(blijftB) + som(betaaldV),
-    toegezegd: som(toegezegdB) + som(openV),
-    onzeker: som(onzekerB),
-    onzekerAantal: onzekerB.length,
-    refund: som(challenges.filter(c => c.challenge_status === 'terugbetaald')),
-  }
 }
 
 // Een getal bovenaan. Klik = eronder een klein lijstje met wie erachter zit.
@@ -273,6 +221,25 @@ export default function GinoDoorstap({ isMobile = false }) {
     setBezig(null)
   }
 
+  // Zeker = uitbetaling (besluit Kersten, 5 nov 2026). Is de challenge voorbij en de klant niet
+  // geschikt, dan is de borg van ons en gaat hij op behouden. De trigger lead_movement_telt_mee
+  // zet hem dan in de lopende uitbetaalperiode. Eenmalig per sale, alleen als hij al betaald is.
+  useEffect(() => {
+    if (!saleRijen || !instellingen.size) return
+    const teDoen = []
+    for (const [clientId, i] of instellingen) {
+      const e = eisen[clientId]
+      const sale = i.sale_id && saleRijen.find(x => x.id === i.sale_id)
+      if (e?.voorbij && sale?.challenge_status === 'open' && sale.payment_received && borgOordeel(e, i)?.geschikt === false) teDoen.push(sale.id)
+    }
+    if (!teDoen.length) return
+    supabase.from('lead_movements').update({ challenge_status: 'behouden' }).in('id', teDoen).eq('challenge_status', 'open')
+      .select('id').then(({ error }) => {
+        if (error) setFout(error.message || 'Borg bijwerken mislukt')
+        else setSaleRijen(l => l.map(x => (teDoen.includes(x.id) ? { ...x, challenge_status: 'behouden' } : x)))
+      }, e => setFout(e.message || 'Borg bijwerken mislukt'))
+  }, [saleRijen, instellingen, eisen])
+
   // Einde aanklikken: looptijd of verlenging aanpassen, hetzelfde venster als in Coach Inzicht.
   const openTraject = async (r) => {
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
@@ -303,7 +270,25 @@ export default function GinoDoorstap({ isMobile = false }) {
     setFout(null)
     try {
       await zetInstelling(clientId, velden)
-      setInstellingen(await haalInstellingen())
+      const nieuw = await haalInstellingen()
+      setInstellingen(nieuw)
+      // Toch geschikt: de borg kan terug, dus uit de uitbetaling. Niet als die maand al is
+      // uitbetaald, en niet als de verlenging betaald is: dan is de borg sowieso van ons.
+      const saleId = nieuw.get(clientId)?.sale_id
+      const sale = saleId && saleRijen?.find(x => x.id === saleId)
+      const verlengingBetaald = saleRijen?.some(x => x.borg_movement_id === saleId && x.payment_received)
+      if (velden.borg_geschikt === true && sale?.challenge_status === 'behouden' && !verlengingBetaald) {
+        const { data: rij } = await supabase.from('lead_movements').select('telt_mee_vanaf').eq('id', saleId).single()
+        const { data: dicht } = rij?.telt_mee_vanaf
+          ? await supabase.from('partner_payouts').select('id').eq('period', rij.telt_mee_vanaf).not('paid_at', 'is', null).limit(1)
+          : { data: [] }
+        if (dicht?.length) setFout('Die maand is al aan Marcel uitbetaald, dus de borg blijft daar staan. Regel dit met de volgende uitbetaling.')
+        else {
+          const { error } = await supabase.from('lead_movements').update({ challenge_status: 'open', telt_mee_vanaf: null }).eq('id', saleId)
+          if (error) throw error
+          setSaleRijen(l => l.map(x => (x.id === saleId ? { ...x, challenge_status: 'open' } : x)))
+        }
+      }
     } catch (e) { setFout(e.message || 'Opslaan mislukt') }
   }
 
