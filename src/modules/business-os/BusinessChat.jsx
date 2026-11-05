@@ -960,8 +960,8 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
           background: 'transparent', color: colors.textPrimary, border: '1px solid rgba(255,255,255,.08)', borderRadius: 8,
           padding: 8, fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.8rem', lineHeight: 1.45, whiteSpace: 'pre-wrap',
         }} />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-        <span style={{ color: colors.textSecondary, fontWeight: 600, fontSize: '0.72rem' }}>{tekst.length} tekens</span>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+        <span style={{ color: colors.textSecondary, fontWeight: 600, fontSize: '0.72rem', whiteSpace: 'nowrap' }}>{tekst.length} tekens</span>
         <span style={{ marginRight: 'auto', display: 'flex' }}>
           <VastzetKnop tekst={tekst} titel={typeof voorstel.titel === 'string' ? voorstel.titel : null} vastgezet={vastgezet} onVastzetten={onVastzetten} />
         </span>

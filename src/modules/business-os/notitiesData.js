@@ -43,14 +43,14 @@ export function notitieTitel(n) {
 
 export const notitieDatum = (iso) => new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
-// Geeft { lijst, lokaal }. lokaal = true: de tabel bestaat nog niet.
+// Geeft { lijst, lokaal, fout }. lokaal = de tabel bestaat nog niet; fout = laden mislukte (bv. geen netwerk).
 export async function laadNotities() {
   const sleutel = await lokaalSleutel()
   const bij = leesLokaal(sleutel)
   const { data, error } = await supabase.from(TABEL).select(KOLOMMEN)
     .order('created_at', { ascending: false }).limit(200)
     .then(r => r, e => ({ error: e }))
-  if (error) return { lijst: bij.map(n => ({ ...n, lokaal: true })).sort(nieuwsteEerst), lokaal: tabelOntbreekt(error) }
+  if (error) return { lijst: bij.map(n => ({ ...n, lokaal: true })).sort(nieuwsteEerst), lokaal: tabelOntbreekt(error), fout: !tabelOntbreekt(error) }
   if (!bij.length) return { lijst: data || [], lokaal: false }
   // Tabel bestaat: lokale notities overzetten. Op id, dus een halve poging dubbelt niets.
   const { error: overzetFout } = await supabase.from(TABEL)
@@ -115,7 +115,8 @@ export function notitiesVoorGino(lijst) {
 // Eén stand voor het blad, de knoppen in de chat en Gino's context.
 export function useNotities() {
   const [stand, setStand] = useState({ lijst: [], geladen: false, lokaal: false })
-  const laad = useCallback(() => laadNotities().then(r => setStand({ ...r, geladen: true })), [])
+  // Laden mislukt? Dan blijft wat er al staat staan: een netwerkfout mag de lijst niet leegmaken.
+  const laad = useCallback(() => laadNotities().then(r => setStand(s => (r.fout && s.lijst.length ? s : { ...r, geladen: true }))), [])
   useEffect(() => { laad() }, [laad])
   const zetVast = useCallback(async (invoer) => {
     const nieuw = await bewaarNotitie(invoer)

@@ -61,9 +61,12 @@ function Lezen({ notitie, onWijzig, onVerwijder, onTerug }) {
   const [bewerken, setBewerken] = useState(false)
   const [gekopieerd, setGekopieerd] = useState(false)
   const [fout, setFout] = useState(null)
-  const kopieer = () => navigator.clipboard?.writeText(notitie.tekst).then(() => {
-    setGekopieerd(true); setFout(null); setTimeout(() => setGekopieerd(false), 1500)
-  }, () => setFout('Kopiëren mislukt'))
+  const kopieer = () => {
+    if (!navigator.clipboard) { setFout('Kopiëren mislukt'); return }
+    navigator.clipboard.writeText(notitie.tekst).then(() => {
+      setGekopieerd(true); setFout(null); setTimeout(() => setGekopieerd(false), 1500)
+    }, () => setFout('Kopiëren mislukt'))
+  }
   const verwijder = async () => {
     if (!window.confirm(`'${notitieTitel(notitie)}' verwijderen?`)) return
     if (!await onVerwijder(notitie)) setFout('Verwijderen mislukt')
@@ -81,7 +84,8 @@ function Lezen({ notitie, onWijzig, onVerwijder, onTerug }) {
         }} />
       ) : (
         <>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: colors.textPrimary, marginTop: 8, wordBreak: 'break-word' }}>{notitieTitel(notitie)}</div>
+          {/* Zonder eigen titel is de eerste regel de titel; die staat al in de tekst. */}
+          {notitie.titel && <div style={{ fontSize: '1.05rem', fontWeight: 900, color: colors.textPrimary, marginTop: 8, wordBreak: 'break-word' }}>{notitie.titel}</div>}
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, margin: '4px 0 16px' }}>{notitieDatum(notitie.created_at)}</div>
           <OpmaakTekst tekst={notitie.tekst} sleutel={notitie.id} />
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', marginTop: 16, marginLeft: -12 }}>
@@ -96,11 +100,12 @@ function Lezen({ notitie, onWijzig, onVerwijder, onTerug }) {
   )
 }
 
-export default function Notities({ lijst, geladen, wijzig, verwijder }) {
+export default function Notities({ lijst, geladen, fout, wijzig, verwijder }) {
   const [openId, setOpenId] = useState(null)
   const open = lijst.find(n => n.id === openId)
   if (open) return <Lezen key={open.id} notitie={open} onWijzig={wijzig} onVerwijder={verwijder} onTerug={() => setOpenId(null)} />
   if (!geladen) return <div style={{ fontSize: '0.85rem', color: colors.textSecondary }}>Laden…</div>
+  if (!lijst.length && fout) return <div style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.danger }}>Notities laden mislukt. Probeer het zo opnieuw.</div>
   if (!lijst.length) return (
     <div style={{ fontSize: '0.85rem', color: colors.textSecondary, lineHeight: 1.45 }}>
       Nog geen notities. Tik op Vastzetten onder een antwoord van Gino.
