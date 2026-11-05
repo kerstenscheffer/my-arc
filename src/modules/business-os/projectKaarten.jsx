@@ -5,7 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BookOpen, Check, CheckCircle2, ChevronRight, Film, Phone, Plus, X } from 'lucide-react'
-import { kortDag } from './testBord'
+import { kortDag } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success

@@ -378,7 +378,9 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
     return toegestaan
   }
   // 5 nov 2026: lees-tools van vaste koppelingen, en opdrachten en scripts die niets versturen.
-  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript)))) {
+  // Monitor draait zelf een shell-opdracht: zelfde toets als Bash.
+  const monitor = tool === 'Monitor' ? String(invoer?.command || '') : ''
+  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript)) || (monitor && vrijeBash(monitor, leesScript)))) {
     console.log(`${tijd()} ✓ zonder vraag: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }

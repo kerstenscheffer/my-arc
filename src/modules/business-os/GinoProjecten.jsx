@@ -22,9 +22,9 @@ import * as stem from './stem'
 import { vandaagIso } from './testMeting'
 import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetStapTerug } from './projectStappen'
 import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
-import { komma, kortDag } from './testBord'
+import { komma, kortDag } from './testBord.js'
 import { useTestMeting } from './useTestMeting'
-import TestBord from './TestBord'
+import TestBord from './TestBord.jsx' // met extensie: macOS ziet testBord.js en TestBord.jsx als dezelfde naam
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 

@@ -100,13 +100,17 @@ const isTijdelijk = (p) => {
 }
 function verwijdertTeVeel(cmd) {
   if (/\bgit\s+clean\b|\brimraf\b|\bxargs\b[^|;&]*\brm\b|-exec\s+(rm|shred|unlink)\b|\bdd\b[^|;&]*\bof=|\btruncate\s+-|\bfs\.(rm|rmSync|unlink|unlinkSync|rmdir|rmdirSync)\b|\bshutil\.rmtree\b|\bos\.(remove|unlink|rmdir)\b/.test(cmd)) return true
+  // Relatief pad na "cd /tmp/...": ligt dan ook in de tijdelijke map.
+  let inTijdelijk = false
   for (const stuk of cmd.split(/[;&|\n]+/)) {
     const woorden = stuk.trim().split(/\s+/).filter(Boolean)
+    if (woorden[0] === 'cd') { inTijdelijk = woorden.length === 2 && isTijdelijk(woorden[1]) && !/[$`]/.test(woorden[1]); continue }
     while (woorden[0] && (/^\w+=/.test(woorden[0]) || ['sudo', 'env', 'time', 'command', 'nohup'].includes(woorden[0]))) woorden.shift()
     if (!woorden.length) continue
     if (VERWIJDER_CMD.test(woorden[0])) {
       const paden = woorden.slice(1).filter(w => !w.startsWith('-'))
-      if (!paden.length || !paden.every(isTijdelijk)) return true
+      const magWeg = (p) => isTijdelijk(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..'))
+      if (!paden.length || !paden.every(magWeg)) return true
     }
     if (woorden[0] === 'find' && /\s-delete\b/.test(stuk)) {
       if (!isTijdelijk(woorden[1] || '')) return true
@@ -151,7 +155,12 @@ export function hardeBlokkade(tool, invoer = {}) {
     if (verwijdertTeVeel(opdracht)) return geef('verwijderen')
     // De uitleg komt van het model; bij een vast bekend commando telt alleen het commando.
     const metUitleg = BEKEND_VEILIG.test(opdracht.trim()) ? opdracht : `${opdracht}\n${invoer.description || ''}`
-    for (const [soort, re] of TEKST_REGELS) if (re.test(metUitleg)) return geef(soort)
+    // ${NAAM:+ja} toont alleen óf een variabele bestaat, niet de waarde.
+    const teToetsen = metUitleg.replace(/\$\{\w+:\+[^}$`]*\}/g, '')
+    // Een leesvraag verstuurt niets: "lead" en "mail" naast elkaar in de SQL is geen bericht.
+    // Alleen de twee woordregels slaan die SQL over; de regel op functie-aanroepen niet.
+    const zonderLees = teToetsen.replace(/pa-db\.mjs\s+lees\s+("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, 'pa-db.mjs lees')
+    for (const [i, [soort, re]] of TEKST_REGELS.entries()) if (re.test(i < 2 ? zonderLees : teToetsen)) return geef(soort)
     if (!LEESCOMMANDO.test(opdracht)) for (const [soort, re] of NOEM_REGELS) if (re.test(opdracht)) return geef(soort)
     return null
   }

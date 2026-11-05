@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
 import { useTestMeting } from './useTestMeting'
-import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, bordStand, isDag, kolomVan, komma, kortDag, leesGetal, volgendeKolom } from './testBord'
+import { BESLUITEN, KOLOMMEN, PLAN_VELDEN, VOORSTEL, bordStand, isDag, kolomVan, komma, kortDag, leesGetal, volgendeKolom } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success

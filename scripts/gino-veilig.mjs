@@ -142,8 +142,21 @@ export function veiligeBash(cmd) {
 }
 
 // De familie als alles wat niet leest tot één familie hoort en er niets gevaarlijks in staat.
+// Een tijdelijk script mag programma's starten als het er alleen deze zijn: lezen uit
+// de database en beeld bewerken. Elke andere of niet te lezen aanroep geeft weer een
+// losse kaart. Geldt alleen na één keer Toestaan binnen dezelfde opdracht.
+const STARTEN = /\b(execFileSync|spawnSync|execFile|spawn|execSync|exec)\s*\(\s*([^)\n]{0,120})/g
+const VEILIG_STARTEN = /^['"](ffmpeg|ffprobe|sips)['"]\s*,|^['"]node['"]\s*,\s*\[\s*['"](?:[\w./-]*\/)?scripts\/pa-db\.mjs['"]\s*,\s*['"](lees|schema)['"]/
+function startSchoon(tekst) {
+  const zonderImport = tekst.replace(/\bimport\s*\{[^}]*\}\s*from\s*['"](node:)?child_process['"]/g, '').replace(/\brequire\(\s*['"](node:)?child_process['"]\s*\)/g, '')
+  const aanroepen = [...zonderImport.matchAll(STARTEN)]
+  return aanroepen.every(m => (m[1] === 'execFileSync' || m[1] === 'spawnSync' || m[1] === 'execFile') && VEILIG_STARTEN.test(m[2]))
+    && !/\bchild_process\b|\bsubprocess\b|\bos\.system\b/.test(zonderImport)
+}
+const zonderVeiligStarten = (s) => (startSchoon(s) ? s.replace(/\b(child_process|execFileSync|spawnSync|execFile|spawn|execSync)\b/g, 'start') : s)
+
 export function familieVan(cmd) {
-  if (GEVAARLIJK.test(String(cmd || ''))) return null
+  if (GEVAARLIJK.test(zonderVeiligStarten(String(cmd || '')))) return null
   const o = ontleed(cmd)
   if (!o) return null
   for (const b of o.subst) if (!veiligeBash(b)) return null
@@ -277,8 +290,13 @@ const FAMILIE = [
   ['node -e "console.log(1)"', 'node'],
   ['yt-dlp --flat-playlist --print "%(id)s" "https://x"', 'yt-dlp'],
   ['curl -s -o /dev/null -w "%{http_code}" "https://x"', 'curl'],
+  ["cat > /tmp/a.mjs <<'EOF'\nimport { execFileSync } from 'node:child_process'\nexecFileSync('node', ['scripts/pa-db.mjs', 'lees', q])\nexecFileSync('ffmpeg', ['-i', a])\nEOF\nnode /tmp/a.mjs", 'node'],
 ]
 const GEEN_FAMILIE = [
+  "cat > /tmp/a.mjs <<'EOF'\nimport { execSync } from 'node:child_process'\nexecSync('curl http://x')\nEOF\nnode /tmp/a.mjs",
+  "cat > /tmp/a.mjs <<'EOF'\nimport { execFileSync } from 'node:child_process'\nexecFileSync('node', ['scripts/pa-db.mjs', 'zet', q])\nEOF\nnode /tmp/a.mjs",
+  "cat > /tmp/a.mjs <<'EOF'\nimport { execFileSync } from 'node:child_process'\nexecFileSync(prog, [q])\nEOF\nnode /tmp/a.mjs",
+  "cat > /tmp/a.mjs <<'EOF'\nconst c = require('child_process')\nc.exec('rm x')\nEOF\nnode /tmp/a.mjs",
   'curl -X POST http://x', 'curl -d a http://x', 'curl --data a http://x', "python3 - <<'E'\nimport os\nos.remove('x')\nE", 'node -e "x.from(1).insert(2)"',
   `python3 -c "import subprocess"`, 'python3 x.py; curl http://x', 'rm x; python3 y.py', 'npm run release', 'node scripts/x.mjs', 'python3 x.py > src/a.py',
 ]
@@ -347,5 +365,9 @@ export function veiligZelftest() {
   for (const c of MOET_VRAGEN) if (veiligeBash(c)) fouten.push(`mag niet zonder vraag: ${c}`)
   for (const [c, f] of FAMILIE) if (familieVan(c) !== f) fouten.push(`familie ${f}: ${c}`)
   for (const c of GEEN_FAMILIE) if (familieVan(c)) fouten.push(`geen familie: ${c}`)
+  // Harde blokkades: valse meldingen weg, echte blijven.
+  const blok = (c) => hardeBlokkade('Bash', { command: c })?.soort || null
+  for (const c of ['echo "t:${PA_ACCESS_TOKEN:+ja}"', 'cd /tmp/x && rm -f a.txt', `node scripts/pa-db.mjs lees "select lead, mail from x"`]) if (blok(c)) fouten.push(`valse blokkade: ${c}`)
+  for (const [c, s] of [['echo $PA_ACCESS_TOKEN', 'geheim'], ['echo ${PA_ACCESS_TOKEN}', 'geheim'], ['echo ${TOKEN:+$TOKEN}', 'geheim'], ['rm -f a.txt', 'verwijderen'], ['cd /tmp/x && cd ~/workapp && rm a.txt', 'verwijderen'], ['cd /tmp/x && rm ../a', 'verwijderen'], ['cd /tmp/x && rm -rf /Users/x/y', 'verwijderen'], ['stuur mail naar klanten', 'melding'], [`node scripts/pa-db.mjs lees "select stuur_push(id) from clients"`, 'melding'], ['git push', 'git']]) if (blok(c) !== s) fouten.push(`moet blokkeren (${s}): ${c}`)
   return fouten
 }
