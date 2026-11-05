@@ -38,6 +38,8 @@ import { nieuweMannenVoorGino } from './nieuweMannenData'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
+import Notities from './Notities'
+import { useNotities, notitiesVoorGino } from './notitiesData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 import { typeLabel } from './contentStand'
@@ -68,6 +70,7 @@ const ONDERDELEN = [
   ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
   ['geldplan', 'Geldplan · 6 maanden cashflow en break-even'],
   ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
+  ['notities', 'Notities · vastgezette antwoorden van Gino'],
   ['content', 'Content · komende 14 dagen'],
   ['week', 'Week · inputs vs doel'],
   ['kern', 'Kerncijfers · deze maand'],
@@ -875,6 +878,10 @@ export default function BusinessOS({ isMobile }) {
   const [schermen, setSchermen] = useState({ lijst: [], geladen: false })
   const laadSchermenNu = useCallback(() => { laadSchermen().then(lijst => setSchermen({ lijst, geladen: true })) }, [])
   useEffect(() => { laadSchermenNu() }, [laadSchermenNu])
+  // Notities: blad, Vastzetten-knoppen in de chat en Gino's context.
+  const notities = useNotities()
+  const laadNotitiesNu = notities.laad
+  useEffect(() => { if (blad === 'notities') laadNotitiesNu() }, [blad, laadNotitiesNu])
   const stuurRef = useRef(null)
   // Tik = meteen de vorige versie tonen en Gino het opnieuw laten maken met
   // verse data; zijn nieuwe visueel vervangt de preview vanzelf.
@@ -1130,6 +1137,7 @@ export default function BusinessOS({ isMobile }) {
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'schermen') return <SchermenLijst {...schermen} onKies={kiesScherm} onVerwijder={verwijderSchermNu} />
+    if (k === 'notities') return <Notities {...notities} />
     if (k === 'week') return <WeekPaneel w={week} />
     if (k === 'kern') return (
       <>
@@ -1356,7 +1364,7 @@ export default function BusinessOS({ isMobile }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
@@ -1389,6 +1397,8 @@ export default function BusinessOS({ isMobile }) {
             weekInputs: week.geladen
               ? week.rijen.map(r => ({ input: r.label, dezeWeek: r.totaal, weekdoel: r.weekdoel, vorigeWeek: r.vorige, daggoalsGehaald: r.doel ? r.gehaald : null }))
               : null,
+            // Achteraan: de Mac zet dit onder een eigen kopje; op de API-route gaan de cijfers voor.
+            Notities: notitiesVoorGino(notities.lijst),
           }} />
           </div>
           {/* Op de rand, zodat hij geen ruimte in het blokje kost. */}

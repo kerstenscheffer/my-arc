@@ -156,6 +156,7 @@ export default function GinoDoorstap() {
   const [eisen, setEisen] = useState({}) // client_id → stand van de zes eisen
   const [openEisen, setOpenEisen] = useState(null)
   const [openGetal, setOpenGetal] = useState(null)
+  const [eindOplopend, setEindOplopend] = useState(() => { try { return localStorage.getItem('myarc.doorstap.sorteer') !== 'af' } catch { return true } })
   const [instellingen, setInstellingen] = useState(() => new Map())
   const [gestopt, setGestopt] = useState([]) // challenge-klanten van wie het traject is beëindigd
   const [soortFilter, setSoortFilter] = useState(leesFilter)
@@ -360,7 +361,19 @@ export default function GinoDoorstap() {
   const ja = rijen.filter(r => r.status === 'ja_mondeling')
   // Een borg hoort bij één klant: wat al gekoppeld of gekozen is, kan een ander niet kiezen.
   const bezet = new Set([...ja.map(r => r.sale?.borg_movement_id), ...Object.values(borgKeuze)].filter(Boolean))
+  // Op einddatum. Onbeperkt en wie geen einde heeft staan altijd onderaan.
+  const eindWaarde = (x) => (x.eind ? new Date(`${x.eind}T12:00:00`).getTime() : null)
   const zichtbaar = rijen.filter(r => soortFilter === 'alles' || (soortFilter === 'challenge' ? r.challenge : !r.challenge))
+    .sort((a, b) => {
+      const ea = eindWaarde(a), eb = eindWaarde(b)
+      if (ea == null || eb == null) return (ea == null) - (eb == null) || naamVan(a.klant).localeCompare(naamVan(b.klant))
+      return (eindOplopend ? ea - eb : eb - ea) || naamVan(a.klant).localeCompare(naamVan(b.klant))
+    })
+  const wisselSorteer = () => {
+    const nieuw = !eindOplopend
+    setEindOplopend(nieuw)
+    try { localStorage.setItem('myarc.doorstap.sorteer', nieuw ? 'op' : 'af') } catch { /* privémodus */ }
+  }
   const metEisen = soortFilter !== 'coaching'
   // Door = echt betaald. Een mondeling ja telt pas als het geld binnen is.
   const telt = (id) => !instellingen.get(id)?.telt_niet_mee
@@ -451,7 +464,7 @@ export default function GinoDoorstap() {
         <div style={{ overflowX: 'auto' }}>
           <div style={{ width: 'max-content' }}>
             <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap: 8, padding: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
-              <span /><span>Traject</span><span />{metEisen && <span>Eisen</span>}<span>Eindcall</span><span /><span /><span />
+              <span /><button type="button" onClick={wisselSorteer} title={eindOplopend ? 'Eerstvolgend einde bovenaan. Klik: omdraaien' : 'Laatste einde bovenaan. Klik: omdraaien'} style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>Traject {eindOplopend ? '↑' : '↓'}</button><span />{metEisen && <span>Eisen</span>}<span>Eindcall</span><span /><span /><span />
             </div>
             {zichtbaar.map((r) => {
               const nodig = gesprekNodig(r)

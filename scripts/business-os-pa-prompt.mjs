@@ -49,12 +49,15 @@ export function zichtbareTekst(ruw) {
 export function chatVraag({ gesprek, context }) {
   const nu = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   // Bewaarde schermen (Mijn schermen) apart onder een eigen kopje, rest blijft JSON.
-  const { 'Bewaarde schermen': schermen, ...cijfers } = context || {}
+  const { 'Bewaarde schermen': schermen, Notities: notities, ...cijfers } = context || {}
   const lijst = Array.isArray(schermen) && schermen.length
     ? `Bewaarde schermen (Kersten verwijst er in eigen woorden naar; maak ze opnieuw met verse data volgens de skill 'Opgeslagen schermen'):\n${schermen.slice(0, 20).map(s => `- ${s}`).join('\n')}\n\n`
     : ''
+  const notitieLijst = Array.isArray(notities) && notities.length
+    ? `Notities van Kersten (antwoorden die hij vastzette; de laatste 5 kort, daarna alleen titels; volledige tekst in tabel business_os_notities; verwijderen doet alleen Kersten):\n${notities.slice(0, 25).map(n => `- ${n}`).join('\n')}\n\n`
+    : ''
   context = context ? cijfers : context
-  return `Nu: ${nu} (NL-tijd).\n\n${lijst}${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
+  return `Nu: ${nu} (NL-tijd).\n\n${lijst}${notitieLijst}${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
 }
 
 const GEHEUGEN_KOP = { correctie: 'Correcties (hier ging je eerder de mist in, nooit herhalen)', voorkeur: 'Voorkeuren', besluit: 'Besluiten', feit: 'Feiten' }

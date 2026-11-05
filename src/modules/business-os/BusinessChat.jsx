@@ -52,6 +52,7 @@ import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop } from './schermen'
+import VastzetKnop from './VastzetKnop'
 import { ToestemmingKaarten, ToestemmingRegels } from './GinoToestemmingen'
 import { useNieuweVersie } from './useNieuweVersie'
 import { contentUitHash, openContent } from './contentStatusData'
@@ -451,6 +452,16 @@ function GinoTekst({ tekst, sleutel, praatBron, onLees, actieveZin, plek, actief
   })
 }
 const MIN_VOORLEES = 25
+const ALINEA_STIJL = { fontSize: '0.86rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.88)' }
+
+// Zelfde opmaak als een antwoord in de chat, buiten de chat (Notities).
+export function OpmaakTekst({ tekst, sleutel }) {
+  return (
+    <div style={{ ...ALINEA_STIJL, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+      <GinoTekst tekst={tekst} sleutel={sleutel} />
+    </div>
+  )
+}
 
 function Inkort({ tekst, achter, alineas = null }) {
   const ref = useRef(null)
@@ -476,7 +487,7 @@ function Inkort({ tekst, achter, alineas = null }) {
     <>
       <div ref={ref} style={{
         whiteSpace: alineas ? 'normal' : 'pre-wrap', wordBreak: 'break-word',
-        ...(alineas ? { fontSize: '0.86rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.88)' } : null),
+        ...(alineas ? ALINEA_STIJL : null),
         ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
       }}>
         {alineas ? <GinoTekst tekst={tekst} {...alineas} actieveZin={actieveZin} plek={plek} actiefRef={actiefRef} /> : <MetLinks tekst={tekst} />}
@@ -918,7 +929,7 @@ function WachtOpJou({ voorstel, staat, onToestaan }) {
 const bewerkingen = new Map()
 const isBewerkbaarBericht = (ac) => ac?.soort === 'bewerkbaar_bericht' && typeof ac.tekst === 'string' && ac.tekst.trim() !== ''
 
-function BewerkbaarBericht({ voorstel, sleutel }) {
+function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
   const origineel = voorstel.tekst
   const key = `${sleutel}|${origineel}`
   const [tekst, setTekst] = useState(() => bewerkingen.get(key) ?? origineel)
@@ -950,7 +961,10 @@ function BewerkbaarBericht({ voorstel, sleutel }) {
           padding: 8, fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.8rem', lineHeight: 1.45, whiteSpace: 'pre-wrap',
         }} />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-        <span style={{ color: colors.textSecondary, fontWeight: 600, fontSize: '0.72rem', marginRight: 'auto' }}>{tekst.length} tekens</span>
+        <span style={{ color: colors.textSecondary, fontWeight: 600, fontSize: '0.72rem' }}>{tekst.length} tekens</span>
+        <span style={{ marginRight: 'auto', display: 'flex' }}>
+          <VastzetKnop tekst={tekst} titel={typeof voorstel.titel === 'string' ? voorstel.titel : null} vastgezet={vastgezet} onVastzetten={onVastzetten} />
+        </span>
         <button type="button" onClick={() => wijzig(origineel)} disabled={tekst === origineel}
           style={{ ...knop2, opacity: tekst === origineel ? 0.4 : 1 }}>Herstel</button>
         <button type="button" onClick={kopieer} style={KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
@@ -1347,7 +1361,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2318,7 +2332,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} onOngedaan={() => ongedaanMaken(actief.id, i, j)} />
                     if (ac.soort === 'bewerkbaar_bericht') return isBewerkbaarBericht(ac)
-                      ? <BewerkbaarBericht key={j} voorstel={ac} sleutel={`${actief.id}-${i}-${j}`} /> : null
+                      ? <BewerkbaarBericht key={j} voorstel={ac} sleutel={`${actief.id}-${i}-${j}`} vastgezet={vastgezet} onVastzetten={onVastzetten} /> : null
                     if (ac.soort === 'visueel') {
                       const vraag = alle.slice(0, i).reverse().find(n => n.role === 'user')?.content || null
                       return (
@@ -2358,6 +2372,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   })}
                   <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null}
                     alineas={{ sleutel: `${actief.id}-${i}`, praatBron: spreekt ? spreekBron : null, onLees: stem.beschikbaar() ? leesAlinea : null }} />
+                  <VastzetKnop tekst={b.content} vastgezet={vastgezet} onVastzetten={onVastzetten} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Kopieer tekst={b.content} />
