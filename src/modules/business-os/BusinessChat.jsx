@@ -666,6 +666,7 @@ const isEditor = (g) => g?.soort === 'editor' || g?.naam === 'Editor'
 // zet de focus bovenaan de vraag; de rest is gewoon Gino (Snel/Slim).
 const isKlanten = (g) => g?.soort === 'klanten' || g?.naam === 'Klanten'
 // Transcript als bijlage of geplakt in het Klanten-tabje (6 nov 2026).
+const TRANSCRIPT_BESTAND = /transcript|zoom|\.vtt$|gesprek|call|meeting/i
 const TRANSCRIPT_HINT = 'Is dit een call-transcript: verwerk het met de skill Call verwerken en geef bij het appje (bewerkbaar_bericht) client_id mee.'
 const metKlanten = (gs, lokaal = []) => {
   if (gs.some(isKlanten)) return gs.map(g => (isKlanten(g) ? { ...g, soort: 'klanten' } : g))
@@ -2122,8 +2123,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       setFout(null)
       try { geupload = await uploadBijlagen(los) } catch (e) { setFout(e.message); return false } finally { setUploadt(false) }
       vraag = [vraag || 'Bekijk de bijlage.', '', ...geupload.map(b => `[bijlage] ${b.naam} | ${b.pad} | ${b.type} | ${b.grootte}`)].join('\n')
-      // Klanten-tabje: een bijlage is meestal een call-transcript (skill Call verwerken).
-      if (isKlanten(actief)) vraag = `${TRANSCRIPT_HINT}\n\n${vraag}`
+      // Call-transcript als bijlage (skill Call verwerken): in het Klanten-tabje
+      // altijd, elders als de bestandsnaam erop lijkt. Scherm meteen naar Klanten.
+      if (isKlanten(actief) || los.some(f => TRANSCRIPT_BESTAND.test(f?.name || ''))) {
+        vraag = `${TRANSCRIPT_HINT}\n\n${vraag}`
+        naarKlantenScherm()
+      }
       setBestanden([])
     }
     stopHerkenner()
