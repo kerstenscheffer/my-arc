@@ -23,6 +23,11 @@ const VOLGORDE_KEY = 'myarc.callblad.volgorde'
 const STANDAARD_VOLGORDE = ['hoe', 'status', 'doel', 'gewicht', 'voeding', 'training', 'goed', 'sinds', 'struggles', 'open', 'randzaken', 'vragen', 'komende_week', 'afsluiten']
 const leesVolgorde = () => { try { const v = JSON.parse(localStorage.getItem(VOLGORDE_KEY)); return Array.isArray(v) ? v : STANDAARD_VOLGORDE } catch { return STANDAARD_VOLGORDE } }
 
+// Ingeklapte blokken: tik op een kop. Geldt voor alle calls (standaard-
+// instelling van Kersten), bewaard in localStorage.
+const DICHT_KEY = 'myarc.callblad.dicht'
+const leesDicht = () => { try { const v = JSON.parse(localStorage.getItem(DICHT_KEY)); return new Set(Array.isArray(v) ? v : []) } catch { return new Set() } }
+
 // Pre-call check: alleen wat je vóór de call leest. Gino zet die regels in
 // call.precall; oudere voorbereidingen vallen terug op status + conclusies.
 const KERN = /^(Conclusie|Suggestie|Oorzaak|Status|Zo help je):/i
@@ -68,6 +73,13 @@ export default function CallBlad({ call, status = null, sleutel = null, precall:
   const [af, setAf] = useState(() => (sleutel ? leesAf(sleutel) : new Set()))
   const [afOpen, setAfOpen] = useState(false)
   const [volgorde, setVolgorde] = useState(leesVolgorde)
+  const [dicht, setDicht] = useState(leesDicht)
+  const klap = (id) => setDicht(oud => {
+    const n = new Set(oud)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    try { localStorage.setItem(DICHT_KEY, JSON.stringify([...n])) } catch { /* geen opslag */ }
+    return n
+  })
   const [sleept, setSleept] = useState(null)
   const [precallEigen, setPrecall] = useState(false)
   const bestuurd = typeof precallProp === 'boolean'
@@ -142,12 +154,15 @@ export default function CallBlad({ call, status = null, sleutel = null, precall:
             onDrop={(e) => { e.preventDefault(); verplaats(sleept, b.id); setSleept(null) }}
             style={{ opacity: sleept === b.id ? 0.4 : 1 }}>
             <div draggable onDragStart={(e) => { setSleept(b.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', b.id) } catch { /* oude browser */ } }}
-              onDragEnd={() => setSleept(null)} title="Sleep om de volgorde te veranderen"
-              style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, cursor: 'grab' }}>
-              <GripVertical size={11} style={{ marginLeft: -3, opacity: 0.6 }} />
+              onDragEnd={() => setSleept(null)} onClick={() => klap(b.id)}
+              title="Tik om in of uit te klappen, sleep om te verplaatsen"
+              style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+              <GripVertical size={11} style={{ marginLeft: -3, opacity: 0.6, cursor: 'grab' }} />
+              {dicht.has(b.id) ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
               {b.stip && <span style={{ width: 7, height: 7, borderRadius: '50%', background: b.stip }} />}{b.titel}
+              {dicht.has(b.id) && <span style={{ fontWeight: 700, opacity: 0.7 }}>· {open.length}</span>}
             </div>
-            {open.map(r => <Regel key={r.id} tekst={r.t} onKlik={sleutel ? () => wissel(r.id) : undefined} />)}
+            {!dicht.has(b.id) && open.map(r => <Regel key={r.id} tekst={r.t} onKlik={sleutel ? () => wissel(r.id) : undefined} />)}
           </div>
         )
       })}
