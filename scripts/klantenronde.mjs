@@ -92,11 +92,26 @@ export function klantenVraag(dag) {
 
 1. Data: node scripts/pa-db.mjs lees "select business_os_ronde_data() as d" en per klant wat de skill noemt (check-ins, workouts, gewicht, oefening-opmerkingen).
 2. Calls van vandaag: node scripts/pa-db.mjs agenda (vandaag) en node scripts/pa-db.mjs lees "select c.client_id, c.call_title, c.scheduled_date, c.preparation_notes from client_calls c where c.scheduled_date::date = (now() at time zone 'Europe/Amsterdam')::date and c.canceled_at is null". Per klant met een call vandaag: volg de skill Call-voorbereiding (doel bovenaan, gewicht met beslisregels, training, voeding, struggles, randzaken). Lees de vorige call (client_calls coach_summary/meeting_notes, call_insights als die er is), client_action_items die open staan en wat er sindsdien gebeurde.
-3. Per klant (niet gepauzeerd, niet het testaccount) een item:
-   → groep: aandacht (rood: stil, niet gewogen of getraind, gewicht de verkeerde kant op zonder reden, hulpvraag, klachten), vervolg (oranje: let op, of traject eindigt binnen 14 dagen), goed (groen).
-   → suggesties.reden: één regel waarom deze kleur, met het cijfer. Gewicht altijd als weektempo zaterdag-op-zaterdag zoals de app (skill Call-voorbereiding, blok 1), nooit een eigen rollend venster.
-   → suggesties.actie: bij aandacht en vervolg, wat Kersten concreet doet om te helpen (bv. "5 min bellen: training loopt vast door nachtdiensten, plan 2 vaste momenten"). Bij goed leeg.
-   → suggesties.signalen: max 3 korte regels voor Kersten.
+   Open beloftes en laatste call-verslag (voor stap 3): node scripts/pa-db.mjs lees "select id, title, created_at from productivity_tasks where status='active' and title ilike 'Belofte%' order by created_at" (koppel per klant op titel 'Belofte <voornaam>…') en node scripts/pa-db.mjs lees "select distinct on (client_id) client_id, status, created_at from client_coaching_logs where category='call_summary' order by client_id, created_at desc".
+3. Per klant (niet gepauzeerd, niet het testaccount) een item. Kleur = deze vaste regels (dezelfde stip staat in Command), de zwaarste die geldt wint:
+   → aandacht (ROOD), actie: Kersten binnen 24 uur. Eén van:
+     · 2 weken op rij onder tempo (weektempo < 75% van het weekdoel van de fase) zonder verklaring (ziekte, vakantie, weekend-uitschieter);
+     · stil: 0 wegingen én 0 trainingen in de laatste 7 dagen;
+     · 2 weken geen check-in;
+     · ziek of blessure zonder plan;
+     · een open belofte aan deze klant (productivity_tasks status active, titel 'Belofte <naam>…') die meer dan 3 dagen oud is.
+   → vervolg (ORANJE), actie: eerstvolgende ronde. Precies één ding mis:
+     · 1 week onder tempo;
+     · check-in gemist;
+     · minder trainingen dan gepland;
+     · een hulpvraag;
+     · traject eindigt binnen 14 dagen zonder besluit over doorgaan;
+     · laatste call-verslag (client_coaching_logs call_summary) off_track of needs_attention en minder dan 7 dagen oud: dan minimaal oranje.
+     Twee of meer van deze punten tegelijk = nog steeds oranje, tenzij een rode regel geldt.
+   → goed (GROEN), actie: compliment in de ronde. Alles tegelijk: op tempo (weektempo zaterdag-op-zaterdag minstens 75% van het weekdoel van de fase), 5+ wegingen in 7 dagen, trainingen volgens plan, check-in ingevuld, geen open klacht.
+   → suggesties.reden: één regel welke regel de kleur bepaalt, met het cijfer (bv. "2 weken onder tempo: -0,1 en 0,0 kg van -0,5 doel"). Gewicht altijd als weektempo zaterdag-op-zaterdag zoals de app (skill Call-voorbereiding, blok 1), nooit een eigen rollend venster.
+   → suggesties.actie: bij aandacht "Binnen 24 uur: …" en bij vervolg "Volgende ronde: …", met wat Kersten concreet doet (bv. "5 min bellen: training loopt vast door nachtdiensten, plan 2 vaste momenten"). Bij goed het compliment voor in de ronde.
+   → suggesties.signalen: max 3 korte regels voor Kersten. Open beloftes aan deze klant staan hier altijd, als "Belofte: <wat> (<n> dagen open)"; daarna wat er verder opvalt.
    → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: [..], hoe: [check-in], gewicht: [..], voeding: [..], training: [..], goed: [ALLES wat goed gaat, met cijfer], komende_week: [voorstel acties], volgende_call: "over 1 of 2 weken + waarom", precall: [max 5 regels die Kersten vóór de call MOET lezen: conclusies, wat opvalt, wat hij niet mag vergeten], struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Elk blok is een LIJST korte regels "Label: waarde", één datapunt per regel, nooit meerdere cijfers achter elkaar in één zin (zie skill, OPMAAK). Gaat iets goed: één regel.
    ${DAG_WERK[dag] || 'Vandaag geen berichten: laat bericht leeg.'}
    → bericht (alleen als hierboven gevraagd): Kerstens vaste opbouw uit de skill Check-in ronde (stap 4), begint letterlijk met "Een hele goede {dagdeel} <voornaam>! Alles goed?". Laat {dagdeel} staan: het paneel vult ochtend/middag/avond in.
