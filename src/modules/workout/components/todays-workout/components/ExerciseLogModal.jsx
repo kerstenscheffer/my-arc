@@ -464,11 +464,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
   // Zelf ophalen in plaats van als prop: dit scherm wordt vanuit vier plekken
   // geopend en bij doorgeven vergeet je er altijd één. Opslaan blijft kilo.
-  const [gymInfo, setGymInfo] = useState({ gyms: [], actiefId: null })
+  const [gymInfo, setGymInfo] = useState({ gyms: [], actiefId: null, geladen: false })
   useEffect(() => {
     if (!db?.supabase || !client?.id) return undefined
     let weg = false
-    haalGyms(db, client.id).then(info => { if (!weg) setGymInfo(info) }, () => {})
+    haalGyms(db, client.id).then(
+      info => { if (!weg) setGymInfo({ ...info, geladen: true }) },
+      () => { if (!weg) setGymInfo(g => ({ ...g, geladen: true })) })
     return () => { weg = true }
   }, [db, client?.id])
   const actieveGym = gymInfo.gyms.find(g => g.id === gymInfo.actiefId) || null
@@ -547,15 +549,17 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // opnieuw bepalen als je naar een andere oefening gaat.
   const rusttijd = rusttijdVoor(exercise)
 
-  useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference(); laadEerdereNotities() }, [])
+  useEffect(() => { loadExistingLogs(); laadEerdereNotities() }, [])
 
-  // De sportschool komt een tel later binnen dan deze eerste ronde. Zonder
-  // deze tweede kijkbeurt zou "vorige keer" de laatste training tonen waar dan
-  // ook, en precies dat wilden we niet meer.
+  // "Vorige keer" en de machine-instellingen pas als de sportschool bekend is:
+  // elke sportschool heeft per oefening een eigen sheet (6 nov 2026). Wissel
+  // je van zaak, dan begin je daar leeg, zodat de progressie niet mengt.
   useEffect(() => {
-    if (gymInfo.actiefId) loadPreviousPerformance()
+    if (!gymInfo.geladen) return
+    loadPreviousPerformance()
+    loadExercisePreference()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gymInfo.actiefId])
+  }, [gymInfo.geladen, gymInfo.actiefId])
 
   useEffect(() => {
     let weg = false
@@ -569,10 +573,18 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     if (!client?.id || !db) return
     try {
       const today = vandaag
-      const { data: sessions } = await db.supabase
+      // Met een sportschool: alleen trainingen van díe zaak. Zonder
+      // sportschool (nooit ingesteld) alles, zoals altijd.
+      let vraag = db.supabase
         .from('workout_sessions').select('id, workout_date, gym_id')
         .eq('client_id', client.id).lt('workout_date', today)
+      if (gymInfo.actiefId) vraag = vraag.eq('gym_id', gymInfo.actiefId)
+      const { data: sessions } = await vraag
         .order('workout_date', { ascending: false }).limit(30)
+      // Eerst leegmaken: na een wissel mag de sheet van de vorige zaak niet blijven staan.
+      setPreviousPerformance(null)
+      setEerdereKeren([])
+      setPreviousMachineSettings(null)
       if (!sessions?.length) return
       const { data: progress } = await db.supabase
         .from('workout_progress').select('sets, session_id, created_at, attachment_used, machine_settings')
@@ -581,24 +593,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
         .order('created_at', { ascending: false }).limit(12)
       if (!progress?.length) return
 
-      // Liefst dezelfde sportschool: 60 kg op de ene legpress is niet 60 kg op
-      // de andere, en dan lijkt een andere zaak op vooruitgang of terugval.
-      //
-      // Is er hier nog niets, dan tonen we wel de laatste keer elders — met de
-      // naam erbij. Niets tonen zou erger zijn: dan sta je bij je eerste
-      // training in een nieuwe zaak zonder enig houvast.
+      // Alleen deze sportschool (zie de vraag hierboven): 60 kg op de ene
+      // legpress is niet 60 kg op de andere. Een nieuwe zaak begint leeg.
       const bijSessie = (r) => sessions.find(x => x.id === r.session_id) || null
       const bruikbaar = progress.filter(r => r.sets?.length)
       if (!bruikbaar.length) return
-      const hier = gymInfo.actiefId
-        ? bruikbaar.find(r => bijSessie(r)?.gym_id === gymInfo.actiefId)
-        : null
-      const gekozen = hier || bruikbaar[0]
+      const gekozen = bruikbaar[0]
       const session = bijSessie(gekozen)
-      const anderGymId = !hier && gymInfo.actiefId ? (session?.gym_id || null) : null
-      const anderGym = anderGymId
-        ? (gymInfo.gyms.find(g => g.id === anderGymId)?.naam || null)
-        : null
+      const anderGym = null
 
       setPreviousPerformance({
         sets: gekozen.sets,
@@ -669,7 +671,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       const prefs = data?.exercise_preferences || {}
       const pref = prefs[exercise.name]
       if (pref?.attachment) setAttachmentUsed(pref.attachment)
-      if (pref?.machine_settings) setMachineSettings(pref.machine_settings)
+      // Machine-instellingen horen bij de machine, dus bij de sportschool.
+      // Bij één sportschool geldt de oude, algemene instelling nog.
+      const perGym = gymInfo.actiefId ? pref?.per_gym?.[gymInfo.actiefId]?.machine_settings : null
+      const algemeen = !gymInfo.actiefId || gymInfo.gyms.length <= 1 ? pref?.machine_settings : null
+      setMachineSettings(perGym || algemeen || {})
     } catch (e) { console.error('Exercise preference load failed:', e) }
   }
 
@@ -860,7 +866,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       const { data } = await db.supabase
         .from('clients').select('exercise_preferences').eq('id', client.id).single()
       const prefs = data?.exercise_preferences || {}
-      prefs[exercise.name] = { ...prefs[exercise.name], machine_settings: settings }
+      // machine_settings blijft ook algemeen staan: oudere app-versies lezen die.
+      const huidig = prefs[exercise.name] || {}
+      prefs[exercise.name] = {
+        ...huidig,
+        machine_settings: settings,
+        ...(gymInfo.actiefId ? { per_gym: { ...(huidig.per_gym || {}), [gymInfo.actiefId]: { machine_settings: settings } } } : {}),
+      }
       await db.supabase.from('clients').update({ exercise_preferences: prefs }).eq('id', client.id)
 
       // Ook opslaan in workout_progress als die al bestaat vandaag
@@ -1396,14 +1408,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {/* Krachtverloop van deze oefening: de beste set per training.
                 Staat onder de pillen, want het is context bij het loggen —
                 je ziet meteen of het zwaarder mag. */}
+            {/* Pas tekenen als de sportschool bekend is: de grafiek hoort bij
+                de zaak waar je nu staat, net als "vorige keer". */}
             <Suspense fallback={<div style={{ minHeight: 160 }} />}>
-              <ExerciseProgressChart
-                db={db}
-                client={client}
-                exerciseName={exercise.name}
-                isMobile={isMobile}
-                herlaadSleutel={grafiekVersie}
-              />
+              {gymInfo.geladen && (
+                <ExerciseProgressChart
+                  db={db}
+                  client={client}
+                  exerciseName={exercise.name}
+                  isMobile={isMobile}
+                  herlaadSleutel={grafiekVersie}
+                  gymId={gymInfo.actiefId}
+                />
+              )}
             </Suspense>
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}

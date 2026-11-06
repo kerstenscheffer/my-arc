@@ -82,7 +82,7 @@ export async function vulRonde(sb, coachId, actie) {
 
 const DAG_WERK = {
   1: `Maandag: schrijf alleen een bericht voor klanten die hun check-in NA zaterdag invulden (checkin_date zondag of maandag) en voor wie nog niets invulde sinds vrijdag. Die laatste: een kort, vriendelijk duwtje om hem in te vullen. De rest geen bericht.`,
-  3: `Woensdag (korte check-in): schrijf alleen een bericht voor de groepen aandacht en vervolg. Kort: wat je ziet en één vraag of tip.`,
+  3: `Woensdag (check-in bericht): schrijf een bericht voor iedere klant die niet gepauzeerd is, in de vaste opbouw (skill Check-in ronde, stap 4). Er is woensdag geen nieuwe check-in: haal stap 2 van het bericht uit de check-in van vrijdag/zaterdag (hoe gaat dat plan nu?) en het compliment uit de data van deze week.`,
   6: `Zaterdag (diepe check-in): schrijf een bericht voor iedere klant die niet gepauzeerd is, op basis van de check-in van vrijdag/zaterdag (skill Check-in ronde, stap 4). Nog geen check-in: een kort duwtje.`,
 }
 

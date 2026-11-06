@@ -91,7 +91,9 @@ function Kaartje({ active, payload }) {
 // `herlaadSleutel` gaat omhoog zodra de log-modal een set heeft weggeschreven.
 // Zonder dat blijft de grafiek op de stand van het moment dat hij openging en
 // zie je je net gelogde set pas na een harde refresh.
-export default function ExerciseProgressChart({ db, client, exerciseName, isMobile, herlaadSleutel = 0, vanaf = null, tot = null }) {
+// `gymId`: alleen trainingen van die sportschool (logscherm, 6 nov 2026). Leeg
+// laten = alle trainingen, zoals in het Kracht-blad en Coach Inzicht.
+export default function ExerciseProgressChart({ db, client, exerciseName, isMobile, herlaadSleutel = 0, vanaf = null, tot = null, gymId = null }) {
   // Eigen id voor het kleurverloop: staan er twee van deze grafieken op één
   // pagina, dan pakken ze anders elkaars definitie.
   const velling = String(exerciseName || 'x').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'x'
@@ -117,6 +119,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
         // Een fase gekozen in het Kracht-blad: alleen de sessies daarbinnen.
         if (vanaf) q = q.gte('workout_date', vanaf)
         if (tot) q = q.lte('workout_date', tot)
+        if (gymId) q = q.eq('gym_id', gymId)
         const { data: sessions } = await q
           // Ruim genomen: je traint deze oefening niet elke sessie, dus voor
           // twaalf punten heb je een flink venster aan sessies nodig.
@@ -170,7 +173,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     }
     laad()
     return () => { leeft = false }
-  }, [db, client?.id, exerciseName, herlaadSleutel, vanaf, tot])
+  }, [db, client?.id, exerciseName, herlaadSleutel, vanaf, tot, gymId])
 
   if (laden) return null
 
