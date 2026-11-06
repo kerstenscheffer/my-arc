@@ -33,11 +33,11 @@ function schoneSuggesties(s) {
     uit.call = Object.fromEntries(Object.entries({
       tijd: tekst(c.tijd, 20),
       titel: tekst(c.titel, 120),
-      doel: tekst(c.doel, 400),
-      gewicht: tekst(c.gewicht, 500),
-      training: tekst(c.training, 600),
-      voeding: tekst(c.voeding, 500),
-      sinds: tekst(c.sinds, 600),
+      doel: Array.isArray(c.doel) ? lijst(c.doel, 250, 6) : tekst(c.doel, 400),
+      gewicht: Array.isArray(c.gewicht) ? lijst(c.gewicht, 250, 6) : tekst(c.gewicht, 500),
+      training: Array.isArray(c.training) ? lijst(c.training, 250, 6) : tekst(c.training, 600),
+      voeding: Array.isArray(c.voeding) ? lijst(c.voeding, 250, 6) : tekst(c.voeding, 500),
+      sinds: Array.isArray(c.sinds) ? lijst(c.sinds, 250, 6) : tekst(c.sinds, 600),
       struggles: lijst(c.struggles, 250, 6),
       open: lijst(c.open, 200, 6),
       randzaken: lijst(c.randzaken, 150, 5),
@@ -89,10 +89,10 @@ export function klantenVraag(dag) {
 2. Calls van vandaag: node scripts/pa-db.mjs agenda (vandaag) en node scripts/pa-db.mjs lees "select c.client_id, c.call_title, c.scheduled_date, c.preparation_notes from client_calls c where c.scheduled_date::date = (now() at time zone 'Europe/Amsterdam')::date and c.canceled_at is null". Per klant met een call vandaag: volg de skill Call-voorbereiding (doel bovenaan, gewicht met beslisregels, training, voeding, struggles, randzaken). Lees de vorige call (client_calls coach_summary/meeting_notes, call_insights als die er is), client_action_items die open staan en wat er sindsdien gebeurde.
 3. Per klant (niet gepauzeerd, niet het testaccount) een item:
    → groep: aandacht (rood: stil, niet gewogen of getraind, gewicht de verkeerde kant op zonder reden, hulpvraag, klachten), vervolg (oranje: let op, of traject eindigt binnen 14 dagen), goed (groen).
-   → suggesties.reden: één regel waarom deze kleur, met het cijfer.
+   → suggesties.reden: één regel waarom deze kleur, met het cijfer. Gewicht altijd als weektempo zaterdag-op-zaterdag zoals de app (skill Call-voorbereiding, blok 1), nooit een eigen rollend venster.
    → suggesties.actie: bij aandacht en vervolg, wat Kersten concreet doet om te helpen (bv. "5 min bellen: training loopt vast door nachtdiensten, plan 2 vaste momenten"). Bij goed leeg.
    → suggesties.signalen: max 3 korte regels voor Kersten.
-   → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: "langetermijndoel + waarom gestart, en of wat hij nu doet daarbij past", gewicht: "Gewicht doet X, komt door Y, suggestie Z", training: "aantal vs plan, afwijkingen, zijn eigen opmerkingen letterlijk + jouw suggestie, kracht", voeding: "tracking, eiwit, bronnen; kort als het goed gaat", struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Gaat iets goed: één korte regel.
+   → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: [..], gewicht: [..], training: [..], voeding: [..], struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Elk blok is een LIJST korte regels "Label: waarde", één datapunt per regel, nooit meerdere cijfers achter elkaar in één zin (zie skill, OPMAAK). Gaat iets goed: één regel.
    ${DAG_WERK[dag] || 'Vandaag geen berichten: laat bericht leeg.'}
    → bericht (alleen als hierboven gevraagd): Kerstens WhatsApp-stijl uit de skill.
 4. Lever alles in één actie: { "soort": "ronde_vul", "items": [ { "client_id", "groep", "suggesties": {…}, "bericht"? } ] }. De PA schrijft hem direct in het paneel. Geen wijziging_voorstel.

@@ -11,16 +11,27 @@ import { BLOKKEN, heeft } from './callBladData'
 const LABEL = { fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: 4 }
 const REGEL = { fontSize: '0.8rem', fontWeight: 700, color: colors.textPrimary, lineHeight: 1.45 }
 
+// Eén regel in Gino's stijl: groen pijltje, "Label:" vet, daarna de tekst.
+function Regel({ tekst }) {
+  const m = String(tekst).match(/^([^:]{1,40}):\s+([\s\S]+)$/)
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 4, ...REGEL, fontWeight: 600 }}>
+      <span style={{ color: colors.success, fontWeight: 900, flexShrink: 0 }}>→</span>
+      <span>{m ? <><b style={{ fontWeight: 900 }}>{m[1]}:</b> {m[2]}</> : tekst}</span>
+    </div>
+  )
+}
+
 export default function CallBlad({ call }) {
   if (!call) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {BLOKKEN.filter(([id]) => heeft(call[id])).map(([id, titel]) => (
         <div key={id}>
           <div style={LABEL}>{titel}</div>
           {Array.isArray(call[id])
-            ? call[id].map((r, i) => <div key={i} style={{ ...REGEL, marginTop: 2 }}>→ {r}</div>)
-            : <div style={{ ...REGEL, ...(id === 'doel' ? { fontWeight: 900 } : null) }}>{call[id]}</div>}
+            ? call[id].map((r, i) => <Regel key={i} tekst={r} />)
+            : <div style={REGEL}>{call[id]}</div>}
         </div>
       ))}
     </div>
