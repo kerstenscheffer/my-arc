@@ -308,7 +308,9 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
       // en past een andere dag beter bij de gelogde oefeningen, dan wint die.
       // Een naam uit een ander (oud) plan blijft staan.
       const bewaardeDag = schemaDagen.find(d => d.naam.toLowerCase() === bewaard.toLowerCase())
-      if (sterk && bewaardeDag && besteScore > score(bewaardeDag)) return beste.naam
+      // Zelfde regel als corrigeerSessieNaam in de app: alleen omzetten als
+      // minder dan de helft van de oefeningen uit de bewaarde dag komt.
+      if (sterk && bewaardeDag && score(bewaardeDag) * 2 < gelogd.size && besteScore > score(bewaardeDag)) return beste.naam
       return bewaard
     }
     if (sterk) return beste.naam

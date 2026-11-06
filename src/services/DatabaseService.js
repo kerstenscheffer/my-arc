@@ -803,6 +803,46 @@ async naamVanTrainingsdag(clientId, datum) {
   } catch { return null }
 }
 
+// De sessie krijgt bij de eerste log de naam van de roosterdag. Traint de
+// klant een andere dag (Elijah: Pull op woensdag, rooster zegt Legs), dan
+// klopte de naam daarna overal niet meer. Na elke log vergelijken we de
+// gelogde oefeningen met de dagen van het plan en zetten de naam om als de
+// huidige dag duidelijk niet past: minder dan de helft van de oefeningen
+// komt eruit, en een andere dag past beter. Een naam die geen dag van dit
+// plan is (oud plan, eigen naam) blijft staan, behalve de generieke.
+async corrigeerSessieNaam(clientId, sessieId, huidigeNaam) {
+  try {
+    const [{ data: klant }, { data: logs }] = await Promise.all([
+      this.supabase.from('clients').select('assigned_schema_id').eq('id', clientId).maybeSingle(),
+      this.supabase.from('workout_progress').select('exercise_name').eq('session_id', sessieId),
+    ])
+    // Pas vanaf twee oefeningen: één oefening zit vaak in meerdere dagen
+    // (Lat Pulldown in Pull én Upper) en zou dan de verkeerde naam geven.
+    if (!klant?.assigned_schema_id || !logs || logs.length < 2) return
+    const { data: plan } = await this.supabase.from('workout_schemas')
+      .select('week_structure').eq('id', klant.assigned_schema_id).maybeSingle()
+    const ws = plan?.week_structure
+    if (!ws || typeof ws !== 'object') return
+    const schoon = (n) => String(n || '').trim().toLowerCase()
+    const gelogd = new Set(logs.map(l => schoon(l.exercise_name)).filter(Boolean))
+    const dagen = Object.values(ws).filter(d => d && typeof d === 'object').map(d => {
+      const oef = new Set((Array.isArray(d.exercises) ? d.exercises : []).map(e => schoon(e?.name)))
+      let score = 0
+      gelogd.forEach(n => { if (oef.has(n)) score++ })
+      return { naam: String(d.name || d.focus || '').trim(), score }
+    }).filter(d => d.naam)
+    const beste = dagen.reduce((b, d) => (!b || d.score > b.score ? d : b), null)
+    if (!beste || !(beste.score >= 2 || beste.score * 2 >= gelogd.size)) return
+    const naam = String(huidigeNaam || '').trim()
+    if (schoon(naam) === schoon(beste.naam)) return
+    const generiek = !naam || /^(quick log\b.*|training|workout)$/i.test(naam)
+    const huidig = dagen.find(d => schoon(d.naam) === schoon(naam))
+    if (!generiek && !(huidig && huidig.score * 2 < gelogd.size && beste.score > huidig.score)) return
+    await this.supabase.from('workout_sessions').update({ day_display_name: beste.naam }).eq('id', sessieId)
+      .then(r => r, () => null)
+  } catch { /* naam laten staan */ }
+}
+
 async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null, datum = null) {
   try {
     // 1. Create or get the day's workout session (vandaag, of een andere dag
@@ -876,7 +916,10 @@ async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null, datum = nu
       progress = inserted
       console.log('✅ Created new workout progress:', exerciseName, sets.length, 'sets')
     }
-    
+
+    // Niet afwachten: de naam is bijzaak, het loggen moet snel terug.
+    this.corrigeerSessieNaam(clientId, session.id, session.day_display_name)
+
     return progress
     
   } catch (error) {

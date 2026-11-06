@@ -134,6 +134,7 @@ export default function WorkoutFlowWizard({ exercises, client, db, onComplete, o
           sets: Array.from({ length: currentSet }, () => ({ weight: 0, reps: exercise.reps || 0 })),
           created_at: new Date().toISOString(),
         })
+        db.corrigeerSessieNaam?.(client.id, session.id, session.day_display_name)
       }
     } catch (e) { console.error('❌ Log set failed:', e) }
   }
