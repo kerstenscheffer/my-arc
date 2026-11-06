@@ -7,12 +7,13 @@
 // bewerkbaar bericht uit checkin_ronde_items (SQL: checkin-ronde.sql).
 // Er gaat NOOIT iets naar de klant: alleen kopiëren, Kersten verstuurt zelf.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import CallBlad from './CallBlad'
+import BerichtVak from './BerichtVak'
 
 export const RONDE_OPDRACHT = 'Zet de check-in ronde van vandaag klaar'
 
@@ -35,18 +36,6 @@ const verschil = (a, b) => {
   return `${v > 0 ? '+' : ''}${v.toFixed(1).replace('.', ',')}`
 }
 const vandaagNL = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
-
-async function kopieer(tekst) {
-  try { await navigator.clipboard.writeText(tekst); return true } catch { /* val terug */ }
-  try {
-    const t = document.createElement('textarea')
-    t.value = tekst; t.style.position = 'fixed'; t.style.opacity = '0'
-    document.body.appendChild(t); t.select()
-    const ok = document.execCommand('copy')
-    t.remove()
-    return ok
-  } catch { return false }
-}
 
 const LABEL = { fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: 4 }
 const REGEL = { fontSize: '0.8rem', fontWeight: 700, color: colors.textPrimary, lineHeight: 1.45 }
@@ -171,84 +160,8 @@ function CallPopup({ naam, call, sleutel, onSluit }) {
 function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
   const [open, setOpen] = useState(false)
   const [callOpen, setCallOpen] = useState(false)
-  const [tekst, setTekst] = useState(item?.bewerkt_bericht ?? item?.bericht ?? '')
-  const [gekopieerd, setGekopieerd] = useState(false)
-  const [bezig, setBezig] = useState(false)
-  const [fout, setFout] = useState(null)
-  const timer = useRef(null)
-  const wacht = useRef(null)
   const serverTekst = item?.bewerkt_bericht ?? item?.bericht ?? ''
-
-  // Nieuwe tekst van de server (Gino) overnemen zolang er niets openstaat.
-  useEffect(() => { if (!timer.current) setTekst(serverTekst) }, [serverTekst])
-
-  // Item ophalen of aanmaken (klant zonder bericht in deze ronde).
-  const zorgVoorItem = useCallback(async () => {
-    if (item?.id) return item
-    const { data, error } = await supabase.from('checkin_ronde_items')
-      .upsert({ client_id: k.id, ronde_datum: ronde }, { onConflict: 'client_id,ronde_datum' })
-      .select(ITEM_KOLOMMEN).single()
-    if (error) throw error
-    onItem(data)
-    return data
-  }, [item, k.id, ronde, onItem])
-
-  const bewaar = useCallback(async (waarde) => {
-    timer.current = null
-    try {
-      const it = await zorgVoorItem()
-      const { data, error } = await supabase.from('checkin_ronde_items')
-        .update({ bewerkt_bericht: waarde }).eq('id', it.id).select(ITEM_KOLOMMEN).single()
-      if (error) throw error
-      onItem(data); setFout(null)
-    } catch (e) { setFout(`Opslaan mislukt: ${e.message}`) }
-  }, [zorgVoorItem, onItem])
-
-  const wijzig = (v) => {
-    setTekst(v)
-    wacht.current = v
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => bewaarRef.current(v), 800)
-  }
-  // Bij sluiten of wegklikken een openstaande wijziging nog bewaren.
-  const bewaarRef = useRef(bewaar)
-  useEffect(() => { bewaarRef.current = bewaar }, [bewaar])
-  useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); bewaarRef.current(wacht.current) } }, [])
-
   const verstuurd = !!item?.verstuurd_at
-
-  const wisselVerstuurd = async () => {
-    if (bezig) return
-    setBezig(true)
-    try {
-      if (timer.current) { clearTimeout(timer.current); await bewaar(wacht.current) }
-      const it = await zorgVoorItem()
-      const nieuw = verstuurd ? null : new Date().toISOString()
-      const { data, error } = await supabase.from('checkin_ronde_items')
-        .update({ verstuurd_at: nieuw }).eq('id', it.id).select(ITEM_KOLOMMEN).single()
-      if (error) throw error
-      onItem(data)
-      if (nieuw) {
-        let coach = data.coach_id
-        if (!coach) coach = (await supabase.auth.getSession()).data.session?.user?.id
-        const s = data.suggesties || {}
-        const { error: nf } = await supabase.from('client_notes').insert({
-          client_id: k.id, coach_id: coach, title: `Check-in ronde ${datumKort(data.ronde_datum)}`,
-          // 'session': client_notes.category heeft een vaste lijst (check-constraint)
-          category: 'session', note_date: vandaagNL(),
-          content: { bericht: tekst, compliment: s.compliment ?? null, verbeterpunt: s.verbeterpunt ?? null },
-        })
-        if (nf) setFout(`Verstuurd gezet, notitie mislukt: ${nf.message}`)
-        else setFout(null)
-      }
-    } catch (e) { setFout(e.message) }
-    setBezig(false)
-  }
-
-  const kopieerKlik = async () => {
-    if (await kopieer(tekst)) { setGekopieerd(true); setTimeout(() => setGekopieerd(false), 1500) }
-    else setFout('Kopiëren lukte niet, selecteer de tekst zelf.')
-  }
 
   return (
     <div style={{ borderBottom: `1px solid ${colors.borderSubtle}` }}>
@@ -278,31 +191,7 @@ function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
           )}
           <Uitklap titel="Data"><UitDeData k={k} /></Uitklap>
           <Uitklap titel={item?.ronde_datum && item.ronde_datum !== ronde ? `Bericht (${datumKort(item.ronde_datum)})` : 'Bericht'} open={!!serverTekst}>
-          <div>
-            <textarea value={tekst} onChange={e => wijzig(e.target.value)} rows={6}
-              placeholder="Nog geen bericht van Gino. Typ hier zelf."
-              style={{
-                width: '100%', boxSizing: 'border-box', resize: 'vertical', background: colors.surface, color: colors.textPrimary,
-                border: 'none', borderRadius: 12, padding: 10, fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.45,
-                fontFamily: 'inherit', outline: 'none',
-              }} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <button type="button" onClick={kopieerKlik} disabled={!tekst.trim()} style={{
-                ...KNOPJE, background: colors.textPrimary, color: colors.onAccent, opacity: tekst.trim() ? 1 : 0.4,
-              }}>
-                {gekopieerd ? <Check size={14} strokeWidth={3} /> : <Copy size={14} strokeWidth={2.5} />}
-                {gekopieerd ? 'Gekopieerd' : 'Kopieer'}
-              </button>
-              <button type="button" onClick={wisselVerstuurd} disabled={bezig} style={{
-                ...KNOPJE, background: verstuurd ? colors.success : 'transparent',
-                color: verstuurd ? colors.onAccent : colors.textPrimary,
-                boxShadow: verstuurd ? 'none' : `inset 0 0 0 1.5px ${colors.success}`, opacity: bezig ? 0.6 : 1,
-              }}>
-                <Check size={14} strokeWidth={3} /> {verstuurd ? 'Verstuurd' : 'Markeer verstuurd'}
-              </button>
-            </div>
-            {fout && <div style={{ fontSize: '0.74rem', fontWeight: 700, color: colors.danger, marginTop: 6 }}>{fout}</div>}
-          </div>
+            <BerichtVak clientId={k.id} voornaam={(k.naam || '').split(' ')[0]} item={item} ronde={ronde} onItem={onItem} rijen={6} />
           </Uitklap>
         </div>
       )}

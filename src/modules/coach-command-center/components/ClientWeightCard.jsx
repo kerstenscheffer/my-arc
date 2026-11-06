@@ -1,6 +1,6 @@
 // src/modules/coach-command-center/components/ClientWeightCard.jsx
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
-// (naam, doel, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
+// (naam, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
@@ -45,13 +45,6 @@ const KAART_KLEUREN = [
   { id: 'rood',    label: 'Urgent',      hex: '#ef4444' },
 ]
 const KLEUR_HEX = { groen: '#10b981', oranje: '#f59e0b', rood: '#ef4444' }
-
-const GOAL_LABELS = {
-  afvallen: 'Afvallen', fat_loss: 'Afvallen', weight_loss: 'Afvallen',
-  spieren: 'Spieropbouw', muscle_gain: 'Spieropbouw',
-  recomp: 'Recomp', body_recomposition: 'Recomp',
-  fitness: 'Fitter worden', general_fitness: 'Fitter worden',
-}
 
 // Hoe lang ligt de langst wachtende check-in er al, en wat betekent dat voor
 // de stip?
@@ -272,10 +265,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
 
   const urgencyColor = getUrgencyColor()
 
-  const intakeDoel = client.coachingPlan?.plan?.intake_call_notes?.notes?.doel
-  const goalRoute  = intakeDoel?.route || client.primary_goal || null
-  const goalLabel  = GOAL_LABELS[goalRoute] || goalRoute || null
-
   const isPaused = client.coaching_status === 'paused'
 
   // Eén status-signaal: de linker-accentrand (urgentiekleur). Verder solide
@@ -383,7 +372,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     : null
 
   return (
+    // Buitenste laag zonder overflow: de videoknop steekt over de bovenrand.
+    <div style={{ position: 'relative', display: 'flex' }}>
     <div style={{
+      flex: 1, minWidth: 0,
       background: '#0a0a0a',
       border: '1px solid rgba(255,255,255,0.08)',
       borderLeft: cardBorderLeft,
@@ -435,12 +427,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
           herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →
           initialen op dezelfde plek, zodat de kaarten uitgelijnd blijven. */}
+      <div style={{
+        width: '10%', minWidth: isMobile ? 44 : 52, flexShrink: 0, position: 'relative',
+        borderRight: `1px solid ${isPaused ? 'rgba(245,158,11,0.6)' : 'rgba(255,255,255,0.08)'}`,
+      }}>
       <div className={PRIVE_FOTO} style={{
-        width: '10%', minWidth: isMobile ? 44 : 52, flexShrink: 0,
+        position: 'absolute', inset: 0,
         background: client.profile_photo_url
           ? `url(${client.profile_photo_url}) center/cover`
           : 'rgba(255,255,255,0.05)',
-        borderRight: '1px solid rgba(255,255,255,0.08)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {!client.profile_photo_url && (
@@ -451,6 +446,18 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             {`${(client.first_name || '')[0] || ''}${(client.last_name || '')[0] || ''}`.toUpperCase() || '?'}
           </span>
         )}
+      </div>
+      {/* Gepauzeerd: oranje gloed met een pauze-icoon over de foto, i.p.v. een balk. */}
+      {isPaused && (
+        <div title="Coaching gepauzeerd" style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(245,158,11,0.35)',
+          boxShadow: 'inset 0 0 18px rgba(245,158,11,0.9)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Pause size={isMobile ? 18 : 20} strokeWidth={2.6} color="#fff" fill="#fff" />
+        </div>
+      )}
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -506,22 +513,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         </>
       )}
 
-      {/* ── PAUSE BANNER ── */}
-      {isPaused && (
-        <div style={{
-          padding: '0.35rem 0.85rem',
-          background: 'rgba(245,158,11,0.12)',
-          borderBottom: '1px solid rgba(245,158,11,0.25)',
-          display: 'flex', alignItems: 'center', gap: '0.4rem',
-          color: '#f59e0b',
-        }}>
-          <Pause size={12} strokeWidth={2.8} fill="#f59e0b" />
-          <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Coaching gepauzeerd
-          </span>
-        </div>
-      )}
-
       {/* ── ROW 1 — naam · doel  |  gewicht · datum, alles op één regel ── */}
       <div style={{
         display: 'flex', alignItems: 'center',
@@ -532,32 +523,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           <h3 className={PRIVE} style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
           </h3>
-          {/* Doel achter de naam i.p.v. op een eigen regel eronder. */}
-          {goalLabel && !isInactive && (
-            <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
-              {goalLabel}
-            </span>
-          )}
           {isInactive && (
             <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 800, color: '#6b7280', whiteSpace: 'nowrap' }}>inactief</span>
-          )}
-          {/* Open techniekvideo's: wit rondje met het aantal; tik = feedback geven. */}
-          {openVideos > 0 && onOpenVideos && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onOpenVideos() }}
-              title={`${openVideos} video${openVideos === 1 ? '' : '’s'} wacht${openVideos === 1 ? '' : 'en'} op feedback`}
-              aria-label="Video's bekijken"
-              style={{
-                flexShrink: 0, alignSelf: 'center', position: 'relative', width: 24, height: 24, borderRadius: '50%',
-                background: '#fff', border: 'none', color: '#000', padding: 0, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-              <Video size={13} strokeWidth={2.6} />
-              {openVideos > 1 && (
-                <span style={{ position: 'absolute', top: -5, right: -6, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#ef4444', color: '#fff', fontSize: '0.56rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #0a0a0a' }}>{openVideos}</span>
-              )}
-            </button>
           )}
         </div>
 
@@ -602,8 +569,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             kolommen breder dan nodig. Het label zegt het al. */}
         {!isInactive && (() => {
           const Cijfer = ({ st }) => (
-            <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', lineHeight: 1, letterSpacing: '0.02em' }}>{st.kort}</span>
+            <span title={st.kort} style={{ display: 'inline-flex', alignItems: 'baseline', whiteSpace: 'nowrap', flexShrink: 0 }}>
               <span style={{ fontSize: '0.88rem', fontWeight: 900, color: st.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                 {st.val}<span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginLeft: 2 }}>kg</span>
               </span>
@@ -777,6 +743,25 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         onClose={() => setVerlengOpen(false)}
       />
 
+    </div>
+          {/* Open techniekvideo's: wit rondje over de bovenrand; tik = feedback geven. */}
+      {openVideos > 0 && onOpenVideos && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenVideos() }}
+          title={`${openVideos} video${openVideos === 1 ? '' : '’s'} wacht${openVideos === 1 ? '' : 'en'} op feedback`}
+          aria-label="Video's bekijken"
+          style={{
+            position: 'absolute', top: -10, right: 26, zIndex: 4, width: 24, height: 24, borderRadius: '50%',
+            background: '#fff', border: 'none', color: '#000', padding: 0, cursor: 'pointer', boxShadow: '0 0 0 3px #000',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          <Video size={13} strokeWidth={2.6} />
+          {openVideos > 1 && (
+            <span style={{ position: 'absolute', top: -5, right: -6, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#ef4444', color: '#fff', fontSize: '0.56rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #0a0a0a' }}>{openVideos}</span>
+          )}
+        </button>
+      )}
     </div>
   )
 }
