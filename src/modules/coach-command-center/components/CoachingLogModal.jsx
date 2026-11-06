@@ -3,12 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import CheckinFlow from './CheckinFlow'
-import OnboardingFlow from './OnboardingFlow'
-import { LEEG as CHECKIN_LEEG, samenvatting, heeftInhoud, uitConcept } from './checkinData'
-import { LEEG as ONB_LEEG, samenvatting as onbSamenvatting, heeftInhoud as onbHeeftInhoud } from './onboardingData'
-import { useConcept } from './useConcept'
-import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History, Rocket } from 'lucide-react'
+import CallBlad from '../../business-os/CallBlad'
+import { callHeeftInhoud } from '../../business-os/callBladData'
+import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket, Check } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { id: 'on_track',        label: 'Op schema',      color: '#FFD700' },
@@ -25,15 +22,106 @@ const STATUS_OPTIONS = [
 // Alles in wit. De kleuren per categorie waren de enige reden dat dit scherm
 // er bont uitzag; wat telt is welk tabblad actief is, en dat lees je aan vet
 // wit tegen dof wit.
+// 6 nov 2026: de formulieren Check-in (3x gebruikt) en Onboarding (nooit) zijn
+// eruit. Het logboek is nu het call-scherm: tab Call met Gino's voorbereiding
+// en de vaste structuur, tab Notities met het notitieveld en de tijdlijn.
+// Oude check-in- en onboarding-items blijven gewoon in de tijdlijn staan.
 const CATEGORIES = [
   { id: 'algemeen',   label: 'Algemeen',   icon: FileText },
   { id: 'checkin',    label: 'Check-in',   icon: Phone },
   { id: 'onboarding', label: 'Onboarding', icon: Rocket },
 ]
 
-// De twee formulier-categorieen. Die krijgen de volle hoogte in het venster
-// en slaan op via hun eigen knop, in plaats van via het notitieveld.
-const FORMULIEREN = new Set(['checkin', 'onboarding'])
+// Vaste volgorde van een check-in call (skill Call-voorbereiding).
+const CALL_STAPPEN = [
+  'Hoe gaat het, hoe zit je erin?',
+  'Voeding',
+  'Training',
+  'Punten van Gino',
+  'Struggles en oude issues: hoe gaat het nu?',
+  'Terug naar het doel: past wat je doet bij wat je wilt?',
+  'Komende week concreet: wat ga je doen?',
+  'Nog vragen of iets onduidelijk?',
+  'Volgende call inplannen: goed over 2 weken, niet goed over 1 week',
+]
+
+const KLEUR_GROEP = { aandacht: '#ef4444', vervolg: '#f59e0b', goed: '#22c55e' }
+const T_LABEL = { fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 6 }
+
+// Tab Call: Gino's voorbereiding (checkin_ronde_items, laatste 3 dagen) en de
+// structuur om af te vinken. Afvinken is alleen voor tijdens de call en wordt
+// niet bewaard: het transcript doet achteraf de verslaglegging.
+function CallVoorbereiding({ client, db }) {
+  const [item, setItem] = useState(undefined)
+  const [gedaan, setGedaan] = useState(() => new Set())
+  useEffect(() => {
+    let weg = false
+    const van = new Date(); van.setDate(van.getDate() - 3)
+    db.supabase.from('checkin_ronde_items').select('ronde_datum, groep, suggesties')
+      .eq('client_id', client.id).gte('ronde_datum', van.toLocaleDateString('sv-SE'))
+      .lte('ronde_datum', new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' }))
+      .order('ronde_datum', { ascending: false }).limit(3)
+      .then(({ data }) => {
+        if (weg) return
+        const lijst = data || []
+        setItem(lijst.find(r => callHeeftInhoud(r.suggesties?.call)) || lijst[0] || null)
+      }, () => { if (!weg) setItem(null) })
+    return () => { weg = true }
+  }, [client.id, db])
+  const s = item?.suggesties || {}
+  const call = s.call
+  const doel = client.primary_goal || client.goal
+  const wissel = (i) => setGedaan(g => { const n = new Set(g); if (n.has(i)) n.delete(i); else n.add(i); return n })
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.75rem 0.875rem 1.5rem', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {item === undefined ? (
+        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
+      ) : (
+        <>
+          {item && (s.reden || s.actie) && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...T_LABEL }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: KLEUR_GROEP[item.groep] || 'rgba(255,255,255,0.3)' }} />
+                Status
+              </div>
+              {s.reden && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', lineHeight: 1.45 }}>{s.reden}</div>}
+              {s.actie && <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, marginTop: 2 }}>{s.actie}</div>}
+            </div>
+          )}
+          {callHeeftInhoud(call) ? <CallBlad call={doel && !call.doel ? { ...call, doel } : call} /> : (
+            <div>
+              {doel && <><div style={T_LABEL}>Doel</div><div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', marginBottom: 12 }}>{doel}</div></>}
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                Nog geen voorbereiding. Gino zet die klaar op de ochtend van de call.
+              </div>
+            </div>
+          )}
+          <div>
+            <div style={T_LABEL}>Structuur</div>
+            {CALL_STAPPEN.map((t, i) => {
+              const aan = gedaan.has(i)
+              return (
+                <button key={i} type="button" onClick={() => wissel(i)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 36, padding: '0 2px',
+                  background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: aan ? '#22c55e' : 'transparent', boxShadow: aan ? 'none' : 'inset 0 0 0 1.5px rgba(255,255,255,0.25)',
+                  }}>{aan && <Check size={12} strokeWidth={3} color="#000" />}</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: aan ? 'rgba(255,255,255,0.35)' : '#fff', textDecoration: aan ? 'line-through' : 'none' }}>
+                    {i + 1}. {t}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // Voor het tonen van bestaande items, ook uit categorieen die je niet meer
 // kunt kiezen. Zonder deze lijst zou een oud WhatsApp-item naamloos worden.
@@ -67,12 +155,10 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   const [saving, setSaving]       = useState(false)
   const [note, setNote]           = useState('')
   const [status, setStatus]       = useState('on_track')
-  const [category, setCategory]   = useState('algemeen')
-  const [filterCat, setFilterCat] = useState('all')
-  // De check-in staat los van het notitieveld: het is een formulier, geen
-  // regel tekst. Wordt bij opslaan één logboek-item.
-  const [checkin, setCheckin] = useState(CHECKIN_LEEG)
-  const [onboarding, setOnboarding] = useState(ONB_LEEG)
+  const category = 'algemeen'
+  // Wijzigingen (automatisch, 9 van de 10 items) standaard niet in de tijdlijn.
+  const [filterCat, setFilterCat] = useState('notities')
+  const [weergave, setWeergave]   = useState('call')
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -101,18 +187,6 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     window.addEventListener('keydown', opToets)
     return () => window.removeEventListener('keydown', opToets)
   }, [onClose])
-
-  // Elk formulier bewaart zijn eigen lopende concept, gescheiden per soort.
-  // Zonder die scheiding zou een halve onboarding de check-in overschrijven:
-  // beide zouden dezelfde rij claimen.
-  const { stand: checkinStand, wisConcept: wisCheckinConcept } = useConcept({
-    db, coachId, clientId: client?.id, soort: 'checkin',
-    waarde: checkin, zetWaarde: setCheckin, heeftInhoud, uitConcept,
-  })
-  const { stand: onbStand, wisConcept: wisOnbConcept } = useConcept({
-    db, coachId, clientId: client?.id, soort: 'onboarding',
-    waarde: onboarding, zetWaarde: setOnboarding, heeftInhoud: onbHeeftInhoud,
-  })
 
   const loadLogs = async () => {
     setLoading(true)
@@ -145,40 +219,6 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       setNote('')
       onLogSaved?.(data)
     } catch (e) { console.error('❌ save log:', e) }
-    setSaving(false)
-  }
-
-  // Een formulier opslaan als logboek-item. Check-in en onboarding lopen via
-  // dezelfde weg: note krijgt de leesbare samenvatting zodat de tijdlijn er
-  // zonder extra code iets van kan tonen, de structuur gaat in data.
-  const bewaarFormulier = async (soort) => {
-    const isCheckin = soort === 'checkin'
-    const inhoud = isCheckin ? checkin : onboarding
-    setSaving(true)
-    try {
-      const { data, error } = await db.supabase
-        .from('client_coaching_logs')
-        .insert({
-          client_id: client.id, coach_id: coachId || null,
-          status, category: soort,
-          note: (isCheckin ? samenvatting : onbSamenvatting)(inhoud, client.first_name),
-          data: inhoud,
-        })
-        .select().single()
-      if (error) throw error
-      setLogs(prev => [data, ...prev])
-
-      await (isCheckin ? wisCheckinConcept : wisOnbConcept)()
-
-      // Leeg formulier, en je blijft op hetzelfde tabblad staan: na opslaan
-      // wil je meestal meteen aan de volgende beginnen.
-      if (isCheckin) setCheckin(CHECKIN_LEEG)
-      else setOnboarding(ONB_LEEG)
-      onLogSaved?.(data)
-    } catch (e) {
-      console.error(`${soort} opslaan mislukt:`, e)
-      alert('Opslaan mislukt — ' + (e?.message || e))
-    }
     setSaving(false)
   }
 
@@ -246,7 +286,10 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     }
   }, [isDragging, isResizing, onDragMove, onResizeMove, onDragEnd, onResizeEnd])
 
-  const filteredLogs = filterCat === 'all' ? logs : logs.filter(l => (l.category || 'algemeen') === filterCat)
+  const isNotitie = (l) => (l.category || 'algemeen') !== 'change_log'
+  const filteredLogs = filterCat === 'all' ? logs
+    : filterCat === 'notities' ? logs.filter(isNotitie)
+    : logs.filter(l => (l.category || 'algemeen') === filterCat)
 
   const zwevend = !inline
   const modal = (
@@ -309,52 +352,38 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
 
       {!minimized && (
         <>
-          {/* ── Nieuwe entry ── */}
-          {/* Het invoerblok stond op flexShrink: 0 en kon dus nooit krimpen.
-              Met een notitieveld van drie regels viel dat niet op, maar het
-              check-in formulier is een stuk langer: dat liep buiten het
-              venster en de modal staat op overflow hidden, dus scrollen kon
-              niet.
+          {/* Tabs: Call (voorbereiding + structuur) en Notities. */}
+          <div style={{ display: 'flex', gap: '0.25rem', padding: '0.625rem 0.75rem 0', flexShrink: 0 }}>
+            {[['call', 'Call', Phone], ['notities', 'Notities', FileText]].map(([id, label, Icoon]) => {
+              const aan = weergave === id
+              return (
+                <button key={id} type="button" onClick={() => setWeergave(id)} style={{
+                  flex: 1, minHeight: 30, borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                  boxShadow: aan ? 'none' : 'inset 0 0 0 1px rgba(255,255,255,0.12)',
+                  fontSize: '0.72rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {Icoon === Phone ? <Phone size={12} /> : <FileText size={12} />}{label}
+                </button>
+              )
+            })}
+          </div>
 
-              Nu mag dit blok krimpen én zelf scrollen. Bij een formulier
-              krijgt het de ruimte (het is dan je werkveld), bij een gewone
-              notitie blijft het compact en houdt de tijdlijn zijn plek. */}
+          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} /> : (<>
+          {/* ── Nieuwe notitie ── */}
           <div style={{
             padding: '0.625rem 0.75rem',
             borderBottom: '1px solid rgba(255,255,255,0.04)',
-            flex: FORMULIEREN.has(category) ? '1 1 auto' : '0 1 auto',
+            flex: '0 1 auto',
             minHeight: 0,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
           }}>
 
-            {/* Categorie selector */}
-            <div style={{ display: 'flex', gap: '0.2rem', marginBottom: '0.4rem' }}>
-              {CATEGORIES.map(cat => {
-                const CatIcon = cat.icon
-                const active = category === cat.id
-                return (
-                  <button key={cat.id} onClick={() => setCategory(cat.id)} style={{
-                    flex: 1, padding: '0.4rem 0.3rem',
-                    background: active ? '#fff' : 'transparent',
-                    border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                    borderRadius: '6px',
-                    color: active ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-                    fontSize: '0.68rem', fontWeight: 900,
-                    cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    minHeight: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',
-                    transition: 'all 0.15s ease'
-                  }}>
-                    <CatIcon size={11} />{cat.label}
-                  </button>
-                )
-              })}
-            </div>
-
             {/* Statuskeuze hoort bij een notitie, niet bij de check-in:
                 daar bepaalt de snelle check hierboven al hoe het ervoor staat. */}
-            {category === 'algemeen' && (
+            {(
               <div style={{ display: 'flex', gap: '0.2rem', marginBottom: '0.4rem' }}>
                 {STATUS_OPTIONS.map(s => (
                   <button key={s.id} onClick={() => setStatus(s.id)} style={{
@@ -375,27 +404,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               </div>
             )}
 
-            {/* Bij een formulier-categorie het formulier, anders het
-                notitieveld. */}
-            {category === 'checkin' ? (
-              <CheckinFlow
-                waarde={checkin}
-                onChange={setCheckin}
-                onOpslaan={() => bewaarFormulier('checkin')}
-                opslaan={saving}
-                clientNaam={client.first_name}
-                conceptStand={checkinStand}
-              />
-            ) : category === 'onboarding' ? (
-              <OnboardingFlow
-                waarde={onboarding}
-                onChange={setOnboarding}
-                onOpslaan={() => bewaarFormulier('onboarding')}
-                opslaan={saving}
-                clientNaam={client.first_name}
-                conceptStand={onbStand}
-              />
-            ) : (
+            {(
               <>
                 <textarea
                   ref={textareaRef}
@@ -441,15 +450,17 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
             borderBottom: '1px solid rgba(255,255,255,0.04)',
             overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none'
           }}>
-            <button onClick={() => setFilterCat('all')} style={{
-              padding: '0.15rem 0.4rem', borderRadius: '3px', border: 'none',
-              background: filterCat === 'all' ? 'rgba(255,255,255,0.08)' : 'transparent',
-              color: filterCat === 'all' ? '#fff' : 'rgba(255,255,255,0.25)',
-              fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
-            }}>
-              Alle <span style={{ opacity: 0.5 }}>{logs.length}</span>
-            </button>
+            {[['notities', 'Notities', logs.filter(isNotitie).length], ['all', 'Alles', logs.length]].map(([id, label, n]) => (
+              <button key={id} onClick={() => setFilterCat(id)} style={{
+                padding: '0.15rem 0.4rem', borderRadius: '3px', border: 'none',
+                background: filterCat === id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: filterCat === id ? '#fff' : 'rgba(255,255,255,0.25)',
+                fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
+              }}>
+                {label} <span style={{ opacity: 0.5 }}>{n}</span>
+              </button>
+            ))}
             {/* Ook categorieen die je niet meer kunt kiezen, zolang er nog
                 items in zitten. Anders zijn oude notities onvindbaar. */}
             {Object.keys(CATEGORIE_LABEL).map(id => {
@@ -477,7 +488,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               terugkijken. De tijdlijn geeft dan ruimte af aan het formulier
               maar blijft bereikbaar door te scrollen. */}
           <div style={{
-            flex: FORMULIEREN.has(category) ? '0 1 30%' : 1,
+            flex: 1,
             minHeight: 0,
             overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           }}>
@@ -492,7 +503,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.25rem', marginBottom: '0.5rem', opacity: 0.3 }}>📝</div>
                 <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>
-                  {filterCat === 'all' ? 'Nog geen logboek entries' : `Geen ${CATEGORIES.find(c => c.id === filterCat)?.label} notities`}
+                  {filterCat === 'all' || filterCat === 'notities' ? 'Nog geen notities' : `Geen ${CATEGORIE_LABEL[filterCat] || filterCat} notities`}
                 </div>
               </div>
             ) : filteredLogs.map((log, i) => {
@@ -550,6 +561,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
             })}
             <div style={{ height: '1rem' }} />
           </div>
+          </>)}
         </>
       )}
 

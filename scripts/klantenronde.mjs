@@ -29,13 +29,20 @@ function schoneSuggesties(s) {
   }
   const c = s.call
   if (c && typeof c === 'object') {
-    uit.call = {
+    // Blokken van de skill Call-voorbereiding (CallBlad.jsx toont ze).
+    uit.call = Object.fromEntries(Object.entries({
       tijd: tekst(c.tijd, 20),
       titel: tekst(c.titel, 120),
+      doel: tekst(c.doel, 400),
+      gewicht: tekst(c.gewicht, 500),
+      training: tekst(c.training, 600),
+      voeding: tekst(c.voeding, 500),
       sinds: tekst(c.sinds, 600),
+      struggles: lijst(c.struggles, 250, 6),
       open: lijst(c.open, 200, 6),
+      randzaken: lijst(c.randzaken, 150, 5),
       vragen: lijst(c.vragen, 200, 5),
-    }
+    }).filter(([, v]) => v != null && !(Array.isArray(v) && !v.length)))
   }
   return Object.fromEntries(Object.entries(uit).filter(([, v]) => v != null && !(Array.isArray(v) && !v.length)))
 }
@@ -85,7 +92,7 @@ export function klantenVraag(dag) {
    → suggesties.reden: één regel waarom deze kleur, met het cijfer.
    → suggesties.actie: bij aandacht en vervolg, wat Kersten concreet doet om te helpen (bv. "5 min bellen: training loopt vast door nachtdiensten, plan 2 vaste momenten"). Bij goed leeg.
    → suggesties.signalen: max 3 korte regels voor Kersten.
-   → suggesties.call (alleen bij een call vandaag): { tijd: "HH:MM", titel, sinds: "wat er sinds de vorige call gebeurde, 2-3 zinnen met cijfers", open: [open beloftes en actiepunten], vragen: [3 vragen voor de call] }.
+   → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: "langetermijndoel + waarom gestart, en of wat hij nu doet daarbij past", gewicht: "Gewicht doet X, komt door Y, suggestie Z", training: "aantal vs plan, afwijkingen, zijn eigen opmerkingen letterlijk + jouw suggestie, kracht", voeding: "tracking, eiwit, bronnen; kort als het goed gaat", struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Gaat iets goed: één korte regel.
    ${DAG_WERK[dag] || 'Vandaag geen berichten: laat bericht leeg.'}
    → bericht (alleen als hierboven gevraagd): Kerstens WhatsApp-stijl uit de skill.
 4. Lever alles in één actie: { "soort": "ronde_vul", "items": [ { "client_id", "groep", "suggesties": {…}, "bericht"? } ] }. De PA schrijft hem direct in het paneel. Geen wijziging_voorstel.

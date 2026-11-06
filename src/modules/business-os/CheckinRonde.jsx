@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import CallBlad from './CallBlad'
 
 export const RONDE_OPDRACHT = 'Zet de check-in ronde van vandaag klaar'
 
@@ -134,21 +135,13 @@ function Uitklap({ titel, open: begin = false, children }) {
   )
 }
 
-// Popup met Gino's voorbereiding van een call van vandaag.
+// Popup met Gino's voorbereiding van een call van vandaag (CallBlad).
 function CallPopup({ naam, call, onSluit }) {
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onSluit() }
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [onSluit])
-  const blok = (titel, inhoud) => inhoud && (Array.isArray(inhoud) ? inhoud.length > 0 : true) && (
-    <div style={{ marginTop: 14 }}>
-      <div style={LABEL}>{titel}</div>
-      {Array.isArray(inhoud)
-        ? inhoud.map((r, i) => <div key={i} style={{ ...REGEL, marginTop: 2 }}>→ {r}</div>)
-        : <div style={REGEL}>{inhoud}</div>}
-    </div>
-  )
   return createPortal(
     <div onClick={onSluit} style={{
       position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
@@ -158,7 +151,7 @@ function CallPopup({ naam, call, onSluit }) {
         width: 'min(460px, 100%)', maxHeight: '85vh', overflowY: 'auto', background: colors.bg, borderRadius: 16,
         border: `1px solid ${colors.borderSubtle}`, padding: 18, boxSizing: 'border-box',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Phone size={15} color={colors.success} strokeWidth={2.5} />
           <div style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: colors.textPrimary }}>
             {call.tijd ? `${call.tijd} · ` : ''}{naam}
@@ -167,10 +160,8 @@ function CallPopup({ naam, call, onSluit }) {
             <X size={18} />
           </button>
         </div>
-        {call.titel && <div style={{ ...REGEL, color: colors.textSecondary, marginTop: 2 }}>{call.titel}</div>}
-        {blok('Sinds de vorige call', call.sinds)}
-        {blok('Open punten', call.open)}
-        {blok('Vragen', call.vragen)}
+        {call.titel && <div style={{ ...REGEL, color: colors.textSecondary, marginBottom: 12 }}>{call.titel}</div>}
+        <CallBlad call={call} />
       </div>
     </div>,
     document.body,
