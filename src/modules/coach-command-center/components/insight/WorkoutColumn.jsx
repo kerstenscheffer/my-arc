@@ -288,19 +288,30 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     return uit
   }
   const naamVoorSessie = (w) => {
-    if ((w.workout_naam || '').trim()) return w.workout_naam.trim()
-    if (schemaDagen.length === 0) return null
+    const bewaard = (w.workout_naam || '').trim()
+    if (schemaDagen.length === 0) return bewaard || null
     const gelogd = new Set([
       ...Object.entries(exerciseProgress).filter(([, entries]) => entries.some(e => e.sessionId === w.id)).map(([n]) => n),
       ...(Array.isArray(w.exercises_completed) ? w.exercises_completed.map(e => e?.name) : []),
     ].map(n => String(n || '').trim().toLowerCase()).filter(Boolean))
+    const score = (d) => { let g = 0; gelogd.forEach(n => { if (d.oefeningen.has(n)) g++ }); return g }
     let beste = null, besteScore = 0
     schemaDagen.forEach(d => {
-      let gedeeld = 0
-      gelogd.forEach(n => { if (d.oefeningen.has(n)) gedeeld++ })
+      const gedeeld = score(d)
       if (gedeeld > besteScore) { besteScore = gedeeld; beste = d }
     })
-    if (beste?.naam && (besteScore >= 2 || besteScore / Math.max(1, gelogd.size) >= 0.5)) return beste.naam
+    const sterk = beste?.naam && (besteScore >= 2 || besteScore / Math.max(1, gelogd.size) >= 0.5)
+    if (bewaard) {
+      // De app noemt een sessie naar het rooster van die weekdag, niet naar
+      // wat er getraind is. Elijah deed op woensdag zijn Pull-dag en de sessie
+      // heette "Legs" (5 nov 2026). Is de bewaarde naam een dag uit dit plan
+      // en past een andere dag beter bij de gelogde oefeningen, dan wint die.
+      // Een naam uit een ander (oud) plan blijft staan.
+      const bewaardeDag = schemaDagen.find(d => d.naam.toLowerCase() === bewaard.toLowerCase())
+      if (sterk && bewaardeDag && besteScore > score(bewaardeDag)) return beste.naam
+      return bewaard
+    }
+    if (sterk) return beste.naam
     const namen = [...new Set(schemaDagen.map(d => d.naam).filter(Boolean))]
     if (namen.length === 1) return namen[0]
     const schedule = workoutData?.schedule
