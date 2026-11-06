@@ -46,8 +46,14 @@ import { typeLabel } from './contentStand'
 import { metStand, laadStandPerDag, standVoorGino, STANDEN, STAND_KLEUR, zonderTest, contentLink, contentUitHash, openContent, CONTENT_OPEN, CONTENT_GEWIJZIGD } from './contentStatusData'
 import ContentPreview from './ContentPreview'
 import { StandChip, StandLegenda } from './contentStatus'
+// Met extensie: GinoTimer.jsx en ginoTimer.js botsen anders op macOS (hoofdletterongevoelig).
+import { TimerKiezer, TimerBlok } from './GinoTimer.jsx'
+import { useGinoTimer, speelGeluid, gewerktMinuten } from './ginoTimer.js'
+import { schrijfPlan, wijzigStap } from './projectStappen'
+import ProductivityService from '../productivity/ProductivityService'
 
 const contentService = new ContentPlanningService(supabase)
+const productivityService = new ProductivityService(supabase)
 
 const C = {
   bg: colors.bg,
@@ -68,6 +74,7 @@ const PRIJS_KEY = 'business_os_prijs'
 // De onderdelen achter de puntjes-knop, in deze volgorde.
 const ONDERDELEN = [
   ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
+  ['timer', 'Timer'],
   ['geldplan', 'Geldplan · 6 maanden cashflow en break-even'],
   ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
   ['notities', 'Notities · vastgezette antwoorden van Gino'],
@@ -84,7 +91,7 @@ const ONDERDELEN = [
 ]
 
 // Niet voor teamleden: bevat agenda, privé geldplan of de Mac-agents.
-const BEPERKT_VERBORGEN = ['vandaag', 'geldplan', 'calls', 'agents']
+const BEPERKT_VERBORGEN = ['vandaag', 'timer', 'geldplan', 'calls', 'agents']
 
 // Leesbare namen voor de cron-jobs. Onbekende jobs tonen hun eigen naam.
 const AGENTS = {
@@ -199,7 +206,12 @@ const REACTOR_CSS = `
   .bos-r .bos-golf, .bos-r .bos-flits { opacity: 0 }
   .bos-r.ontwaakt .bos-golf { animation: bos-golf .7s ease-out }
   .bos-r.ontwaakt .bos-flits { animation: bos-flits .7s ease-out }
+  /* timer afgelopen: dezelfde lichtgolf + flits, drie keer */
+  .bos-r.wekker .bos-golf { animation: bos-golf .9s ease-out 3 }
+  .bos-r.wekker .bos-flits { animation: bos-flits .9s ease-out 3 }
   @media (prefers-reduced-motion: reduce) {
+    .bos-r.wekker .bos-golf { animation: none }
+    .bos-r.wekker .bos-flits { animation: none; opacity: .7 }
     .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo, .bos-r.aan .bos-a, .bos-r.aan .bos-kern, .bos-r.aan .bos-halo,
     .bos-r.bezig .bos-a, .bos-r.bezig .bos-kern, .bos-r.praat .bos-kern, .bos-r.praat .bos-halo,
     .bos-r.dooft .bos-kern, .bos-r.ontwaakt .bos-golf, .bos-r.fout .bos-fout { animation: none }
@@ -209,7 +221,7 @@ const REACTOR_CSS = `
   }
 `
 
-function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik, zonderNaam = false, klikTitel = null }) {
+function Reactor({ pct, maat, bezig, praat, stemAan, fout, wekker = false, melding, onKlik, zonderNaam = false, klikTitel = null }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
   // Eenmalige overgang bij wisselen van de stem: .ontwaakt (aan) of .dooft (uit).
@@ -222,7 +234,7 @@ function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik, zond
     const t = setTimeout(() => setOvergang(null), stemAan ? 700 : 600)
     return () => clearTimeout(t)
   }, [stemAan])
-  const klassen = ['bos-r', stemAan && 'aan', fout && 'fout', praat ? 'praat' : bezig && 'bezig', overgang].filter(Boolean).join(' ')
+  const klassen = ['bos-r', stemAan && 'aan', fout && 'fout', praat ? 'praat' : bezig && 'bezig', overgang, wekker && 'wekker'].filter(Boolean).join(' ')
   const labelMaat = maat >= 200 ? '0.62rem' : '0.56rem'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -383,6 +395,7 @@ function useVandaag() {
       console.error('Afvinken mislukt:', error)
       setTaken(l => [...(l || []), taak].sort((x, y) => (x.scheduled_date || '9').localeCompare(y.scheduled_date || '9')))
     }
+    return !error
   }, [])
 
   return { geladen: taken !== null, vandaag, calls, ...lijsten, vinkAf, laad }
@@ -905,7 +918,53 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   useEffect(() => { if (blad !== 'geldplan') laadGeldplan().then(d => { if (d) setGeldplan(d) }) }, [blad])
   const vandaag = useVandaag()
   const { laad: laadVandaag } = vandaag
-  useEffect(() => { if (blad === 'vandaag') laadVandaag() }, [blad, laadVandaag])
+  useEffect(() => { if (blad === 'vandaag' || blad === 'timer') laadVandaag() }, [blad, laadVandaag])
+  // Taaktimer (ginoTimer.js): kiezen in het blad Timer, aftellen bij de bol.
+  // Afgelopen = bol licht op (zelfde golf + flits als ontwaken) en een kort signaal.
+  const timer = useGinoTimer()
+  const [wekker, setWekker] = useState(false)
+  useEffect(() => {
+    if (!timer.af) return undefined
+    setWekker(true)
+    speelGeluid()
+    const t = setTimeout(() => setWekker(false), 2800)
+    return () => clearTimeout(t)
+  }, [timer.af])
+  // Gewerkte tijd op een productivity_task: zelfde tijdlog als de CoachHub-timer.
+  const logTimerTijd = async (s) => {
+    if (s?.taak?.soort !== 'taak') return
+    const min = gewerktMinuten(s)
+    if (min < 1) return
+    const { data } = await supabase.auth.getUser().then(r => r, () => ({ data: null }))
+    if (data?.user?.id) await productivityService.logTime(data.user.id, s.taak.id, s.taak.titel, null, min)
+  }
+  const startTimer = (taak, minuten) => {
+    if (timer.stand) logTimerTijd(timer.stand)
+    setBlad(null)
+    timer.start(taak, minuten)
+  }
+  const stopTimer = () => {
+    const s = timer.stand
+    timer.sluit()
+    logTimerTijd(s)
+  }
+  // Bordkaart via projectStappen (leest het plan vlak voor het schrijven opnieuw, alleen die kaart);
+  // productivity_task via het Vandaag-afvinken (status completed + completed_at); eigen taak: alleen sluiten.
+  const vinkTimerAf = async () => {
+    const s = timer.stand
+    if (!s) return true
+    const { taak } = s
+    let ok = true
+    if (taak.soort === 'kaart') {
+      ok = (await schrijfPlan(supabase, taak.projectId, wijzigStap(taak.id, { klaar: true }))).ok
+    } else if (taak.soort === 'taak') {
+      ok = await vandaag.vinkAf({ id: taak.id, title: taak.titel, scheduled_date: taak.scheduled_date || null })
+    }
+    if (!ok) return false
+    timer.sluit()
+    logTimerTijd(s)
+    return true
+  }
   useEffect(() => { if (blad === 'schermen') laadSchermenNu() }, [blad, laadSchermenNu])
   const content = useContent()
   const { laad: laadContent } = content
@@ -1141,6 +1200,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   const inhoud = (k) => {
     if (k === 'geldplan') return <Geldplan />
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
+    if (k === 'timer') return <TimerKiezer taken={vandaag.takenVandaag} lopend={timer.stand?.taak?.titel || null} onStart={startTimer} />
     if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'schermen') return <SchermenLijst {...schermen} onKies={kiesScherm} onVerwijder={verwijderSchermNu} />
     if (k === 'notities') return <Notities {...notities} />
@@ -1363,8 +1423,12 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
         } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
           <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
-            <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+            <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
             {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
+            {!beperkt && (
+              <TimerBlok key={timer.stand?.taak?.titel || ''} timer={timer} onAfvinken={vinkTimerAf} onStop={stopTimer}
+                plek={isZij ? (zijLinks ? 'onder-links' : 'onder-rechts') : isMini || telefoonKlein ? 'links' : 'boven'} />
+            )}
           </div>
 
           {/* ── Chat: de ring praat ── */}
