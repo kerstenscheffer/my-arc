@@ -67,7 +67,6 @@ const ORANJE = '#f59e0b' // alleen voor de API-waarschuwing (kost geld)
 const MAX_BEELDEN = 10 // zoveel recente screenshots gaan mee naar de AI (de PA pakt er net zoveel)
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
-const TABS_BREED = 140 // breedte van de tabjes-slider op desktop: twee tabjes
 const STATUS_GAT = 6 // vaste ruimte tussen statusregel en invoerveld (en in BusinessOS/GinoKalender tussen de rijen)
 const opdrachtKop = (w) => String(w.opdracht || '').split('\n')[0].replace(/^Onderwerp:\s*/i, '')
 const duurSinds = (w) => {
@@ -2256,6 +2255,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     : bezig ? (isEditor(actief) ? 'ChatGPT denkt na…' : deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
     : anderBezig ? `Gino denkt na in ${anderBezig.naam}…`
     : code === 'wacht' ? 'Wacht op je Mac…' : null
+  const statusRegel = werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))
   // De opdracht die de statusregel noemt; zolang de chat zelf bezig is, gaat die voor.
   const macNu = macWerk.find(w => w.status === 'bezig') || (code === 'wacht' && !bezig && !spreekt ? macWerk[0] : null)
 
@@ -2422,7 +2422,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
             }}>
               {/* Klik op het poppetje: berichtenvenster open/dicht. Groene stip = iets ongelezen. */}
               <button role="status" onClick={() => setOpen(o => !o)} aria-expanded={open}
-                title={open ? 'Berichten verbergen' : 'Berichten tonen'}
+                title={!isMobile && !macNu && typeof statusRegel === 'string' ? statusRegel : open ? 'Berichten verbergen' : 'Berichten tonen'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
                   flex: isMobile || macNu ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
@@ -2442,8 +2442,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     }} />
                   )}
                 </span>
-                {!macNu && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <StatusTekst tekst={werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))} />
+                {!macNu && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                  <StatusTekst tekst={statusRegel} />
                 </span>}
               </button>
               {macNu && (
@@ -2472,7 +2472,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, height: 16, marginLeft: -4 }}>{herhaalKnop(laatst.vol)}</span>
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
-              {/* Op desktop passen er twee tabjes in beeld, de rest schuift zijwaarts. Het actieve schuift mee. */}
+              {/* Desktop: minstens de helft van de rij, groeit mee met de inhoud (statusregel kapt af). Teveel schuift zijwaarts. */}
               <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" ref={el => {
                 if (!el || el.dataset.actief === actief.id) return
                 el.dataset.actief = actief.id
@@ -2484,8 +2484,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   else if (a.right > v.right) el.scrollLeft += a.right - v.right
                 })
               }} style={{
-                // Breedte = inhoud (max TABS_BREED), zodat de laatste knop precies op de rechterrand van het invoerveld eindigt.
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? undefined : TABS_BREED, overflowX: 'auto', marginLeft: -4,
+                // Rechts uitgelijnd (safe: bij overloop blijft links bereikbaar), zodat + precies op de rechterrand van het invoerveld eindigt.
+                display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', marginLeft: -4,
+                ...(isMobile
+                  ? { minWidth: 0, flex: '0 0 auto' }
+                  : { flex: '0 0 auto', minWidth: '50%', maxWidth: 'calc(100% - 40px)', justifyContent: 'safe flex-end' }),
               }}>
                 {gesprekken.filter(g => !beperkt || !isEditor(g)).map((g, gi) => {
                   const aan = g.id === actief.id

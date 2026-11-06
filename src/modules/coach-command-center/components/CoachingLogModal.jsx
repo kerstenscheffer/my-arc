@@ -76,7 +76,7 @@ function CallVoorbereiding({ client, db, precall }) {
 // kunt kiezen. Zonder deze lijst zou een oud WhatsApp-item naamloos worden.
 const CATEGORIE_LABEL = {
   algemeen: 'Algemeen', checkin: 'Check-in', onboarding: 'Onboarding', change_log: 'Wijziging',
-  status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep',
+  status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep', call_summary: 'Call',
 }
 
 const DEFAULT_SIZE = { w: 400, h: 620 }
