@@ -221,64 +221,10 @@ const REACTOR_CSS = `
   }
 `
 
-// Mac-lampje (6 nov): klein licht rechtsboven bij de bol. Groen = de PA op de
-// Mac meldde zich < 2 min geleden (business_os_pa_status.laatst_gezien, eigen
-// coach_id), grijs anders. Tik = kort 'Mac aan/uit, laatst gezien HH:MM'.
-const MAC_AAN_MS = 2 * 60 * 1000
 // iPhone (ook Capacitor): rondjes rechtsboven onder de statusbalk.
 const BOVEN_MOBIEL = 'calc(12px + env(safe-area-inset-top, 0px))'
-function MacLampje({ maat }) {
-  const [gezien, setGezien] = useState(null)
-  const [nu, setNu] = useState(() => Date.now())
-  const [toon, setToon] = useState(false)
-  useEffect(() => {
-    let weg = false
-    const kijk = async () => {
-      const { data: s } = await supabase.auth.getSession().then(r => r, () => ({ data: null }))
-      const id = s?.session?.user?.id
-      if (!id || weg) return
-      const { data } = await supabase.from('business_os_pa_status').select('laatst_gezien').eq('coach_id', id).maybeSingle()
-        .then(r => r, () => ({ data: null }))
-      if (weg) return
-      setGezien(data?.laatst_gezien ? new Date(data.laatst_gezien).getTime() : null)
-      setNu(Date.now())
-    }
-    kijk()
-    const t = setInterval(kijk, 30000)
-    return () => { weg = true; clearInterval(t) }
-  }, [])
-  useEffect(() => {
-    if (!toon) return
-    const t = setTimeout(() => setToon(false), 2500)
-    return () => clearTimeout(t)
-  }, [toon])
-  const aan = gezien != null && nu - gezien < MAC_AAN_MS
-  const tijd = gezien ? new Date(gezien).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : null
-  const tekst = `Mac ${aan ? 'aan' : 'uit'}${tijd ? `, laatst gezien ${tijd}` : ''}`
-  const plek = Math.max(0, Math.round(maat * 0.08))
-  return (
-    <div style={{ position: 'absolute', top: plek, right: plek, zIndex: 3 }}>
-      <button type="button" onClick={e => { e.stopPropagation(); setNu(Date.now()); setToon(v => !v) }}
-        aria-label={tekst} title={tekst}
-        style={{ width: 22, height: 22, margin: -7, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%', display: 'block',
-          background: aan ? C.groen : 'rgba(255,255,255,0.28)',
-          boxShadow: aan ? `0 0 8px ${C.groen}` : 'none', transition: 'background 0.4s, box-shadow 0.4s',
-        }} />
-      </button>
-      {toon && (
-        <div role="status" style={{
-          position: 'absolute', top: 16, right: -7, whiteSpace: 'nowrap', pointerEvents: 'none',
-          background: '#0a0a0a', border: `1px solid ${C.rand}`, borderRadius: 10, padding: '6px 10px',
-          fontSize: '0.75rem', fontWeight: 700, color: C.wit, boxShadow: '0 10px 28px rgba(0,0,0,0.6)',
-        }}>
-          {tekst}
-        </div>
-      )}
-    </div>
-  )
-}
+// Het losse Mac-lampje op de bol is weg (6 nov): de Mac/API-aanduiding staat nu
+// boven de bol, gerenderd door BusinessChat in het vak macPlekEl.
 
 function Reactor({ pct, maat, bezig, praat, stemAan, fout, wekker = false, melding, onKlik, zonderNaam = false, klikTitel = null }) {
   const R = 96
@@ -1110,6 +1056,8 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   }, [kalender])
   // Gino laat iets zien: podium boven de bol (alleen als de kalender dicht is).
   const [podiumEl, setPodiumEl] = useState(null)
+  // Vak boven de Gino-bol voor de Mac/API-aanduiding (BusinessChat portalt erin).
+  const [macPlekEl, setMacPlekEl] = useState(null)
   const podiumOpen = !kalender && !!visueel
   const boven = !!kalender || podiumOpen
   // Klein venster: bol en chatbalk samen in een sleepbaar blokje, zodat de pagina de ruimte
@@ -1481,10 +1429,13 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
           display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
         } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
-          <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
-            <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
-            {!isZij && !beperkt && <MacLampje maat={isMini ? 64 : telefoonKlein ? 44 : maat} />}
-            {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
+          {/* Bol met erboven (gecentreerd) de Mac/API-aanduiding; de timer staat boven het geheel. */}
+          <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {!isZij && !beperkt && <div ref={setMacPlekEl} style={{ alignSelf: 'stretch', marginBottom: 4 }} />}
+            <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
+              <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+              {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
+            </div>
             {!beperkt && (
               <TimerBlok key={timer.stand?.taak?.titel || ''} timer={timer} onAfvinken={vinkTimerAf} onStop={stopTimer}
                 plek={isZij ? (zijLinks ? 'onder-links' : 'onder-rechts') : isMini || telefoonKlein ? 'links' : 'boven'} />
@@ -1494,7 +1445,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat beperkt={beperkt} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),

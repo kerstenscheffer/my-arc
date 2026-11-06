@@ -45,6 +45,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
@@ -84,10 +85,11 @@ const KNOP_RAND = { ...KNOP, background: 'transparent', color: colors.textPrimar
 const KAART = { margin: '2px 0 6px', fontSize: '0.76rem', lineHeight: 1.35 }
 const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 2 }
 
-// Mac/API-pil in de tabjesrij (6 nov): altijd zichtbaar, op telefoon vast links.
-// Groen + Mac = via de Mac, gratis. Oranje + API = kost geld. Tik = korte uitleg
-// met laatst gezien, verversen en de Mac/API-keuze.
-function MacPil({ viaMac, route, paOnline, gezien, herstart, kanHerstarten, onHerstart, onWissel, isMobile }) {
+// Mac/API-aanduiding boven de Gino-bol (6 nov): geen container, alleen bolletje
+// + Mac/API. BusinessOS geeft het vak boven de bol (macPlek.el), wij portalen erin.
+// Groen + Mac = via de Mac, gratis. Oranje + API = kost geld. Tik (44 px) = korte
+// uitleg met laatst gezien, verversen en de Mac/API-keuze.
+function MacPil({ viaMac, route, paOnline, gezien, herstart, kanHerstarten, onHerstart, onWissel, isMobile, links }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!open) return
@@ -101,27 +103,25 @@ function MacPil({ viaMac, route, paOnline, gezien, herstart, kanHerstarten, onHe
   const regel = viaMac ? 'Mac aan, gratis' : paOnline && route === 'api' ? 'API gekozen, dit kost geld' : 'Mac uit, dit kost geld via de API'
   const knop = { ...KNOP_RAND, minHeight: isMobile ? 44 : 32, fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: 6 }
   return (
-    <div data-mac-pil style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={regel}
+    <div data-mac-pil style={{ position: 'relative', display: 'flex', justifyContent: 'center', height: 16 }}>
+      {/* Tikvlak 44 px hoog, zichtbaar alleen bolletje + tekst; steekt boven en onder uit zonder ruimte te kosten. */}
+      <button type="button" onClick={e => { e.stopPropagation(); setOpen(o => !o) }} aria-expanded={open} aria-label={regel}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          height: isMobile ? 44 : 26, minWidth: isMobile ? 44 : undefined, margin: isMobile ? '-9px 0' : 0,
-          padding: isMobile ? '0 4px 0 0' : '0 0 0 4px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 4,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          height: 44, minWidth: 56, padding: '0 6px', whiteSpace: 'nowrap',
+          background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          color: colors.textPrimary, fontSize: 10.5, fontWeight: 800, lineHeight: 1,
         }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999,
-          background: colors.surface, border: `1px solid ${kleur}66`,
-          color: colors.textPrimary, fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap',
-        }}>
-          <span className={herstart ? 'bos-stip' : undefined} style={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kleur, boxShadow: `0 0 6px ${kleur}88`,
-          }} />
-          {herstart ? 'Herstart' : viaMac ? 'Mac' : 'API'}
-        </span>
+        <span className={herstart ? 'bos-stip' : undefined} style={{
+          width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: kleur, boxShadow: `0 0 6px ${kleur}88`,
+        }} />
+        {herstart ? 'Herstart' : viaMac ? 'Mac' : 'API'}
       </button>
       {open && (
         <div role="status" style={{
-          position: 'absolute', bottom: '100%', marginBottom: 10, zIndex: 7, ...(isMobile ? { left: 0 } : { right: 0 }),
+          position: 'absolute', bottom: '100%', marginBottom: 14, zIndex: 9,
+          ...(links ? { left: 0 } : { left: '50%', transform: 'translateX(-50%)' }),
           width: 'max-content', maxWidth: '86vw', display: 'flex', flexDirection: 'column', gap: 10, padding: 14, boxSizing: 'border-box',
           background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
         }}>
@@ -1358,7 +1358,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false, macPlek = null }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2060,7 +2060,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     const los = vanBuiten ? [] : bestanden
     if ((!vraag && !bij.length && !los.length) || bezig || uploadt || (vanBuiten && isEditor(actief))) return false
     // Bestanden leest alleen Gino op de Mac (pa-db bijlage); screenshots gaan via de API.
-    if (los.length && !viaMac) { setFout('Bestanden kan Gino alleen via je Mac lezen. Zet de PA aan (Mac, rechtsboven).'); return false }
+    if (los.length && !viaMac) { setFout('Bestanden kan Gino alleen via je Mac lezen. Zet de PA aan (Mac, boven de bol).'); return false }
     if (los.length && bij.length) { setFout('Stuur screenshots en bestanden apart.'); return false }
     const { id, sessie } = actief
     let geupload = []
@@ -2395,15 +2395,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 ))}
               </div>
             )}
-            {/* Mac/API-pil buiten de scrollrij: telefoon vast links, desktop rechts. */}
-            {(() => {
-              const macPil = !beperkt && (
-                <MacPil viaMac={viaMac} route={route} paOnline={paOnline} gezien={paGezien} herstart={herstart}
-                  kanHerstarten={!ergensBezig} onHerstart={herstartPa} onWissel={wisselRoute} isMobile={isMobile} />
-              )
-              return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 0, height: 26, minWidth: 0 }}>
-            {isMobile && macPil}
+            {/* Mac/API-aanduiding: boven de Gino-bol (vak van BusinessOS), niet meer in de tabjesrij. */}
+            {!beperkt && macPlek?.el && createPortal(
+              <MacPil viaMac={viaMac} route={route} paOnline={paOnline} gezien={paGezien} herstart={herstart} links={macPlek.links}
+                kanHerstarten={!ergensBezig} onHerstart={herstartPa} onWissel={wisselRoute} isMobile={isMobile} />,
+              macPlek.el,
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', height: 26, minWidth: 0 }}>
             {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
             <div className={isMobile ? 'bos-tabjes' : undefined} style={{
               display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, flex: 1,
@@ -2507,10 +2505,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               </div>
               <span onClick={() => setOpen(o => !o)} style={{ flex: isMobile ? 1 : '0 0 8px', minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
             </div>
-            {!isMobile && macPil}
             </div>
-              )
-            })()}
             {wachtLijst.map(w => (
               <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 38 }}>
                 <span title={w.tekst} style={{
