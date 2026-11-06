@@ -151,7 +151,8 @@ function GinoZegt({ tekst, onWeg }) {
 
 const BEPERKT_WEERGAVEN = ['content', 'keten', 'omzet', 'klanten']
 
-export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false, beperkt = false }) {
+// inspring: px vanaf links tot het invoerveld (kleine bol ernaast), zodat de rij onderaan op dezelfde linkerrand begint.
+export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false, beperkt = false, inspring = 0 }) {
   const [maand, setMaand] = useState(() => maandVan(verzoek?.maand) || maandVan(verzoek?.dag) || new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [gekozen, setGekozen] = useState(verzoek?.dag || null)
   const [items, setItems] = useState(null)
@@ -436,7 +437,6 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         @keyframes gk-op { from { opacity: 0; transform: translateY(28px) scale(.94) } to { opacity: 1; transform: none } }
         @keyframes gk-cel { 0% { opacity: 0; transform: scale(.6) } 70% { transform: scale(1.06) } 100% { opacity: 1; transform: none } }
         @keyframes gk-rij { from { opacity: 0; transform: translateX(-10px) } to { opacity: 1; transform: none } }
-        @keyframes gk-lijn { from { transform: scaleY(0) } to { transform: scaleY(1) } }
         @keyframes gk-draai { to { transform: rotate(360deg) } }
         @keyframes gk-puls { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
         @keyframes gk-ring { from { stroke-dashoffset: 60 } to { stroke-dashoffset: var(--gk-tot) } }
@@ -565,8 +565,11 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         </div>
       )}
 
-      {/* Onder het overzicht: Gino's voorstellen of samen plannen, dan de lijn naar de bol */}
-      <div style={{ display: isMobile && weergave !== 'content' ? 'none' : 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
+      {/* Onder het overzicht: Gino's voorstellen of samen plannen. Bol ernaast (inspring): zelfde linkerrand als het invoerveld en 6 px tot de statusregel. */}
+      {/* De dunne groene lijn naar de bol is weg (6 nov): puur sier, hing los als de bol naast de balk staat. */}
+      <div style={{ display: isMobile && weergave !== 'content' ? 'none' : 'flex', alignItems: 'center', gap: inspring ? 12 : 16, paddingTop: 10, paddingLeft: inspring, paddingBottom: inspring ? 6 : 18, flexShrink: 0, minHeight: 26, boxSizing: 'content-box',
+        // Naast de bol: altijd één regel; past het niet, dan schuift hij zijwaarts.
+        ...(inspring ? { flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' } : { flexWrap: 'wrap' }) }}>
         {weergave === 'tijd' ? (
           <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
             onClick={() => onVraag?.(`Kijk naar mijn tijd van de week van ${weekTitel}: waar valt winst te halen?`)}>
@@ -591,9 +594,6 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             <Zap size={13} /> Autopilot
           </button>
         )}
-      </div>
-      <div style={{ height: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-        <div style={{ width: 1, height: '100%', background: `linear-gradient(to bottom, ${G}66, ${G})`, boxShadow: `0 0 6px ${G}`, transformOrigin: 'top', animation: 'gk-lijn .4s ease-out .3s both' }} />
       </div>
     </div>
   )

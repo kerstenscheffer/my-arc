@@ -1,23 +1,26 @@
 // src/modules/business-os/CheckinRonde.jsx
 //
-// Check-in ronde bovenaan het Klanten-tabje. Woensdag en zaterdag loopt
-// Kersten al zijn klanten langs en stuurt per klant zelf een WhatsApp-appje.
+// Klanten-paneel bovenaan het Klanten-tabje. Elke ochtend (ma t/m za) zet
+// Gino per klant een status, hoe Kersten helpt en de voorbereiding van calls
+// van vandaag klaar (scripts/klantenronde.mjs); ma/wo/za ook conceptappjes.
 // Per klant: live data (business_os_ronde_data), Gino's suggesties en een
 // bewerkbaar bericht uit checkin_ronde_items (SQL: checkin-ronde.sql).
 // Er gaat NOOIT iets naar de klant: alleen kopiëren, Kersten verstuurt zelf.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 export const RONDE_OPDRACHT = 'Zet de check-in ronde van vandaag klaar'
 
+const ORANJE = '#f59e0b'
 const GROEPEN = [
   { id: 'aandacht', label: 'Aandacht', kleur: colors.danger },
-  { id: 'vervolg', label: 'Vervolg bespreken', kleur: '#f59e0b' },
-  { id: 'goed', label: 'Goed bezig', kleur: colors.success },
-  { id: 'zonder', label: 'Zonder bericht', kleur: colors.textMuted },
+  { id: 'vervolg', label: 'Let op', kleur: ORANJE },
+  { id: 'goed', label: 'Goed bezig', kleur: colors.success, dicht: true },
+  { id: 'zonder', label: 'Nog geen status', kleur: colors.textMuted, dicht: true },
   { id: 'gepauzeerd', label: 'Gepauzeerd', kleur: colors.textMuted, dicht: true },
 ]
 
@@ -102,10 +105,11 @@ function UitDeData({ k }) {
 function Suggesties({ s }) {
   if (!s || typeof s !== 'object') return null
   const signalen = Array.isArray(s.signalen) ? s.signalen : []
-  if (!s.compliment && !s.verbeterpunt && !signalen.length) return null
+  if (!s.actie && !s.compliment && !s.verbeterpunt && !signalen.length) return null
   return (
     <div>
-      <div style={LABEL}>Suggesties van Gino</div>
+      <div style={LABEL}>Zo help je</div>
+      {s.actie && <div style={{ ...REGEL, marginBottom: 4 }}>{s.actie}</div>}
       {s.compliment && <div style={REGEL}><span style={{ color: colors.success }}>Compliment: </span>{s.compliment}</div>}
       {s.verbeterpunt && <div style={REGEL}><span style={{ color: colors.success }}>Verbeterpunt: </span>{s.verbeterpunt}</div>}
       {signalen.map((x, i) => <div key={i} style={{ ...REGEL, color: colors.textSecondary }}>· {typeof x === 'string' ? x : JSON.stringify(x)}</div>)}
@@ -113,8 +117,69 @@ function Suggesties({ s }) {
   )
 }
 
-function KlantKaart({ k, item, kleur, ronde, onItem }) {
+// Klein uitklapblok binnen een klantkaart (Data, Bericht).
+function Uitklap({ titel, open: begin = false, children }) {
+  const [open, setOpen] = useState(begin)
+  return (
+    <div>
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        ...LABEL, display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none',
+        padding: 0, cursor: 'pointer', fontFamily: 'inherit', marginBottom: open ? 6 : 0,
+      }}>
+        {open ? <ChevronDown size={12} strokeWidth={3} /> : <ChevronRight size={12} strokeWidth={3} />}
+        {titel}
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
+// Popup met Gino's voorbereiding van een call van vandaag.
+function CallPopup({ naam, call, onSluit }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onSluit() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onSluit])
+  const blok = (titel, inhoud) => inhoud && (Array.isArray(inhoud) ? inhoud.length > 0 : true) && (
+    <div style={{ marginTop: 14 }}>
+      <div style={LABEL}>{titel}</div>
+      {Array.isArray(inhoud)
+        ? inhoud.map((r, i) => <div key={i} style={{ ...REGEL, marginTop: 2 }}>→ {r}</div>)
+        : <div style={REGEL}>{inhoud}</div>}
+    </div>
+  )
+  return createPortal(
+    <div onClick={onSluit} style={{
+      position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: 'min(460px, 100%)', maxHeight: '85vh', overflowY: 'auto', background: colors.bg, borderRadius: 16,
+        border: `1px solid ${colors.borderSubtle}`, padding: 18, boxSizing: 'border-box',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Phone size={15} color={colors.success} strokeWidth={2.5} />
+          <div style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: colors.textPrimary }}>
+            {call.tijd ? `${call.tijd} · ` : ''}{naam}
+          </div>
+          <button type="button" onClick={onSluit} aria-label="Sluiten" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textMuted, display: 'flex' }}>
+            <X size={18} />
+          </button>
+        </div>
+        {call.titel && <div style={{ ...REGEL, color: colors.textSecondary, marginTop: 2 }}>{call.titel}</div>}
+        {blok('Sinds de vorige call', call.sinds)}
+        {blok('Open punten', call.open)}
+        {blok('Vragen', call.vragen)}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
   const [open, setOpen] = useState(false)
+  const [callOpen, setCallOpen] = useState(false)
   const [tekst, setTekst] = useState(item?.bewerkt_bericht ?? item?.bericht ?? '')
   const [gekopieerd, setGekopieerd] = useState(false)
   const [bezig, setBezig] = useState(false)
@@ -203,6 +268,7 @@ function KlantKaart({ k, item, kleur, ronde, onItem }) {
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: kleur, flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.88rem', fontWeight: 800, color: colors.textPrimary }}>
           {k.naam || 'Onbekend'}
+          {status?.suggesties?.reden && <span style={{ fontWeight: 600, color: colors.textSecondary }}> · {status.suggesties.reden}</span>}
         </span>
         {k.week != null && <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary, flexShrink: 0 }}>wk {k.week}{k.weken_totaal ? `/${k.weken_totaal}` : ''}</span>}
         {verstuurd && <Check size={15} strokeWidth={3} color={colors.success} style={{ flexShrink: 0 }} />}
@@ -210,10 +276,18 @@ function KlantKaart({ k, item, kleur, ronde, onItem }) {
       </button>
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '2px 2px 16px' }}>
-          <UitDeData k={k} />
-          <Suggesties s={item?.suggesties} />
+          <Suggesties s={status?.suggesties} />
+          {status?.suggesties?.call && (
+            <button type="button" onClick={() => setCallOpen(true)} style={{
+              ...KNOPJE, alignSelf: 'flex-start', minHeight: 28, background: 'transparent', color: colors.success,
+              boxShadow: `inset 0 0 0 1.5px ${colors.success}`,
+            }}>
+              <Phone size={13} strokeWidth={2.5} /> Call {status.suggesties.call.tijd || 'vandaag'}: voorbereiding
+            </button>
+          )}
+          <Uitklap titel="Data"><UitDeData k={k} /></Uitklap>
+          <Uitklap titel={item?.ronde_datum && item.ronde_datum !== ronde ? `Bericht (${datumKort(item.ronde_datum)})` : 'Bericht'} open={!!serverTekst}>
           <div>
-            <div style={LABEL}>Bericht</div>
             <textarea value={tekst} onChange={e => wijzig(e.target.value)} rows={6}
               placeholder="Nog geen bericht van Gino. Typ hier zelf."
               style={{
@@ -238,8 +312,10 @@ function KlantKaart({ k, item, kleur, ronde, onItem }) {
             </div>
             {fout && <div style={{ fontSize: '0.74rem', fontWeight: 700, color: colors.danger, marginTop: 6 }}>{fout}</div>}
           </div>
+          </Uitklap>
         </div>
       )}
+      {callOpen && <CallPopup naam={k.naam} call={status.suggesties.call} onSluit={() => setCallOpen(false)} />}
     </div>
   )
 }
@@ -250,16 +326,19 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
   const [items, setItems] = useState([])
   const [ronde, setRonde] = useState(null)
   const [fout, setFout] = useState(null)
-  const [dichtGroep, setDichtGroep] = useState({ gepauzeerd: true })
+  const [dichtGroep, setDichtGroep] = useState(() => Object.fromEntries(GROEPEN.map(g => [g.id, !!g.dicht])))
+  const [callVan, setCallVan] = useState(null)
 
   const laad = useCallback(async () => {
+    const vandaag = vandaagNL()
     const [data, laatste] = await Promise.all([
       supabase.rpc('business_os_ronde_data').then(r => r, e => ({ error: e })),
-      supabase.from('checkin_ronde_items').select('ronde_datum').order('ronde_datum', { ascending: false }).limit(1)
-        .then(r => r, e => ({ error: e })),
+      // Nooit een datum in de toekomst (testrijen).
+      supabase.from('checkin_ronde_items').select('ronde_datum').lte('ronde_datum', vandaag)
+        .order('ronde_datum', { ascending: false }).limit(1).then(r => r, e => ({ error: e })),
     ])
     if (data.error || laatste.error) {
-      setFout(`Check-in ronde laden mislukt: ${(data.error || laatste.error)?.message || 'onbekende fout'}`)
+      setFout(`Klanten laden mislukt: ${(data.error || laatste.error)?.message || 'onbekende fout'}`)
       setKlanten([])
       return
     }
@@ -268,7 +347,10 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
     const datum = laatste.data?.[0]?.ronde_datum || null
     setRonde(datum)
     if (datum) {
-      const { data: rij } = await supabase.from('checkin_ronde_items').select(ITEM_KOLOMMEN).eq('ronde_datum', datum)
+      // Ook de dagen ervoor: een appje van za dat nog niet verstuurd is blijft zichtbaar.
+      const van = new Date(`${datum}T12:00:00`); van.setDate(van.getDate() - 4)
+      const { data: rij } = await supabase.from('checkin_ronde_items').select(ITEM_KOLOMMEN)
+        .gte('ronde_datum', van.toLocaleDateString('sv-SE')).lte('ronde_datum', datum)
         .then(r => r, () => ({ data: null }))
       if (rij) setItems(rij)
     } else setItems([])
@@ -287,39 +369,56 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
     if (!ronde) setRonde(it.ronde_datum)
   }, [ronde])
 
-  const perKlant = Object.fromEntries(items.map(i => [i.client_id, i]))
+  const heeftBericht = (i) => !!(i && ((i.bewerkt_bericht ?? i.bericht) || '').trim())
   const lijst = (klanten || []).map(k => {
-    const item = perKlant[k.id]
-    const groep = item?.groep || (k.gepauzeerd ? 'gepauzeerd' : 'zonder')
-    return { k, item, groep }
+    const eigen = items.filter(i => i.client_id === k.id).sort((a, b) => String(b.ronde_datum).localeCompare(String(a.ronde_datum)))
+    const status = eigen.find(i => i.ronde_datum === ronde) || null
+    // Bericht: van vandaag, anders het laatste dat nog niet verstuurd is.
+    const item = (status && (heeftBericht(status) || status.verstuurd_at)) ? status
+      : eigen.find(i => heeftBericht(i) && !i.verstuurd_at) || status
+    const groep = status?.groep || (k.gepauzeerd ? 'gepauzeerd' : 'zonder')
+    return { k, item, status, groep }
   })
-  const telbaar = lijst.filter(x => x.groep !== 'gepauzeerd')
-  const metItem = telbaar.filter(x => x.item)
-  const noemer = metItem.length ? metItem : telbaar
-  const verstuurd = noemer.filter(x => x.item?.verstuurd_at).length
+  const telling = Object.fromEntries(GROEPEN.map(g => [g.id, lijst.filter(x => x.groep === g.id).length]))
+  const metBericht = lijst.filter(x => x.groep !== 'gepauzeerd' && (heeftBericht(x.item) || x.item?.verstuurd_at))
+  const verstuurd = metBericht.filter(x => x.item?.verstuurd_at).length
+  const calls = lijst.filter(x => x.status?.suggesties?.call)
+    .sort((a, b) => String(a.status.suggesties.call.tijd || '').localeCompare(String(b.status.suggesties.call.tijd || '')))
+  const stip = (kleur, n) => n > 0 && (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: kleur }} />{n}
+    </span>
+  )
 
   return (
     <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: `1px solid ${colors.borderSubtle}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <button type="button" onClick={() => setOpen(o => !o)} style={{
           display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0,
           cursor: 'pointer', fontFamily: 'inherit', color: colors.textPrimary, fontSize: '0.95rem', fontWeight: 900,
         }}>
           {open ? <ChevronDown size={16} strokeWidth={2.5} /> : <ChevronRight size={16} strokeWidth={2.5} />}
-          Check-in ronde
+          Klanten
         </button>
         {ronde && <span style={{ fontSize: '0.74rem', fontWeight: 800, color: colors.textSecondary }}>{datumKort(ronde)}</span>}
-        {klanten && !fout && (
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: verstuurd && verstuurd === noemer.length ? colors.success : colors.textSecondary }}>
-            {verstuurd} van {noemer.length} verstuurd
+        {klanten && !fout && ronde && (
+          <>
+            {stip(colors.danger, telling.aandacht)}
+            {stip(ORANJE, telling.vervolg)}
+            {stip(colors.success, telling.goed)}
+          </>
+        )}
+        {metBericht.length > 0 && (
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: verstuurd === metBericht.length ? colors.success : colors.textSecondary }}>
+            {verstuurd}/{metBericht.length} appjes
           </span>
         )}
         <span style={{ flex: 1 }} />
-        <button type="button" onClick={() => onVraagGino?.(RONDE_OPDRACHT)} disabled={bezig} style={{
-          ...KNOPJE, minHeight: 28, background: 'transparent', color: colors.success,
-          boxShadow: `inset 0 0 0 1.5px ${colors.success}`, opacity: bezig ? 0.5 : 1,
+        <button type="button" onClick={() => onVraagGino?.(RONDE_OPDRACHT)} disabled={bezig} title="Gino, zet de ronde opnieuw klaar" aria-label="Ronde opnieuw klaarzetten" style={{
+          display: 'flex', background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
+          color: colors.textMuted, opacity: bezig ? 0.4 : 1,
         }}>
-          Gino, zet de ronde klaar
+          <RefreshCw size={14} strokeWidth={2.5} />
         </button>
       </div>
       {open && (
@@ -336,6 +435,26 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
               </button>
             </div>
           )}
+          {calls.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={LABEL}>Calls vandaag · {calls.length}</div>
+              {calls.map(x => (
+                <button key={x.k.id} type="button" onClick={() => setCallVan(x)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 40, padding: '0 2px',
+                  background: 'transparent', border: 'none', borderBottom: `1px solid ${colors.borderSubtle}`,
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  <Phone size={13} color={colors.success} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 900, color: colors.textPrimary, flexShrink: 0 }}>{x.status.suggesties.call.tijd || '–'}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.88rem', fontWeight: 800, color: colors.textPrimary }}>
+                    {x.k.naam}
+                    {x.status.suggesties.call.titel && <span style={{ fontWeight: 600, color: colors.textSecondary }}> · {x.status.suggesties.call.titel}</span>}
+                  </span>
+                  <ChevronRight size={15} color={colors.textMuted} />
+                </button>
+              ))}
+            </div>
+          )}
           {GROEPEN.map(g => {
             const rij = lijst.filter(x => x.groep === g.id)
             if (!rij.length) return null
@@ -350,13 +469,14 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
                   {g.label} · {rij.length}
                 </button>
                 {!dicht && rij.map(x => (
-                  <KlantKaart key={x.k.id} k={x.k} item={x.item} kleur={g.kleur} ronde={ronde || vandaagNL()} onItem={opItem} />
+                  <KlantKaart key={x.k.id} k={x.k} item={x.item} status={x.status} kleur={g.kleur} ronde={ronde || vandaagNL()} onItem={opItem} />
                 ))}
               </div>
             )
           })}
         </div>
       )}
+      {callVan && <CallPopup naam={callVan.k.naam} call={callVan.status.suggesties.call} onSluit={() => setCallVan(null)} />}
     </div>
   )
 }

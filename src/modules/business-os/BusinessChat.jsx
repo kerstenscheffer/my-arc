@@ -68,6 +68,7 @@ const MAX_BEELDEN = 10 // zoveel recente screenshots gaan mee naar de AI (de PA 
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
 const TABS_BREED = 140 // breedte van de tabjes-slider op desktop: twee tabjes
+const STATUS_GAT = 6 // vaste ruimte tussen statusregel en invoerveld (en in BusinessOS/GinoKalender tussen de rijen)
 const opdrachtKop = (w) => String(w.opdracht || '').split('\n')[0].replace(/^Onderwerp:\s*/i, '')
 const duurSinds = (w) => {
   const min = Math.max(0, Math.round((Date.now() - new Date(w.gestart_at || w.created_at).getTime()) / 60000))
@@ -1217,6 +1218,14 @@ const duur = (ms) => {
   if (s < 86400) return `${Math.floor(s / 3600)} u`
   return `${Math.floor(s / 86400)} d`
 }
+// Statusregel: één regel 12 px / 600 grijs; het kopje (tot de eerste ':' of 'Wacht op jou') wit 800.
+function StatusTekst({ tekst }) {
+  const t = typeof tekst === 'string' ? tekst : ''
+  const m = /^([^:]{2,32}):\s(.*)$/.exec(t) || /^((?:Gino |Ik )?[Ww]acht op jou)(.*)$/.exec(t)
+  if (!m) return t
+  return <><span style={{ color: colors.textPrimary, fontWeight: 800 }}>{m[1]}</span>{t.startsWith(`${m[1]}: `) ? ': ' : ''}{m[2]}</>
+}
+
 function TabStatus({ staat, nu }) {
   const st = staat && TAB_STATUS[staat.status]
   if (!st) return null
@@ -1534,9 +1543,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
           .update({ gezien_at: new Date().toISOString() }).eq('id', r.id).is('gezien_at', null).select('id')
         if (!geclaimd?.length) continue
         const gs = gesprekkenRef.current
-        const doel = gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
+        // Klanten-ochtendronde (klantenronde.mjs) hoort in het tabje Klanten.
+        const klantRonde = /^Klanten/.test(r.opdracht || '')
+        const doel = (klantRonde && gs.find(isKlanten)) || gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
         const wanneer = new Date(r.klaar_at).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `${/^Strategie/.test(r.opdracht || '') ? r.opdracht : 'Groeironde'} (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
+        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `${/^(Strategie|Klanten)/.test(r.opdracht || '') ? r.opdracht : 'Groeironde'} (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
         // Ochtendbeeld meteen rond de bol.
         const beeld = (r.antwoord.acties || []).find(a => a?.soort === 'visueel')
         if (beeld) onVisueel?.(beeld, doel.id)
@@ -2365,7 +2376,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
           {/* In het kleine blokje hoort deze regel in de kaart zelf, anders steekt hij erbuiten. */}
-          <div style={klein?.aan ? { position: 'relative', marginBottom: 4 } : { position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
+          {/* Eén linkerkant met het invoerveld (left/right 0) en vast 6 px erboven (STATUS_GAT). */}
+          <div style={klein?.aan ? { position: 'relative', marginBottom: STATUS_GAT } : { position: 'absolute', left: 0, right: 0, bottom: '100%', marginBottom: STATUS_GAT }}>
             {/* Op de Mac: alle opdrachten voluit, hoe lang al, en Stop */}
             {macOpen && macWerk.length > 0 && (
               <div data-mac-werk style={{
@@ -2405,7 +2417,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
             {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
             <div className={isMobile ? 'bos-tabjes' : undefined} style={{
               display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, flex: 1,
-              ...(isMobile ? { overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' } : null),
+              // Mobiel 4 px extra boven (en weer terug), zodat de antenne van het opgeschoven robotje niet wegvalt.
+              ...(isMobile ? { overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', height: 30, marginTop: -4, paddingTop: 4, boxSizing: 'border-box' } : null),
             }}>
               {/* Klik op het poppetje: berichtenvenster open/dicht. Groene stip = iets ongelezen. */}
               <button role="status" onClick={() => setOpen(o => !o)} aria-expanded={open}
@@ -2414,10 +2427,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
                   flex: isMobile || macNu ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
                   background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  fontSize: '0.75rem', fontWeight: 800,
+                  fontSize: 12, fontWeight: 600, lineHeight: '16px',
                   color: werk || vraagNu || open ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
                 }}>
-                <span style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+                {/* Robotje: tafelrand (y=21) op de basislijn van de tekst, getekende linkerkant op de rand van het invoerveld. */}
+                <span style={{ position: 'relative', display: 'flex', flexShrink: 0, marginLeft: -2, transform: melding && !werk && !vraagNu ? 'none' : 'translateY(-4px)' }}>
                   {melding && !werk && !vraagNu
                     ? <span style={{ width: 30, display: 'flex', justifyContent: 'center' }}>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>
                     : <Robotje rustig={!werk && !vraagNu} />}
@@ -2429,7 +2443,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   )}
                 </span>
                 {!macNu && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))}
+                  <StatusTekst tekst={werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))} />
                 </span>}
               </button>
               {macNu && (
@@ -2451,9 +2465,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   <ChevronDown size={12} strokeWidth={3} color={colors.textSecondary} style={{ flexShrink: 0, transform: macOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                 </button>
               )}
-              {/* Herhaalknop direct achter het laatste opdrachtresultaat (robot-regel) */}
+              {/* Lege ruimte (tik = berichten open/dicht) duwt luidspreker + tabjes naar de rechterrand van het invoerveld. */}
+              <span onClick={() => setOpen(o => !o)} style={{ flex: macNu && !isMobile ? '0 0 4px' : '1 0 4px', minWidth: 4, alignSelf: 'stretch', cursor: 'pointer' }} />
+              {/* Herhaalknop van het laatste opdrachtresultaat: klein, direct links van de tabjes */}
               {!werk && !(melding && !vraagNu) && !vraagNu && laatst?.tekst && stem.beschikbaar() && (
-                <span style={{ display: 'flex', flexShrink: 0, marginLeft: -6 }}>{herhaalKnop(laatst.vol)}</span>
+                <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, height: 16, marginLeft: -4 }}>{herhaalKnop(laatst.vol)}</span>
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
               {/* Op desktop passen er twee tabjes in beeld, de rest schuift zijwaarts. Het actieve schuift mee. */}
@@ -2468,7 +2484,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   else if (a.right > v.right) el.scrollLeft += a.right - v.right
                 })
               }} style={{
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : `0 0 ${TABS_BREED}px`, overflowX: 'auto', marginLeft: isMobile ? 2 : 'auto',
+                // Breedte = inhoud (max TABS_BREED), zodat de laatste knop precies op de rechterrand van het invoerveld eindigt.
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? undefined : TABS_BREED, overflowX: 'auto', marginLeft: -4,
               }}>
                 {gesprekken.filter(g => !beperkt || !isEditor(g)).map((g, gi) => {
                   const aan = g.id === actief.id
@@ -2477,7 +2494,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     <button key={g.id} role="tab" aria-selected={aan} onClick={() => (aan && open ? setOpen(false) : kiesGesprek(g.id))}
                       title={bezigPer[g.id] ? `${g.naam}: Gino denkt na` : g.naam}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', flexShrink: 0,
+                        display: 'inline-flex', alignItems: 'center', gap: 5, height: 16, padding: '0 8px', flexShrink: 0,
                         borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                         background: aan ? colors.surface : 'transparent',
                         color: aan ? colors.textPrimary : colors.textMuted, fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap',
@@ -2499,15 +2516,14 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   )
                 })}
                 <button onClick={extraGesprek} title="Extra gesprek" aria-label="Extra gesprek" style={{
-                  height: 22, padding: '0 7px', flexShrink: 0, border: 'none', borderRadius: 999, background: 'transparent',
+                  height: 16, padding: '0 0 0 7px', flexShrink: 0, border: 'none', borderRadius: 999, background: 'transparent',
                   color: colors.textMuted, fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
                 }}>+</button>
               </div>
-              <span onClick={() => setOpen(o => !o)} style={{ flex: isMobile ? 1 : '0 0 8px', minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
             </div>
             </div>
             {wachtLijst.map(w => (
-              <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 38 }}>
+              <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 36 }}>
                 <span title={w.tekst} style={{
                   flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   fontSize: '0.74rem', fontWeight: 700, color: colors.textPrimary,

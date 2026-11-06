@@ -223,6 +223,11 @@ const REACTOR_CSS = `
 
 // iPhone (ook Capacitor): rondjes rechtsboven onder de statusbalk.
 const BOVEN_MOBIEL = 'calc(12px + env(safe-area-inset-top, 0px))'
+// Chatbalk-maten (BusinessChat): invoerveld 46 hoog, statusregel 26, vast 6 px ertussen.
+const BALK_H = 46
+const STATUS_H = 26
+const STATUS_GAT = 6
+const KLEIN_BOL = 44 // bol naast de balk op telefoon
 // Het losse Mac-lampje op de bol is weg (6 nov): de Mac/API-aanduiding staat nu
 // boven de bol, gerenderd door BusinessChat in het vak macPlekEl.
 
@@ -1138,6 +1143,10 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   const isMini = (mini || isZij) && !isMobile
   // Telefoon met agenda of beeld open: bol klein naast de balk, anders houdt de pagina maar de helft over.
   const telefoonKlein = isMobile && boven
+  // Bol naast de balk (klein blokje of telefoon met agenda): maten voor één lijn met de statusregel.
+  const bolNaast = (isMini && !isZij) || telefoonKlein
+  const kleineMaat = isMini ? 64 : KLEIN_BOL
+  const bolOnder = Math.max(-8, (BALK_H - kleineMaat) / 2) // bol verticaal op het invoerveld (blokje: binnen de rand)
   // Links of rechts: de helft van het scherm waar hij het laatst stond.
   const zijLinks = isZij && !!miniPos && miniPos.x + 40 < (typeof window !== 'undefined' ? window.innerWidth / 2 : 0)
   // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
@@ -1411,7 +1420,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
         {kalender && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
-              onVraag={(t, o) => stuurRef.current?.(t, o)} />
+              onVraag={(t, o) => stuurRef.current?.(t, o)} inspring={telefoonKlein ? KLEIN_BOL + 6 : 0} />
           </div>
         )}
         {podiumOpen && (
@@ -1426,14 +1435,18 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
         } : isMini ? {
           cursor: 'grab', userSelect: 'none',
           position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, width: 'min(760px, calc(100vw - 16px))',
-          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'flex-end', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
-        } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
+        } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'flex-end', gap: 6, flexShrink: 0, paddingTop: STATUS_H + STATUS_GAT } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
           {/* Bol met erboven (gecentreerd) de Mac/API-aanduiding; de timer staat boven het geheel. */}
-          <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {!isZij && !beperkt && <div ref={setMacPlekEl} style={{ alignSelf: 'stretch', marginBottom: 4 }} />}
+          {/* Bol naast de balk (klein): bol gecentreerd op het invoerveld, Mac-label erboven op de hoogte van de statusregel. */}
+          <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', ...(bolNaast ? { marginBottom: bolOnder } : null) }}>
+            {!isZij && !beperkt && <div ref={setMacPlekEl} style={bolNaast ? {
+              position: 'absolute', left: 0, right: 0, bottom: '100%', height: STATUS_H, marginBottom: BALK_H + STATUS_GAT - (bolOnder + kleineMaat),
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            } : { alignSelf: 'stretch', marginBottom: 4 }} />}
             <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
-              <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+              <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? KLEIN_BOL : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
               {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
             </div>
             {!beperkt && (
@@ -1445,7 +1458,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 18 : 24} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
