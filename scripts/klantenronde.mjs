@@ -42,6 +42,7 @@ function schoneSuggesties(s) {
       goed: lijst(c.goed, 250, 8),
       komende_week: lijst(c.komende_week, 250, 5),
       volgende_call: tekst(c.volgende_call, 200),
+      precall: lijst(c.precall, 250, 6),
       struggles: lijst(c.struggles, 250, 6),
       open: lijst(c.open, 200, 6),
       randzaken: lijst(c.randzaken, 150, 5),
@@ -96,7 +97,7 @@ export function klantenVraag(dag) {
    → suggesties.reden: één regel waarom deze kleur, met het cijfer. Gewicht altijd als weektempo zaterdag-op-zaterdag zoals de app (skill Call-voorbereiding, blok 1), nooit een eigen rollend venster.
    → suggesties.actie: bij aandacht en vervolg, wat Kersten concreet doet om te helpen (bv. "5 min bellen: training loopt vast door nachtdiensten, plan 2 vaste momenten"). Bij goed leeg.
    → suggesties.signalen: max 3 korte regels voor Kersten.
-   → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: [..], hoe: [check-in], gewicht: [..], voeding: [..], training: [..], goed: [ALLES wat goed gaat, met cijfer], komende_week: [voorstel acties], volgende_call: "over 1 of 2 weken + waarom", struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Elk blok is een LIJST korte regels "Label: waarde", één datapunt per regel, nooit meerdere cijfers achter elkaar in één zin (zie skill, OPMAAK). Gaat iets goed: één regel.
+   → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: [..], hoe: [check-in], gewicht: [..], voeding: [..], training: [..], goed: [ALLES wat goed gaat, met cijfer], komende_week: [voorstel acties], volgende_call: "over 1 of 2 weken + waarom", precall: [max 5 regels die Kersten vóór de call MOET lezen: conclusies, wat opvalt, wat hij niet mag vergeten], struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Elk blok is een LIJST korte regels "Label: waarde", één datapunt per regel, nooit meerdere cijfers achter elkaar in één zin (zie skill, OPMAAK). Gaat iets goed: één regel.
    ${DAG_WERK[dag] || 'Vandaag geen berichten: laat bericht leeg.'}
    → bericht (alleen als hierboven gevraagd): Kerstens WhatsApp-stijl uit de skill.
 4. Lever alles in één actie: { "soort": "ronde_vul", "items": [ { "client_id", "groep", "suggesties": {…}, "bericht"? } ] }. De PA schrijft hem direct in het paneel. Geen wijziging_voorstel.

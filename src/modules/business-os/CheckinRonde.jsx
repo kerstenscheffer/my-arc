@@ -136,7 +136,7 @@ function Uitklap({ titel, open: begin = false, children }) {
 }
 
 // Popup met Gino's voorbereiding van een call van vandaag (CallBlad).
-function CallPopup({ naam, call, onSluit }) {
+function CallPopup({ naam, call, sleutel, onSluit }) {
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onSluit() }
     window.addEventListener('keydown', esc)
@@ -161,7 +161,7 @@ function CallPopup({ naam, call, onSluit }) {
           </button>
         </div>
         {call.titel && <div style={{ ...REGEL, color: colors.textSecondary, marginBottom: 12 }}>{call.titel}</div>}
-        <CallBlad call={call} />
+        <CallBlad call={call} sleutel={sleutel} />
       </div>
     </div>,
     document.body,
@@ -306,7 +306,7 @@ function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
           </Uitklap>
         </div>
       )}
-      {callOpen && <CallPopup naam={k.naam} call={status.suggesties.call} onSluit={() => setCallOpen(false)} />}
+      {callOpen && <CallPopup naam={k.naam} call={status.suggesties.call} sleutel={`${k.id}-${status.ronde_datum}`} onSluit={() => setCallOpen(false)} />}
     </div>
   )
 }
@@ -478,7 +478,7 @@ export default function CheckinRonde({ onVraagGino, bezig = false, challenge = n
           })}
         </div>
       )}
-      {callVan && <CallPopup naam={callVan.k.naam} call={callVan.status.suggesties.call} onSluit={() => setCallVan(null)} />}
+      {callVan && <CallPopup naam={callVan.k.naam} call={callVan.status.suggesties.call} sleutel={`${callVan.k.id}-${callVan.status.ronde_datum}`} onSluit={() => setCallVan(null)} />}
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import CallBlad from '../../business-os/CallBlad'
+import CallBlad, { PrecallKnop } from '../../business-os/CallBlad'
 import { callHeeftInhoud } from '../../business-os/callBladData'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket } from 'lucide-react'
 
@@ -35,7 +35,7 @@ const CATEGORIES = [
 // Tab Call: Gino's voorbereiding (checkin_ronde_items, laatste 3 dagen) in de
 // volgorde van de call, als pijltjes-regels. De vaste vragen staan er altijd,
 // ook als Gino nog niets klaarzette. Verslag doet achteraf het transcript.
-function CallVoorbereiding({ client, db }) {
+function CallVoorbereiding({ client, db, precall }) {
   const [item, setItem] = useState(undefined)
   useEffect(() => {
     let weg = false
@@ -64,7 +64,7 @@ function CallVoorbereiding({ client, db }) {
                 Nog geen voorbereiding van Gino. Die staat klaar op de ochtend van de call.
               </div>
             )}
-            <CallBlad call={call} status={item && (s.reden || s.actie) ? { groep: item.groep, reden: s.reden, actie: s.actie } : null} />
+            <CallBlad key={`${client.id}-${item?.ronde_datum || 'leeg'}`} sleutel={`${client.id}-${item?.ronde_datum || 'leeg'}`} precall={precall} call={call} status={item && (s.reden || s.actie) ? { groep: item.groep, reden: s.reden, actie: s.actie } : null} />
           </>}
     </div>
   )
@@ -106,6 +106,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   // Wijzigingen (automatisch, 9 van de 10 items) standaard niet in de tijdlijn.
   const [filterCat, setFilterCat] = useState('notities')
   const [weergave, setWeergave]   = useState('call')
+  const [precall, setPrecall]     = useState(false)
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -299,25 +300,21 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
 
       {!minimized && (
         <>
-          {/* Tabs: Call (voorbereiding + structuur) en Notities. */}
-          <div style={{ display: 'flex', gap: '0.25rem', padding: '0.625rem 0.75rem 0', flexShrink: 0 }}>
-            {[['call', 'Call', Phone], ['notities', 'Notities', FileText]].map(([id, label, Icoon]) => {
-              const aan = weergave === id
-              return (
-                <button key={id} type="button" onClick={() => setWeergave(id)} style={{
-                  flex: 1, minHeight: 30, borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-                  boxShadow: aan ? 'none' : 'inset 0 0 0 1px rgba(255,255,255,0.12)',
-                  fontSize: '0.72rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  {Icoon === Phone ? <Phone size={12} /> : <FileText size={12} />}{label}
-                </button>
-              )
-            })}
+          {/* Kopregel: Call | Notities links, Pre-call rechts. Klein, zoals de
+              Plan-knop bij Gewicht: tekst in plaats van grote knoppen. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0.6rem 0.875rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            {[['call', 'Call'], ['notities', 'Notities']].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setWeergave(id)} style={{
+                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: '0.8rem', fontWeight: 900, color: weergave === id ? '#fff' : 'rgba(255,255,255,0.35)',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>{label}</button>
+            ))}
+            <div style={{ flex: 1 }} />
+            {weergave === 'call' && <PrecallKnop aan={precall} onKlik={() => setPrecall(p => !p)} />}
           </div>
 
-          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} /> : (<>
+          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} precall={precall} /> : (<>
           {/* ── Nieuwe notitie ── */}
           <div style={{
             padding: '0.625rem 0.75rem',
