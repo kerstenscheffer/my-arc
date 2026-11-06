@@ -2087,6 +2087,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '') || OMZET_VRAAG.test(vraag || '') || TIJD_VRAAG.test(vraag || '')
     if (visueel && !overAgenda) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     if (kalender) onKalender?.(kalender)
+    // Appje klaar (Call verwerken, Na salescall): chat open op dat tabje, zodat
+    // je het bewerkveld met Opslaan en versturen meteen voor je hebt.
+    if ((bericht.acties || []).some(isBewerkbaarBericht)) kiesGesprek(id)
     markeer(id)
     meld('Klaar', false)
     if (actiefRef.current !== id) return
