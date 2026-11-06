@@ -10,7 +10,7 @@
 // staat op het moment dat je het eerste gewicht invult.
 
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Check, Plus, X, Pencil, Trash2 } from 'lucide-react'
+import { MapPin, Check, Plus, X, Pencil, Trash2, ChevronDown } from 'lucide-react'
 import { haalGyms, kiesGym, bewaarGym, verwijderGym, eenheidLabel } from './GymService'
 
 const LIJN = 'rgba(255,255,255,0.12)'
@@ -59,11 +59,13 @@ export default function GymKiezer({ db, client, isMobile }) {
   return (
     <>
       <span style={{ position: 'relative', display: 'inline-flex' }}>
-        <Knop onClick={() => setOpen(v => !v)} isMobile={isMobile} aan={open}>
-          {actief?.naam || 'Sportschool'}
-          {actief?.eenheid === 'lb' && (
-            <span style={{ opacity: 0.6, fontWeight: 800 }}> · lb</span>
-          )}
+        <Knop onClick={() => setOpen(v => !v)} isMobile={isMobile} aan={open} pijl>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {actief?.naam || 'Sportschool'}
+            {actief?.eenheid === 'lb' && (
+              <span style={{ opacity: 0.6, fontWeight: 800 }}> · lb</span>
+            )}
+          </span>
         </Knop>
 
         {open && (
@@ -130,25 +132,29 @@ export default function GymKiezer({ db, client, isMobile }) {
   )
 }
 
+// Staat boven de workout-titel (6 nov 2026): platte tekst met een pijltje,
+// zodat je ziet dat je hier wisselt. Geen pil eromheen.
 function Knop(props) {
-  const { children, onClick, isMobile, aan } = props
+  const { children, onClick, isMobile, aan, pijl = false } = props
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick() }}
+      aria-expanded={pijl ? !!aan : undefined}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '2px 7px', borderRadius: 7,
-        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)',
-        border: `1px solid ${aan ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)'}`,
-        color: '#fff', fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
-        fontFamily: 'inherit', cursor: 'pointer', maxWidth: 170,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        textShadow: 'none',
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '2px 0', background: 'none', border: 'none',
+        color: '#fff', fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800,
+        fontFamily: 'inherit', cursor: 'pointer', maxWidth: 220, minHeight: 28,
+        whiteSpace: 'nowrap', overflow: 'hidden',
+        textShadow: '0 2px 8px rgba(0,0,0,0.7)',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <MapPin size={11} strokeWidth={2.8} style={{ flexShrink: 0, opacity: 0.7 }} />
+      <MapPin size={13} strokeWidth={2.6} style={{ flexShrink: 0 }} />
       {children}
+      {pijl && (
+        <ChevronDown size={15} strokeWidth={3} style={{ flexShrink: 0, opacity: 0.8, transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      )}
     </button>
   )
 }

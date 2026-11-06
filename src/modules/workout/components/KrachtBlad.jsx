@@ -7,7 +7,8 @@
 // regel met foto, laatste stand en verschil; tik erop voor de grafiek.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ChevronDown, Info } from 'lucide-react'
+import { Search, ChevronDown, Info, MapPin } from 'lucide-react'
+import { haalGyms } from '../gym/GymService'
 import ExerciseProgressChart from './todays-workout/components/ExerciseProgressChart'
 import { metBandFases, KLEUR_VOOR, oordeelTekst, geschatRM, REFERENTIE_REPS } from './todays-workout/krachtBand'
 import useOefeningFotos from '../utils/useOefeningFotos'
@@ -49,6 +50,20 @@ export default function KrachtBlad({ db, client, isMobile }) {
       })
     return () => { weg = true }
   }, [client?.id, db])
+  // Sportschool: elke zaak heeft andere machines, dus standaard alleen de
+  // zaak waar je nu traint (6 nov 2026). "Alle" voegt ze weer samen.
+  const [gyms, setGyms] = useState(null)
+  const [gymId, setGymId] = useState('alles')
+  const [gymOpen, setGymOpen] = useState(false)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    haalGyms(db, client.id).then(
+      ({ gyms: lijst, actiefId }) => { if (weg) return; setGyms(lijst); if (actiefId) setGymId(actiefId) },
+      () => { if (!weg) setGyms([]) })
+    return () => { weg = true }
+  }, [client?.id, db])
+  const gymFilter = gymId !== 'alles' ? gymId : null
   const fase = (fases || []).find(f => f.id === faseId) || null
   const vanaf = fase ? String(fase.started_on).slice(0, 10) : null
   const tot = fase?.ended_on ? String(fase.ended_on).slice(0, 10) : null
@@ -59,13 +74,14 @@ export default function KrachtBlad({ db, client, isMobile }) {
   const [ruw, setRuw] = useState(null) // { perOefening: {naam: [punten]}, fases }
 
   useEffect(() => {
-    if (!client?.id || !db?.supabase || fases === null) return
+    if (!client?.id || !db?.supabase || fases === null || gyms === null) return
     let weg = false
     setRuw(null)
     ;(async () => {
       let q = db.supabase.from('workout_sessions').select('id, workout_date').eq('client_id', client.id)
       if (vanaf) q = q.gte('workout_date', vanaf)
       if (tot) q = q.lte('workout_date', tot)
+      if (gymFilter) q = q.eq('gym_id', gymFilter)
       const { data: sessies } = await q.order('workout_date', { ascending: true }).then(r => r, () => ({ data: [] }))
       const perSessie = new Map((sessies || []).map(s => [s.id, s.workout_date]))
       let rijen = []
@@ -89,7 +105,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
       setRuw({ perOefening, fases })
     })()
     return () => { weg = true }
-  }, [client?.id, db, fases, vanaf, tot])
+  }, [client?.id, db, fases, vanaf, tot, gyms, gymFilter])
 
   // Per oefening: laatste stand, oordeel, verschil, PR.
   const oefeningen = useMemo(() => {
@@ -138,6 +154,50 @@ export default function KrachtBlad({ db, client, isMobile }) {
         </div>
       )}
 
+      {/* Sportschool, alleen als er meer dan één is. Eigen lijstje i.p.v. een
+          <select>: de systeemlijst opende in dit blad los van de knop, en het
+          pijltje stond zo ver weg als de langste naam breed is. */}
+      {(gyms || []).length > 1 && (() => {
+        const opties = [...gyms.map(g => ({ id: g.id, naam: g.naam })), { id: 'alles', naam: 'Alle sportscholen' }]
+        const huidig = opties.find(o => o.id === gymId) || opties[0]
+        return (
+          <div style={{ position: 'relative', display: 'inline-block', marginBottom: 8 }}>
+            <button onClick={() => setGymOpen(v => !v)} aria-expanded={gymOpen} aria-label="Sportschool kiezen" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0, minHeight: 32,
+              background: 'none', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <MapPin size={14} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+              {huidig.naam}
+              <ChevronDown size={14} strokeWidth={2.8} style={{ flexShrink: 0, transform: gymOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {gymOpen && (
+              <>
+                <div onClick={() => setGymOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 21, minWidth: 190,
+                  background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+                  padding: 4, boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                }}>
+                  {opties.map(o => {
+                    const aan = o.id === gymId
+                    return (
+                      <button key={o.id} onClick={() => { setGymId(o.id); setGymOpen(false) }} style={{
+                        display: 'flex', alignItems: 'center', width: '100%', minHeight: 40, padding: '0 0.75rem',
+                        borderRadius: 9, border: 'none', textAlign: 'left', whiteSpace: 'nowrap',
+                        background: aan ? '#fff' : 'transparent', color: aan ? '#000' : '#fff',
+                        fontSize: '0.85rem', fontWeight: aan ? 900 : 700, fontFamily: 'inherit', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}>{o.naam}</button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Eén regel: oordeel-dropdown links, fase-dropdown rechts. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -165,7 +225,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
       {ruw === null ? (
         <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Laden…</div>
       ) : lijst.length === 0 ? (
-        <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Geen oefeningen in deze fase.</div>
+        <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>{gymFilter ? 'Geen oefeningen in deze fase bij deze sportschool.' : 'Geen oefeningen in deze fase.'}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {lijst.map(o => {
@@ -218,7 +278,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
                 </button>
                 {isOpen && (
                   <div style={{ margin: '0 0 10px', marginLeft: isMobile ? -16 : -20, marginRight: isMobile ? -16 : -20 }}>
-                    <ExerciseProgressChart db={db} client={client} exerciseName={o.naam} isMobile={isMobile} vanaf={vanaf} tot={tot} />
+                    <ExerciseProgressChart db={db} client={client} exerciseName={o.naam} isMobile={isMobile} vanaf={vanaf} tot={tot} gymId={gymFilter} />
                   </div>
                 )}
               </div>

@@ -6,7 +6,7 @@
 // icoon zonder tekst — dat is nu een knop met tekst + pijl.
 
 import React, { useState, useEffect } from 'react'
-import { Check, ChevronDown, Timer, Flame } from 'lucide-react'
+import { Check, ChevronDown, Timer } from 'lucide-react'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from './opwarmen'
 import { useRef } from 'react'
 import { actieveOefeningen } from '../../utils/exerciseCompletion'
@@ -153,6 +153,12 @@ export default function TodaysWorkoutCard({
           position: 'absolute', left: 0, right: 0, bottom: 0,
           padding: isMobile ? '0 1rem 0.85rem' : '0 1.5rem 1rem',
         }}>
+          {/* Waar je vandaag traint, boven de titel; tik = wisselen. */}
+          {client?.id && db && (
+            <div style={{ marginBottom: 2 }}>
+              <GymKiezer db={db} client={client} isMobile={isMobile} />
+            </div>
+          )}
           <h2 style={{
             fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff', margin: 0,
             letterSpacing: '-0.03em', lineHeight: 1.15, wordBreak: 'break-word',
@@ -204,11 +210,6 @@ export default function TodaysWorkoutCard({
             <span style={{ color: isCompleted ? '#10b981' : '#fff' }}>
               {pct}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}>% klaar</span>
             </span>
-            {/* Waar je vandaag traint. Hier omdat je er pas aan denkt op het
-                moment dat je het eerste gewicht invult. */}
-            {client?.id && db && (
-              <GymKiezer db={db} client={client} isMobile={isMobile} />
-            )}
             <OpwarmKnop isMobile={isMobile} />
           </div>
         </div>
@@ -408,25 +409,38 @@ function OpwarmKnop({ isMobile }) {
     setAan(nieuw)
     if (navigator.vibrate) navigator.vibrate(10)
   }
+  // Schakelaar i.p.v. een knop met doorgestreepte tekst (6 nov 2026): aan/uit
+  // zie je aan de stand, de tekst blijft gewoon leesbaar.
   return (
     <button
       onClick={wissel}
-      aria-pressed={aan}
-      aria-label={aan ? 'Warming-up vraag staat aan' : 'Warming-up vraag staat uit'}
+      role="switch"
+      aria-checked={aan}
+      aria-label="Warming-up vraag"
       title={aan ? 'Warming-up: aan' : 'Warming-up: uit'}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '2px 7px', borderRadius: 7,
-        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${aan ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
-        color: aan ? '#fff' : 'rgba(255,255,255,0.45)',
+        // De rij staat op de grondlijn van de tekst; het schuifje stak daar
+        // boven uit en maakte de regel hoger. Midden uitlijnen, compact.
+        display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'center', lineHeight: 1,
+        padding: 0, background: 'none', border: 'none',
+        color: aan ? '#fff' : 'rgba(255,255,255,0.6)',
         fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
         fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', textShadow: 'none',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <Flame size={11} strokeWidth={2.8} fill={aan ? '#f59e0b' : 'none'} color={aan ? '#f59e0b' : 'currentColor'} style={{ flexShrink: 0 }} />
-      <span style={{ textDecoration: aan ? 'none' : 'line-through' }}>Warming-up</span>
+      Warming-up
+      <span aria-hidden style={{
+        position: 'relative', width: 26, height: 14, borderRadius: 999, flexShrink: 0,
+        background: aan ? '#fff' : 'rgba(255,255,255,0.18)',
+        transition: 'background 0.15s ease',
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, left: aan ? 14 : 2, width: 10, height: 10, borderRadius: '50%',
+          background: aan ? '#000' : '#fff',
+          transition: 'left 0.15s ease, background 0.15s ease',
+        }} />
+      </span>
     </button>
   )
 }
