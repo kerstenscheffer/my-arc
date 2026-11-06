@@ -5,7 +5,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import CallBlad from '../../business-os/CallBlad'
 import { callHeeftInhoud } from '../../business-os/callBladData'
-import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket, Check } from 'lucide-react'
+import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { id: 'on_track',        label: 'Op schema',      color: '#FFD700' },
@@ -32,28 +32,11 @@ const CATEGORIES = [
   { id: 'onboarding', label: 'Onboarding', icon: Rocket },
 ]
 
-// Vaste volgorde van een check-in call (skill Call-voorbereiding).
-const CALL_STAPPEN = [
-  'Hoe gaat het, hoe zit je erin?',
-  'Voeding',
-  'Training',
-  'Punten van Gino',
-  'Struggles en oude issues: hoe gaat het nu?',
-  'Terug naar het doel: past wat je doet bij wat je wilt?',
-  'Komende week concreet: wat ga je doen?',
-  'Nog vragen of iets onduidelijk?',
-  'Volgende call inplannen: goed over 2 weken, niet goed over 1 week',
-]
-
-const KLEUR_GROEP = { aandacht: '#ef4444', vervolg: '#f59e0b', goed: '#22c55e' }
-const T_LABEL = { fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 6 }
-
-// Tab Call: Gino's voorbereiding (checkin_ronde_items, laatste 3 dagen) en de
-// structuur om af te vinken. Afvinken is alleen voor tijdens de call en wordt
-// niet bewaard: het transcript doet achteraf de verslaglegging.
+// Tab Call: Gino's voorbereiding (checkin_ronde_items, laatste 3 dagen) in de
+// volgorde van de call, als pijltjes-regels. De vaste vragen staan er altijd,
+// ook als Gino nog niets klaarzette. Verslag doet achteraf het transcript.
 function CallVoorbereiding({ client, db }) {
   const [item, setItem] = useState(undefined)
-  const [gedaan, setGedaan] = useState(() => new Set())
   useEffect(() => {
     let weg = false
     const van = new Date(); van.setDate(van.getDate() - 3)
@@ -69,56 +52,20 @@ function CallVoorbereiding({ client, db }) {
     return () => { weg = true }
   }, [client.id, db])
   const s = item?.suggesties || {}
-  const call = s.call
   const doel = client.primary_goal || client.goal
-  const wissel = (i) => setGedaan(g => { const n = new Set(g); if (n.has(i)) n.delete(i); else n.add(i); return n })
+  const call = callHeeftInhoud(s.call) ? s.call : (doel ? { doel: [`Doel: ${doel}`] } : {})
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.75rem 0.875rem 1.5rem', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {item === undefined ? (
-        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
-      ) : (
-        <>
-          {item && (s.reden || s.actie) && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...T_LABEL }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: KLEUR_GROEP[item.groep] || 'rgba(255,255,255,0.3)' }} />
-                Status
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.75rem 0.875rem 1.5rem' }}>
+      {item === undefined
+        ? <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
+        : <>
+            {!callHeeftInhoud(s.call) && (
+              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+                Nog geen voorbereiding van Gino. Die staat klaar op de ochtend van de call.
               </div>
-              {s.reden && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', lineHeight: 1.45 }}>{s.reden}</div>}
-              {s.actie && <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, marginTop: 2 }}>{s.actie}</div>}
-            </div>
-          )}
-          {callHeeftInhoud(call) ? <CallBlad call={doel && !call.doel ? { ...call, doel } : call} /> : (
-            <div>
-              {doel && <><div style={T_LABEL}>Doel</div><div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', marginBottom: 12 }}>{doel}</div></>}
-              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-                Nog geen voorbereiding. Gino zet die klaar op de ochtend van de call.
-              </div>
-            </div>
-          )}
-          <div>
-            <div style={T_LABEL}>Structuur</div>
-            {CALL_STAPPEN.map((t, i) => {
-              const aan = gedaan.has(i)
-              return (
-                <button key={i} type="button" onClick={() => wissel(i)} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 36, padding: '0 2px',
-                  background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                }}>
-                  <span style={{
-                    width: 18, height: 18, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: aan ? '#22c55e' : 'transparent', boxShadow: aan ? 'none' : 'inset 0 0 0 1.5px rgba(255,255,255,0.25)',
-                  }}>{aan && <Check size={12} strokeWidth={3} color="#000" />}</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: aan ? 'rgba(255,255,255,0.35)' : '#fff', textDecoration: aan ? 'line-through' : 'none' }}>
-                    {i + 1}. {t}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+            )}
+            <CallBlad call={call} status={item && (s.reden || s.actie) ? { groep: item.groep, reden: s.reden, actie: s.actie } : null} />
+          </>}
     </div>
   )
 }
