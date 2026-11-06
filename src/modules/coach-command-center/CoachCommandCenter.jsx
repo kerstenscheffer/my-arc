@@ -10,6 +10,7 @@ import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback, { KlantVideos } from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
 import { laadDoorstap } from './components/doorstap'
+import { laadKlantStatus } from './components/klantStatus'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 import { OPEN_KLANTKAART_EVENT, pakWachtendeKlantkaart } from './klantkaartOpenen'
@@ -99,6 +100,16 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
     laadDoorstap(doorstapSleutel.split(',')).then(m => { if (!weg) setDoorstap(m) })
     return () => { weg = true }
   }, [doorstapSleutel])
+
+  // Klantstatus uit de ochtendronde (rood/oranje/groen), nieuwste rij per
+  // klant uit de laatste 3 dagen, in één query. null = nog aan het laden.
+  const [klantStatus, setKlantStatus] = useState(null)
+  useEffect(() => {
+    if (!doorstapSleutel) return
+    let weg = false
+    laadKlantStatus(db.supabase, doorstapSleutel.split(',')).then(m => { if (!weg) setKlantStatus(m) })
+    return () => { weg = true }
+  }, [doorstapSleutel, db])
 
   // Wie doet er mee aan een lopende challenge. Eén kleine query, los van de
   // zware klantenlaadbeurt, zodat de lijst er niet op hoeft te wachten.
@@ -619,6 +630,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
                 onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
                 openInzicht={kaartKlantId === client.id}
                 onInzichtGeopend={() => setKaartKlantId(null)}
+                klantStatus={klantStatus ? (klantStatus[client.id] || null) : undefined}
               />
             ))}
           </div>

@@ -15,6 +15,7 @@ import {
   BarChart3, Pause, CheckCircle2, Circle, Video
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
+import KlantStatusStip from './KlantStatusStip'
 import { computePeriod, hervatTraject, pauzeerTraject } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
 import TrajectModal from './TrajectModal'
@@ -74,7 +75,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
   const [lokaal, setLokaal] = useState(null)
@@ -544,6 +545,7 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
         gap: isMobile ? '0.4rem' : '0.5rem',
       }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
+          {klantStatus !== undefined && !isInactive && <KlantStatusStip status={klantStatus} isMobile={isMobile} />}
           <h3 className={PRIVE} style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
           </h3>
