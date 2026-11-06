@@ -83,6 +83,68 @@ const UITKLAP = {
   magnets: { groep: (p) => (p.soort === 'magnet' && p.woord ? String(p.woord).trim().toUpperCase() : null), naam: (g) => g, leads: true },
 }
 UITKLAP.chal = { naam: (g) => g }
+
+// Woorden met een eigen toolpagina (6 nov 2026). Bij deze carrousels en foto's komen de leads
+// binnen via de pagina (call_leads.lead_source), niet via het comment-woord: daarom telt
+// get_magnet_trechter ze niet. Alleen deze twee pagina's bestaan (App.jsx, mail-lead-pdf).
+const TOOL_WOORDEN = [
+  { woord: 'MENU', bron: 'mijn_menu', vanaf: '2026-10-23', onderwerp: /weekmenu/i },
+  { woord: 'SPLIT', bron: 'mijn_split', vanaf: '2026-10-23', onderwerp: /trainingsplan|trainingsschema/i },
+]
+// Een post hoort bij een toolwoord via het woord-veld, anders via Reageer/Comment "WOORD" in de
+// caption, of als aankondiging (eerste regel "staat live") over die tool. Stories tellen niet.
+const toolWoordVan = (p) => {
+  if (!p || p.soort === 'story') return null
+  const veld = p.woord ? String(p.woord).trim().toUpperCase() : null
+  if (veld) return TOOL_WOORDEN.find(t => t.woord === veld)?.woord || null
+  const tekst = p.tekst || ''
+  const eerste = tekst.split('\n')[0]
+  return TOOL_WOORDEN.find(t => new RegExp(`(reageer|comment)\\s*["“”'‘’]?\\s*${t.woord}\\b`, 'i').test(tekst)
+    || (/staat live/i.test(eerste) && t.onderwerp.test(eerste)))?.woord || null
+}
+// Alle leads van de toolpagina's met hoe ver ze kwamen. Eén keer voor alle weken; na een minuut
+// vers. Mislukt iets, dan null: de leadrijen vallen weg, de tabel blijft staan.
+// gesprek = ooit in een Gesprek-sectie of verder (call voorgesteld, sales call, sale);
+// call = ooit in Sales Call of een sale; sale = beweging met order_value.
+let toolLeads = null
+const haalToolLeads = () => {
+  if (toolLeads && Date.now() - toolLeads.tijd < 60e3) return toolLeads.belofte
+  const belofte = (async () => {
+    const leads = []
+    for (let vanaf = 0; ; vanaf += PORTIE) {
+      const res = await supabase.from('call_leads').select('id, lead_source, created_at, gender, first_reply_at')
+        .in('lead_source', TOOL_WOORDEN.map(t => t.bron)).is('deleted_at', null)
+        .order('created_at').order('id').range(vanaf, vanaf + PORTIE - 1)
+        .then(r => r, fout => ({ error: fout }))
+      if (res.error || !res.data) return null
+      leads.push(...res.data)
+      if (res.data.length < PORTIE) break
+    }
+    const stap = {}
+    for (let i = 0; i < leads.length; i += 200) {
+      const ids = leads.slice(i, i + 200).map(l => l.id)
+      for (let vanaf = 0; ; vanaf += PORTIE) {
+        const res = await supabase.from('lead_movements').select('lead_id, to_section_title, order_value')
+          .in('lead_id', ids).is('reverted_at', null).order('id').range(vanaf, vanaf + PORTIE - 1)
+          .then(r => r, fout => ({ error: fout }))
+        if (res.error || !res.data) return null
+        for (const m of res.data) {
+          const s = stap[m.lead_id] ||= { gesprek: false, call: false, sale: false, order: 0 }
+          const titel = (m.to_section_title || '').trim()
+          const order = Number(m.order_value) || 0
+          if (order > 0) { s.sale = true; s.order += order }
+          if (s.sale || /^sales call/i.test(titel)) s.call = true
+          if (s.call || /^(gesprek|call voorgesteld)/i.test(titel)) s.gesprek = true
+        }
+        if (res.data.length < PORTIE) break
+      }
+    }
+    return leads.map(l => ({ ...l, gesprek: false, call: false, sale: false, order: 0, ...stap[l.id], tijd: new Date(l.created_at).getTime() }))
+  })().catch(() => null)
+  toolLeads = { tijd: Date.now(), belofte }
+  belofte.then(r => { if (!r) toolLeads = null })
+  return belofte
+}
 // De challenge in groepen. veld = uit get_keten_challenge. deel = percentage van twee rijen.
 // neutraal = geen kleur: een cohort dat nog loopt is geen slechte week.
 const CHALLENGE_GROEPEN = [
@@ -205,7 +267,7 @@ async function haalWeek(svc, coachId, van) {
   // Geslacht apart tellen op de server: dezelfde telling als newLeads, plus het filter.
   const telLeads = (g) => supabase.from('call_leads').select('id', { count: 'exact', head: true })
     .gte('created_at', s).lt('created_at', e).is('deleted_at', null).eq('gender', g).then(res => (res.error ? null : res.count), () => null)
-  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen, magnetLeads, chal] = await Promise.all([
+  const [act, fun, rx, cash, media, mannen, vrouwen, challenge, challengeMannen, challengeVrouwen, magnetLeads, chal, alleToolLeads] = await Promise.all([
     svc.getRangeActivity(coachId, s, e),
     svc.getRangeFunnelStats(coachId, s, e),
     svc.getRangeReactionStats(coachId, s, e),
@@ -218,6 +280,7 @@ async function haalWeek(svc, coachId, van) {
     telChallenge(s, e, 'female'),
     supabase.rpc('get_keten_magnet_leads', { p_van: s, p_tot: e }).then(res => (res.error ? null : res.data || []), () => null),
     supabase.rpc('get_keten_challenge', { p_van: s, p_tot: e }).then(res => res.data || null, () => null),
+    haalToolLeads(),
   ])
   const waarden = {}
   const ctx = { act, fun, rx, cash }
@@ -278,6 +341,29 @@ async function haalWeek(svc, coachId, van) {
       waarden['magnetsTotaal:per10'] = (tel('totaal') / metTotaal.length) * 10
       waarden['magnetsTotaal:per10Mannen'] = (tel('mannen') / metTotaal.length) * 10
       waarden['magnetsTotaal:per10Vrouwen'] = (tel('vrouwen') / metTotaal.length) * 10
+    }
+  }
+  // Toolwoorden: posts van deze week, en de leads die deze week via de pagina binnenkwamen
+  // met hoe ver die tot nu toe kwamen. Vóór de pagina bestond: leeg, telt niet in het gemiddelde.
+  for (const t of TOOL_WOORDEN) {
+    if (isoLokaal(tot) <= t.vanaf) continue
+    const k = `tool:${t.woord}`
+    if (m) {
+      const tp = m.filter(p => toolWoordVan(p) === t.woord)
+      waarden[`${k}:posts`] = tp.length
+      waarden[`${k}:comments`] = som(tp, 'comments')
+    }
+    if (alleToolLeads) {
+      const l = alleToolLeads.filter(x => x.lead_source === t.bron && x.tijd >= van.getTime() && x.tijd < tot.getTime())
+      const tel = (f) => l.filter(f).length
+      waarden[`${k}:leads`] = l.length
+      waarden[`${k}:gereageerd`] = tel(x => x.first_reply_at)
+      waarden[`${k}:gesprek`] = tel(x => x.gesprek)
+      waarden[`${k}:call`] = tel(x => x.call)
+      waarden[`${k}:sale`] = tel(x => x.sale)
+      waarden[`${k}:order`] = som(l, 'order')
+      waarden[`${k}:mannen`] = tel(x => x.gender === 'male')
+      waarden[`${k}:onbekend`] = tel(x => !x.gender)
     }
   }
   // Challenge: de rijen uit CHALLENGE_GROEPEN, plus de berichten uit de telling hierboven.
@@ -778,8 +864,36 @@ export default function GinoKeten({ isMobile, onVraag }) {
         ...(!keys.includes(PER10_UIT) ? [{ key: 'magnetsTotaal:per10', label: per10Label, titel: `Alle magnets: ${per10Label.toLowerCase()}`, sub: true, overal: 'per10', geslacht: 'magnetLeads', basis: 'magnetsTotaal:per10', decimaal: true, postsKey: 'magnetsTotaal:posts' }] : []),
       ] : []),
     ] : []
+    // Toolwoorden: eigen groep met de leads via de pagina. Een rij zonder enige waarde (laden
+    // mislukt) valt weg.
+    const geladen = kolommen.map(k => perWeek[k.id]).filter(Boolean)
+    const heeft = (key) => geladen.some(w => w.waarden[key] != null)
+    const TOOL_STATS = [
+      ['comments', 'Comments', { lijst: { sorteer: 'comments' } }],
+      ['leads', 'Leads via pagina'],
+      ['gereageerd', 'Gereageerd'],
+      ['gesprek', 'In gesprek'],
+      ['call', 'Call'],
+      ['sale', 'Sale'],
+      ['order', 'Orderwaarde', { euro: true }],
+      ['mannen', 'Mannen'],
+      ['onbekend', 'Geslacht onbekend', { neutraal: true }],
+    ]
+    const toolRijen = u.leads ? TOOL_WOORDEN.flatMap(({ woord }) => {
+      const klap = `tool:${woord}`
+      const metPost = (p) => toolWoordVan(p) === woord
+      if (!heeft(`${klap}:posts`) && !heeft(`${klap}:leads`)) return []
+      return [
+        { key: `${klap}:posts`, label: `${woord} · pagina`, titel: `${woord} (pagina)`, kop: true, klap, lijst: { sorteer: 'tijd', filter: metPost } },
+        ...(uitklap[klap] ? TOOL_STATS.filter(([id]) => heeft(`${klap}:${id}`)).map(([id, label, extra]) => ({
+          key: `${klap}:${id}`, label, titel: `${woord} (pagina): ${label.toLowerCase()}`, sub: true, ...extra,
+          ...(extra?.lijst ? { lijst: { ...extra.lijst, filter: metPost } } : null),
+        })) : []),
+      ]
+    }) : []
     return [
       ...totaalRijen,
+      ...toolRijen,
       ...groepen.filter(isRecent).flatMap(groepRijen),
       ...(stil.length ? [{ key: stilKlap, label: `Niet gepost, laatste 8 weken (${stil.length})`, kop: true, klap: stilKlap, leeg: true }] : []),
       ...(stil.length && uitklap[stilKlap] ? stil.flatMap(groepRijen) : []),
