@@ -223,11 +223,11 @@ const REACTOR_CSS = `
 
 // iPhone (ook Capacitor): rondjes rechtsboven onder de statusbalk.
 const BOVEN_MOBIEL = 'calc(12px + env(safe-area-inset-top, 0px))'
-// Chatbalk-maten (BusinessChat): invoerveld 46 hoog, statusregel 26, vast 6 px ertussen.
-const BALK_H = 46
+// Chatbalk-maten (BusinessChat): invoerveld 40 hoog (knoppen 30 + marge 2 + padding 2 + rand 1), statusregel 26, vast 6 px ertussen.
+const BALK_H = 40
 const STATUS_H = 26
 const STATUS_GAT = 6
-const KLEIN_BOL = 44 // bol naast de balk op telefoon
+const KLEIN_BOL = 40 // bol naast de balk op telefoon: even hoog als de balk
 // Het losse Mac-lampje op de bol is weg (6 nov): de Mac/API-aanduiding staat nu
 // boven de bol, gerenderd door BusinessChat in het vak macPlekEl.
 
@@ -1447,7 +1447,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
             } : { alignSelf: 'stretch', marginBottom: 4 }} />}
             <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
               <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? KLEIN_BOL : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
-              {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
+              {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? KLEIN_BOL : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
             </div>
             {!beperkt && (
               <TimerBlok key={timer.stand?.taak?.titel || ''} timer={timer} onAfvinken={vinkTimerAf} onStop={stopTimer}

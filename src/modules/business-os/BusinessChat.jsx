@@ -2248,7 +2248,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     }
   }
   const rondeKnop = {
-    width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
+    width: 30, height: 30, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
   const anderBezig = gesprekken.find(g => g.id !== actief.id && bezigPer[g.id])
@@ -2615,15 +2615,16 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 rows={1}
                 style={{
                   flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
-                  color: colors.textPrimary, fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.35, padding: '9px 0 9px 4px',
-                  minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
+                  color: colors.textPrimary, fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.3, padding: '6px 0 6px 4px',
+                  // marginBottom 2 = zelfde marge als de ronde knoppen, zodat de tekst op hun midden staat.
+                  minHeight: 30, marginBottom: 2, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
               {/* In Editor is er geen ⋯-menu, dus daar blijft groot/klein een los knopje. */}
               {isEditor(actief) && klein && (
                 <button onClick={klein.wissel} title={klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'} aria-label={klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
-                  {klein.aan ? <Maximize2 size={15} strokeWidth={2.5} /> : <Minimize2 size={15} strokeWidth={2.5} />}
+                  {klein.aan ? <Maximize2 size={14} strokeWidth={2.5} /> : <Minimize2 size={14} strokeWidth={2.5} />}
                 </button>
               )}
               {/* Snel/Slim zichtbaar; foto, bestand, groot/klein, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
@@ -2632,7 +2633,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
                   : 'Snel: kort en vlot. Klik: Slim (Opus, denkt langer na)'}
                 style={{
-                  display: 'flex', alignItems: 'center', height: 40, padding: '0 4px', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', height: 30, margin: '2px 0', padding: '0 4px', flexShrink: 0,
                   fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
                   color: modus === 'slim' ? (viaMac ? colors.success : colors.textMuted) : colors.textSecondary, fontFamily: 'inherit',
                 }}>
@@ -2642,7 +2643,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => { if (!menu && stem.beschikbaar()) stem.tegoed(); setMenu(m => !m) }} title="Meer" aria-label="Meer opties"
                     style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
-                    <MoreHorizontal size={18} strokeWidth={2.4} />
+                    <MoreHorizontal size={16} strokeWidth={2.4} />
                   </button>
                   {menu && (
                     <>
@@ -2733,7 +2734,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     animation: luistert ? 'bos-mic 1.2s ease-in-out infinite' : 'none',
                   }}
                 >
-                  <Mic size={18} strokeWidth={2.5} />
+                  <Mic size={16} strokeWidth={2.5} />
                 </button>
               )}
               {kanStoppen && !kanSturen ? (
@@ -2743,7 +2744,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                   aria-label={bezig ? 'Stop Gino' : 'Stop de code-opdracht'}
                   style={{ ...rondeKnop, background: colors.textPrimary, color: colors.onAccent, cursor: 'pointer' }}
                 >
-                  <span style={{ width: 13, height: 13, borderRadius: 3, background: 'currentColor', display: 'block' }} />
+                  <span style={{ width: 11, height: 11, borderRadius: 3, background: 'currentColor', display: 'block' }} />
                 </button>
               ) : (
                 <button
@@ -2756,7 +2757,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                     color: colors.onAccent, cursor: kanSturen ? 'pointer' : 'default',
                   }}
                 >
-                  <ArrowUp size={18} strokeWidth={3} />
+                  <ArrowUp size={16} strokeWidth={3} />
                 </button>
               )}
             </div>

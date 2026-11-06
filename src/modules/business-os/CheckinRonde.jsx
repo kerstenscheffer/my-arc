@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -320,8 +320,10 @@ function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
   )
 }
 
-export default function CheckinRonde({ onVraagGino, bezig = false }) {
+// challenge: het challenge-overzicht (GinoDoorstap), ingeklapt achter de trofee.
+export default function CheckinRonde({ onVraagGino, bezig = false, challenge = null }) {
   const [open, setOpen] = useState(true)
+  const [challengeOpen, setChallengeOpen] = useState(false)
   const [klanten, setKlanten] = useState(null)
   const [items, setItems] = useState([])
   const [ronde, setRonde] = useState(null)
@@ -414,6 +416,14 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
           </span>
         )}
         <span style={{ flex: 1 }} />
+        {challenge && (
+          <button type="button" onClick={() => setChallengeOpen(o => !o)} title="Challenge" aria-label="Challenge" aria-pressed={challengeOpen} style={{
+            display: 'flex', background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
+            color: challengeOpen ? colors.success : colors.textMuted,
+          }}>
+            <Trophy size={15} strokeWidth={2.5} />
+          </button>
+        )}
         <button type="button" onClick={() => onVraagGino?.(RONDE_OPDRACHT)} disabled={bezig} title="Gino, zet de ronde opnieuw klaar" aria-label="Ronde opnieuw klaarzetten" style={{
           display: 'flex', background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
           color: colors.textMuted, opacity: bezig ? 0.4 : 1,
@@ -421,6 +431,7 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
           <RefreshCw size={14} strokeWidth={2.5} />
         </button>
       </div>
+      {challenge && challengeOpen && <div style={{ marginTop: 8, paddingBottom: 8, borderBottom: `1px solid ${colors.borderSubtle}` }}>{challenge}</div>}
       {open && (
         <div style={{ marginTop: 6 }}>
           {fout && <div style={{ ...REGEL, color: colors.textSecondary }}>{fout}</div>}

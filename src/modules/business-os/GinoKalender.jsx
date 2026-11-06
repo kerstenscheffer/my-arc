@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronDown, ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check, Zap,
+  ChevronDown, ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check, Zap, Users, CalendarPlus, Trophy,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import GinoWeek from './GinoWeek'
@@ -152,7 +152,40 @@ function GinoZegt({ tekst, onWeg }) {
 const BEPERKT_WEERGAVEN = ['content', 'keten', 'omzet', 'klanten']
 
 // inspring: px vanaf links tot het invoerveld (kleine bol ernaast), zodat de rij onderaan op dezelfde linkerrand begint.
+const KLANTEN_DEEL_KEY = 'myarc.gino.klantenDeel'
+const KLANTEN_DELEN = [
+  { id: 'klanten', label: 'Klanten', Icoon: Users },
+  { id: 'verlengen', label: 'Verlengen', Icoon: CalendarPlus },
+  { id: 'challenge', label: 'Challenge', Icoon: Trophy },
+]
+function KlantenKnoppen({ open, onKies }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, padding: '4px 0 8px' }}>
+      {KLANTEN_DELEN.map((deel) => {
+        const { id, label } = deel
+        const aan = open === id
+        return (
+          <button key={id} type="button" onClick={() => onKies(id)} title={label} aria-label={label} aria-pressed={aan} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 34, borderRadius: 999,
+            border: 'none', cursor: 'pointer', background: aan ? colors.surface : 'transparent',
+            color: aan ? colors.success : colors.textMuted, boxShadow: aan ? 'none' : `inset 0 0 0 1px ${colors.borderSubtle}`,
+          }}>
+            <deel.Icoon size={16} strokeWidth={2.5} />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false, beperkt = false, inspring = 0 }) {
+  // Klanten-scherm: Klanten, Verlengen en Challenge achter een icoon, één tegelijk open (6 nov 2026).
+  const [klantenDeel, setKlantenDeel] = useState(() => { try { return localStorage.getItem(KLANTEN_DEEL_KEY) || null } catch { return null } })
+  const kiesKlantenDeel = (id) => setKlantenDeel(d => {
+    const nieuw = d === id ? null : id
+    try { if (nieuw) localStorage.setItem(KLANTEN_DEEL_KEY, nieuw); else localStorage.removeItem(KLANTEN_DEEL_KEY) } catch { /* geen opslag */ }
+    return nieuw
+  })
   const [maand, setMaand] = useState(() => maandVan(verzoek?.maand) || maandVan(verzoek?.dag) || new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [gekozen, setGekozen] = useState(verzoek?.dag || null)
   const [items, setItems] = useState(null)
@@ -527,9 +560,10 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Klanten: de check-in ronde over de volle breedte; Gino-vragen lopen via het Klanten-tabje */}
       {weergave === 'klanten' && (
         <div className="gk-scroll" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 2px' : '0 4px' }}>
-          <GinoDoorstap isMobile={isMobile} />
-          <CheckinRonde onVraagGino={(t) => onVraag?.(t, { tab: 'klanten' })} />
-          <GinoVerlengen isMobile={isMobile} />
+          <KlantenKnoppen open={klantenDeel} onKies={kiesKlantenDeel} />
+          {klantenDeel === 'klanten' && <CheckinRonde onVraagGino={(t) => onVraag?.(t, { tab: 'klanten' })} />}
+          {klantenDeel === 'verlengen' && <GinoVerlengen isMobile={isMobile} />}
+          {klantenDeel === 'challenge' && <GinoDoorstap isMobile={isMobile} />}
         </div>
       )}
 
