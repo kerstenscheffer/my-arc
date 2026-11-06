@@ -5,9 +5,36 @@
 // (MET × factor × 3,5 × kg / 200 per minuut); zei je horloge iets anders,
 // dan wint het horloge en bewaren we dat als bron.
 
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useRef, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, ChevronLeft, Watch } from 'lucide-react'
+import { meldFout, foutContext } from '../../../ui/PaginaVangnet'
+
+// Toetsenbord dicht en de pagina terug waar hij stond. iOS schuift de pagina
+// op als je in het horloge-veld tikt; verdwijnt dat veld (volgende stap,
+// sluiten) terwijl het toetsenbord open is, dan bleef de pagina verschoven en
+// stond het blad buiten beeld: alleen de zwarte achtergrond bleef over
+// (Martijn van Doesburg, crossfit, nov 2026).
+const toetsenbordDicht = (scrollY) => {
+  try {
+    const el = document.activeElement
+    if (el && typeof el.blur === 'function' && el !== document.body) el.blur()
+    if (Number.isFinite(scrollY)) requestAnimationFrame(() => window.scrollTo(0, scrollY))
+  } catch { /* geen document */ }
+}
+
+// Vangnet om het blad: een fout tijdens het tekenen gaat naar app_fouten en
+// sluit het blad, in plaats van een zwart vlak over de hele app te laten.
+class BladVangnet extends Component {
+  constructor(props) { super(props); this.state = { fout: null } }
+  static getDerivedStateFromError(fout) { return { fout } }
+  componentDidCatch(fout, info) {
+    meldFout(fout, info, 'workout:cardio-log', foutContext.clientId)
+    toetsenbordDicht(this.props.scrollRef?.current)
+    try { this.props.onClose?.() } catch { /* sluiten mag nooit zelf crashen */ }
+  }
+  render() { return this.state.fout ? null : this.props.children }
+}
 
 // Zelfde MET-tabel als het weekbudget van de coach (Compendium 2011).
 const MET = { wandelen: 4.3, fietsen: 6.8, zwemmen: 6.0, hardlopen: 8.3, roeien: 7.0, crosstrainer: 5.0, stairmaster: 9.0, hiit: 8.0, padel: 6.0, hyrox: 9.0, crossfit: 8.0 }
@@ -29,8 +56,27 @@ const VERVOEGING = [['wandel','gewandeld'],['hardl','hardgelopen'],['run','hardg
 const werkwoord = (soort) => { const n = String(soort || '').toLowerCase(); const t = VERVOEGING.find(([k]) => n.includes(k)); return t ? t[1] : 'getraind' }
 const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 
-export default function CardioLogBlad({ open, soort, minutenGepland, gewicht = 80, onLog, onClose, isMobile }) {
-  const [stap, setStap] = useState(1)
+export default function CardioLogBlad(props) {
+  const scrollBijOpen = useRef(null)
+  useEffect(() => {
+    if (!props.open) return
+    scrollBijOpen.current = window.scrollY
+    // Dicht (gelogd, kruisje, buiten tikken): toetsenbord weg, pagina terug.
+    return () => toetsenbordDicht(scrollBijOpen.current)
+  }, [props.open])
+  if (!props.open) return null
+  return (
+    <BladVangnet onClose={props.onClose} scrollRef={scrollBijOpen}>
+      <CardioLogBladInhoud {...props} naarStap={() => toetsenbordDicht(scrollBijOpen.current)} />
+    </BladVangnet>
+  )
+}
+
+function CardioLogBladInhoud({ open, soort, minutenGepland, gewicht = 80, onLog, onClose, isMobile, naarStap }) {
+  const [stap, setStapRuw] = useState(1)
+  // Elke stapwissel eerst het toetsenbord dicht, anders verdwijnt het
+  // horloge-veld met open toetsenbord en blijft de pagina verschoven.
+  const setStap = (s) => { naarStap(); setStapRuw(s) }
   const [minuten, setMinuten] = useState(30)
   const [intensiteit, setIntensiteit] = useState('gemiddeld')
   const [afstand, setAfstand] = useState('')
@@ -38,7 +84,7 @@ export default function CardioLogBlad({ open, soort, minutenGepland, gewicht = 8
   const [bezig, setBezig] = useState(false)
   useEffect(() => {
     if (!open) return
-    setStap(1); setMinuten(Number(minutenGepland) || 30); setIntensiteit('gemiddeld'); setAfstand(''); setHorloge(''); setBezig(false)
+    setStapRuw(1); setMinuten(Number(minutenGepland) || 30); setIntensiteit('gemiddeld'); setAfstand(''); setHorloge(''); setBezig(false)
   }, [open, minutenGepland, soort])
   if (!open) return null
 
@@ -76,12 +122,17 @@ export default function CardioLogBlad({ open, soort, minutenGepland, gewicht = 8
         distance_km: afstand ? parseFloat(String(afstand).replace(',', '.')) : null,
         intensity: intensiteit, calories: kcal, calories_source: bron,
       })
+    } catch (err) {
+      meldFout(err, null, 'workout:cardio-log', foutContext.clientId)
     } finally { setBezig(false) }
   }
 
   return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+    // Scrollbaar met margin: auto op het blad: past het niet (toetsenbord,
+    // klein scherm), dan kun je erheen scrollen in plaats van dat het buiten
+    // beeld valt.
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.92)', display: 'flex', padding: '1rem', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+      <div onClick={e => e.stopPropagation()} style={{ margin: 'auto', width: '100%', maxWidth: 420,background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
         {/* Kop: stap terug, sport, sluiten */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           {stap > 1 ? (
@@ -140,7 +191,8 @@ export default function CardioLogBlad({ open, soort, minutenGepland, gewicht = 8
             </div>
             <div style={{ position: 'relative', marginBottom: 16 }}>
               <Watch size={16} color="rgba(255,255,255,0.45)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-              <input inputMode="numeric" value={horloge} onChange={e => setHorloge(e.target.value)} placeholder="Kcal volgens je horloge (mag leeg)" style={{ ...veld, paddingLeft: 38 }} />
+              <input inputMode="numeric" value={horloge} onChange={e => setHorloge(e.target.value)} placeholder="Kcal volgens je horloge (mag leeg)" enterKeyHint="done"
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} style={{ ...veld, paddingLeft: 38 }} />
             </div>
             <button onClick={() => setStap(3)} style={primair}>Volgende</button>
           </>

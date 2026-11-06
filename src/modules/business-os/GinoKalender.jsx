@@ -160,7 +160,7 @@ const KLANTEN_DELEN = [
 ]
 function KlantenKnoppen({ open, onKies }) {
   return (
-    <div style={{ display: 'flex', gap: 6, padding: '4px 0 8px' }}>
+    <div style={{ display: 'flex', gap: 6, padding: '4px 0 8px', alignItems: 'center' }}>
       {KLANTEN_DELEN.map((deel) => {
         const { id, label } = deel
         const aan = open === id

@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import CardioLogBlad from './CardioLogBlad'
 import CardioService from '../services/CardioService'
+import { meldFout } from '../../../ui/PaginaVangnet'
 
 export default function CardioLogVanger({ client, db, isMobile }) {
   const [blad, setBlad] = useState(null) // { soort, minuten }
@@ -39,7 +40,10 @@ export default function CardioLogVanger({ client, db, isMobile }) {
       setBlad(null)
       if (navigator.vibrate) navigator.vibrate([20, 40, 20])
       window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
-    } catch (err) { alert('Loggen mislukt: ' + (err?.message || 'onbekende fout')) }
+    } catch (err) {
+      meldFout(err, null, 'workout:cardio-log', client?.id)
+      alert('Loggen mislukt: ' + (err?.message || 'onbekende fout'))
+    }
   }
 
   return (

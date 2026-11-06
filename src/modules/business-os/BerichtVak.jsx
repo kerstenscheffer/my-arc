@@ -87,6 +87,10 @@ export default function BerichtVak({ clientId, voornaam, item, ronde, onItem, me
         content: { bericht: tekst, compliment: s.compliment ?? null, verbeterpunt: s.verbeterpunt ?? null },
       })
       if (nf) setFout(`Verstuurd gezet, notitie mislukt: ${nf.message}`)
+      // Ook in het logboek van de klant (Coach Inzicht > Logboek > Notities, label WhatsApp).
+      const { error: lf } = await supabase.from('client_coaching_logs')
+        .insert({ client_id: clientId, coach_id: coach, status: 'on_track', category: 'whatsapp', note: tekst.trim() })
+      if (lf) setFout(`Verstuurd gezet, logboek mislukt: ${lf.message}`)
     }
   }
 

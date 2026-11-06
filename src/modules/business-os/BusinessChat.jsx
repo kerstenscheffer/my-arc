@@ -48,6 +48,7 @@ import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } fr
 import { createPortal } from 'react-dom'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { waNummer } from './berichtTekst'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
@@ -664,6 +665,8 @@ const isEditor = (g) => g?.soort === 'editor' || g?.naam === 'Editor'
 // wie aandacht nodig heeft, afspraken). De PA krijgt invoer.tab = 'klanten' en
 // zet de focus bovenaan de vraag; de rest is gewoon Gino (Snel/Slim).
 const isKlanten = (g) => g?.soort === 'klanten' || g?.naam === 'Klanten'
+// Transcript als bijlage of geplakt in het Klanten-tabje (6 nov 2026).
+const TRANSCRIPT_HINT = 'Is dit een call-transcript: verwerk het met de skill Call verwerken en geef bij het appje (bewerkbaar_bericht) client_id mee.'
 const metKlanten = (gs, lokaal = []) => {
   if (gs.some(isKlanten)) return gs.map(g => (isKlanten(g) ? { ...g, soort: 'klanten' } : g))
   const t = { ...(lokaal.find(isKlanten) || nieuwTabje('Klanten')), soort: 'klanten' }
@@ -945,6 +948,32 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
   }
   const kopieer = () => navigator.clipboard?.writeText(tekst)
     .then(() => { setKlaar(true); setTimeout(() => setKlaar(false), 1500) }, () => {})
+  // Appje na een call (skill Call verwerken, voorstel.client_id): opslaan in het
+  // logboek van de klant, naar het klembord en WhatsApp open bij de klant.
+  // Versturen doet Kersten zelf (plakken + verzenden).
+  const klant = UUID.test(voorstel.client_id || '') ? voorstel.client_id : null
+  const [verstuurd, setVerstuurd] = useState(() => bewerkingen.get(`${key}|verstuurd`) === true)
+  const [versturen, setVersturen] = useState(false)
+  const [waFout, setWaFout] = useState(null)
+  const opslaanEnVersturen = async () => {
+    if (!klant || versturen || !tekst.trim()) return
+    const venster = window.open('', '_blank')
+    setVersturen(true); setWaFout(null)
+    try {
+      await navigator.clipboard?.writeText(tekst).catch(() => {})
+      const coach = (await supabase.auth.getSession()).data.session?.user?.id || null
+      const { error } = await supabase.from('client_coaching_logs')
+        .insert({ client_id: klant, coach_id: coach, status: 'on_track', category: 'whatsapp', note: tekst.trim() })
+      if (error) throw error
+      const { data } = await supabase.from('clients').select('phone').eq('id', klant).maybeSingle()
+      const nr = waNummer(data?.phone)
+      if (nr) { if (venster) venster.location.href = `https://wa.me/${nr}`; else window.location.href = `https://wa.me/${nr}` }
+      else { venster?.close(); setWaFout('Opgeslagen en gekopieerd, maar geen telefoonnummer bekend.') }
+      bewerkingen.set(`${key}|verstuurd`, true)
+      setVerstuurd(true)
+    } catch (e) { venster?.close(); setWaFout(`Mislukt: ${e.message}`) }
+    setVersturen(false)
+  }
   const knop2 = { ...KNOP, background: 'transparent', color: colors.textPrimary, border: '1px solid rgba(255,255,255,.15)' }
   return (
     <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, margin: '2px 0 8px' }}>
@@ -964,8 +993,15 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
         </span>
         <button type="button" onClick={() => wijzig(origineel)} disabled={tekst === origineel}
           style={{ ...knop2, opacity: tekst === origineel ? 0.4 : 1 }}>Herstel</button>
-        <button type="button" onClick={kopieer} style={KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
+        <button type="button" onClick={kopieer} style={klant ? knop2 : KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
+        {klant && (
+          <button type="button" onClick={opslaanEnVersturen} disabled={versturen || !tekst.trim()}
+            style={{ ...KNOP, background: colors.success, color: '#000', opacity: versturen ? 0.6 : 1 }}>
+            {verstuurd ? 'Opgeslagen ✓ Nog eens' : 'Opslaan en versturen'}
+          </button>
+        )}
       </div>
+      {waFout && <div style={{ color: colors.danger, fontWeight: 700, fontSize: '0.72rem', marginTop: 6 }}>{waFout}</div>}
     </div>
   )
 }
@@ -1431,10 +1467,14 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stuurNu.current?.(naKlanten)
   }, [naKlanten, actief])
 
+  // Tabje Klanten = scherm Klanten erachter (6 nov 2026): wat je daar vraagt
+  // hoort bij je klanten, dus de kalender springt mee naar die weergave.
+  const naarKlantenScherm = () => onKalender?.({ weergave: 'klanten' })
   const kiesGesprek = (id) => {
     setActiefId(id)
     schrijf(ACTIEF_KEY, id)
     setOpen(true)
+    if (isKlanten(gesprekken.find(g => g.id === id))) naarKlantenScherm()
   }
   const extraGesprek = () => {
     const t = nieuwTabje(`Gesprek ${gesprekken.length + 1}`)
@@ -2066,6 +2106,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       if (k) { setNaKlanten(tekst); kiesGesprek(k.id); return true }
     }
     let vraag = (vanBuiten ? tekst : invoer).trim()
+    if (isKlanten(actief) && vraag) naarKlantenScherm()
+    // Geplakt transcript (lange tekst) in het Klanten-tabje: zelfde hint.
+    if (isKlanten(actief) && !vanBuiten && vraag.length > 1500 && !vraag.includes('Call verwerken')) vraag = `${TRANSCRIPT_HINT}\n\n${vraag}`
     const bij = vanBuiten ? [] : bijlagen
     const los = vanBuiten ? [] : bestanden
     if ((!vraag && !bij.length && !los.length) || bezig || uploadt || (vanBuiten && isEditor(actief))) return false
@@ -2079,6 +2122,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       setFout(null)
       try { geupload = await uploadBijlagen(los) } catch (e) { setFout(e.message); return false } finally { setUploadt(false) }
       vraag = [vraag || 'Bekijk de bijlage.', '', ...geupload.map(b => `[bijlage] ${b.naam} | ${b.pad} | ${b.type} | ${b.grootte}`)].join('\n')
+      // Klanten-tabje: een bijlage is meestal een call-transcript (skill Call verwerken).
+      if (isKlanten(actief)) vraag = `${TRANSCRIPT_HINT}\n\n${vraag}`
       setBestanden([])
     }
     stopHerkenner()
