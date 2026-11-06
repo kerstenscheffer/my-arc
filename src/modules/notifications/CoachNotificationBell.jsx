@@ -24,6 +24,14 @@ export default function CoachNotificationBell({ db, onNavigate, open: openProp, 
     return () => clearInterval(interval)
   }, [])
 
+  // Het bolletje in de zijbalk volgt elke wijziging van de telling. Eerder
+  // kreeg de zijbalk het aantal alleen bij de 30-secondenpoll, dus na
+  // "gelezen" bleef het witte bolletje tot een halve minuut staan (6 nov 2026).
+  useEffect(() => {
+    if (typeof onCountChange === 'function') onCountChange(unreadCount)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadCount])
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e) => {
@@ -55,7 +63,6 @@ export default function CoachNotificationBell({ db, onNavigate, open: openProp, 
       setNotifications(data || [])
       const unread = (data || []).filter(n => !n.read_status).length
       setUnreadCount(unread)
-      if (typeof onCountChange === 'function') onCountChange(unread)
     } catch (err) {
       console.error('❌ Notification load error:', err)
     }
