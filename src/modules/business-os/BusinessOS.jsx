@@ -221,6 +221,65 @@ const REACTOR_CSS = `
   }
 `
 
+// Mac-lampje (6 nov): klein licht rechtsboven bij de bol. Groen = de PA op de
+// Mac meldde zich < 2 min geleden (business_os_pa_status.laatst_gezien, eigen
+// coach_id), grijs anders. Tik = kort 'Mac aan/uit, laatst gezien HH:MM'.
+const MAC_AAN_MS = 2 * 60 * 1000
+// iPhone (ook Capacitor): rondjes rechtsboven onder de statusbalk.
+const BOVEN_MOBIEL = 'calc(12px + env(safe-area-inset-top, 0px))'
+function MacLampje({ maat }) {
+  const [gezien, setGezien] = useState(null)
+  const [nu, setNu] = useState(() => Date.now())
+  const [toon, setToon] = useState(false)
+  useEffect(() => {
+    let weg = false
+    const kijk = async () => {
+      const { data: s } = await supabase.auth.getSession().then(r => r, () => ({ data: null }))
+      const id = s?.session?.user?.id
+      if (!id || weg) return
+      const { data } = await supabase.from('business_os_pa_status').select('laatst_gezien').eq('coach_id', id).maybeSingle()
+        .then(r => r, () => ({ data: null }))
+      if (weg) return
+      setGezien(data?.laatst_gezien ? new Date(data.laatst_gezien).getTime() : null)
+      setNu(Date.now())
+    }
+    kijk()
+    const t = setInterval(kijk, 30000)
+    return () => { weg = true; clearInterval(t) }
+  }, [])
+  useEffect(() => {
+    if (!toon) return
+    const t = setTimeout(() => setToon(false), 2500)
+    return () => clearTimeout(t)
+  }, [toon])
+  const aan = gezien != null && nu - gezien < MAC_AAN_MS
+  const tijd = gezien ? new Date(gezien).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : null
+  const tekst = `Mac ${aan ? 'aan' : 'uit'}${tijd ? `, laatst gezien ${tijd}` : ''}`
+  const plek = Math.max(0, Math.round(maat * 0.08))
+  return (
+    <div style={{ position: 'absolute', top: plek, right: plek, zIndex: 3 }}>
+      <button type="button" onClick={e => { e.stopPropagation(); setNu(Date.now()); setToon(v => !v) }}
+        aria-label={tekst} title={tekst}
+        style={{ width: 22, height: 22, margin: -7, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', display: 'block',
+          background: aan ? C.groen : 'rgba(255,255,255,0.28)',
+          boxShadow: aan ? `0 0 8px ${C.groen}` : 'none', transition: 'background 0.4s, box-shadow 0.4s',
+        }} />
+      </button>
+      {toon && (
+        <div role="status" style={{
+          position: 'absolute', top: 16, right: -7, whiteSpace: 'nowrap', pointerEvents: 'none',
+          background: '#0a0a0a', border: `1px solid ${C.rand}`, borderRadius: 10, padding: '6px 10px',
+          fontSize: '0.75rem', fontWeight: 700, color: C.wit, boxShadow: '0 10px 28px rgba(0,0,0,0.6)',
+        }}>
+          {tekst}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Reactor({ pct, maat, bezig, praat, stemAan, fout, wekker = false, melding, onKlik, zonderNaam = false, klikTitel = null }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
@@ -1355,7 +1414,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
       <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
-        position: 'absolute', top: isMobile ? 12 : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
+        position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
         width: 36, height: 36, borderRadius: '50%', border: `1.5px solid ${kalender ? colors.success : '#fff'}`,
         background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1364,7 +1423,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
       </button>
 
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
-      <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
+      <div style={{ position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
           width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff',
           background: menu ? colors.surface : 'transparent', color: C.wit, cursor: 'pointer',
@@ -1402,13 +1461,13 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
         alignItems: 'center', justifyContent: 'flex-end',
       }}>
         {kalender && (
-          <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 0 }}>
+          <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
               onVraag={(t, o) => stuurRef.current?.(t, o)} />
           </div>
         )}
         {podiumOpen && (
-          <div ref={setPodiumEl} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }} />
+          <div ref={setPodiumEl} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 44 }} />
         )}
         {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
         <div ref={miniVak} onPointerDown={isMini ? sleepMini : undefined} onClickCapture={isMini ? naMiniSleep : undefined} style={isZij ? {
@@ -1424,6 +1483,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
         } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
           <div data-sleep-ok="" style={{ position: 'relative', flexShrink: 0 }}>
             <Reactor zonderNaam={isMini || telefoonKlein} klikTitel={isZij ? 'Gino openen' : null} pct={pctDoel} maat={isMini ? 64 : telefoonKlein ? 44 : maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} wekker={wekker} melding={stemMelding} onKlik={isZij ? () => zetZijkant(false) : klikRing} />
+            {!isZij && !beperkt && <MacLampje maat={isMini ? 64 : telefoonKlein ? 44 : maat} />}
             {!isZij && <GinoHerinnering maat={isMini ? 64 : telefoonKlein ? 44 : maat} isMobile={isMobile} onPraat={setHerinnertPraat} kaart={isMini || telefoonKlein} onder={!telefoonKlein && (miniPos?.y ?? 999) < 240} />}
             {!beperkt && (
               <TimerBlok key={timer.stand?.taak?.titel || ''} timer={timer} onAfvinken={vinkTimerAf} onStop={stopTimer}

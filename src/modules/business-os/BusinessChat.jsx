@@ -58,7 +58,11 @@ import { useNieuweVersie } from './useNieuweVersie'
 import { contentUitHash, openContent } from './contentStatusData'
 
 const KEY = 'business_os_chat'
-const PA_ONLINE_MS = 45000
+// Mac telt als aan als de PA zich < 2 min geleden meldde (zelfde regel als het
+// Mac-lampje in BusinessOS.jsx). Hartslag is elke 15 s; pakt de Mac een vraag
+// toch niet op, dan valt hij na 25 s terug op de API.
+const PA_ONLINE_MS = 2 * 60 * 1000
+const ORANJE = '#f59e0b' // alleen voor de API-waarschuwing (kost geld)
 const MAX_BEELDEN = 10 // zoveel recente screenshots gaan mee naar de AI (de PA pakt er net zoveel)
 const INVOER_MAX_H = 130 // ~6 regels
 const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
@@ -79,6 +83,68 @@ const KNOP = {
 const KNOP_RAND = { ...KNOP, background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }
 const KAART = { margin: '2px 0 6px', fontSize: '0.76rem', lineHeight: 1.35 }
 const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 2 }
+
+// Mac/API-pil in de tabjesrij (6 nov): altijd zichtbaar, op telefoon vast links.
+// Groen + Mac = via de Mac, gratis. Oranje + API = kost geld. Tik = korte uitleg
+// met laatst gezien, verversen en de Mac/API-keuze.
+function MacPil({ viaMac, route, paOnline, gezien, herstart, kanHerstarten, onHerstart, onWissel, isMobile }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const buiten = (e) => { if (!e.target.closest?.('[data-mac-pil]')) setOpen(false) }
+    const t = setTimeout(() => setOpen(false), 8000)
+    document.addEventListener('pointerdown', buiten)
+    return () => { clearTimeout(t); document.removeEventListener('pointerdown', buiten) }
+  }, [open])
+  const kleur = viaMac ? colors.success : ORANJE
+  const tijd = gezien ? new Date(gezien).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : null
+  const regel = viaMac ? 'Mac aan, gratis' : paOnline && route === 'api' ? 'API gekozen, dit kost geld' : 'Mac uit, dit kost geld via de API'
+  const knop = { ...KNOP_RAND, minHeight: isMobile ? 44 : 32, fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: 6 }
+  return (
+    <div data-mac-pil style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={regel}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          height: isMobile ? 44 : 26, minWidth: isMobile ? 44 : undefined, margin: isMobile ? '-9px 0' : 0,
+          padding: isMobile ? '0 4px 0 0' : '0 0 0 4px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999,
+          background: colors.surface, border: `1px solid ${kleur}66`,
+          color: colors.textPrimary, fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap',
+        }}>
+          <span className={herstart ? 'bos-stip' : undefined} style={{
+            width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kleur, boxShadow: `0 0 6px ${kleur}88`,
+          }} />
+          {herstart ? 'Herstart' : viaMac ? 'Mac' : 'API'}
+        </span>
+      </button>
+      {open && (
+        <div role="status" style={{
+          position: 'absolute', bottom: '100%', marginBottom: 10, zIndex: 7, ...(isMobile ? { left: 0 } : { right: 0 }),
+          width: 'max-content', maxWidth: '86vw', display: 'flex', flexDirection: 'column', gap: 10, padding: 14, boxSizing: 'border-box',
+          background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 900, color: viaMac ? colors.textPrimary : ORANJE, lineHeight: 1.35 }}>
+            {regel}
+            <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: colors.textSecondary }}>
+              {tijd ? `Laatst gezien ${tijd}` : 'Nog niet gezien'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onHerstart} disabled={herstart || !kanHerstarten} title="PA op je Mac herstarten en scherm verversen"
+              style={{ ...knop, opacity: herstart || !kanHerstarten ? 0.4 : 1, cursor: herstart || !kanHerstarten ? 'default' : 'pointer' }}>
+              <RotateCw size={13} strokeWidth={2.5} className={herstart ? 'bos-draai' : undefined} /> Verversen
+            </button>
+            <button type="button" onClick={onWissel} style={knop}>
+              {route === 'api' ? 'Via Mac' : 'Altijd API'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 6 }
 
 // Bijlagen (31 okt): bestanden (pdf, csv, Excel, txt, foto's) gaan naar de
@@ -609,7 +675,34 @@ const metEditorAlleen = (gs, lokaal = []) => {
   const t = { ...(lokaal.find(isEditor) || nieuwTabje('Editor')), soort: 'editor' }
   return [...gs.slice(0, 2), t, ...gs.slice(2)]
 }
-const metEditor = (gs, lokaal = []) => metKlanten(metEditorAlleen(gs, lokaal), lokaal)
+// Eén tabje per naam (6 nov): een tweede apparaat maakte eigen Code/Strategie/
+// Editor/Klanten met nieuwe id's; die kwamen via 'lokaal met berichten erachter'
+// ook in de database, dus stond Code er twee keer. Dubbelen worden hier
+// samengevoegd in het eerste tabje: berichten op tijd (op) gesorteerd en
+// ontdubbeld, sessie van het laatst gebruikte. De oude rijen blijven in de
+// database staan (niets weg); samen = hun id's, voor het actieve tabje.
+const berichtSleutel = (b) => `${b?.op || ''}|${b?.role || ''}|${String(b?.content ?? '').slice(0, 80)}`
+const laatsteOp = (g) => Math.max(g.bijgewerkt || 0, ...g.berichten.map(b => b?.op || 0))
+const eenPerNaam = (gs) => {
+  const perNaam = new Map()
+  gs.forEach(g => { const k = (g.naam || '').trim().toLowerCase(); perNaam.set(k, [...(perNaam.get(k) || []), g]) })
+  if ([...perNaam.values()].every(l => l.length === 1)) return gs
+  return gs.flatMap(g => {
+    const groep = perNaam.get((g.naam || '').trim().toLowerCase())
+    if (groep[0] !== g) return []
+    if (groep.length === 1) return [g]
+    const gezien = new Set()
+    const berichten = groep.flatMap(x => x.berichten)
+      .filter(b => { const s = berichtSleutel(b); if (gezien.has(s)) return false; gezien.add(s); return true })
+      .map((b, i) => ({ b, i })).sort((a, z) => ((a.b?.op || 0) - (z.b?.op || 0)) || (a.i - z.i)).map(x => x.b)
+    const recent = groep.reduce((a, x) => (laatsteOp(x) > laatsteOp(a) ? x : a))
+    const samen = [...new Set([...(g.samen || []), ...groep.slice(1).flatMap(x => [x.id, ...(x.samen || [])])])]
+    // bijgewerkt blijft die van het eerste tabje: samenvoegen schrijft zelf niets
+    // weg (opslaan houdt de laatste 40), pas een nieuw bericht doet dat.
+    return [{ ...g, berichten, sessie: recent.sessie, samen }]
+  })
+}
+const metEditor = (gs, lokaal = []) => metKlanten(metEditorAlleen(eenPerNaam(gs), lokaal), lokaal)
 // Code, Strategie, Editor en Klanten kunnen niet dicht.
 const isVast = (g, i) => i < 2 || isEditor(g) || isKlanten(g)
 const leesGesprekken = () => {
@@ -1271,7 +1364,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // 'Code' nog op een antwoord of code-opdracht wacht.
   const [gesprekken, setGesprekken] = useState(leesGesprekken)
   const [actiefId, setActiefId] = useState(() => lees(ACTIEF_KEY))
-  const actief = gesprekken.find(g => g.id === actiefId) || gesprekken[0]
+  const actief = gesprekken.find(g => g.id === actiefId) || gesprekken.find(g => g.samen?.includes(actiefId)) || gesprekken[0]
   const gesprek = actief.berichten
   useEffect(() => { onTab?.(actief.id) }, [actief.id, onTab])
   const gesprekkenRef = useRef(gesprekken)
@@ -1519,6 +1612,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // Draait de PA op de Mac? (hartslag elke 15 s). Route = Kerstens keuze
   // (klik op Mac/API), maar Mac alleen als de PA ook echt online is.
   const [paOnline, setPaOnline] = useState(false)
+  const [paGezien, setPaGezien] = useState(null) // laatst_gezien van de PA (ms)
   const [route, setRoute] = useState(() => { try { return localStorage.getItem('business_os_route') || 'mac' } catch { return 'mac' } })
   const wisselRoute = () => setRoute(r => {
     const n = r === 'mac' ? 'api' : 'mac'
@@ -1556,7 +1650,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   useEffect(() => {
     let weg = false
     const kijk = () => supabase.from('business_os_pa_status').select('laatst_gezien').maybeSingle()
-      .then(({ data }) => { if (!weg) setPaOnline(!!data && Date.now() - new Date(data.laatst_gezien).getTime() < PA_ONLINE_MS) }, () => {})
+      .then(({ data }) => {
+        if (weg) return
+        const t = data?.laatst_gezien ? new Date(data.laatst_gezien).getTime() : null
+        setPaGezien(t)
+        setPaOnline(t != null && Date.now() - t < PA_ONLINE_MS)
+      }, () => {})
     kijk()
     const t = setInterval(kijk, 15000)
     return () => { weg = true; clearInterval(t) }
@@ -2296,9 +2395,18 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 ))}
               </div>
             )}
+            {/* Mac/API-pil buiten de scrollrij: telefoon vast links, desktop rechts. */}
+            {(() => {
+              const macPil = !beperkt && (
+                <MacPil viaMac={viaMac} route={route} paOnline={paOnline} gezien={paGezien} herstart={herstart}
+                  kanHerstarten={!ergensBezig} onHerstart={herstartPa} onWissel={wisselRoute} isMobile={isMobile} />
+              )
+              return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 0, height: 26, minWidth: 0 }}>
+            {isMobile && macPil}
             {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
             <div className={isMobile ? 'bos-tabjes' : undefined} style={{
-              display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0,
+              display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0, flex: 1,
               ...(isMobile ? { overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' } : null),
             }}>
               {/* Klik op het poppetje: berichtenvenster open/dicht. Groene stip = iets ongelezen. */}
@@ -2398,34 +2506,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 }}>+</button>
               </div>
               <span onClick={() => setOpen(o => !o)} style={{ flex: isMobile ? 1 : '0 0 8px', minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
-              {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
-              {!beperkt && <button onClick={wisselRoute}
-                title={route === 'api' ? 'Via de API. Klik: via je Mac'
-                  : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
-                  : 'Mac gekozen, maar de PA draait niet: gaat nu via de API. Klik: altijd API'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 2px', flexShrink: 0,
-                  fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
-                  color: viaMac || route === 'api' ? colors.textSecondary : colors.textMuted, fontFamily: 'inherit',
-                }}>
-                <span className={herstart ? 'bos-stip' : undefined} style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: viaMac ? colors.success : route === 'api' ? colors.textPrimary : colors.danger,
-                  boxShadow: viaMac ? `0 0 6px ${colors.success}88` : 'none',
-                }} />
-                {!isMobile && (herstart ? 'Herstart' : route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
-              </button>}
-              {!beperkt && route === 'mac' && (
-                <button onClick={herstartPa} disabled={herstart || ergensBezig} title="PA op je Mac herstarten en scherm verversen"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 26, padding: 0, flexShrink: 0,
-                    background: 'transparent', border: 'none', cursor: herstart || ergensBezig ? 'default' : 'pointer',
-                    color: colors.textMuted, opacity: ergensBezig ? 0.4 : 1,
-                  }}>
-                  <RotateCw size={12} strokeWidth={2.5} className={herstart ? 'bos-draai' : undefined} />
-                </button>
-              )}
             </div>
+            {!isMobile && macPil}
+            </div>
+              )
+            })()}
             {wachtLijst.map(w => (
               <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 38 }}>
                 <span title={w.tekst} style={{
