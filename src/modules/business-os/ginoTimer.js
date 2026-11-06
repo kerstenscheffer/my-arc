@@ -11,6 +11,7 @@
 //          rest: ms over tijdens pauze of null }
 
 import { useState, useEffect, useCallback } from 'react'
+import { eerstvolgendeVanKersten } from './testBord.js'
 
 const KEY = 'business_os_timer'
 
@@ -111,18 +112,26 @@ export function useGinoTimer() {
   return { stand, rest, af, gepauzeerd: !!stand && !stand.eind, start, pauze, hervat, verleng, sluit }
 }
 
-// Open bordkaarten van Kersten: projecten in uitvoering, stappen met wie kersten
-// en klaar niet true. Vroegste dag eerst, zonder dag achteraan.
+// Open bordkaarten van Kersten (projecten in uitvoering, wie kersten, klaar niet true) in drie groepen:
+//   nu: per fase de eerstvolgende kaart, dezelfde regel als de witte rand (eerstvolgendeVanKersten, zonder voorstellen)
+//   later: overige open kaarten zonder voorstel
+//   voorstellen: voorstel true (Gino bedacht, Kersten bevestigde nog niet)
+// Elke groep op dag, zonder dag achteraan.
 export function openKaarten(projecten) {
-  const uit = []
+  const nu = [], later = [], voorstellen = []
   for (const p of projecten || []) {
     for (const fase of p.plan?.fases || []) {
-      for (const s of fase.stappen || []) {
-        if (s?.id && s.wie === 'kersten' && s.klaar !== true && s.titel) {
-          uit.push({ soort: 'kaart', id: s.id, projectId: p.id, titel: s.titel, project: p.titel, dag: s.dag || null })
-        }
-      }
+      const stappen = fase.stappen || []
+      const eerst = eerstvolgendeVanKersten(stappen)
+      stappen.forEach((s, si) => {
+        if (!s?.id || s.wie !== 'kersten' || s.klaar === true || !s.titel) return
+        const k = { soort: 'kaart', id: s.id, projectId: p.id, titel: s.titel, project: p.titel, fase: fase.naam || '', dag: s.dag || null }
+        if (s.voorstel === true) voorstellen.push(k)
+        else if (si === eerst) nu.push(k)
+        else later.push(k)
+      })
     }
   }
-  return uit.sort((a, b) => (a.dag || '9').localeCompare(b.dag || '9'))
+  const opDag = (a, b) => (a.dag || '9').localeCompare(b.dag || '9')
+  return { nu: nu.sort(opDag), later: later.sort(opDag), voorstellen: voorstellen.sort(opDag) }
 }

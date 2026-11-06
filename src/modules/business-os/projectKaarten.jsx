@@ -4,7 +4,7 @@
 // het testbord (TestBord): kaart, invoerveld, + Kaart, oordeelpil en cijfer.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BookOpen, Check, CheckCircle2, ChevronRight, ChevronUp, Film, Phone, Plus, X } from 'lucide-react'
+import { BookOpen, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Film, Phone, Plus, X } from 'lucide-react'
 import { isDag, kortDag } from './testBord.js'
 import { colors } from '../../ui/tokens'
 
@@ -133,7 +133,7 @@ function NotitieTekst({ tekst, klaar, isMobile, onBewerk }) {
         }}
         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
         <span style={{
-          fontSize: 12, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: `rgba(255,255,255,${klaar ? 0.5 : 0.7})`,
+          fontSize: 12, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: `rgba(255,255,255,${klaar ? 0.85 : 0.7})`,
           ...(uit ? { display: 'block' } : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
         }}>{tekst}</span>
       </button>
@@ -149,11 +149,18 @@ function NotitieTekst({ tekst, klaar, isMobile, onBewerk }) {
 // Op het bord (opBord): volle kolombreedte, geen kader, eigenaar, datum en notitie (onWie, onDag, onNotitie),
 // en eventueel slepen (onSleepStart) en een pijltje naar de volgende kolom (onVolgende).
 // witteRand: binnen de kaart getekend, dus de kaart verspringt niet en de slider knipt de rand niet af.
-export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, onKlaar, onTekst, onWeg, opBord = false, onWie, onDag, onNotitie, onVolgende, onSleepStart, onSleepEind }) {
+// s.voorstel === true (Gino bedacht, nog niet bevestigd): stippelrand en label Voorstel; tik op het label = onVoorstelWeg.
+// Afgevinkt (s.klaar): geen vlak, inhoud op dekking 0,4, kleinere titel; op het bord ingeklapt tot de titel (pijltje klapt uit).
+// Het vinkje staat buiten het gedimde deel en blijft fel groen.
+export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, onKlaar, onTekst, onWeg, opBord = false, onWie, onDag, onNotitie, onVoorstelWeg, onVolgende, onSleepStart, onSleepEind }) {
   const [titelOpen, setTitelOpen] = useState(false)
   const [notitieOpen, setNotitieOpen] = useState(false)
   const [datumOpen, setDatumOpen] = useState(false)
+  const [afUit, setAfUit] = useState(false)
   const bewerkt = titelOpen || notitieOpen || datumOpen
+  const af = !!s.klaar
+  const inklapbaar = opBord && af
+  const ingeklapt = inklapbaar && !afUit && !notitieOpen && !datumOpen
   const notitie = opBord && typeof s.notitie === 'string' ? s.notitie.trim() : ''
   const Icoon = SOORT_ICOON[s.soort] || CheckCircle2
   const isNu = s.dag === vandaag
@@ -164,6 +171,7 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
   // Telefoon: pijltje naast het kruisje. Desktop: eronder, dus de tekst houdt zijn breedte.
   const rechts = isMobile ? (metPijl ? 76 : 40) : 28
   const sleepbaar = !!onSleepStart && !bewerkt
+  const voorstel = opBord && s.voorstel === true
   const metaRegel = meta && (
     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: achter ? '#f59e0b' : isNu ? G : 'rgba(255,255,255,0.7)', marginTop: 2 }}>
       <Icoon size={12} strokeWidth={2.6} /> {meta}
@@ -181,8 +189,9 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
       style={{
         ...kaartMaat(isMobile, opBord), position: 'relative', boxSizing: 'border-box', display: 'flex', gap: 10, alignItems: 'flex-start', minHeight: metPijl && !isMobile ? 52 : 44, minWidth: 0,
         padding: `10px ${rechts}px 10px 10px`, borderRadius: 10, cursor: sleepbaar ? 'grab' : undefined,
-        background: oplichten ? `${G}22` : isNu ? `${G}14` : opBord ? colors.surface : 'transparent',
-        ...(witteRand ? { outline: '1.5px solid #fff', outlineOffset: -1.5 } : {}),
+        background: af ? 'transparent' : oplichten ? `${G}22` : isNu ? `${G}14` : opBord ? colors.surface : 'transparent',
+        ...(voorstel ? { outline: '1.5px dashed rgba(255,255,255,0.55)', outlineOffset: -1.5 }
+          : witteRand ? { outline: '1.5px solid #fff', outlineOffset: -1.5 } : {}),
       }}>
       <button type="button" onClick={onKlaar} aria-pressed={!!s.klaar} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
         flexShrink: 0, padding: rondMarge, margin: -rondMarge, border: 'none', background: 'none', cursor: 'pointer', display: 'flex',
@@ -193,17 +202,25 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
           display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000',
         }}>{s.klaar && <Check size={13} strokeWidth={3.5} />}</span>
       </button>
-      <div style={{ minWidth: 0, flex: 1 }}>
+      <div style={{ minWidth: 0, flex: 1, opacity: af ? 0.4 : 1, transition: 'opacity .2s' }}>
         {titelOpen ? (
           <StapInvoer begin={s.titel || ''} label="Stap" isMobile={isMobile}
             onKlaar={t => { setTitelOpen(false); if (t) onTekst(t) }} />
         ) : (
-          <button type="button" onClick={() => setTitelOpen(true)} style={{
-            display: 'block', width: '100%', minHeight: 18, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
-            fontSize: 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: s.klaar ? 'line-through' : 'none',
-          }}>{s.titel}</button>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+            <button type="button" onClick={() => setTitelOpen(true)} style={{
+              display: 'block', flex: 1, minWidth: 0, minHeight: 18, padding: 0, border: 'none', background: 'none', cursor: 'text', textAlign: 'left', fontFamily: 'inherit',
+              fontSize: af ? 13 : 14, fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere', color: '#fff', textDecoration: af ? 'line-through' : 'none',
+            }}>{s.titel}</button>
+            {inklapbaar && (
+              <button type="button" onClick={() => setAfUit(u => !u)} aria-expanded={afUit} aria-label={afUit ? 'Inklappen' : 'Uitklappen'} style={{
+                flexShrink: 0, width: isMobile ? 36 : 18, height: isMobile ? 36 : 18, margin: isMobile ? '-9px 0' : 0, padding: 0, border: 'none', background: 'none',
+                color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{afUit ? <ChevronUp size={14} strokeWidth={2.8} /> : <ChevronDown size={14} strokeWidth={2.8} />}</button>
+            )}
+          </div>
         )}
-        {notitieOpen ? (
+        {ingeklapt ? null : notitieOpen ? (
           <div style={{ marginTop: 4 }}>
             <StapInvoer begin={notitie} label="Notitie" isMobile={isMobile} fontGrootte={12} meerregelig
               onKlaar={t => { setNotitieOpen(false); if (t !== null) onNotitie(t) }} />
@@ -211,8 +228,12 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
         ) : notitie ? (
           <NotitieTekst tekst={notitie} klaar={s.klaar} isMobile={isMobile} onBewerk={() => setNotitieOpen(true)} />
         ) : null}
-        {opBord ? (
+        {ingeklapt ? null : opBord ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 12 }}>
+            {voorstel && !datumOpen && (
+              <button type="button" onClick={onVoorstelWeg} disabled={!onVoorstelWeg} aria-label="Voorstel van Gino. Tik om te bevestigen" title="Tik om te bevestigen"
+                style={{ ...rijKnop(isMobile), color: G }}>Voorstel</button>
+            )}
             <Eigenaar wie={s.wie} isMobile={isMobile} onWie={onWie} />
             {datumOpen ? (
               <div style={{ flex: '1 1 100%', marginTop: 4 }}>
@@ -221,7 +242,7 @@ export function StapKaart({ s, vandaag, isMobile, oplichten, witteRand = false, 
               </div>
             ) : isDag(s.dag) ? (
               <button type="button" onClick={() => setDatumOpen(true)} aria-label={`Datum: ${kortDag(s.dag)}. Wijzig`} style={{
-                ...rijKnop(isMobile), color: achter ? '#f59e0b' : isNu ? G : s.klaar ? 'rgba(255,255,255,0.5)' : '#fff', fontVariantNumeric: 'tabular-nums',
+                ...rijKnop(isMobile), color: achter ? '#f59e0b' : isNu ? G : '#fff', fontVariantNumeric: 'tabular-nums',
               }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icoon size={12} strokeWidth={2.6} /> {kortDag(s.dag)}</span>
               </button>

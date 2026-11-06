@@ -35,6 +35,8 @@
 //         Alleen zichtbaar op het bord. Tellen nergens mee (bordStand, klaar-regels, meting).
 //       stappen[].vast (optioneel): true = de takenronde kreeg de kaart niet af, reden staat in notitie. Oranje label Vast op het bord.
 //         Veld weghalen (kaart met "vast":null) en de kaart doet weer mee.
+//       stappen[].voorstel (optioneel): true = Gino bedacht de kaart, Kersten bevestigde nog niet. Stippelrand + label Voorstel
+//         op het bord; nooit de witte rand; in de timerkeuze gedimd onderaan. Kersten tikt het label weg = bevestigd (veld weg).
 //       test erbij: wat, controlegroep, posts_doel (getal), besluit (meer|aanpassen|stoppen), les
 //       test mag leeg {} zijn; zonder test.van is de test niet gestart (Posten en Meten: Nog geen data)
 //       test.suggesties (optioneel): { wat?, nulmeting_per_10? (getal), controlegroep?, posts_doel? (getal), verwachting?,

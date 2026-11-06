@@ -379,6 +379,7 @@ export default function TestBord({ projectId, f, fi, doel, vandaag, isMobile, hu
                           <StapKaart s={s} vandaag={vandaag} isMobile={isMobile} opBord witteRand={si === eerstvolgende} oplichten={huidig?.stappen?.includes(s.id)}
                             onKlaar={() => zetStap(s.id, !s.klaar)} onTekst={t => zetStapTekst(s.id, t)} onWeg={() => stapWeg(fi, si)}
                             onWie={wie => zetKaart(s.id, { wie })} onDag={dag => zetKaart(s.id, { dag })} onNotitie={notitie => zetKaart(s.id, { notitie })}
+                            onVoorstelWeg={s.id ? () => zetKaart(s.id, { voorstel: null }) : null}
                             onVolgende={volgende && s.id ? () => verplaats(s.id, volgende) : null}
                             onSleepStart={!isMobile && s.id ? () => sleepStart(s.id) : null} onSleepEind={sleepEind} />
                         </Fragment>

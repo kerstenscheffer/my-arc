@@ -1,7 +1,7 @@
 // src/modules/business-os/GinoTimer.jsx
 //
 // Taaktimer in Business OS (6 nov 2026). TimerKiezer zit in het blad onder de
-// puntjes (Timer): taak kiezen of typen, dan duur. TimerBlok is het aftellende
+// puntjes (Timer): taak kiezen (Nu, Later, Voorstellen van Gino) of typen, dan duur. TimerBlok is het aftellende
 // blokje bij de bol: pauze en stop, en als de tijd op is Klaar? met Afvinken en
 // +10 min. Logica en opslag: ginoTimer.js.
 
@@ -19,6 +19,7 @@ const GROEN = colors.success
 const LIJN = 'rgba(255,255,255,0.06)'
 const DUREN = [15, 25, 45, 60]
 const KOP = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: WIT, margin: '20px 0 4px' }
+const LEEG = { fontSize: '0.85rem', color: ZACHT, padding: '8px 0' }
 const TIK = { minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', color: WIT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }
 
 const vandaagIso = () => {
@@ -28,11 +29,11 @@ const vandaagIso = () => {
 const kortDag = (iso) => (iso === vandaagIso() ? 'vandaag'
   : new Date(`${iso}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }))
 
-function Regel({ titel, sub, rechts, onKies }) {
+function Regel({ titel, sub, rechts, dim = false, onKies }) {
   return (
     <button type="button" onClick={onKies} style={{
       ...TIK, width: '100%', justifyContent: 'flex-start', gap: 12, textAlign: 'left',
-      padding: '8px 0', borderBottom: `1px solid ${LIJN}`,
+      padding: '8px 0', borderBottom: `1px solid ${LIJN}`, opacity: dim ? 0.45 : 1,
     }}>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, lineHeight: 1.3 }}>{titel}</span>
@@ -59,6 +60,16 @@ export function TimerKiezer({ taken, lopend, onStart }) {
   }, [])
 
   const kiesEigen = () => { const t = eigen.trim(); if (t) setTaak({ soort: 'eigen', id: null, titel: t }) }
+
+  // Nu: kaarten met dag vandaag of eerder, dan de taken van vandaag, dan de rest.
+  const vandaag = vandaagIso()
+  const nuVoor = (kaarten?.nu || []).filter(k => k.dag && k.dag <= vandaag)
+  const nuNa = (kaarten?.nu || []).filter(k => !(k.dag && k.dag <= vandaag))
+  const kaartRegel = (k, metFase = false, dim = false) => (
+    <Regel key={`${k.projectId}:${k.id}`} titel={k.titel} dim={dim}
+      sub={metFase && k.fase ? `${k.project} · ${k.fase}` : k.project} rechts={k.dag ? kortDag(k.dag) : null}
+      onKies={() => setTaak({ soort: 'kaart', id: k.id, projectId: k.projectId, titel: k.titel })} />
+  )
 
   if (taak) {
     const ok = minuten >= 1
@@ -111,20 +122,29 @@ export function TimerKiezer({ taken, lopend, onStart }) {
         </button>
       </form>
 
-      <div style={KOP}>Bord</div>
-      {kaarten === null && <div style={{ fontSize: '0.85rem', color: ZACHT, padding: '8px 0' }}>Laden…</div>}
-      {kaarten?.length === 0 && <div style={{ fontSize: '0.85rem', color: ZACHT, padding: '8px 0' }}>Geen open kaarten.</div>}
-      {(kaarten || []).map(k => (
-        <Regel key={`${k.projectId}:${k.id}`} titel={k.titel} sub={k.project} rechts={k.dag ? kortDag(k.dag) : null}
-          onKies={() => setTaak({ soort: 'kaart', id: k.id, projectId: k.projectId, titel: k.titel })} />
-      ))}
-
-      <div style={KOP}>Vandaag</div>
-      {(taken || []).length === 0 && <div style={{ fontSize: '0.85rem', color: ZACHT, padding: '8px 0' }}>Geen taken.</div>}
+      <div style={KOP}>Nu</div>
+      {kaarten === null && <div style={LEEG}>Laden…</div>}
+      {nuVoor.map(k => kaartRegel(k, true))}
       {(taken || []).map(t => (
         <Regel key={t.id} titel={t.title}
           onKies={() => setTaak({ soort: 'taak', id: t.id, titel: t.title, scheduled_date: t.scheduled_date || null })} />
       ))}
+      {nuNa.map(k => kaartRegel(k, true))}
+      {kaarten && !nuVoor.length && !nuNa.length && !(taken || []).length && <div style={LEEG}>Niets open.</div>}
+
+      {kaarten?.later.length > 0 && (
+        <>
+          <div style={KOP}>Later</div>
+          {kaarten.later.map(k => kaartRegel(k))}
+        </>
+      )}
+
+      {kaarten?.voorstellen.length > 0 && (
+        <>
+          <div style={KOP}>Voorstellen van Gino</div>
+          {kaarten.voorstellen.map(k => kaartRegel(k, false, true))}
+        </>
+      )}
     </div>
   )
 }
