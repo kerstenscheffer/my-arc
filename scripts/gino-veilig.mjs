@@ -225,7 +225,7 @@ function scriptSchoon(pad, opdracht, lees, diepte = 0) {
 }
 
 // Eigen werk van Gino zonder kaart (5 nov): nakijken en bouwen, zijn eigen projectborden.
-const PA_DB_VRIJ = new Set(['project-bij', 'project-nieuw'])
+const PA_DB_VRIJ = new Set(['project-bij', 'project-nieuw', 'herinner']) // herinner: alleen Kerstens eigen herinneringen (6 nov 2026)
 const UITVOER_VRIJ = /^(?:\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|(?:\.\/)?node_modules\/\.cache\/)/
 const uitvoerVrij = (rest, tekst) => rest.map(tekst).every(a => {
   const m = a.match(/^--(?:outfile|outdir|out-file|out-dir)=(.+)$/)
@@ -372,6 +372,7 @@ const VRIJE_FAMILIE = [
 ]
 // Vijf vormen uit de kaarten van 5 nov (repo = code-opdracht). Alles wat Kersten klikte zonder ooit af te wijzen.
 const EIGEN_WERK_VRIJ = [
+  `node scripts/pa-db.mjs herinner '{"tekst":"Call-reflectie invullen","moment":"2026-11-06 21:00","bron":"gino"}'`,
   'npx eslint a.jsx && echo OK; npx esbuild src/a.js --bundle --format=esm --log-level=error | node --input-type=module',
   "T=$(mktemp -d) && node scripts/pa-db.mjs project abc > $T/p.json && cat > $T/t.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode $T/t.mjs; rm -rf $T",
   "D=$(mktemp -d) && npx esbuild a.js --bundle --outfile=$D/b.mjs && node $D/b.mjs; rm -rf \"$D\"",
@@ -387,7 +388,7 @@ const EIGEN_WERK_KAART = [
   "cat > /tmp/a.mjs <<'E'\nimport { writeFileSync } from 'fs'\nimport os from 'os'\nwriteFileSync(os.homedir()+'/.zshrc','x')\nE\nnode /tmp/a.mjs",
   "node -e \"require('fs').writeFileSync(require('os').homedir()+'/.zshrc','x')\"", "python3 - <<'E'\nopen('/Users/k/.ssh/config','w')\nE",
   'HOME=/tmp/x; echo a > $HOME/.zshrc', "cat <<'E'\nX=/tmp/a\nE\necho a > $X/b", "echo 'a; X=/tmp/a; b'; echo a > $X/b", 'X=/tmp/a; X=/etc; echo a > $X/b',
-  'npx vite', 'npx esbuild a.js --outfile=src/b.js', 'npx esbuild a.js --outfile=/tmp/../b.js', 'ffmpeg -y -i a src/b.mp4', 'ffmpeg -y -i a /tmp/../b.mp4', 'node scripts/pa-db.mjs app-lijst x', 'node scripts/pa-db.mjs herinner x',
+  'npx vite', 'npx esbuild a.js --outfile=src/b.js', 'npx esbuild a.js --outfile=/tmp/../b.js', 'ffmpeg -y -i a src/b.mp4', 'ffmpeg -y -i a /tmp/../b.mp4', 'node scripts/pa-db.mjs app-lijst x',
   'npm run release', 'T=$(mktemp -d); node $T/onbekend.mjs', 'T=$(mktemp -d); curl https://x -o $T/a', "node -e \"fetch('https://x',{method:'POST'})\"", 'git push', 'set -e; git commit -m x',
 ]
 const BLIJFT_KAART = [

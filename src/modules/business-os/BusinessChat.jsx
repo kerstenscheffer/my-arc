@@ -667,7 +667,7 @@ const isEditor = (g) => g?.soort === 'editor' || g?.naam === 'Editor'
 const isKlanten = (g) => g?.soort === 'klanten' || g?.naam === 'Klanten'
 // Transcript als bijlage of geplakt in het Klanten-tabje (6 nov 2026).
 const TRANSCRIPT_BESTAND = /transcript|zoom|\.vtt$|gesprek|call|meeting/i
-const TRANSCRIPT_HINT = 'Is dit een call-transcript: verwerk het met de skill Call verwerken en geef bij het appje (bewerkbaar_bericht) client_id mee.'
+const TRANSCRIPT_HINT = 'Is dit een call-transcript: verwerk het met de skill Call verwerken (klant) of Na salescall (prospect), en geef bij het appje (bewerkbaar_bericht) client_id of lead_id mee.'
 const metKlanten = (gs, lokaal = []) => {
   if (gs.some(isKlanten)) return gs.map(g => (isKlanten(g) ? { ...g, soort: 'klanten' } : g))
   const t = { ...(lokaal.find(isKlanten) || nieuwTabje('Klanten')), soort: 'klanten' }
@@ -952,21 +952,31 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
   // Appje na een call (skill Call verwerken, voorstel.client_id): opslaan in het
   // logboek van de klant, naar het klembord en WhatsApp open bij de klant.
   // Versturen doet Kersten zelf (plakken + verzenden).
+  // Ook na een salescall: lead_id (call_leads) in plaats van client_id; dan gaat
+  // het appje in de lead-notities. opslaan: false (bv. het losse linkje) = alleen
+  // klembord + WhatsApp, niets bewaren.
   const klant = UUID.test(voorstel.client_id || '') ? voorstel.client_id : null
+  const lead = !klant && UUID.test(voorstel.lead_id || '') ? voorstel.lead_id : null
+  const bewaren = voorstel.opslaan !== false
   const [verstuurd, setVerstuurd] = useState(() => bewerkingen.get(`${key}|verstuurd`) === true)
   const [versturen, setVersturen] = useState(false)
   const [waFout, setWaFout] = useState(null)
   const opslaanEnVersturen = async () => {
-    if (!klant || versturen || !tekst.trim()) return
+    if ((!klant && !lead) || versturen || !tekst.trim()) return
     const venster = window.open('', '_blank')
     setVersturen(true); setWaFout(null)
     try {
       await navigator.clipboard?.writeText(tekst).catch(() => {})
       const coach = (await supabase.auth.getSession()).data.session?.user?.id || null
-      const { error } = await supabase.from('client_coaching_logs')
-        .insert({ client_id: klant, coach_id: coach, status: 'on_track', category: 'whatsapp', note: tekst.trim() })
-      if (error) throw error
-      const { data } = await supabase.from('clients').select('phone').eq('id', klant).maybeSingle()
+      if (bewaren) {
+        const { error } = klant
+          ? await supabase.from('client_coaching_logs')
+            .insert({ client_id: klant, coach_id: coach, status: 'on_track', category: 'whatsapp', note: tekst.trim() })
+          : await supabase.from('lead_notes')
+            .insert({ lead_id: lead, coach_id: coach, note_type: 'whatsapp', subject: 'WhatsApp', content: tekst.trim() })
+        if (error) throw error
+      }
+      const { data } = await supabase.from(klant ? 'clients' : 'call_leads').select('phone').eq('id', klant || lead).maybeSingle()
       const nr = waNummer(data?.phone)
       if (nr) { if (venster) venster.location.href = `https://wa.me/${nr}`; else window.location.href = `https://wa.me/${nr}` }
       else { venster?.close(); setWaFout('Opgeslagen en gekopieerd, maar geen telefoonnummer bekend.') }
@@ -994,11 +1004,11 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
         </span>
         <button type="button" onClick={() => wijzig(origineel)} disabled={tekst === origineel}
           style={{ ...knop2, opacity: tekst === origineel ? 0.4 : 1 }}>Herstel</button>
-        <button type="button" onClick={kopieer} style={klant ? knop2 : KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
-        {klant && (
+        <button type="button" onClick={kopieer} style={klant || lead ? knop2 : KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
+        {(klant || lead) && (
           <button type="button" onClick={opslaanEnVersturen} disabled={versturen || !tekst.trim()}
             style={{ ...KNOP, background: colors.success, color: '#000', opacity: versturen ? 0.6 : 1 }}>
-            {verstuurd ? 'Opgeslagen ✓ Nog eens' : 'Opslaan en versturen'}
+            {verstuurd ? `${bewaren ? 'Opgeslagen' : 'Geopend'} ✓ Nog eens` : bewaren ? 'Opslaan en versturen' : 'Naar WhatsApp'}
           </button>
         )}
       </div>
