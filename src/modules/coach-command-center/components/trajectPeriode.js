@@ -48,6 +48,17 @@ export function computePeriod(client) {
 // Pauze eraf: de pauzedagen gaan bij het totaal, dus de einddatum schuift mee. De open rij in
 // coaching_pauses wordt gesloten; daarop schuiven ook de betaaltermijnen (pauze_schuif).
 // Eén plek voor Coach Inzicht en het overzicht in Business OS. Gooit een fout als het mislukt.
+// Coaching op pauze zetten, met een rij in coaching_pauses (daar rekent de
+// betaalpauze mee). Gedeeld door Coach Inzicht en de foto op de klantkaart.
+export async function pauzeerTraject(supabase, client, coachId, { vanaf = null, reden = null } = {}) {
+  const pausedAt = vanaf ? new Date(vanaf + 'T00:00:00').toISOString() : new Date().toISOString()
+  const payload = { coaching_status: 'paused', coaching_paused_at: pausedAt, coaching_pause_reason: reden }
+  const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
+  if (error) throw error
+  await supabase.from('coaching_pauses').insert({ client_id: client.id, coach_id: coachId, paused_at: pausedAt, reason: reden })
+  return payload
+}
+
 export async function hervatTraject(supabase, client) {
   if (!client?.coaching_paused_at) throw new Error('Deze klant staat niet op pauze')
   const pausedDays = Math.max(0, Math.floor((Date.now() - new Date(client.coaching_paused_at).getTime()) / 86400000))

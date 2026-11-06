@@ -2,7 +2,7 @@
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
 // (naam, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 // In split screen mag een modal niet het hele scherm afdekken maar alleen de
@@ -15,9 +15,8 @@ import {
   BarChart3, Pause, CheckCircle2, Circle, Video
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
-import { computePeriod } from './trajectPeriode'
+import { computePeriod, hervatTraject, pauzeerTraject } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
-import DoorstapKeuze from './DoorstapKeuze'
 import TrajectModal from './TrajectModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel, startInWeek, actueelGemiddelde } from '../../weight-tracker/utils/coachingBand'
@@ -75,8 +74,12 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
+  // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
+  const [lokaal, setLokaal] = useState(null)
+  const client = useMemo(() => (lokaal ? { ...clientProp, ...lokaal } : clientProp), [clientProp, lokaal])
+  const [pauzeBezig, setPauzeBezig] = useState(false)
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
   // Verjaardagsmelding aangetikt: Command vraagt om deze kaart te openen.
@@ -266,6 +269,24 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const urgencyColor = getUrgencyColor()
 
   const isPaused = client.coaching_status === 'paused'
+  // Alleen een lopend traject kan op pauze of terug; beëindigd of inactief niet.
+  const kanPauzeren = !!db?.supabase && ['active', 'paused', undefined, null].includes(client.coaching_status) && client.status !== 'inactive'
+  const wisselPauze = async (e) => {
+    e.stopPropagation()
+    if (pauzeBezig) return
+    const naam = client.first_name || 'deze klant'
+    if (!window.confirm(isPaused ? `Coaching van ${naam} hervatten?` : `Coaching van ${naam} op pauze zetten?\n\nTermijnen en looptijd staan stil tot je hervat.`)) return
+    setPauzeBezig(true)
+    try {
+      const payload = isPaused
+        ? await hervatTraject(db.supabase, client)
+        : await pauzeerTraject(db.supabase, client, coachId)
+      setLokaal(l => ({ ...(l || {}), ...payload }))
+    } catch (err) {
+      console.error('Pauze wisselen mislukt:', err)
+      alert(isPaused ? 'Hervatten mislukt' : 'Pauzeren mislukt')
+    } finally { setPauzeBezig(false) }
+  }
 
   // Eén status-signaal: de linker-accentrand (urgentiekleur). Verder solide
   // #0a0a0a met een subtiele goud-rand — geen gradients, niet druk.
@@ -382,7 +403,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       borderRadius: isMobile ? '12px' : '14px',
       // Vaste minimale hoogte: dezelfde als het skelet in Command, zodat de
       // kaart niet groeit of krimpt wanneer de data binnenkomt.
-      minHeight: isMobile ? 70 : 74,
+      minHeight: isMobile ? 60 : 62,
       overflow: 'hidden', position: 'relative',
       transition: 'all 0.2s ease', transform: 'translateZ(0)',
       opacity: isInactive ? 0.55 : 1,
@@ -427,7 +448,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
           herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →
           initialen op dezelfde plek, zodat de kaarten uitgelijnd blijven. */}
-      <div style={{
+      <div onClick={kanPauzeren ? wisselPauze : undefined}
+        title={kanPauzeren ? (isPaused ? 'Gepauzeerd · klik om te hervatten' : 'Klik om coaching te pauzeren') : undefined}
+        style={{
+        cursor: kanPauzeren ? (pauzeBezig ? 'wait' : 'pointer') : 'default', opacity: pauzeBezig ? 0.6 : 1,
         width: '10%', minWidth: isMobile ? 44 : 52, flexShrink: 0, position: 'relative',
         borderRight: `1px solid ${isPaused ? 'rgba(245,158,11,0.6)' : 'rgba(255,255,255,0.08)'}`,
       }}>
@@ -449,7 +473,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       </div>
       {/* Gepauzeerd: oranje gloed met een pauze-icoon over de foto, i.p.v. een balk. */}
       {isPaused && (
-        <div title="Coaching gepauzeerd" style={{
+        <div style={{
           position: 'absolute', inset: 0,
           background: 'rgba(245,158,11,0.35)',
           boxShadow: 'inset 0 0 18px rgba(245,158,11,0.9)',
@@ -603,12 +627,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           marginLeft: 'auto',
           gap: isMobile ? '0.55rem' : '0.7rem',
         }}>
-        {/* Doorstap na de week-5 evaluatie: vlaggetje, of het label als er
-            een status staat. Betaald → verlenging via TrajectModal. */}
-        {!isInactive && (
-          <DoorstapKeuze client={client} coachId={coachId} waarde={doorstap}
-            onGewijzigd={onDoorstap} onBetaald={() => setVerlengOpen(true)} />
-        )}
         {/* Dagelijks afvinken. Alleen een icoon: er staan al twee knoppen
             met tekst naast, en een derde woord maakt de rij te vol op een
             smalle kaart. */}

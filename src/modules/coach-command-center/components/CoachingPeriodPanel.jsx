@@ -35,7 +35,7 @@ const formatDate = (iso) => {
 }
 
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
-import { computePeriod, hervatTraject, isOnbeperkt } from './trajectPeriode'
+import { computePeriod, hervatTraject, pauzeerTraject, isOnbeperkt } from './trajectPeriode'
 import BetaalPauze from './BetaalPauze'
 
 // `menu`: alleen de acties als lijstje (dropdown onder de looptijd-lijn in de
@@ -113,21 +113,10 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
   const pause = async () => {
     setBusy(true)
-    const pausedAt = pauseVanaf && pauseVanaf < vandaag()
-      ? new Date(pauseVanaf + 'T00:00:00').toISOString()
-      : new Date().toISOString()
-    const reason = pauseReason.trim() || null
     try {
-      const payload = {
-        coaching_status: 'paused',
-        coaching_paused_at: pausedAt,
-        coaching_pause_reason: reason,
-      }
-      const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
-      if (error) throw error
-      // Audit row
-      await supabase.from('coaching_pauses').insert({
-        client_id: client.id, coach_id: coachId, paused_at: pausedAt, reason,
+      const payload = await pauzeerTraject(supabase, client, coachId, {
+        vanaf: pauseVanaf && pauseVanaf < vandaag() ? pauseVanaf : null,
+        reden: pauseReason.trim() || null,
       })
       onClientUpdate?.(payload)
       setShowPauseModal(false)

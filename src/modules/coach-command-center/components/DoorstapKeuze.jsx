@@ -19,7 +19,9 @@ import { supabase } from '../../../lib/supabase'
 import { DOORSTAP_OPTIES, optieVan, tabelOntbreekt, laadDoorstap } from './doorstap'
 
 // waarde: laatste rij (of null = geen status). undefined + zelfLaden = haal zelf op.
-export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = false, onGewijzigd, onBetaald, groot = false }) {
+// `alleenIcoon`: op de klantkaart geen label ("Betaald"), alleen het vlaggetje
+// in de kleur van de status; de status staat in de tooltip.
+export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = false, onGewijzigd, onBetaald, groot = false, alleenIcoon = false }) {
   const host = useModalHost()
   const knopRef = useRef(null)
   const [eigen, setEigen] = useState(undefined)
@@ -91,14 +93,14 @@ export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = fal
       <button ref={knopRef} onClick={openen} title={titel} aria-label="Doorstap"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-          height: groot ? 32 : 26, padding: gezet ? '0 0.5rem' : '0 0.25rem',
-          background: gezet ? `${opt.kleur}1f` : 'none',
-          border: gezet ? `1px solid ${opt.kleur}55` : 'none', borderRadius: 999,
+          height: groot ? 32 : 26, padding: gezet && !alleenIcoon ? '0 0.5rem' : '0 0.25rem',
+          background: gezet && !alleenIcoon ? `${opt.kleur}1f` : 'none',
+          border: gezet && !alleenIcoon ? `1px solid ${opt.kleur}55` : 'none', borderRadius: 999,
           color: gezet ? opt.kleur : 'rgba(255,255,255,0.35)',
           fontSize: groot ? '0.72rem' : '0.66rem', fontWeight: 900, whiteSpace: 'nowrap',
           cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-        {gezet ? opt.kort : <Flag size={groot ? 17 : 15} />}
+        {gezet && !alleenIcoon ? opt.kort : <Flag size={groot ? 17 : 15} fill={gezet ? opt.kleur : 'none'} />}
       </button>
 
       {open && pos && createPortal(

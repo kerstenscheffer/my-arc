@@ -413,7 +413,8 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
       <div style={{
         padding: isMobile ? '0.75rem 1rem' : '0.9rem 2rem',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(10,10,10,0.92)',
+        // Zelfde zwart als de pagina (#000); het was #0a0a0a en stak af.
+        background: 'rgba(0,0,0,0.92)',
         backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
         // Op een telefoon past dit niet op één regel: twee dropdowns plus een
         // zoekveld plus twee knoppen lopen ruim over 375px heen. Daarom
@@ -582,7 +583,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
           <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem', animation: kaartFase === 'klaar' ? 'ccKaartIn 0.28s ease' : 'none' }}>
             <style>{'@keyframes ccKaartIn { from { opacity: 0.35; } to { opacity: 1; } } @keyframes ccSkelet { 0% { opacity: 0.55; } 50% { opacity: 0.85; } 100% { opacity: 0.55; } }'}</style>
             {kaartFase === 'skelet' && filteredClients.map(client => (
-              <div key={client.id} style={{ height: isMobile ? 70 : 74, borderRadius: isMobile ? 12 : 14, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'stretch', overflow: 'hidden', animation: 'ccSkelet 1.4s ease-in-out infinite' }}>
+              <div key={client.id} style={{ height: isMobile ? 60 : 62, borderRadius: isMobile ? 12 : 14, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'stretch', overflow: 'hidden', animation: 'ccSkelet 1.4s ease-in-out infinite' }}>
                 <div style={{ width: isMobile ? 56 : 64, background: 'rgba(255,255,255,0.06)' }} />
                 <div style={{ flex: 1, padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>

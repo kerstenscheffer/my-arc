@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import CallBlad, { PrecallKnop } from '../../business-os/CallBlad'
+import BerichtVak from '../../business-os/BerichtVak'
+import { ITEM_KOLOMMEN } from '../../business-os/berichtTekst'
 import { callHeeftInhoud } from '../../business-os/callBladData'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket } from 'lucide-react'
 
@@ -95,6 +97,36 @@ function formatDate(iso) {
 // `inline`: geen zwevend venster maar een paneel dat de ruimte van zijn
 // ouder vult. Zo staat het logboek als tabblad in Coach Insight naast
 // gewicht en training, in plaats van als los venster erbovenop.
+// Tab Bericht: het check-in bericht voor WhatsApp. Pakt het laatste bericht
+// van Gino dat nog niet verstuurd is (laatste 7 dagen), anders een nieuw
+// bericht met Kerstens vaste opbouw.
+function BerichtTab({ client, db }) {
+  const [item, setItem] = useState(undefined)
+  const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+  useEffect(() => {
+    let weg = false
+    const van = new Date(); van.setDate(van.getDate() - 7)
+    db.supabase.from('checkin_ronde_items').select(ITEM_KOLOMMEN)
+      .eq('client_id', client.id).gte('ronde_datum', van.toLocaleDateString('sv-SE')).lte('ronde_datum', vandaag)
+      .order('ronde_datum', { ascending: false })
+      .then(({ data }) => {
+        if (weg) return
+        const lijst = data || []
+        const heeft = (r) => ((r.bewerkt_bericht ?? r.bericht) || '').trim()
+        setItem(lijst.find(r => heeft(r) && !r.verstuurd_at) || lijst.find(r => r.ronde_datum === vandaag) || null)
+      }, () => { if (!weg) setItem(null) })
+    return () => { weg = true }
+  }, [client.id, db, vandaag])
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.75rem 0.875rem 1.5rem' }}>
+      {item === undefined
+        ? <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
+        : <BerichtVak key={client.id} clientId={client.id} voornaam={client.first_name} item={item}
+            ronde={item?.ronde_datum || vandaag} onItem={setItem} metSjabloon rijen={12} />}
+    </div>
+  )
+}
+
 export default function CoachingLogModal({ client, db, coachId, onClose, isMobile, onLogSaved, inline = false }) {
   const modalHost = useModalHost()
   const [logs, setLogs]           = useState([])
@@ -303,7 +335,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
           {/* Kopregel: Call | Notities links, Pre-call rechts. Klein, zoals de
               Plan-knop bij Gewicht: tekst in plaats van grote knoppen. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0.6rem 0.875rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-            {[['call', 'Call'], ['notities', 'Notities']].map(([id, label]) => (
+            {[['call', 'Call'], ['bericht', 'Bericht'], ['notities', 'Notities']].map(([id, label]) => (
               <button key={id} type="button" onClick={() => setWeergave(id)} style={{
                 background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
                 fontSize: '0.8rem', fontWeight: 900, color: weergave === id ? '#fff' : 'rgba(255,255,255,0.35)',
@@ -314,7 +346,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
             {weergave === 'call' && <PrecallKnop aan={precall} onKlik={() => setPrecall(p => !p)} />}
           </div>
 
-          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} precall={precall} /> : (<>
+          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} precall={precall} /> : weergave === 'bericht' ? <BerichtTab client={client} db={db} /> : (<>
           {/* ── Nieuwe notitie ── */}
           <div style={{
             padding: '0.625rem 0.75rem',

@@ -99,7 +99,7 @@ export function klantenVraag(dag) {
    → suggesties.signalen: max 3 korte regels voor Kersten.
    → suggesties.call (alleen bij een call vandaag), blokken uit de skill Call-voorbereiding: { tijd: "HH:MM", titel, doel: [..], hoe: [check-in], gewicht: [..], voeding: [..], training: [..], goed: [ALLES wat goed gaat, met cijfer], komende_week: [voorstel acties], volgende_call: "over 1 of 2 weken + waarom", precall: [max 5 regels die Kersten vóór de call MOET lezen: conclusies, wat opvalt, wat hij niet mag vergeten], struggles: [oude issues als check hoe dat gaat], open: [beloftes vorige call], randzaken: [foto's, check-in, traject], vragen: [max 3 punten die echt besproken moeten worden] }. Elk blok is een LIJST korte regels "Label: waarde", één datapunt per regel, nooit meerdere cijfers achter elkaar in één zin (zie skill, OPMAAK). Gaat iets goed: één regel.
    ${DAG_WERK[dag] || 'Vandaag geen berichten: laat bericht leeg.'}
-   → bericht (alleen als hierboven gevraagd): Kerstens WhatsApp-stijl uit de skill.
+   → bericht (alleen als hierboven gevraagd): Kerstens vaste opbouw uit de skill Check-in ronde (stap 4), begint letterlijk met "Een hele goede {dagdeel} <voornaam>! Alles goed?". Laat {dagdeel} staan: het paneel vult ochtend/middag/avond in.
 4. Lever alles in één actie: { "soort": "ronde_vul", "items": [ { "client_id", "groep", "suggesties": {…}, "bericht"? } ] }. De PA schrijft hem direct in het paneel. Geen wijziging_voorstel.
 5. Je tekst: max 4 regels. Hoeveel rood/oranje/groen, de calls van vandaag met tijd, en de 1-2 klanten die vandaag echt voorgaan.`
 }
