@@ -162,6 +162,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const setWeergave = (w) => { if (!beperkt || BEPERKT_WEERGAVEN.includes(w)) zetWeergave(w) }
   useTijdPlek(!beperkt && weergave === 'content' ? 'contentkalender' : null)
   const [projectId, setProjectId] = useState(verzoek?.project || null)
+  // Telefoon + open project: balk over twee regels (terug, naam, kruisje / test, KPI, ring, dropdown).
+  const projectBalkMobiel = isMobile && weergave === 'projecten' && !!projectId
   // Op smalle schermen zou de balk onder de zwevende knoppen schuiven: dan ruimte vrijhouden.
   const kopRef = useRef(null)
   const [kopRuimte, setKopRuimte] = useState({ links: 0, rechts: 0 })
@@ -450,7 +452,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
       {/* Desktop: vaste hoogte van 36, zodat hij op één lijn staat met de agendaknop rechtsboven. */}
-      <div ref={kopRef} style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : 10, paddingBottom: isMobile ? 8 : 0, flexShrink: 0, ...(isMobile ? null : { height: 36, marginBottom: 14, marginLeft: kopRuimte.links, marginRight: kopRuimte.rechts }) }}>
+      <div ref={kopRef} style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : 10, ...(projectBalkMobiel ? { rowGap: 4 } : null), paddingBottom: isMobile ? 8 : 0, flexShrink: 0, ...(isMobile ? null : { height: 36, marginBottom: 14, marginLeft: kopRuimte.links, marginRight: kopRuimte.rechts }) }}>
         {(weergave === 'week' || weergave === 'content') && (
           <div style={{ minWidth: 0, flexBasis: isMobile ? '100%' : 'auto', order: isMobile ? 9 : 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
             {weergave === 'week' ? `${telling.calls} calls · ` : ''}{telling.content} content gepland
@@ -458,9 +460,13 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           </div>
         )}
         {weergave === 'projecten'
-          ? <div ref={setKopVak} style={{ flex: 1, minWidth: 0, display: 'flex', ...(isMobile ? { flexBasis: '100%', order: 9 } : null) }} />
+          // display: contents: het projectdetail zet zijn knoppen als losse items in deze balk (zelfde regel als dropdown en kruisje).
+          ? <div ref={setKopVak} style={{ display: 'contents' }} />
           : !isMobile && <div style={{ flex: 1 }} />}
-        <div style={{ position: 'relative', flexShrink: 0, marginRight: isMobile ? 'auto' : 0 }}>
+        <div style={{
+          position: 'relative', flexShrink: 0,
+          ...(projectBalkMobiel ? { order: 8, marginLeft: 'auto' } : weergave === 'projecten' && !isMobile ? { marginLeft: 'auto' } : { marginRight: isMobile ? 'auto' : 0 }),
+        }}>
           <select
             value={weergave}
             onChange={(e) => kiesWeergave(e.target.value)}
@@ -486,7 +492,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         </div>
         <button type="button" onClick={() => verzet(1)} aria-label="Volgende" style={rond}><ChevronRight size={16} strokeWidth={2.6} /></button>
         </>}
-        <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={rond}><X size={16} strokeWidth={2.6} /></button>
+        <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={projectBalkMobiel ? { ...rond, order: 3 } : rond}><X size={16} strokeWidth={2.6} /></button>
       </div>
 
       {notitie && <GinoZegt tekst={notitie} onWeg={() => { setNotitie(''); setFocus(null) }} />}

@@ -12,7 +12,8 @@
 //     tekst aanpassen, verwijderen, toevoegen; opslaan via projectStappen.js) en, bij
 //     een fase.test, live cijfers + oordeel (testMeting.js); teksten achter een
 //     klik op de rij; onderzoek lezen. Een fase met bord: true is een test en krijgt
-//     een horizontale kanban (TestBord.jsx); de rest blijft een rij.
+//     een horizontale kanban (TestBord.jsx); de rest blijft een rij. Er staat één test
+//     tegelijk: kiezen via de titel van het bord (TestKiezer), keuze per project in localStorage.
 //   "Presenteer" → Gino loopt het plan door met zijn stem (stem.leesVoor):
 //     per deel licht dat stuk op, de rest dimt, ondertitel onderin, en
 //     vanzelf door naar het volgende deel als hij uitgepraat is.
@@ -26,7 +27,7 @@ import * as stem from './stem'
 import { vandaagIso } from './testMeting'
 import { hernoemFase, kopieVanPlan, nieuweStapId, schrijfPlan, verplaatsStap, verwijderFase, verwijderStap, voegStapToe, voegTestToe, wijzigStap, wijzigTest, zetFaseTerug, zetKaartVelden, zetStapTerug } from './projectStappen'
 import { Cijfer, NieuweStap, OordeelPil, StapInvoer, StapKaart } from './projectKaarten'
-import { komma, kortDag } from './testBord.js'
+import { KOLOMMEN, bordStand, isDag, komma, kortDag, laatsteDag } from './testBord.js'
 import { useTestMeting } from './useTestMeting'
 import TestBord from './TestBord.jsx' // met extensie: macOS ziet testBord.js en TestBord.jsx als dezelfde naam
 import { supabase } from '../../lib/supabase'
@@ -106,16 +107,110 @@ function TestCijfers({ m, isMobile }) {
   )
 }
 
-// Onder de laatste test: vraagt alleen de naam.
-function NieuweTest({ isMobile, onNieuw }) {
+// ── Testkiezer ──
+// Gekozen test per project, alleen op dit apparaat. Opgeslagen op naam (uniek binnen een project).
+const keuzeSleutel = (pid) => `business_os_test_keuze:${pid}`
+const leesKeuze = (pid) => { try { return localStorage.getItem(keuzeSleutel(pid)) } catch { return null } }
+const schrijfKeuze = (pid, naam) => {
+  try {
+    if (naam) localStorage.setItem(keuzeSleutel(pid), naam)
+    else localStorage.removeItem(keuzeSleutel(pid))
+  } catch { /* privé-venster */ }
+}
+// Zelfde regel als uniekeNaam in projectStappen.js: zo weten we de naam die de test echt krijgt.
+const uniekeNaam = (fases, naam, behalve = null) => {
+  const bezet = (n) => fases.some(f => f !== behalve && f.naam === n)
+  let uit = naam
+  for (let i = 2; bezet(uit); i++) uit = `${naam} ${i}`
+  return uit
+}
+// Standaard: de test met de open kaart van Kersten met de vroegste dag (gelijk = eerste test), anders de eerste test.
+function standaardTest(borden) {
+  let beste = null
+  for (const b of borden) {
+    for (const s of b.f.stappen || []) {
+      if (s?.klaar || s?.wie !== 'kersten' || s?.voorstel === true || !isDag(s?.dag)) continue
+      if (!beste || s.dag < beste.dag) beste = { dag: s.dag, b }
+    }
+  }
+  return (beste?.b || borden[0])?.f.naam ?? null
+}
+
+// Regel onderin de lijst (Naam wijzigen, + Nieuwe test). Focus alleen subtiel voor toetsenbord (.gp-kiezer).
+const lijstRegel = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, padding: '0 10px', border: 'none', borderRadius: 7, background: 'none', color: '#fff', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 14, fontWeight: 900, textAlign: 'left',
+}
+
+// Eén regel in de lijst: naam, huidige fase (met de meting, net als op het bord) en Klaar op.
+// Altijd gemonteerd (ook als de lijst dicht is), zodat de fase er al staat bij openklappen.
+function TestKeuzeRij({ f, doel, vandaag, gekozen, onKies }) {
+  const test = f.test && typeof f.test === 'object' ? f.test : {}
+  const stappen = f.stappen || []
+  const stand = useTestMeting(test, doel)
+  const b = bordStand({ stappen, test, stand, vandaag })
+  const klaarOp = laatsteDag(stappen)
+  return (
+    <button type="button" className="gp-kiezer" aria-current={gekozen || undefined} onClick={onKies} style={{
+      display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 12, rowGap: 2, width: '100%', minHeight: 44, padding: '8px 10px', boxSizing: 'border-box',
+      background: gekozen ? 'rgba(255,255,255,0.14)' : 'transparent', border: 'none', borderRadius: 7, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    }}>
+      <span style={{ flex: '1 1 160px', minWidth: 0, fontSize: 14, fontWeight: 900, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{f.naam}</span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: G, whiteSpace: 'nowrap' }}>{b.laadt ? '…' : KOLOMMEN.find(k => k.id === b.huidig)?.naam || 'Klaar'}</span>
+      {klaarOp && <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>Klaar op {kortDag(klaarOp)}</span>}
+    </button>
+  )
+}
+
+// De titel van de zichtbare test is zelf de dropdown: naam + pijltje; de lijst heeft alle tests,
+// Naam wijzigen (opent het invoerveld in TestBord) en onderaan + Nieuwe test.
+function TestKiezer({ borden, getoond, doel, vandaag, isMobile, onKies, onNieuw, onNaamWijzigen }) {
+  const [open, setOpen] = useState(false)
+  const vak = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const buiten = (e) => { if (!vak.current?.contains(e.target)) setOpen(false) }
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('pointerdown', buiten)
+    window.addEventListener('keydown', esc)
+    return () => { window.removeEventListener('pointerdown', buiten); window.removeEventListener('keydown', esc) }
+  }, [open])
+  return (
+    <div ref={vak} style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
+      <button type="button" className="gp-kiezer" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(o => !o)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%', padding: 0, border: 'none', borderRadius: 6, background: 'none', color: '#fff', cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 18, fontWeight: 900, lineHeight: 1.25, textAlign: 'left',
+      }}>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{getoond}</span>
+        <ChevronDown size={16} strokeWidth={2.8} aria-hidden style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+      </button>
+      <div aria-label="Tests" hidden={!open} style={{
+        position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 25, width: isMobile ? 'min(480px, calc(100vw - 32px))' : 480, boxSizing: 'border-box', maxHeight: 360, overflowY: 'auto', padding: 4,
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
+      }}>
+        {borden.map(({ f }) => (
+          <TestKeuzeRij key={f.naam} f={f} doel={doel} vandaag={vandaag} gekozen={f.naam === getoond} onKies={() => { onKies(f.naam); setOpen(false) }} />
+        ))}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderTop: '1px solid rgba(255,255,255,0.14)', marginTop: 4, paddingTop: 2 }}>
+          {onNaamWijzigen && <button type="button" className="gp-kiezer" onClick={() => { setOpen(false); onNaamWijzigen() }} style={lijstRegel}>Naam wijzigen</button>}
+          {open && <NieuweTest isMobile={isMobile} inLijst onNieuw={(naam) => { setOpen(false); onNieuw(naam) }} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Vraagt alleen de naam.
+function NieuweTest({ isMobile, inLijst, onNieuw }) {
   const [open, setOpen] = useState(false)
   if (open) {
     return (
-      <div style={{ padding: '8px 0', maxWidth: 320 }}>
+      <div style={{ padding: inLijst ? '8px 10px' : '8px 0', maxWidth: 320, width: '100%', boxSizing: 'border-box' }}>
         <StapInvoer label="Naam van de test" isMobile={isMobile} fontGrootte={18} onKlaar={t => { setOpen(false); if (t) onNieuw(t) }} />
       </div>
     )
   }
+  if (inLijst) return <button type="button" className="gp-kiezer" onClick={() => setOpen(true)} style={lijstRegel}><Plus size={16} strokeWidth={3} color={G} /> Nieuwe test</button>
   return (
     <button type="button" onClick={() => setOpen(true)} style={{
       display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, padding: 0, border: 'none', background: 'none', color: '#fff', cursor: 'pointer',
@@ -248,6 +343,14 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   const p = projectId ? (lijst || []).find(x => x.id === projectId) : null
   const vandaag = vandaagIso()
+  const borden = (p?.plan?.fases || []).map((f, fi) => ({ f, fi })).filter(({ f }) => f.bord === true)
+
+  // Testkiezer: naam in localStorage per project; staat er niets (of een naam die niet meer bestaat), dan de standaard.
+  const [testKeuze, setTestKeuze] = useState({})
+  const kiesTest = (pid, naam) => {
+    setTestKeuze(k => ({ ...k, [pid]: naam }))
+    schrijfKeuze(pid, naam)
+  }
 
   // ── Presentatie ──
   const dia = useMemo(() => (p && p.status !== 'onderzoek' ? maakDia(p) : []), [p])
@@ -257,6 +360,11 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   const gestart = useRef(null)
   const vakken = useRef({})
   const huidig = dIdx != null ? dia[dIdx] : null
+  // Gekozen test; tijdens de presentatie staat de test die Gino bespreekt (zonder de keuze te wijzigen).
+  const gekozenNaam = p ? (testKeuze[p.id] !== undefined ? testKeuze[p.id] : leesKeuze(p.id)) : null
+  const gekozenTest = borden.some(({ f }) => f.naam === gekozenNaam) ? gekozenNaam : standaardTest(borden)
+  const presentatieFi = /^fase-\d+$/.test(huidig?.focus || '') ? Number(huidig.focus.slice(5)) : -1
+  const getoondeTest = borden.find(({ fi }) => fi === presentatieFi)?.f.naam ?? gekozenTest
   // Alleen de eigen presentatie stoppen, nooit een lopend antwoord van Gino.
   const stopPresentatie = useCallback(() => {
     if (String(stemStandRef.current?.bron || '').startsWith('presentatie-')) stem.stop()
@@ -346,10 +454,20 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   const plekVan = (fi) => ({ fi, naam: p.plan.fases[fi].naam })
   const verplaats = (stapId, kolom) => wijzigPlan(verplaatsStap(stapId, kolom))
   const zetTest = (fi, velden) => wijzigPlan(wijzigTest(plekVan(fi), velden))
-  const hernoem = (fi, naam) => wijzigPlan(hernoemFase(plekVan(fi), naam))
-  const nieuweTest = (naam) => wijzigPlan(voegTestToe(naam))
+  const hernoem = (fi, naam) => {
+    const fases = p.plan.fases
+    const echt = uniekeNaam(fases, naam, fases[fi])
+    if (fases[fi].naam === getoondeTest) kiesTest(p.id, echt)
+    return wijzigPlan(hernoemFase(plekVan(fi), naam))
+  }
+  const nieuweTest = (naam) => {
+    kiesTest(p.id, uniekeNaam(p.plan?.fases || [], naam))
+    return wijzigPlan(voegTestToe(naam))
+  }
   const testWeg = async (fi) => {
     const fase = p.plan.fases[fi]
+    // Was dit de gekozen test, dan de eerste die overblijft.
+    if (fase.naam === getoondeTest) kiesTest(p.id, p.plan.fases.find(f => f.bord === true && f !== fase)?.naam || null)
     const item = { pid: p.id, terug: zetFaseTerug({ fase, fi, naNaam: p.plan.fases[fi - 1]?.naam }) }
     setWeg(w => [...w, item])
     if (!await wijzigPlan(verwijderFase(plekVan(fi)))) setWeg(w => w.filter(x => x !== item))
@@ -430,6 +548,8 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
       .gp-bordnieuw:hover { color: #fff }
       .gp-nieuw { border: 1px dashed rgba(255,255,255,0.22); color: rgba(255,255,255,0.7); transition: color .15s, border-color .15s }
       .gp-nieuw:hover { border-color: ${G}; color: #fff }
+      .gp-kiezer { outline: none; -webkit-tap-highlight-color: transparent }
+      .gp-kiezer:focus-visible { box-shadow: 0 0 0 2px ${G}88 }
       .gp-kaart { transition: box-shadow .2s, transform .2s }
       .gp-kaart:hover { box-shadow: 0 0 0 1px ${G}, 0 0 24px ${G}44; transform: translateY(-2px) }
     `}</style>
@@ -508,26 +628,54 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   // ── Detail ──
   const fases = p.plan?.fases || []
-  const laatsteBord = fases.reduce((n, f, i) => (f.bord === true ? i : n), -1)
   const st = stappenVan(p)
   const klaar = st.filter(s => s.klaar).length
   return (
     <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {animaties}
-      {/* Terug, titel en voortgang staan in de balk van de kalender (kopVak). */}
-      {(() => { const kop = (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0, width: '100%', paddingBottom: kopVak ? 0 : 12 }}>
-        <button type="button" onClick={() => { setLeest(false); onKies?.(null) }} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4, height: 36, padding: '0 14px 0 10px', borderRadius: 999,
-          border: '1.5px solid #fff', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, flexShrink: 0,
-        }}><ChevronLeft size={16} strokeWidth={2.6} /> Projecten</button>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>{p.titel}</div>
-          <div title={p.doel} style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.doel}</div>
-        </div>
-        {st.length > 0 && <Ring deel={klaar / st.length} grootte={36} kind={<span style={{ fontSize: 10, fontWeight: 900, color: '#fff' }}>{klaar}/{st.length}</span>} />}
-      </div>
-      ); return kopVak ? createPortal(kop, kopVak) : kop })()}
+      {/* Eén balk in de kalenderkop (kopVak, display: contents): terug, naam + doel, KPI, voortgang;
+          daarna volgen daar de Projecten-dropdown en het kruisje. Telefoon: regel 1 terug, naam, kruisje;
+          regel 2 KPI, ring (en de dropdown), via order. Test wisselen gaat via de titel van het bord. */}
+      {(() => {
+        const plan = p.status !== 'onderzoek'
+        const orde = (n) => (isMobile ? { order: n } : null)
+        const afkap = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+        const kop = (
+          <>
+            <button type="button" onClick={() => { setLeest(false); onKies?.(null) }} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4, height: 36, padding: '0 14px 0 10px', borderRadius: 999,
+              border: '1.5px solid #fff', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, flexShrink: 0, ...orde(1),
+            }}><ChevronLeft size={16} strokeWidth={2.6} /> Projecten</button>
+            <div title={p.doel ? `${p.titel}\n${p.doel}` : p.titel} style={{ flex: '1 1 0', minWidth: 0, ...orde(2) }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.2, ...afkap }}>{p.titel}</div>
+              {p.doel && <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.25, ...afkap }}>{p.doel}</div>}
+            </div>
+            {isMobile && <div aria-hidden style={{ flexBasis: '100%', height: 0, order: 4 }} />}
+            {plan && (p.kpis || []).length > 0 && (
+              <div ref={zet('kpis')} style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, ...orde(6), ...spot('kpis') }}>
+                {p.kpis.map((k, i) => {
+                  const nu = Number(k.nu) || 0, doel = Number(k.doel) || 0
+                  return (
+                    <div key={i} title={[k.naam, k.eenheid, k.meet].filter(Boolean).join(' · ')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Ring deel={doel ? nu / doel : 0} grootte={22} dikte={2.5} kind={null} />
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {nu.toLocaleString('nl-NL')} → <span style={{ color: G }}>{doel.toLocaleString('nl-NL')}</span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {st.length > 0 && (
+              <div title={`${klaar} van ${st.length} stappen klaar`} style={{ flexShrink: 0, display: 'flex', ...orde(7) }}>
+                <Ring deel={klaar / st.length} grootte={36} kind={<span style={{ fontSize: 10, fontWeight: 900, color: '#fff' }}>{klaar}/{st.length}</span>} />
+              </div>
+            )}
+          </>
+        )
+        return kopVak ? createPortal(kop, kopVak)
+          : <div style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 10, flexShrink: 0, minWidth: 0, paddingBottom: 12 }}>{kop}</div>
+      })()}
 
       {p.status === 'onderzoek' ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -545,28 +693,10 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
           {p.plan?.samenvatting && (
             <div ref={zet('samenvatting')} style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 14, maxWidth: 900, padding: huidig ? 8 : 0, ...spot('samenvatting') }}>{p.plan.samenvatting}</div>
           )}
-          {/* KPI's */}
-          {(p.kpis || []).length > 0 && (
-            <div ref={zet('kpis')} style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 16, padding: huidig ? 8 : 0, ...spot('kpis') }}>
-              {p.kpis.map((k, i) => {
-                const nu = Number(k.nu) || 0, doel = Number(k.doel) || 0
-                return (
-                  <div key={i} title={k.meet || undefined} style={{ display: 'flex', alignItems: 'center', gap: 10, animation: `gp-in .35s ease-out ${i * 70}ms both` }}>
-                    <Ring deel={doel ? nu / doel : 0} grootte={36} kind={null} />
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{k.naam}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
-                        {nu.toLocaleString('nl-NL')} → <span style={{ color: G }}>{doel.toLocaleString('nl-NL')}</span> {k.eenheid || ''}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {/* Fases als rijen onder elkaar */}
+          {/* KPI's staan in de balk hierboven. Fases als rijen onder elkaar; van de tests alleen de gekozen (wisselen via de titel). */}
           <div>
             {fases.map((f, fi) => {
+              if (f.bord === true && f.naam !== getoondeTest) return null
               const gedeeld = {
                 f, fi, doel: p.kpis?.[0]?.doel, vandaag, isMobile, huidig, zetStap, zetStapTekst, nieuweStap, stapWeg,
                 spotStijl: spot(`fase-${fi}`), vakRef: zet(`fase-${fi}`),
@@ -574,9 +704,12 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
               return (
                 <Fragment key={f.bord === true ? `bord-${f.naam}` : fi}>
                   {f.bord === true
-                    ? <TestBord {...gedeeld} projectId={p.id} verplaats={verplaats} zetKaart={zetKaart} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg} />
+                    ? <TestBord {...gedeeld} verplaats={verplaats} zetKaart={zetKaart} zetTest={zetTest} hernoem={hernoem} verwijder={testWeg}
+                        kiezer={({ onNaamWijzigen }) => (
+                          <TestKiezer borden={borden} getoond={f.naam} doel={p.kpis?.[0]?.doel} vandaag={vandaag} isMobile={isMobile}
+                            onKies={naam => kiesTest(p.id, naam)} onNieuw={nieuweTest} onNaamWijzigen={onNaamWijzigen} />
+                        )} />
                     : <FaseRij {...gedeeld} />}
-                  {fi === laatsteBord && <NieuweTest isMobile={isMobile} onNieuw={nieuweTest} />}
                 </Fragment>
               )
             })}
