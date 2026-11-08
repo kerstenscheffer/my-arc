@@ -19,6 +19,13 @@
 // key: 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Getallen gaan als Engelse woorden naar ElevenLabs (getallen.ts; stem.js doet
 // het ook al), de tekst op het scherm blijft Nederlands.
+// Azure als tweede stem (8 nov 2026): lukt ElevenLabs niet (quota, 401/402/429,
+// of geen sleutel) en staan AZURE_SPEECH_KEY + AZURE_SPEECH_REGION er, dan
+// nl-NL-MaartenNeural met de onbewerkte Nederlandse tekst (header x-gino-stem:
+// Azure Maarten). Faalt die ook of ontbreken de secrets: de oude antwoorden
+// (402 quota, 503 geen_sleutel, 502 elevenlabs), zodat de Mac-stem blijft werken.
+// Het tegoedantwoord kreeg er alleen veld azure bij. GET ?diag=1&azure=1 doet één
+// korte proefaanroep (per instantie één keer, zonder login-sessie te testen).
 // Nooit een sleutel in de frontend of de repo.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -117,6 +124,53 @@ async function kiesStemmen(sleutel: string): Promise<Stem[] | { status: number }
   return stemmen
 }
 
+// Azure Speech (F0 = gratis tegoed). Alleen als beide secrets er staan.
+const AZURE_SLEUTEL = Deno.env.get('AZURE_SPEECH_KEY')?.trim()
+const AZURE_REGIO = Deno.env.get('AZURE_SPEECH_REGION')?.trim().toLowerCase().replace(/\s+/g, '')
+const AZURE_KAN = !!(AZURE_SLEUTEL && AZURE_REGIO)
+const AZURE_VOICE = 'nl-NL-MaartenNeural'
+const AZURE_NAAM = 'Azure Maarten'
+const AZURE_TIJDSLIMIET = 10000 // stem.js geeft een stuk 15 s, inclusief de ElevenLabs-poging ervoor
+
+const XML: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
+// Stuurtekens zijn ongeldig in XML en zouden de hele aanroep laten falen.
+const xmlVeilig = (t: string) => t
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ')
+  .replace(/[&<>"']/g, (c) => XML[c])
+
+// Geeft audio of een foutregel; de sleutel komt nooit in die regel. Audio wordt
+// helemaal gelezen, zodat een lege 200 ook netjes als fout terugvalt.
+async function azureSpraak(tekst: string): Promise<{ audio: ArrayBuffer } | { status: number; fout: string }> {
+  try {
+    const res = await fetch(`https://${AZURE_REGIO}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_SLEUTEL!,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',
+        'User-Agent': 'gino-stem',
+      },
+      body: `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="nl-NL"><voice name="${AZURE_VOICE}">${xmlVeilig(tekst)}</voice></speak>`,
+      signal: AbortSignal.timeout(AZURE_TIJDSLIMIET),
+    })
+    if (!res.ok) return { status: res.status, fout: `${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}` }
+    const audio = await res.arrayBuffer()
+    return audio.byteLength ? { audio } : { status: res.status, fout: `${res.status} lege audio` }
+  } catch (e) {
+    return { status: 0, fout: `aanroep mislukt: ${e instanceof Error ? e.name : 'onbekend'}` }
+  }
+}
+
+// Proefaanroep voor ?diag=1&azure=1: per instantie maximaal één, want diag kan zonder sessie.
+let azureProef: { ok: boolean; status?: number; bytes?: number } | null = null
+async function proefAzure() {
+  if (azureProef) return azureProef
+  const uit = await azureSpraak('Test.')
+  if ('fout' in uit) console.error('Azure Speech proef', uit.fout)
+  azureProef = 'audio' in uit ? { ok: true, bytes: uit.audio.byteLength } : { ok: false, status: uit.status }
+  return azureProef
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (body: unknown, status = 200) =>
@@ -126,7 +180,11 @@ Deno.serve(async (req) => {
     // GET ?diag=1: welke stem gekozen wordt + ElevenLabs-plan, zonder spraak
     // (kost geen tegoed, geeft geen sleutels terug). Om te testen zonder login.
     if (req.method === 'GET' && new URL(req.url).searchParams.get('diag') === '1') {
-      if (!SLEUTEL) return json({ sleutel: false, secret_voice_id: !!VOICE_ID })
+      const azure = {
+        azure: AZURE_KAN,
+        ...(AZURE_KAN && new URL(req.url).searchParams.get('azure') === '1' ? { azure_proef: await proefAzure() } : {}),
+      }
+      if (!SLEUTEL) return json({ sleutel: false, secret_voice_id: !!VOICE_ID, ...azure })
       const volgorde = await kiesStemmen(SLEUTEL)
       const abo = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': SLEUTEL } })
         .then((r) => (r.ok ? r.json() : { status: r.status }), () => null)
@@ -137,6 +195,7 @@ Deno.serve(async (req) => {
         volgorde,
         model: MODEL,
         plan: abo?.tier ?? abo,
+        ...azure,
       })
     }
     if (req.method !== 'POST') return json({ fout: 'alleen_post' }, 405)
@@ -155,25 +214,57 @@ Deno.serve(async (req) => {
     if (!eigenTeam?.length) return json({ fout: 'alleen_eigenaar' }, 403)
 
     const sleutel = SLEUTEL
-    if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
-    const volgorde = await kiesStemmen(sleutel)
-    if (!Array.isArray(volgorde)) return json({ fout: 'elevenlabs', status: volgorde.status }, 502)
+    // Zonder ElevenLabs-sleutel gaat het alleen door als Azure kan. sleutelOntbreekt()
+    // in stem.js krijgt dan 400 geen_tekst en meldt terecht geen ontbrekende sleutel.
+    if (!sleutel && !AZURE_KAN) return json({ fout: 'geen_sleutel' }, 503)
+    const volgorde = sleutel ? await kiesStemmen(sleutel) : null
+    const lijstFout = volgorde && !Array.isArray(volgorde) ? volgorde.status : null
+    if (lijstFout !== null && !(AZURE_KAN && [401, 402, 429].includes(lijstFout))) {
+      return json({ fout: 'elevenlabs', status: lijstFout }, 502)
+    }
     const logFout = (melding: string) => sb.from('app_fouten')
       .insert({ user_id: user.id, pagina: 'business-os-stem', melding: melding.slice(0, 1000) })
       .then((r) => { if (r.error) console.error('app_fouten', r.error.message) }, () => {})
 
     const body = await req.json().catch(() => ({}))
     if (body?.tegoed === true) {
+      if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
       const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': sleutel } }).catch(() => null)
       if (!r?.ok) return json({ fout: 'elevenlabs', status: r?.status ?? 0 }, 502)
       const abo = await r.json().catch(() => ({}))
       const gebruikt = Number(abo?.character_count) || 0
       const limiet = Number(abo?.character_limit) || 0
-      return json({ gebruikt, limiet, over: Math.max(0, limiet - gebruikt), reset_unix: abo?.next_character_count_reset_unix ?? null, plan: abo?.tier ?? null })
+      return json({ gebruikt, limiet, over: Math.max(0, limiet - gebruikt), reset_unix: abo?.next_character_count_reset_unix ?? null, plan: abo?.tier ?? null, azure: AZURE_KAN })
     }
     const invoer = typeof body?.tekst === 'string' ? body.tekst.trim() : ''
     if (!invoer) return json({ fout: 'geen_tekst' }, 400)
     if (invoer.length > MAX_TEKENS) return json({ fout: 'te_lang', max: MAX_TEKENS }, 413)
+
+    // Azure krijgt invoer (Nederlands, géén getallenNaarEngels). Lukt het niet:
+    // anders() = het antwoord dat er zonder Azure ook was geweest.
+    const metAzure = async (anders: () => Response) => {
+      if (!AZURE_KAN) return anders()
+      const uit = await azureSpraak(invoer)
+      if ('audio' in uit) {
+        return new Response(uit.audio, {
+          headers: {
+            ...CORS,
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'no-store',
+            'x-gino-stem': AZURE_NAAM,
+            'Access-Control-Expose-Headers': 'x-gino-stem',
+          },
+        })
+      }
+      console.error('Azure Speech', uit.fout)
+      await logFout(`Azure Speech ${uit.fout}`)
+      return anders()
+    }
+    if (!sleutel) return await metAzure(() => json({ fout: 'geen_sleutel' }, 503))
+    if (!Array.isArray(volgorde)) {
+      return await metAzure(() => json({ fout: 'elevenlabs', status: lijstFout ?? 0 }, 502))
+    }
+
     // Engelse woorden worden langer; past het niet meer, dan de oorspronkelijke tekst.
     const engels = getallenNaarEngels(invoer)
     const tekst = engels.length <= MAX_TEKENS ? engels : invoer
@@ -207,7 +298,8 @@ Deno.serve(async (req) => {
       const detail = (await res.text().catch(() => '')).slice(0, 200)
       if (quota(res.status, detail)) {
         console.error('ElevenLabs tegoed op', res.status, detail)
-        return json({ fout: 'quota', status: res.status, detail: detail.slice(0, 150) }, 402)
+        const status = res.status
+        return await metAzure(() => json({ fout: 'quota', status, detail: detail.slice(0, 150) }, 402))
       }
       console.error('ElevenLabs', res.status, 'voor', gebruikt.naam, detail, '→', kandidaten[i].naam)
       const reden = res.status === 402 ? 'gratis ElevenLabs-plan staat deze (bibliotheek)stem niet toe' : 'stem niet gevonden'
@@ -219,8 +311,12 @@ Deno.serve(async (req) => {
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => '')
       console.error('ElevenLabs', res.status, detail.slice(0, 500))
-      if (quota(res.status, detail)) return json({ fout: 'quota', status: res.status, detail: detail.slice(0, 150) }, 402)
-      return json({ fout: 'elevenlabs', status: res.status }, 502)
+      const status = res.status
+      const opTegoed = quota(status, detail)
+      const anders = () => opTegoed
+        ? json({ fout: 'quota', status, detail: detail.slice(0, 150) }, 402)
+        : json({ fout: 'elevenlabs', status }, 502)
+      return opTegoed || status === 402 ? await metAzure(anders) : anders()
     }
     return new Response(res.body, {
       headers: {

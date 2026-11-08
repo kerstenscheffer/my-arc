@@ -41,11 +41,14 @@
 // { bewaar: true })) blijft als object-URL's in het geheugen staan, zodat
 // herhaal() hem opnieuw afspeelt zonder nieuwe gino-stem-aanroep (ElevenLabs-
 // tekens). Nog niets bewaard (stem stond uit)? Dan haalt herhaal() hem één keer op.
+// Azure (8 nov 2026): valt ElevenLabs uit, dan spreekt gino-stem zelf met Azure
+// Maarten. Daarom gaat de tekst hier onbewerkt mee: gino-stem zet getallen alleen
+// voor ElevenLabs om, Azure moet het Nederlands houden. Tegoed op blokkeert de
+// aanroep nooit; de Mac-stem is pas aan de beurt als gino-stem een fout geeft.
 
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
 import { APP_VERSIE } from '../app-update/appVersie'
-import { getallenNaarEngels } from './getallenNaarEngels'
 
 const KEY = 'bos_stem_aan'
 const KEY_ALLES = 'bos_stem_alles'
@@ -227,15 +230,6 @@ const ruimOp = () => {
 // Fout met een korte code voor app_fouten (bijv. '503 geen_sleutel', 'afspelen NotAllowedError').
 const stemFout = (code, detail = '') => Object.assign(new Error(`gino-stem ${code}${detail ? ` ${detail}` : ''}`), { code })
 
-// Getallen naar Engelse woorden (getallenNaarEngels.js), alleen voor ElevenLabs:
-// de browser-terugval en het scherm houden de Nederlandse tekst. Wordt het te
-// lang voor gino-stem (max 1000 tekens), dan de oorspronkelijke tekst.
-const MAX_GINO_STEM = 1000
-function voorStem(tekst) {
-  const engels = getallenNaarEngels(tekst)
-  return engels.length <= MAX_GINO_STEM ? engels : tekst
-}
-
 async function haalAudio(tekst, signal) {
   const { data } = await supabase.auth.getSession()
   const token = data?.session?.access_token
@@ -243,7 +237,7 @@ async function haalAudio(tekst, signal) {
   const res = await fetch(STEM_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tekst: voorStem(tekst) }),
+    body: JSON.stringify({ tekst }),
     signal,
   }).catch(e => { throw stemFout('netwerk', e?.message) })
   if (!res.ok) {
@@ -258,7 +252,7 @@ async function haalAudio(tekst, signal) {
     throw stemFout(`${res.status}${fout ? ` ${fout}` : ''}`, fout ? '' : body.slice(0, 200))
   }
   const stem = res.headers.get('x-gino-stem')
-  if (stem) console.info('[stem] ElevenLabs:', decodeURIComponent(stem))
+  if (stem) console.info('[stem]', decodeURIComponent(stem))
   return URL.createObjectURL(await res.blob())
 }
 
