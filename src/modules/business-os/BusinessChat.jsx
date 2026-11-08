@@ -1618,7 +1618,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   const [luistert, setLuistert] = useState(false)
   const luistertRef = useRef(false)
   useEffect(() => { luistertRef.current = luistert }, [luistert])
-  const { spreekt, bron: spreekBron, alles: allesVoorlezen, tegoed: stemTegoed } = stem.useStem()
+  const { spreekt, bron: spreekBron, alles: allesVoorlezen, tegoed: stemTegoed, azure: stemAzure } = stem.useStem()
   // ElevenLabs-tegoed bij openen en bij elk openen van het puntjes-menu (kost geen tekens).
   useEffect(() => { if (stem.beschikbaar()) stem.tegoed() }, [])
   const [sleept, setSleept] = useState(false)
@@ -2768,6 +2768,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                             {stemTegoed && (
                               <div style={{ padding: '2px 10px 8px 35px', fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted }}>
                                 Stem: nog {stemTegoed.over.toLocaleString('nl-NL')} tekens deze maand
+                              </div>
+                            )}
+                            {!beperkt && stemAzure && (
+                              <div style={{ padding: '0 10px 8px 35px', fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted }}>
+                                Azure: {stemAzure.gebruikt.toLocaleString('nl-NL')} van {stemAzure.limiet.toLocaleString('nl-NL')} tekens, nog {stemAzure.over.toLocaleString('nl-NL')}, kosten € {stemAzure.kosten_eur.toLocaleString('nl-NL')}
                               </div>
                             )}
                           </>

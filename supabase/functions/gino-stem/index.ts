@@ -26,6 +26,10 @@
 // (402 quota, 503 geen_sleutel, 502 elevenlabs), zodat de Mac-stem blijft werken.
 // Het tegoedantwoord kreeg er alleen veld azure bij. GET ?diag=1&azure=1 doet één
 // korte proefaanroep (per instantie één keer, zonder login-sessie te testen).
+// Azure-verbruik (8 nov 2026): na elke geslaagde Azure-aanroep (ook de proef) telt
+// telAzure de tekens op in gino_stem_verbruik (lopende maand UTC). Faalt het
+// tellen, dan spreekt de stem gewoon door. Het tegoedantwoord kreeg veld
+// azure: { gebruikt, limiet, over, kosten_eur, actief }, ook als ElevenLabs faalt.
 // Nooit een sleutel in de frontend of de repo.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -131,6 +135,23 @@ const AZURE_KAN = !!(AZURE_SLEUTEL && AZURE_REGIO)
 const AZURE_VOICE = 'nl-NL-MaartenNeural'
 const AZURE_NAAM = 'Azure Maarten'
 const AZURE_TIJDSLIMIET = 10000 // stem.js geeft een stuk 15 s, inclusief de ElevenLabs-poging ervoor
+const AZURE_LIMIET = 500000 // F0: gratis tekens per maand; daarboven weigert Azure, er komt geen rekening
+const TEL_TIJDSLIMIET = 2000
+
+// Service role alleen voor gino_stem_tel; lezen gaat met de sessie van Kersten (RLS).
+let beheer: ReturnType<typeof createClient> | null = null
+async function telAzure(tekens: number) {
+  try {
+    beheer ||= createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      auth: { persistSession: false },
+    })
+    const { error } = await beheer.rpc('gino_stem_tel', { p_provider: 'azure', p_tekens: tekens })
+      .abortSignal(AbortSignal.timeout(TEL_TIJDSLIMIET))
+    if (error) console.error('gino-stem tellen', error.message)
+  } catch (e) {
+    console.error('gino-stem tellen', e instanceof Error ? e.name : 'onbekend')
+  }
+}
 
 const XML: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
 // Stuurtekens zijn ongeldig in XML en zouden de hele aanroep laten falen.
@@ -155,7 +176,9 @@ async function azureSpraak(tekst: string): Promise<{ audio: ArrayBuffer } | { st
     })
     if (!res.ok) return { status: res.status, fout: `${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}` }
     const audio = await res.arrayBuffer()
-    return audio.byteLength ? { audio } : { status: res.status, fout: `${res.status} lege audio` }
+    if (!audio.byteLength) return { status: res.status, fout: `${res.status} lege audio` }
+    await telAzure(tekst.length)
+    return { audio }
   } catch (e) {
     return { status: 0, fout: `aanroep mislukt: ${e instanceof Error ? e.name : 'onbekend'}` }
   }
@@ -228,13 +251,28 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     if (body?.tegoed === true) {
-      if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
+      // Lukt het lezen niet: gebruikt null, dan toont stem.js geen verzonnen 0.
+      const { data: telling, error: telFout } = await sb.from('gino_stem_verbruik')
+        .select('tekens')
+        .eq('maand', `${new Date().toISOString().slice(0, 7)}-01`)
+        .eq('provider', 'azure')
+        .maybeSingle()
+        .then((r) => r, () => ({ data: null, error: true }))
+      const azureGebruikt = telFout ? null : Number(telling?.tekens) || 0
+      const azure = {
+        gebruikt: azureGebruikt,
+        limiet: AZURE_LIMIET,
+        over: azureGebruikt === null ? null : Math.max(0, AZURE_LIMIET - azureGebruikt),
+        kosten_eur: 0,
+        actief: AZURE_KAN,
+      }
+      if (!sleutel) return json({ fout: 'geen_sleutel', azure }, 503)
       const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': sleutel } }).catch(() => null)
-      if (!r?.ok) return json({ fout: 'elevenlabs', status: r?.status ?? 0 }, 502)
+      if (!r?.ok) return json({ fout: 'elevenlabs', status: r?.status ?? 0, azure }, 502)
       const abo = await r.json().catch(() => ({}))
       const gebruikt = Number(abo?.character_count) || 0
       const limiet = Number(abo?.character_limit) || 0
-      return json({ gebruikt, limiet, over: Math.max(0, limiet - gebruikt), reset_unix: abo?.next_character_count_reset_unix ?? null, plan: abo?.tier ?? null, azure: AZURE_KAN })
+      return json({ gebruikt, limiet, over: Math.max(0, limiet - gebruikt), reset_unix: abo?.next_character_count_reset_unix ?? null, plan: abo?.tier ?? null, azure })
     }
     const invoer = typeof body?.tekst === 'string' ? body.tekst.trim() : ''
     if (!invoer) return json({ fout: 'geen_tekst' }, 400)

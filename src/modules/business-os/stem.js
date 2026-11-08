@@ -45,6 +45,7 @@
 // Maarten. Daarom gaat de tekst hier onbewerkt mee: gino-stem zet getallen alleen
 // voor ElevenLabs om, Azure moet het Nederlands houden. Tegoed op blokkeert de
 // aanroep nooit; de Mac-stem is pas aan de beurt als gino-stem een fout geeft.
+// stand.azure = { gebruikt, limiet, over, kosten_eur, actief } uit het tegoedantwoord.
 
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -386,9 +387,10 @@ export function tegoed() {
         headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
         body: JSON.stringify({ tegoed: true }),
       })
-      if (!res.ok) return
+      // Azure komt ook mee als ElevenLabs faalt (503/502), juist dan is hij de stem.
       const j = await res.json().catch(() => null)
-      if (typeof j?.over === 'number') zet({ tegoed: { over: j.over, limiet: j.limiet, gebruikt: j.gebruikt } })
+      if (typeof j?.azure?.gebruikt === 'number') zet({ azure: j.azure })
+      if (res.ok && typeof j?.over === 'number') zet({ tegoed: { over: j.over, limiet: j.limiet, gebruikt: j.gebruikt } })
     } catch { /* netwerk: oude stand laten staan */ } finally { tegoedBezig = null }
   })()
   return tegoedBezig
@@ -420,7 +422,7 @@ const leesAan = () => {
 const leesAlles = () => {
   try { return localStorage.getItem(KEY_ALLES) !== '0' } catch { return true }
 }
-let stand = { aan: leesAan(), alles: leesAlles(), spreekt: false, teruggevallen: null, bron: null, tegoed: null }
+let stand = { aan: leesAan(), alles: leesAlles(), spreekt: false, teruggevallen: null, bron: null, tegoed: null, azure: null }
 const luisteraars = new Set()
 const zet = (veld) => {
   stand = { ...stand, ...veld }
