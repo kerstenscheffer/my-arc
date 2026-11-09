@@ -133,6 +133,8 @@ const AZURE_SLEUTEL = Deno.env.get('AZURE_SPEECH_KEY')?.trim()
 const AZURE_REGIO = Deno.env.get('AZURE_SPEECH_REGION')?.trim().toLowerCase().replace(/\s+/g, '')
 const AZURE_KAN = !!(AZURE_SLEUTEL && AZURE_REGIO)
 const AZURE_VOICE = 'nl-NL-MaartenNeural'
+const AZURE_PITCH = '-10%' // lager = dieper
+const AZURE_RATE = '-8%' // lager = rustiger
 const AZURE_NAAM = 'Azure Maarten'
 const AZURE_TIJDSLIMIET = 10000 // stem.js geeft een stuk 15 s, inclusief de ElevenLabs-poging ervoor
 const AZURE_LIMIET = 500000 // F0: gratis tekens per maand; daarboven weigert Azure, er komt geen rekening
@@ -171,7 +173,7 @@ async function azureSpraak(tekst: string): Promise<{ audio: ArrayBuffer } | { st
         'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',
         'User-Agent': 'gino-stem',
       },
-      body: `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="nl-NL"><voice name="${AZURE_VOICE}">${xmlVeilig(tekst)}</voice></speak>`,
+      body: `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="nl-NL"><voice name="${AZURE_VOICE}"><prosody pitch="${AZURE_PITCH}" rate="${AZURE_RATE}">${xmlVeilig(tekst)}</prosody></voice></speak>`,
       signal: AbortSignal.timeout(AZURE_TIJDSLIMIET),
     })
     if (!res.ok) return { status: res.status, fout: `${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}` }
