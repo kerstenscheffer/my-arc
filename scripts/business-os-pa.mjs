@@ -60,7 +60,7 @@ import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 import { maakStilteKlok } from './gino-waakhond.mjs'
 import { maakKaartMelder } from './gino-kaart-melding.mjs'
-import { FAMILIE_NAAM, familieVan, leesTool, veiligeBash, veiligZelftest, vrijeBash } from './gino-veilig.mjs'
+import { FAMILIE_NAAM, familieVan, leesSql, leesTool, veiligeBash, veiligZelftest, vrijeBash } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 import { kaartenVastNaRonde, kiesTaken, leesLopendeProjecten, vandaagNL } from './takenronde.mjs'
 import { KLANTEN_TITEL, klantenVraag, vulRonde } from './klantenronde.mjs'
@@ -382,7 +382,8 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
   // 5 nov 2026: lees-tools van vaste koppelingen, en opdrachten en scripts die niets versturen.
   // Monitor draait zelf een shell-opdracht: zelfde toets als Bash.
   const monitor = tool === 'Monitor' ? String(invoer?.command || '') : ''
-  if (veiligAan && (leesTool(tool) || (cmd && vrijeBash(cmd, leesScript, { repoSchrijven: !!ctx.repoSchrijven })) || (monitor && vrijeBash(monitor, leesScript, { repoSchrijven: !!ctx.repoSchrijven })))) {
+  const leesVraag = /__execute_sql$/.test(tool) && leesSql(invoer?.query) // 9 nov: pure SELECT
+  if (veiligAan && (leesTool(tool) || leesVraag || (cmd && vrijeBash(cmd, leesScript, { repoSchrijven: !!ctx.repoSchrijven })) || (monitor && vrijeBash(monitor, leesScript, { repoSchrijven: !!ctx.repoSchrijven })))) {
     console.log(`${tijd()} ✓ zonder vraag: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }

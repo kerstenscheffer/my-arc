@@ -306,6 +306,35 @@ export function leesTool(tool) {
   return (LEES_KOPPELING.test(naam) || ZOOM_LEZEN.test(naam)) && !NOOIT_LEESTOOL.test(naam)
 }
 
+// 9 nov 2026 (Kersten): execute_sql met een pure SELECT zonder kaart. execute_sql draait
+// zonder read-only transactie, dus streng: één SELECT/WITH, geen commentaar of $$, geen
+// schrijfwoorden, en alleen functies van deze lijst (een eigen functie kan schrijven).
+const SQL_FUNCTIES = new Set(`count sum avg min max coalesce nullif greatest least round floor ceil ceiling abs trunc mod
+  length char_length lower upper trim btrim ltrim rtrim substr substring left right replace split_part concat concat_ws
+  position strpos format to_char to_date to_timestamp to_number date_trunc date_part extract age now make_date make_interval
+  generate_series array_agg string_agg array_length cardinality unnest array_to_string string_to_array jsonb_agg json_agg
+  jsonb_build_object json_build_object jsonb_build_array jsonb_array_length jsonb_array_elements jsonb_array_elements_text
+  jsonb_each jsonb_each_text jsonb_object_keys jsonb_typeof jsonb_pretty jsonb_strip_nulls to_jsonb to_json row_to_json
+  bool_and bool_or every regexp_replace regexp_match regexp_matches regexp_split_to_array row_number rank dense_rank lag
+  lead first_value last_value ntile percentile_cont percentile_disc stddev variance mode timezone cast date numeric
+  decimal varchar char interval timestamp timestamptz
+  select from where and or not in any all exists filter over as on join using lateral when then else values
+  group by order having limit distinct materialized like ilike between is case end`.split(/\s+/))
+const SQL_SCHRIJFT = /\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke|copy|call|do|execute|perform|set|reset|lock|vacuum|analyze|refresh|comment|reindex|cluster|listen|notify|into|prepare|deallocate|import|security|owner)\b|\bfor\s+(update|share|no\s+key|key)\b/i
+const SQL_GEHEIM = /vault|secret|token|password|wachtwoord|encrypted|pg_authid|pg_shadow|\bauth\s*\./i
+export function leesSql(query) {
+  let q = String(query || '').trim()
+  if (!q || q.length > 6000 || SQL_GEHEIM.test(q) || /--|\/\*|\$/.test(q)) return false
+  q = q.replace(/;\s*$/, '')
+  if (!/^(select|with)\s/i.test(q)) return false
+  // Teksten eruit (komma's of haakjes daarin tellen niet); "x" wordt een gewone naam.
+  const zonder = q.replace(/'(?:[^']|'')*'/g, "''").replace(/"(?:[^"]|"")*"/g, 'naam')
+  if (/['"]/.test(zonder.replace(/''/g, '')) || zonder.includes(';')) return false
+  if (SQL_SCHRIJFT.test(zonder)) return false
+  for (const [, f] of zonder.matchAll(/([\w.]+)\s*\(/g)) if (!SQL_FUNCTIES.has(f.toLowerCase())) return false
+  return true
+}
+
 export const FAMILIE_NAAM = {
   python: 'Python-scripts', node: 'losse Node-scripts', 'yt-dlp': 'YouTube ophalen', curl: 'webpagina’s ophalen', ffmpeg: 'video bewerken',
 }
@@ -417,6 +446,21 @@ const LEES_NEE = [
   'mcp__claude_ai_Zoom_for_Claude__meeting_create', 'mcp__claude_ai_Zoom_for_Claude__capabilities_invoke_write', 'mcp__claude_ai_Stripe__list_customers', 'Bash', 'Edit',
 ]
 
+const SQL_JA = [
+  "select max(bundel) as nieuwste_bundel, max(created_at) as laatste_log, count(*) filter (where created_at > '2026-11-08') as logs_sinds_8nov, max(bundel) filter (where stap='download_ok') as nieuwste_download_ok from app_live_update_log;",
+  'select id, naam from clients where updated_at > now() - interval \'7 days\' order by 2 limit 20',
+  "with a as (select client_id, count(*) n from client_coaching_logs group by 1) select * from a where n > 3",
+  "select column_name from information_schema.columns where table_name = 'clients'",
+  "select coalesce(jsonb_agg(x), '[]'::jsonb) from (select 'delete; drop (x)' as t) x",
+]
+const SQL_NEE = [
+  "insert into notifications (client_id) values ('x')", 'select 1; delete from clients', 'select stuur_push(id) from clients',
+  "select net.http_post(url := 'https://x')", 'with d as (delete from clients returning *) select * from d', 'select * into kopie from clients',
+  'select * from clients for update', 'select * from vault.decrypted_secrets', 'select email from auth.users', "select set_config('a','b',false)",
+  'select 1 -- x', 'select $$x$$', 'update clients set naam = 1', 'select "evil"(1)', 'select public.business_os_lees(1)', 'select pg_sleep(100)',
+  "select 'onaf",
+]
+
 export function veiligZelftest() {
   const fouten = []
   for (const c of MOET_VRIJ) if (veiligeBash(c) !== 'lezen') fouten.push(`moet zonder kaart: ${c}`)
@@ -429,6 +473,8 @@ export function veiligZelftest() {
   for (const [c, wel] of [['D=$(mktemp -d); rm -rf $D', false], ['rm -rf $HOME', true], ["cat <<'E'\nX=$(mktemp -d)\nE\nrm -rf $X", true], ['D=$(mktemp -d); rm -rf $D/..', true], ['D=$(mktemp -d); D=~; rm -rf $D', true], ["echo 'a; X=/tmp/b; c'; rm -rf $X", true]]) if (!!hardeBlokkade('Bash', { command: c }) !== wel) fouten.push(`rm met variabele: ${c}`)
   for (const t of LEES_JA) if (!leesTool(t)) fouten.push(`lees-tool: ${t}`)
   for (const t of LEES_NEE) if (leesTool(t)) fouten.push(`geen lees-tool: ${t}`)
+  for (const q of SQL_JA) if (!leesSql(q)) fouten.push(`lees-SQL moet vrij: ${q}`)
+  for (const q of SQL_NEE) if (leesSql(q)) fouten.push(`SQL moet een kaart blijven: ${q}`)
   for (const c of MOET_VEILIG) if (veiligeBash(c) !== 'lezen') fouten.push(`moet veilig zijn: ${c}`)
   for (const c of MOET_VRAGEN) if (veiligeBash(c)) fouten.push(`mag niet zonder vraag: ${c}`)
   for (const [c, f] of FAMILIE) if (familieVan(c) !== f) fouten.push(`familie ${f}: ${c}`)
