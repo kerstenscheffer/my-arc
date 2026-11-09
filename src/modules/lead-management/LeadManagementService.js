@@ -881,6 +881,50 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     const t = (titel || '').toLowerCase()
     return (t.includes('verloren') || t.includes('lost')) && !t.includes('afgewezen')
   }
+  // Zelfde woorden als isScheduledSectionTitle op het bord.
+  _isSalesCallTitel(titel) {
+    const t = (titel || '').toLowerCase()
+    const NEE = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgewezen', 'geweigerd']
+    return ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'].some(w => t.includes(w))
+      && !NEE.some(w => t.includes(w))
+  }
+  // Wat zegt de doelsectie over de call? false = niet gevoerd, true = gevoerd,
+  // null = niets.
+  _callUitkomstVanSectie(titel) {
+    const t = (titel || '').toLowerCase()
+    if (/no.?show/.test(t) || ['afgewezen', 'geweigerd', 'rejected'].some(w => t.includes(w))) return false
+    if (this._isSaleTitel(titel) || this._isSaleVerlorenTitel(titel)) return true
+    return null
+  }
+
+  // Vult call_happened in op de laatste Sales Call-rij van de lead als de
+  // doelsectie de uitkomst verraadt. Een ingevulde waarde blijft altijd staan.
+  // De verplaatsing zelf is dan al gelukt, dus een fout hier mag die niet breken.
+  async _vulCallUitkomstIn(leadId, naarTitel) {
+    const uitkomst = this._callUitkomstVanSectie(naarTitel)
+    if (uitkomst === null) return
+    try {
+      const { data: rijen, error } = await this.db.supabase
+        .from('lead_movements')
+        .select('id, to_section_title, call_happened')
+        .eq('lead_id', leadId)
+        .not('call_date', 'is', null)
+        .is('reverted_at', null)
+        .order('moved_at', { ascending: false })
+        .limit(25)
+      if (error) throw error
+      const laatste = (rijen || []).find(r => this._isSalesCallTitel(r.to_section_title))
+      if (!laatste || laatste.call_happened !== null) return
+      const { error: schrijfFout } = await this.db.supabase
+        .from('lead_movements')
+        .update({ call_happened: uitkomst })
+        .eq('id', laatste.id)
+        .is('call_happened', null)
+      if (schrijfFout) throw schrijfFout
+    } catch (e) {
+      console.warn('call-uitkomst invullen mislukt:', e?.message || e)
+    }
+  }
 
   // Sleep je een lead wéér uit de Sale-kolom, dan was het geen sale.
   //
@@ -1005,6 +1049,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         leadId, leadName, fromSectionId, fromSectionTitle,
         toSectionId: targetSectionId, toSectionTitle, coachId, callDate, callTime
       })
+
+      // Ná logMovement: de databasetrigger mark_call_held_on_sale vult bij een
+      // sale-rij de open call al in. Eerder invullen zou hem naar een oudere
+      // lege call sturen, en die zou dan ten onrechte als gevoerd tellen.
+      await this._vulCallUitkomstIn(leadId, toSectionTitle)
 
       return { success: true, leadName, fromSection: fromSectionTitle, toSection: toSectionTitle, movementId }
     } catch (error) {
@@ -1147,6 +1196,56 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     } catch (e) {
       console.error('getDueScheduledCalls failed:', e)
       return []
+    }
+  }
+
+  // Per lead de laatste Sales Call-rij met een call_date, als die voorbij is en
+  // call_happened nog leeg is: { [leadId]: { movementId, callDate, callTime } }.
+  // Bewust niet alleen op lege rijen filteren: staat er een oudere lege rij
+  // onder een ingevulde nieuwere, dan valt er niets meer te vragen.
+  async getCallsZonderUitkomst() {
+    try {
+      const { data, error } = await this.db.supabase
+        .from('lead_movements')
+        .select('id, lead_id, to_section_title, call_date, call_time, call_happened')
+        .not('call_date', 'is', null)
+        .is('reverted_at', null)
+        .order('moved_at', { ascending: false })
+      if (error) throw error
+      const nu = new Date()
+      const gezien = new Set()
+      const open = {}
+      for (const r of data || []) {
+        if (!r.lead_id || gezien.has(r.lead_id) || !this._isSalesCallTitel(r.to_section_title)) continue
+        gezien.add(r.lead_id)
+        if (r.call_happened !== null) continue
+        const moment = new Date(`${r.call_date}T${r.call_time || '23:59'}:00`)
+        if (isNaN(moment.getTime()) || moment > nu) continue
+        open[r.lead_id] = { movementId: r.id, callDate: r.call_date, callTime: r.call_time }
+      }
+      return open
+    } catch (e) {
+      console.warn('getCallsZonderUitkomst failed:', e?.message || e)
+      return {}
+    }
+  }
+
+  // Antwoord op "Gehouden?". Schrijft alleen op een lege rij; komt er geen rij
+  // terug, dan is er niets opgeslagen.
+  async zetCallGehouden(movementId, gehouden) {
+    try {
+      const { data, error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ call_happened: !!gehouden })
+        .eq('id', movementId)
+        .is('call_happened', null)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) return { success: false, error: 'Niet opgeslagen: deze call is al ingevuld of je mist de rechten.' }
+      return { success: true }
+    } catch (e) {
+      console.error('zetCallGehouden failed:', e)
+      return { success: false, error: e.message }
     }
   }
 

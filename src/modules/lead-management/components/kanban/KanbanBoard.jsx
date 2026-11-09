@@ -164,6 +164,8 @@ export default function KanbanBoard({
   const [statsRange, setStatsRange] = useState({ start: '', end: '' })
   const [statsVolledig, setStatsVolledig] = useState(false)
   const [dueCalls, setDueCalls] = useState([])
+  // Voorbije Sales Calls zonder uitkomst per lead → label 'Gehouden?' op de kaart.
+  const [gehoudenVragen, setGehoudenVragen] = useState({})
   // Closes die nog op geld wachten; tweede tabblad van hetzelfde venster.
   const [wachtBetaling, setWachtBetaling] = useState([])
   // Leads met een uitgestelde sale → label 'Uitgesteld' op de kaart.
@@ -1001,6 +1003,7 @@ export default function KanbanBoard({
         setDueCalls(due)
         leadService.getAwaitingPayment(coachId).then(setWachtBetaling).catch(() => {})
         leadService.getUitgesteldeLeadIds().then(setUitgesteldLeads)
+        leadService.getCallsZonderUitkomst().then(setGehoudenVragen)
         if (isInitialLoad && due.length) setShowDueCalls(true) // auto-open bij openen bord
       } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
@@ -1460,10 +1463,29 @@ export default function KanbanBoard({
       setHighlightedLeadId(lead.id)
       setTimeout(() => setHighlightedLeadId(null), 2000)
       loadActivityData()
+      leadService.getCallsZonderUitkomst().then(setGehoudenVragen)
     } catch (error) {
       console.error('❌ Move lead to scheduled section failed:', error)
       await loadBoard(true)
     }
+  }
+
+  // Antwoord op het label 'Gehouden?'. Het label gaat meteen weg; lukt het
+  // opslaan niet, dan komt het terug en zeggen we waarom.
+  const handleCallGehouden = async (leadId, vraag, gehouden) => {
+    setGehoudenVragen(prev => {
+      const rest = { ...prev }
+      delete rest[leadId]
+      return rest
+    })
+    const res = await leadService.zetCallGehouden(vraag.movementId, gehouden)
+    if (!res?.success) {
+      alert(res?.error || 'Opslaan mislukt')
+      leadService.getCallsZonderUitkomst().then(setGehoudenVragen)
+      return
+    }
+    setDueCalls(prev => prev.filter(d => d.movementId !== vraag.movementId))
+    setStatsRefreshKey(k => k + 1)
   }
 
   // Betaling binnen bij een close die erop wachtte. De rij verdwijnt meteen uit
@@ -1602,6 +1624,7 @@ export default function KanbanBoard({
       }
       setStatsRefreshKey(k => k + 1)
     } catch (e) { console.error('due call outcome failed:', e) }
+    finally { leadService.getCallsZonderUitkomst().then(setGehoudenVragen) }
   }
 
   // `zonderVenster`: bedrag of objectie is al gevraagd (bv. in de call-lijst),
@@ -1673,7 +1696,14 @@ export default function KanbanBoard({
     let cardShadow = 'none'
     if (highlightedLeadId === lead.id) cardShadow = `0 0 0 2px ${section.color}, 0 0 15px ${section.color}40`
     else if (isCallReady) cardShadow = '0 0 0 1px #D4AF37'
-    
+    const gehoudenVraag = isScheduledSectionTitle(section.title) ? gehoudenVragen[lead.id] : null
+    const gehoudenKnop = (accent) => ({
+      minHeight: isMobile ? 40 : 30, minWidth: 52, padding: '0 0.75rem', borderRadius: 8,
+      background: accent ? '#10b981' : 'transparent',
+      border: accent ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.3)',
+      color: '#fff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+    })
+
     return (
       <div key={lead.id} ref={(el) => { leadRefs.current[lead.id] = el }} style={{ transition: 'all 0.2s ease', borderRadius: isMobile ? '10px' : '12px', boxShadow: cardShadow }}>
         <KanbanCard
@@ -1691,6 +1721,19 @@ export default function KanbanBoard({
           verbergNaam={namenVerborgen}
           uitgesteld={uitgesteldLeads.has(lead.id)}
         />
+        {gehoudenVraag && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            marginTop: 4, padding: '0.35rem 0.5rem 0.35rem 0.75rem', borderRadius: 10,
+            background: 'rgba(249,115,22,0.14)', border: '1px solid rgba(249,115,22,0.55)',
+          }}>
+            <span style={{ color: '#f97316', fontSize: '0.8rem', fontWeight: 800 }}>Gehouden?</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" style={gehoudenKnop(true)} onClick={() => handleCallGehouden(lead.id, gehoudenVraag, true)}>Ja</button>
+              <button type="button" style={gehoudenKnop(false)} onClick={() => handleCallGehouden(lead.id, gehoudenVraag, false)}>Nee</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

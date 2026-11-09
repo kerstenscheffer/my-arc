@@ -1,10 +1,10 @@
 // src/modules/manual-workout-builder/components/DayTemplatePickerModal.jsx
 // Kies bij "+ Dag" een lege dag óf een opgeslagen dag-template (bv. "Push dag").
 // Een template laadt de dag meteen met alle oefeningen.
-import { X, Plus, Dumbbell, Trash2 } from 'lucide-react'
+import { X, Plus, Dumbbell, Trash2, Pencil } from 'lucide-react'
 
 export default function DayTemplatePickerModal({
-  templates = [], onPickEmpty, onPickTemplate, onDeleteTemplate, onClose, isMobile,
+  templates = [], onPickEmpty, onPickTemplate, onEditTemplate, onDeleteTemplate, onClose, isMobile,
 }) {
   return (
     <div
@@ -86,6 +86,15 @@ export default function DayTemplatePickerModal({
                     </div>
                   </div>
                 </button>
+                {onEditTemplate && (
+                  <button
+                    onClick={() => onEditTemplate(tpl)}
+                    title="Dag-template bewerken"
+                    style={{ flexShrink: 0, width: 38, height: 38, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                )}
                 {onDeleteTemplate && (
                   <button
                     onClick={() => onDeleteTemplate(tpl)}

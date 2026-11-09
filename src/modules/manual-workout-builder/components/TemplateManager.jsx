@@ -1,9 +1,10 @@
 // src/modules/manual-workout-builder/components/TemplateManager.jsx
 import { useState } from 'react'
-import { FileText, Clock, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { FileText, Clock, Archive, ArchiveRestore, Trash2, Pencil } from 'lucide-react'
 import dbService from '../../../services/DatabaseService'
 
-export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onChange }) {
+// onBewerk (9 nov 2026): het sjabloon zelf aanpassen i.p.v. een kopie laden.
+export function TemplateManager({ templates, onLoad, onBewerk, onClose, isMobile, db, onChange }) {
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(null)
   // Gebruik de meegegeven db, val terug op de singleton (robuust tegen een
@@ -160,6 +161,13 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
 
                   {/* Archiveer/herstel + verwijder */}
                   <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                    {onBewerk && (
+                      <button onClick={(e) => { e.stopPropagation(); onBewerk(template) }} disabled={busy === template.id}
+                        title="Template bewerken: wijzigingen gaan in het sjabloon zelf"
+                        style={{ flex: 1, width: 42, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Pencil size={15} strokeWidth={2.4} />
+                      </button>
+                    )}
                     <button onClick={(e) => setStandaard(template, !template.is_public, e)} disabled={busy === template.id}
                       title={template.is_public ? 'Standaardplan: klanten kunnen dit zelf kiezen. Klik om uit te zetten.' : 'Maak standaardplan: klanten kunnen dit zelf kiezen in hun wisselvenster'}
                       style={{ flex: 1, width: 42, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: template.is_public ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy === template.id ? 0.4 : 1 }}>
