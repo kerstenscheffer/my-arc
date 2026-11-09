@@ -43,6 +43,17 @@ export default function ExerciseList({
   // openen terwijl je alleen wilde verslepen.
   const netGesleept = useRef(false)
   const [terugzetBezig, setTerugzetBezig] = useState(false)
+  // Timer aan: na de laatste set van een oefening opent de eerstvolgende
+  // die nog niet af is. Eerst vooruit in de lijst, dan wat er eerder bleef liggen.
+  const [openIndex, setOpenIndex] = useState(null)
+  const naarVolgende = (huidig) => {
+    // De volgorde zoals de klant hem ziet: gegroepeerd op spiergroep.
+    const volgorde = groepen.flatMap(g => g.items.map(it => it.index))
+    const plek = volgorde.indexOf(huidig)
+    const volgende = [...volgorde.slice(plek + 1), ...volgorde.slice(0, plek)]
+      .find(i => !isExerciseFullyLogged(localExercises[i], todaysLogs))
+    if (volgende !== undefined) setOpenIndex(volgende)
+  }
 
   useEffect(() => {
     localExercises.forEach((_, index) => {
@@ -348,6 +359,9 @@ export default function ExerciseList({
                 delay={index * 120}
                 onMakePermanent={() => handleMakePermanent(index)}
                 onVerwijder={(modus) => handleVerwijder(index, modus)}
+                openNu={openIndex === index}
+                onGeopend={() => setOpenIndex(null)}
+                onVolgende={() => naarVolgende(index)}
               />
             </div>
                 )

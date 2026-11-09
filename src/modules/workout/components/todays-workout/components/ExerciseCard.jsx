@@ -14,12 +14,18 @@ import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseCard({
   exercise, index, isLogged, onLogsUpdate,
-  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder
+  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder, openNu = false, onGeopend, onVolgende
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
+  // De lijst stuurt ons hierheen na de laatste set van de vorige oefening.
+  useEffect(() => {
+    if (!openNu) return
+    setShowLogModal(true)
+    onGeopend?.()
+  }, [openNu]) // eslint-disable-line react-hooks/exhaustive-deps
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [imageUrls, setImageUrls] = useState(() => [...fotoKandidaten(exercise), getFallbackImage(exercise)])
   const [loadingImage, setLoadingImage] = useState(true)
@@ -397,6 +403,7 @@ export default function ExerciseCard({
           /* Aantal sets aanpassen gebeurt daar; hier stonden de − en + maar
              als je een set overslaat of toevoegt ben je al in dat scherm. */
           onSetsWijzigen={zetSets}
+          onVolgendeOefening={onVolgende ? () => { handleLogComplete(); onVolgende() } : undefined}
         />
       )}
       <BladModal open={vraagVerwijderen} titel="Oefening verwijderen" onClose={() => setVraagVerwijderen(false)}>

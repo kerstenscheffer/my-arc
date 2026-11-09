@@ -38,7 +38,13 @@ export default function FaseStarter({ db, client, schemaId, plannen = [] }) {
       })
       if (error) throw error
       await laad()
-    } catch (e) { setFout(e.message || 'Starten mislukt') }
+    } catch (e) {
+      // Coach en klant delen in één browser de inlogsessie: is er in een ander
+      // tabblad naar de klant gewisseld, dan schrijft dit scherm als klant.
+      setFout(/row-level security/i.test(e.message || '')
+        ? 'Je bent in deze browser nu als klant ingelogd. Wissel terug naar je coachaccount en probeer opnieuw.'
+        : (e.message || 'Starten mislukt'))
+    }
     setBezig(false)
   }
 

@@ -464,7 +464,7 @@ function youtubeThumb(url) {
 // een afgeronde training uit het weekrooster of de historie. Alles wat
 // 'vandaag' was, is dan die dag: de gelogde sets, 'vorige keer' (de keer
 // ervóór) en waar een nieuwe set naartoe gaat.
-export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768, datum = null }) {
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, onVolgendeOefening, isMobile = window.innerWidth <= 768, datum = null }) {
   const vandaag = datum || new Date().toISOString().split('T')[0]
   const [loggedSets, setLoggedSets] = useState([])
   // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
@@ -495,6 +495,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
   const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
   const herstelGehad = useRef(false)
+  const naFeedbackVerder = useRef(false)
   useEffect(() => {
     if (!bfAan) return undefined
     let weg = false
@@ -772,7 +773,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
     // Bouwfase: laatste geplande set gelogd → hoe zwaar voelde deze oefening?
-    if (bfAan && editingIndex === null && !oefFeedback && newSets.length >= plannedSetCount(exercise)) setFbOpen('oefening')
+    const vraagFeedback = bfAan && editingIndex === null && !oefFeedback && newSets.length >= plannedSetCount(exercise)
+    if (vraagFeedback) setFbOpen('oefening')
+    // Timer aan en de laatste geplande set net gelogd: door naar de volgende
+    // oefening (9 nov 2026). Precies gelijk, zodat een extra set je niet
+    // wegstuurt. Met een feedbackvraag open wachten we tot die dicht is.
+    if (onVolgendeOefening && rustTimerAan && editingIndex === null && newSets.length === plannedSetCount(exercise)) {
+      if (vraagFeedback) naFeedbackVerder.current = true
+      else onVolgendeOefening()
+    }
   }
 
   // De lus: timer op nul → invoerscherm voor de volgende set. Stopt vanzelf
@@ -780,6 +789,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // knop, maar de app moet niet blijven duwen.
   const volgendeSet = () => {
     stopRustKlok()
+    // Doorgestuurd naar deze oefening en de rust is om: de eerste set loopt
+    // via startSet, zodat de herstel- en opwarmvraag niet wegvallen.
+    if (loggedSets.length === 0) { startSet(); return }
     const gepland = parseInt(exercise.sets, 10)
     // De schakelaar blijft aan: die geldt voor de hele workout, en anders is de
     // timer bij de volgende oefening weg.
@@ -1562,6 +1574,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             setFbOpen(null)
             // Na de herstelvraag gewoon door naar de set (of de opwarmvraag).
             if (wasHerstel) startSet()
+            else if (naFeedbackVerder.current) { naFeedbackVerder.current = false; onVolgendeOefening?.() }
           }}
         />
       )}
