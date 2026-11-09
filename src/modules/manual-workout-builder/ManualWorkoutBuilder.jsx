@@ -47,6 +47,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [instellingenOpen, setInstellingenOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false) // Planinfo: sets per spiergroep
   const [faseOpen, setFaseOpen] = useState(false) // Trainingsfase starten/stoppen
+  // Alle dagen uitgeklapt naast elkaar (9 nov 2026), alleen op desktop. Onthouden per toestel.
+  const [alleDagen, setAlleDagenState] = useState(() => { try { return localStorage.getItem('mwb_alle_dagen') === '1' } catch { return false } })
+  const setAlleDagen = (v) => { setAlleDagenState(v); try { localStorage.setItem('mwb_alle_dagen', v ? '1' : '0') } catch { /* leeg */ } }
   const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
@@ -849,6 +852,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </>)}
         </div>
 
+        {!m && workoutPlan.days.length > 1 && (
+          <div role="group" aria-label="Weergave" style={{ display: 'flex', flexShrink: 0, padding: 3, gap: 2, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)' }}>
+            {[[false, '1 dag'], [true, 'Alle dagen']].map(([v, label]) => (
+              <button key={label} onClick={() => setAlleDagen(v)} aria-pressed={alleDagen === v} style={{
+                height: 28, padding: '0 0.7rem', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                background: alleDagen === v ? '#fff' : 'transparent', color: alleDagen === v ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+                fontSize: '0.78rem', fontWeight: 900, whiteSpace: 'nowrap',
+              }}>{label}</button>
+            ))}
+          </div>
+        )}
         <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={16} /></button>
         <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw" aria-label="Opnieuw" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canRedo ? 1 : 0.3 }}><Redo2 size={16} /></button>
         {!bewerk && <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} style={{ ...opslaanKnop(false), opacity: leegPlan ? 0.45 : 1 }}>
@@ -926,6 +940,38 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
         </div>
       )}
+      {!m && alleDagen && workoutPlan.days.length > 1 ? (
+        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div style={{ display: 'flex', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
+            {workoutPlan.days.map((dag, i) => (
+              <div key={dag.id} style={{ width: 330, flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+                <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.75rem 0.85rem 0.6rem', background: 'none', border: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
+                </button>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.7rem 0 130px', scrollbarWidth: 'thin' }}>
+                  <DayBuilder
+                    key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop
+                    onActivate={() => setActiveDay(dag.id)}
+                    onUpdate={(updates) => updateDay(dag.id, updates)}
+                    onDelete={() => deleteDay(dag.id)}
+                    onDuplicate={() => duplicateDay(dag.id)}
+                    onSaveTemplate={() => saveDayAsTemplate(dag)}
+                    onAddExercise={() => { setActiveDay(dag.id); setShowExerciseSelector(true) }}
+                    onUpdateExercise={(exerciseId, updates) => updateExercise(dag.id, exerciseId, updates)}
+                    onDeleteExercise={(exerciseId) => deleteExercise(dag.id, exerciseId)}
+                    isMobile db={db} client={effectiveClient}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div style={m
         ? { paddingBottom: 120 }
         : { flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -1121,6 +1167,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
         </div>
       </div>
+      )}
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {/* Titel-venster voor een nieuwe template. Bewust een eigen naam: het plan
