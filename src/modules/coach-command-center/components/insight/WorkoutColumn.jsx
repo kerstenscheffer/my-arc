@@ -20,6 +20,7 @@ import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import KlantPlanTerugzetten from './KlantPlanTerugzetten'
 import InklapKop, { useInklap } from './InklapKop'
+import BouwfaseInzicht from './BouwfaseInzicht'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 // Wanneer de klant de training opsloeg (completed_at wordt bij het opslaan
@@ -401,6 +402,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           </div>
           {/* Stappen: alleen het dagdoel zetten, de week staat al in de agenda */}
           <StappenInsight db={db} client={client} isMobile={isMobile} alleenDoel />
+          {/* Bouwfase-tracking aan/uit + herstel-indicator per spiergroep */}
+          <BouwfaseInzicht db={db} client={client} isMobile={isMobile} />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
           {/* Wat de klant zelf aan het plan veranderde, met "door klant" erbij. */}

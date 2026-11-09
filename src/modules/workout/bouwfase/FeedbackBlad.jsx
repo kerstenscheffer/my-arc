@@ -58,7 +58,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
       const rij = await bewaarFeedback(db.supabase, {
         client_id: client.id, soort, fase_id: fase?.id || null,
         oefening: soort === 'oefening' ? oefening : null,
-        spiergroep: soort === 'herstel' ? spiergroep : null,
+        // Oefening-rijen krijgen hun spiergroep mee: dan ziet de coach herstel en zwaarte per spiergroep.
+        spiergroep: soort === 'workout' ? null : (spiergroep || null),
         score: soort === 'herstel' ? null : score,
         gevoel: soort === 'workout' ? null : gevoel,
         opmerking: opmerking.trim() || null,
