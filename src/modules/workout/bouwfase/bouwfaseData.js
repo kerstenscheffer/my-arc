@@ -36,7 +36,7 @@ export const spierWoord = (k) => String(spierLabel(k) || '').toLowerCase()
 export async function leesActieveFase(sb, clientId) {
   if (!sb || !clientId) return null
   const { data } = await sb.from('training_fases')
-    .select('id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, created_at')
+    .select('id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, reflectie, created_at')
     .eq('client_id', clientId).eq('actief', true)
     .order('start_datum', { ascending: false }).limit(1)
     .then(r => r, () => ({ data: null }))
@@ -90,4 +90,43 @@ export async function bewaarFeedback(sb, rij) {
   if (error) throw error
   window.dispatchEvent(new CustomEvent('myarc:training-feedback'))
   return data
+}
+
+export const magReflecteren = (stand) => stand?.soort === 'deload' || stand?.soort === 'klaar'
+
+// Beste set van een oefening op één dag (geschatte 1RM, zodat 60×12 en 70×8 vergelijkbaar zijn).
+const kracht = (s) => (Number(s?.weight) || 0) * (1 + (Number(s?.reps) || 0) / 30)
+const besteSet = (sets) => (Array.isArray(sets) ? sets : []).reduce((b, s) => (kracht(s) > kracht(b) ? s : b), null)
+
+// Per oefening de eerste en de laatste training binnen de fase. Oefeningen die
+// maar één keer gelogd zijn laten we weg: daar valt niets te vergelijken.
+export async function faseProgressie(sb, fase) {
+  if (!sb || !fase?.client_id || !fase?.start_datum) return []
+  const eind = new Date(`${String(fase.start_datum).slice(0, 10)}T12:00:00`)
+  eind.setDate(eind.getDate() + (Number(fase.bouw_weken) || 7) * 7 + (Number(fase.deload_dagen) || 0))
+  const { data: sessies } = await sb.from('workout_sessions').select('id, workout_date')
+    .eq('client_id', fase.client_id).gte('workout_date', String(fase.start_datum).slice(0, 10))
+    .lte('workout_date', eind.toISOString().slice(0, 10)).then(r => r, () => ({ data: [] }))
+  if (!sessies?.length) return []
+  const datumVan = Object.fromEntries(sessies.map(s => [s.id, String(s.workout_date).slice(0, 10)]))
+  const { data: logs } = await sb.from('workout_progress').select('session_id, exercise_name, sets')
+    .in('session_id', sessies.map(s => s.id)).then(r => r, () => ({ data: [] }))
+  const perOef = {}
+  for (const l of logs || []) {
+    const set = besteSet(l.sets)
+    if (!set || !kracht(set)) continue
+    const k = String(l.exercise_name || '').toLowerCase()
+    ;(perOef[k] = perOef[k] || { naam: l.exercise_name, rijen: [] }).rijen.push({ datum: datumVan[l.session_id], set })
+  }
+  return Object.values(perOef).filter(o => o.rijen.length > 1).map(o => {
+    const r = [...o.rijen].sort((a, b) => a.datum.localeCompare(b.datum))
+    const eerste = r[0].set, laatste = r[r.length - 1].set
+    const verschil = Math.round(((kracht(laatste) - kracht(eerste)) / kracht(eerste)) * 100)
+    return { naam: o.naam, eerste, laatste, verschil }
+  }).sort((a, b) => b.verschil - a.verschil)
+}
+
+export async function bewaarReflectie(sb, faseId, reflectie) {
+  const { error } = await sb.rpc('bewaar_fase_reflectie', { p_fase_id: faseId, p_reflectie: reflectie })
+  if (error) throw error
 }

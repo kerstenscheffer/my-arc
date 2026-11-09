@@ -25,10 +25,11 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3 } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
+import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -45,6 +46,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // dan pakken we de eerste.
   const [instellingenOpen, setInstellingenOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false) // Planinfo: sets per spiergroep
+  const [faseOpen, setFaseOpen] = useState(false) // Trainingsfase starten/stoppen
   const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
@@ -750,6 +752,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
     { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
     { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
+    { id: 'fase', icon: <Flag size={16} />, label: 'Trainingsfase', onClick: () => setFaseOpen(v => !v), actief: faseOpen && !!selectedSchemaId, uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Bouwfase van 6-7 weken starten of stoppen' },
     { id: 'info', icon: <BarChart3 size={16} />, label: 'Planinfo', onClick: () => setInfoOpen(v => !v), actief: infoOpen },
     { id: 'instellingen', icon: <ChevronDown size={16} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none' }} />, label: 'Planinstellingen', onClick: () => setInstellingenOpen(v => !v), actief: instellingenOpen },
   ]
@@ -1001,7 +1004,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                   <span style={{ display: 'flex', color: g.actief && m ? '#0a0a0a' : 'rgba(255,255,255,0.7)' }}>{g.icon}</span>
                   <span style={{ flex: m ? undefined : 1 }}>{g.label}</span>
                   {g.badge != null && <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)' }}>{g.badge}</span>}
-                  {!m && g.id !== 'instellingen' && g.id !== 'info' && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
+                  {!m && g.id !== 'instellingen' && g.id !== 'info' && g.id !== 'fase' && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
                 </button>
               ))}
               {!m && (
@@ -1016,6 +1019,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               )}
             </div>
 
+            {faseOpen && effectiveClient && selectedSchemaId && <FaseStarter key={effectiveClient.id} db={db} client={effectiveClient} schemaId={selectedSchemaId} plannen={clientSchemas} />}
             {infoOpen && <PlanInfo days={workoutPlan.days} />}
 
             {instellingenOpen && (

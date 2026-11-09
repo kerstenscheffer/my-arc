@@ -17,7 +17,8 @@ import { useCardioVanDag } from './useCardioVanDag'
 // Bouwfase-tracking (9 nov 2026): na de workout een cijfer met toelichting.
 import useBouwfase from '../../bouwfase/useBouwfase'
 import FeedbackBlad from '../../bouwfase/FeedbackBlad'
-import { leesFeedbackVanDag, faseTekst } from '../../bouwfase/bouwfaseData'
+import FaseReflectieBlad from '../../bouwfase/FaseReflectieBlad'
+import { leesFeedbackVanDag, faseTekst, magReflecteren } from '../../bouwfase/bouwfaseData'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
@@ -49,6 +50,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const bouwfase = useBouwfase(client, db)
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
   const [wkOpen, setWkOpen] = useState(false)
+  const [reflectieOpen, setReflectieOpen] = useState(false)
   useEffect(() => {
     if (!bouwfase.aan || !client?.id || !db?.supabase) return undefined
     let weg = false
@@ -460,6 +462,12 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const faseRegel = bouwfase.aan && bouwfase.stand ? (
     <div style={{ padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: bouwfase.stand.soort === 'deload' ? '#f59e0b' : '#10b981' }}>
       {faseTekst(bouwfase.stand)}
+      {bouwfase.stand.soort === 'deload' && <div style={{ marginTop: 2, fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: 'rgba(255,255,255,0.6)' }}>Zelfde oefeningen, minder sets en lichter.</div>}
+      {magReflecteren(bouwfase.stand) && !bouwfase.fase?.reflectie && (
+        <button onClick={() => setReflectieOpen(true)} style={{ display: 'block', marginTop: 8, height: 36, padding: '0 0.9rem', borderRadius: 10, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+          Bouwfase afronden
+        </button>
+      )}
     </div>
   ) : null
   const afrondOefeningen = (todaysWorkout?.exercises || []).filter(ex => !ex?._overgeslagen).map(ex => {
@@ -472,6 +480,11 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       oefeningen={afrondOefeningen} bestaand={fbDag.workout}
       onOpgeslagen={(rij) => setFbDag(d => ({ ...d, workout: rij }))}
       onClose={() => setWkOpen(false)} />
+  ) : null
+  const reflectieBlad = bouwfase.aan ? (
+    <FaseReflectieBlad open={reflectieOpen} db={db} fase={bouwfase.fase}
+      onOpgeslagen={(reflectie) => bouwfase.setFase(f => (f ? { ...f, reflectie } : f))}
+      onClose={() => setReflectieOpen(false)} />
   ) : null
 
   const kaart = (
@@ -536,6 +549,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
           </div>
         </div>
         {afrondBlad}
+        {reflectieBlad}
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </>
     )
@@ -547,6 +561,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{schakelaar}{kaart}</div>
       {faseRegel}
       {afrondBlad}
+      {reflectieBlad}
       {/* Staat er die dag ook cardio, dan direct onder de training. */}
       <CardioVandaag lijst={cardioLijst} isMobile={isMobile} />
     </>

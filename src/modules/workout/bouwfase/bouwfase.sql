@@ -52,3 +52,18 @@ drop policy if exists rls_eigen on public.training_feedback;
 create policy rls_eigen on public.training_feedback for all to authenticated
   using ((select rls_is_coach()) or client_id in (select rls_mijn_client_ids()))
   with check ((select rls_is_coach()) or client_id in (select rls_mijn_client_ids()));
+
+-- Reflectie aan het einde van de fase: de klant mag training_fases niet zelf
+-- wijzigen, dus alleen dit ene veld via een RPC (9 nov 2026).
+create or replace function public.bewaar_fase_reflectie(p_fase_id uuid, p_reflectie jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update training_fases set reflectie = p_reflectie, updated_at = now()
+  where id = p_fase_id and client_id in (select rls_mijn_client_ids());
+  if not found then raise exception 'fase niet gevonden'; end if;
+end $$;
+revoke all on function public.bewaar_fase_reflectie(uuid, jsonb) from public, anon;
+grant execute on function public.bewaar_fase_reflectie(uuid, jsonb) to authenticated;
+
+-- De fase hoort bij het plan waarop hij gestart is (Workout Builder, 9 nov 2026).
+alter table public.training_fases add column if not exists schema_id uuid references public.workout_schemas(id) on delete set null;
