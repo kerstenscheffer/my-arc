@@ -482,6 +482,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         setBewaardeStand(huidigeStand)
         setNetOpgeslagen(true)
         setTimeout(() => setNetOpgeslagen(false), 2500)
+        // Het rooster laadt het plan opnieuw: anders blijft een net opgeslagen
+        // dag 'Eerst opslaan' zeggen tot je de pagina ververst.
+        setAgendaKey(k => k + 1)
       } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
       finally { setSaving(false) }
       return
@@ -899,6 +902,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <div style={{ flexShrink: 0, borderBottom: DUN }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem' }}>
             <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop
+              verwijderGeblokkeerd={nietOpgeslagen ? 'Sla eerst je wijzigingen op.' : null}
+              onPlandagWeg={herlaadKlant}
               voorbeeld={selectedSchemaId ? { schemaId: selectedSchemaId, week: buildWeekStructure() } : null}
               onKiesTraining={(key) => {
                 // Rooster-sleutel 'dag2' = de tweede dag van het plan (zelfde

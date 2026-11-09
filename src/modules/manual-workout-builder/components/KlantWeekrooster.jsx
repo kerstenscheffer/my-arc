@@ -16,7 +16,7 @@ const LEEG_SCHEMA = { id: null, name: 'Nog geen plan', week_structure: {} }
 // `voorbeeld` = { schemaId, week }: de onopgeslagen stand uit de Workout
 // Builder. Is dat het actieve plan van de klant, dan toont het rooster die
 // stand meteen (namen, oefeningen), nog vóór opslaan (Kersten, 27 okt 2026).
-export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false, onKiesTraining = null, voorbeeld = null }) {
+export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false, onKiesTraining = null, voorbeeld = null, verwijderGeblokkeerd = null, onPlandagWeg = null }) {
   const [schema, setSchema] = useState(null)
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [weekOffset, setWeekOffset] = useState(0)
@@ -51,15 +51,17 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
 
   if (!client?.id || !schema) return null
 
-  // Plandagen die nergens in de week staan. Het rooster toont alleen wat
-  // ingepland is, dus zonder deze regel lijken ze verdwenen (9 nov 2026).
-  const ingepland = new Set(Object.values(weekSchedule || {}))
-  const nietIngepland = onKiesTraining
-    ? Object.entries(getoond?.week_structure || {}).filter(([k]) => !ingepland.has(k))
-    : []
+  // Permanent uit het plan. Via de RPC, want de dagen worden hernummerd en
+  // rooster en weekwissels moeten in dezelfde transactie mee.
+  const verwijderPlandag = async (key, naam) => {
+    if (verwijderGeblokkeerd) { alert(verwijderGeblokkeerd); return }
+    if (!window.confirm(`${naam} permanent uit dit plan verwijderen? Dit kun je niet ongedaan maken.`)) return
+    const { error } = await db.supabase.rpc('verwijder_plandag', { p_schema_id: schema.id, p_dag_key: key })
+    if (error) { alert(`Verwijderen mislukt: ${error.message}`); return }
+    onPlandagWeg?.()
+  }
 
   return (
-    <>
     <WeekSchedule
       weekSchedule={weekSchedule}
       schema={getoond}
@@ -81,18 +83,8 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
       client={client}
       isMobile={isMobile}
       zonderKop={zonderKop}
+      // Alleen in de builder: plandagen die niet in de week staan, om weer in te plannen.
+      nietIngepland={onKiesTraining ? { opgeslagen: Object.keys(schema.week_structure || {}), onOpen: onKiesTraining, onVerwijder: verwijderPlandag } : null}
     />
-    {nietIngepland.length > 0 && (
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.6rem' }}>
-        <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#f59e0b' }}>Niet ingepland:</span>
-        {nietIngepland.map(([k, dag]) => (
-          <button key={k} type="button" onClick={() => onKiesTraining(k)} style={{
-            height: 28, padding: '0 0.65rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(245,158,11,0.45)',
-            color: '#fff', fontSize: '0.76rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-          }}>{String(dag?.name || dag?.focus || k).trim()}</button>
-        ))}
-      </div>
-    )}
-    </>
   )
 }

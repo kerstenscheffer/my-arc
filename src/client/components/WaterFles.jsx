@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Minus, ChevronRight, Droplets } from 'lucide-react'
 import { useOnderMarge } from './videoBalkHoogte'
 import useVensterOpen from './useVensterOpen'
+import { useWaterDatum, datumSleutel } from './waterDatum'
 
 const STAP_ML = 100
 const STANDAARD_DOEL_L = 3
@@ -26,12 +27,15 @@ const SLEUTEL_INGEKLAPT = 'myarc_waterfles_ingeklapt'
 const lees = (k) => { try { return localStorage.getItem(k) } catch { return null } }
 const schrijf = (k, v) => { try { localStorage.setItem(k, String(v)) } catch { /* leeg */ } }
 
-const vandaag = () => new Date().toISOString().split('T')[0]
-
 // onderMarge is de afstand zonder video-balk; komt die omhoog, dan schuift de
 // fles mee.
 export default function WaterFles({ client, db, isMobile = false, onderMarge = 96 }) {
   const onder = useOnderMarge(onderMarge)
+  // De dag die de maaltijdpagina toont (zie waterDatum.js).
+  const datum = useWaterDatum()
+  const isVandaag = datum === datumSleutel()
+  const isToekomst = datum > datumSleutel()
+  const wachtend = useRef(null)
   const [ml, setMl] = useState(0)
   const [doelMl, setDoelMl] = useState(STANDAARD_DOEL_L * 1000)
   const [geladen, setGeladen] = useState(false)
@@ -77,11 +81,13 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
         const [{ data: rij }, { data: c }] = await Promise.all([
           db.supabase.from('ai_water_tracking')
             .select('milliliters, target_milliliters')
-            .eq('client_id', client.id).eq('date', vandaag()).maybeSingle(),
+            .eq('client_id', client.id).eq('date', datum).maybeSingle(),
           db.supabase.from('clients')
             .select('water_intake_target').eq('id', client.id).maybeSingle(),
         ])
         if (weg) return
+        // Een tik die nog onderweg is voor deze dag niet overschrijven.
+        if (wachtend.current?.datum === datum) return
         setMl(Number(rij?.milliliters) || 0)
         // Het doel van de coach staat in liters op de klant; de rij van
         // vandaag kan een eigen doel hebben (bv. omdat het toen anders was).
@@ -94,30 +100,40 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
       }
     })()
     return () => { weg = true }
-  }, [db, client?.id])
+  }, [db, client?.id, datum])
 
   // Opslaan met een korte adempauze: tik je vijf keer achter elkaar, dan gaat
   // er één rij naar de database in plaats van vijf.
-  const bewaar = useCallback((nieuweMl) => {
-    if (bewaarTimer.current) clearTimeout(bewaarTimer.current)
-    bewaarTimer.current = setTimeout(async () => {
-      try {
-        const { error } = await db.supabase.from('ai_water_tracking').upsert({
-          client_id: client.id,
-          date: vandaag(),
-          milliliters: nieuweMl,
-          glasses: Math.round(nieuweMl / 250),
-          target_milliliters: doelMl,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'client_id,date' })
-        if (error) throw error
-      } catch (e) {
-        console.error('Water opslaan mislukt:', e)
-      }
-    }, 600)
-  }, [db, client?.id, doelMl])
+  const verstuur = useCallback(async () => {
+    if (bewaarTimer.current) { clearTimeout(bewaarTimer.current); bewaarTimer.current = null }
+    const w = wachtend.current
+    if (!w) return
+    wachtend.current = null
+    try {
+      const { error } = await db.supabase.from('ai_water_tracking').upsert({
+        client_id: client.id,
+        date: w.datum,
+        milliliters: w.ml,
+        glasses: Math.round(w.ml / 250),
+        target_milliliters: w.doelMl,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'client_id,date' })
+      if (error) throw error
+    } catch (e) {
+      console.error('Water opslaan mislukt:', e)
+    }
+  }, [db, client?.id])
 
-  useEffect(() => () => { if (bewaarTimer.current) clearTimeout(bewaarTimer.current) }, [])
+  // Onthoudt bij welke dag de tik hoort: blader je binnen de adempauze naar
+  // een andere dag, dan gaat de tik nog naar de goede dag.
+  const bewaar = useCallback((nieuweMl) => {
+    wachtend.current = { datum, ml: nieuweMl, doelMl }
+    if (bewaarTimer.current) clearTimeout(bewaarTimer.current)
+    bewaarTimer.current = setTimeout(verstuur, 600)
+  }, [datum, doelMl, verstuur])
+
+  // Dag gewisseld of fles weg: openstaande tik meteen opslaan.
+  useEffect(() => () => { verstuur() }, [datum, verstuur])
 
   const verzet = (delta) => {
     setMl(vorig => {
@@ -135,6 +151,9 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
   if (!geladen || !client?.id) return null
 
   if (vensterOpen) return null
+
+  // Water voor een dag die nog moet komen bijhouden slaat nergens op.
+  if (isToekomst) return null
 
   if (ingeklapt) {
     return (
@@ -290,6 +309,14 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
         }}>
           {liters}<span style={{ color: 'rgba(255,255,255,0.45)' }}>/{(doelMl / 1000).toFixed(1)}L</span>
         </span>
+        {!isVandaag && (
+          <span style={{
+            padding: '1px 6px', borderRadius: 999, background: '#fff', color: '#0a0a0a',
+            fontSize: '0.55rem', fontWeight: 900, lineHeight: 1.4, textTransform: 'lowercase',
+          }}>
+            {new Date(datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </span>
+        )}
       </button>
       </div>
     </div>

@@ -19,6 +19,7 @@ import MealSetupWizard from './components/wizard/MealSetupWizard'
 
 // New (overhaul) — header + macro hero + more sheet
 import MealDayNavHeader from './components/MealDayNavHeader'
+import { zetWaterDatum } from '../../client/components/waterDatum'
 import MealDaySummaryModal from './components/MealDaySummaryModal'
 import MacroHero from './components/MacroHero'
 import { dagVenster } from './utils/dagVenster'
@@ -144,6 +145,13 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   const [mealPlanVisible, setMealPlanVisible] = useState(client?.meal_plan_visible !== false)
   const [savingVisibility, setSavingVisibility] = useState(false)
   useEffect(() => { setMealPlanVisible(client?.meal_plan_visible !== false) }, [client?.meal_plan_visible])
+
+  // De waterfles (in ClientDashboard) volgt de dag die je hier bekijkt, zodat
+  // je ook achteraf water bij gisteren kunt zetten.
+  useEffect(() => {
+    zetWaterDatum(indexToDate(dayKeyToIndex(selectedDay), weekOffset))
+  }, [selectedDay, weekOffset])
+  useEffect(() => () => zetWaterDatum(null), [])
   // Zonder actief plan altijd de vrije stand: eten loggen, water, macro's
   // uit het profiel. Eerder verving een lege staat de hele pagina ("Geen
   // actief meal plan"); dat is weg (issue 9 okt 2026).

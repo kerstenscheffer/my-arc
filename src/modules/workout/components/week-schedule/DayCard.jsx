@@ -11,12 +11,12 @@
 //   · Rust-waarschuwing → rode/oranje rand als dezelfde training te dicht
 //     op deze dag staat
 
-import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2, Footprints } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2, Footprints, CalendarX } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
 // Eén tegel: foto, verloop, eyebrow + titel linksonder, pijltjes onderin.
-function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null }) {
+function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null }) {
   // Als variabele met hoofdletter, anders telt de lint-regel de JSX-aanroep niet.
   const Icoon = icoon
   return (
@@ -54,6 +54,17 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
           <Trash2 size={isMobile ? 13 : 14} strokeWidth={2.8} />
+        </button>
+      )}
+      {/* Uitplannen (alleen builder): uit de week, blijft in het plan staan. */}
+      {onUitplannen && !klaar && (
+        <button onClick={(e) => { e.stopPropagation(); onUitplannen(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Uitplannen" title="Uit de week halen, blijft in het plan" style={{
+          position: 'absolute', top: 2, left: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
+          background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.7))', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <CalendarX size={isMobile ? 13 : 14} strokeWidth={2.6} />
         </button>
       )}
       {/* Pijltjes aan de foto vast: links en rechts in de onderrand. */}
@@ -102,7 +113,7 @@ export default function DayCard({
   // Een gedane sessie die niet bij de geplande training hoort (bv. na een
   // planwissel): { naam }. Komt als eigen groene tegel boven de planning.
   gedaanAnders = null,
-  extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null,
+  extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null, onUitplannen = null, onUitplannenExtra = null,
   onCardioInfo = null,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -228,6 +239,7 @@ export default function DayCard({
               isMobile={isMobile} icoon={Dumbbell}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
+              onUitplannen={kanPlannen && workoutData ? onUitplannen : null}
             />
           )}
           {extraTrainingen.map((x, i) => (
@@ -239,6 +251,7 @@ export default function DayCard({
               onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
               isMobile={isMobile} icoon={Dumbbell}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
+              onUitplannen={kanPlannen && onUitplannenExtra ? () => onUitplannenExtra(x.rosterKey) : null}
             />
           ))}
           {heeftCardio && (

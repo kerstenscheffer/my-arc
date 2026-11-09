@@ -20,7 +20,7 @@ export default function WeekGrid({
   onPrevWeek = null, onNextWeek = null,
   onInfo = null,   // tik op een training in een week die je niet kunt openen: inkijken
   onCardioInfo = null,
-  onRemoveTraining = null, onRemoveCardio = null,
+  onRemoveTraining = null, onRemoveCardio = null, onUitplannen = null,
   onOpenGedaan = null, onOpenCardioGedaan = null,
   // Stappen per dag (zeven items: { steps, gehaald, toekomst, isVandaag }) en
   // het dagdoel; samen met de training in dezelfde kolommen (8 okt 2026).
@@ -180,6 +180,8 @@ export default function WeekGrid({
             extraTrainingen={extraTrainingen}
             onOpenExtra={(key) => handleCardClick(day, key)}
             onRemoveExtra={onRemoveTraining ? (rk) => onRemoveTraining(day, rk) : null}
+            onUitplannen={onUitplannen ? () => onUitplannen(day) : null}
+            onUitplannenExtra={onUitplannen ? (rk) => onUitplannen(day, rk) : null}
             onRemoveCardio={onRemoveCardio}
             onOpenGedaan={onOpenGedaan ? () => onOpenGedaan(day) : null}
             gedaanAnders={gedaanAnders}

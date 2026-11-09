@@ -50,9 +50,12 @@ export default function WeekSchedule({
   // Alleen de dagen en de stappen, zonder plannaam, wisselknop en
   // "+ Training" (de Workout Builder heeft die al in zijn eigen kopbalk).
   zonderKop = false,
+  // { opgeslagen: ['dag1', …], onOpen(key) }: toont plandagen die niet in deze week staan.
+  nietIngepland = null,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
+  const [inplanKey, setInplanKey] = useState(null) // welke niet-ingeplande dag is opengeklapt
   const [selectedForSwap, setSelectedForSwap] = useState(null)
   const [tempSchedule, setTempSchedule] = useState(weekSchedule || {})
   const [hasChanges, setHasChanges] = useState(false)
@@ -480,6 +483,22 @@ export default function WeekSchedule({
     } finally { setSaving(false) }
   }
 
+  // Uitplannen (builder): uit deze week en de weken erna; blijft in het plan
+  // staan en komt dus onder 'Niet ingepland'.
+  const uitplannen = async (day, rosterKey = null) => {
+    const key = tempSchedule[rosterKey || day]
+    if (!key) return
+    await handleAutoSave(zonderTraining(tempSchedule, [day], key))
+    const { data: weken } = await db.supabase.from('client_week_schedules')
+      .select('week_start, schedule').eq('client_id', clientId).gt('week_start', weekSleutel)
+      .then(r => r, () => ({ data: [] }))
+    for (const w of weken || []) {
+      const nieuw = zonderTraining(w.schedule, [day], key)
+      if (JSON.stringify(nieuw) !== JSON.stringify(w.schedule || {})) await WorkoutServiceNew.saveWeekPlanning(clientId, w.week_start, nieuw, db)
+    }
+    await laadBuurWeken()
+  }
+
   // Is de training op deze dag (van de getoonde week) al gedaan? Dan schuift
   // hij bij een wissel niet mee naar de andere dag: hij is al getraind. Zonder
   // dit stond Pull twee keer in de week nadat ks10k Legs naar een dag zette
@@ -859,6 +878,7 @@ export default function WeekSchedule({
                 onOpenGedaan={(day) => { const g = gedaneDagen.find(u => u.workout_day === day); if (g?.blok) setSessieBlad(g.blok) }}
                 onOpenCardioGedaan={(c) => c?.log && setCardioBlad({ log: c.log, soort: c.soort, gepland: c.duur })}
                 onRemoveTraining={vraagTraining}
+                onUitplannen={nietIngepland ? uitplannen : null}
                 onRemoveCardio={vraagCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
                 onNextWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
@@ -887,6 +907,47 @@ export default function WeekSchedule({
                 rustPerDag={rustPerDag}
               />
             </div>
+
+            {/* Niet ingepland (9 nov 2026): het rooster toont alleen wat in de
+                week staat, dus een plandag zonder dag leek verdwenen. */}
+            {nietIngepland && kanPlannen && (() => {
+              const ingepland = new Set(Object.values(tempSchedule || {}))
+              const lijst = Object.entries(schema?.week_structure || {}).filter(([k]) => !ingepland.has(k))
+              if (!lijst.length) return null
+              const naam = (d, k) => String(d?.name || d?.focus || k).trim()
+              const knopje = (aan) => ({ height: 30, padding: '0 0.65rem', borderRadius: 8, background: aan ? '#fff' : 'transparent', border: `1px solid ${aan ? '#fff' : 'rgba(245,158,11,0.45)'}`, color: aan ? '#0a0a0a' : '#fff', fontSize: '0.76rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation' })
+              const open = lijst.find(([k]) => k === inplanKey)
+              const opgeslagen = open && nietIngepland.opgeslagen.includes(open[0])
+              return (
+                <div style={{ padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.6rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#f59e0b' }}>Niet ingepland:</span>
+                    {lijst.map(([k, d]) => <button key={k} type="button" onClick={() => setInplanKey(x => (x === k ? null : k))} style={knopje(inplanKey === k)}>{naam(d, k)}</button>)}
+                  </div>
+                  {open && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      {opgeslagen ? <>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Inplannen op:</span>
+                        {weekDays.map((dag, i) => (
+                          <button key={dag} type="button" disabled={saving} onClick={async () => {
+                            setInplanKey(null)
+                            try { await bewaarGym({ workoutKey: open[0], day: dag, bereik: 'standaard', extra: true }) }
+                            catch { alert('⚠️ Inplannen mislukt.') }
+                          }} style={{ ...knopje(false), minWidth: 36, padding: 0, borderColor: 'rgba(255,255,255,0.2)' }}>{weekDaysDutch[i]}</button>
+                        ))}
+                      </> : <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Eerst opslaan, dan kun je deze dag inplannen.</span>}
+                      {opgeslagen && nietIngepland.onVerwijder && (
+                        <button type="button" aria-label={`${naam(open[1], open[0])} permanent verwijderen`} title="Permanent uit het plan verwijderen" onClick={() => { setInplanKey(null); nietIngepland.onVerwijder(open[0], naam(open[1], open[0])) }}
+                          style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                          <Trash2 size={13} strokeWidth={2.6} />
+                        </button>
+                      )}
+                      <button type="button" onClick={() => { nietIngepland.onOpen(open[0]); setInplanKey(null) }} style={{ background: 'none', border: 'none', padding: '0 4px', color: 'rgba(255,255,255,0.6)', fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Bekijken</button>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             <TrainingInfoBlad open={!!infoTraining} training={infoTraining} db={db} isMobile={isMobile} onClose={() => setInfoTraining(null)} />
             <CardioInfoBlad open={!!infoCardio} cardio={infoCardio} isMobile={isMobile} onClose={() => setInfoCardio(null)} />
