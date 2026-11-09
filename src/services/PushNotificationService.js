@@ -55,14 +55,42 @@ class PushNotificationService {
     }
   }
 
+  // Elke push zet badge 1 op het icoon en iOS haalt die nooit zelf weg.
+  // removeAllDeliveredNotifications zet hem op 0, maar de plugin weigert dat tot
+  // iOS de registratie heeft gemeld. Vandaar: wissen bij 'registration' (de
+  // opstart) en bij terugkeer. Een weigering is onschuldig, de volgende keer lukt het.
+  async wisBadge() {
+    if (!this.isAvailable()) return;
+    try {
+      await PushNotifications.removeAllDeliveredNotifications();
+    } catch (e) {
+      console.log('[push] badge niet gewist:', e?.message || e);
+    }
+  }
+
+  async _wisBadgeBijTerugkeer() {
+    try {
+      const { App } = await import('@capacitor/app');
+      await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) this.wisBadge();
+      });
+    } catch (e) {
+      console.warn('[push] terugkeer-luisteraar niet geïnstalleerd:', e?.message || e);
+    }
+  }
+
   _addListeners(userId, clientId) {
+    this._wisBadgeBijTerugkeer();
+
     PushNotifications.addListener('registration', async ({ value: token }) => {
       console.log('[push] token ontvangen:', String(token).slice(0, 12) + '…');
+      this.wisBadge();
       await this._saveToken(userId, clientId, token);
     });
 
     PushNotifications.addListener('registrationError', (err) => {
       console.error('[push] registratie geweigerd door iOS:', JSON.stringify(err));
+      this.wisBadge();
     });
 
     // Foreground notification — you can dispatch a custom event here if needed
