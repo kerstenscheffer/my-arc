@@ -22,6 +22,8 @@ import StappenService, { STANDAARD_DOEL } from '../../steps/StappenService'
 import { STAPPEN_EVENT } from '../../steps/stappenSync'
 import StappenInzichtModal from '../../steps/StappenInzichtModal'
 import { Footprints, BarChart3 } from 'lucide-react'
+import useBouwfase from '../bouwfase/useBouwfase'
+import { faseStand, faseTekst } from '../bouwfase/bouwfaseData'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -97,6 +99,22 @@ export default function WeekSchedule({
   })()
   const weekSleutel = WorkoutServiceNew.datumSleutel(getoondeMaandag)
   const isHuidigeWeek = weekOffset === 0
+  // Bouwfase (9 nov 2026): welke week van de fase hoort bij de getoonde week.
+  // Valt er een deloaddag in, dan is dat wat telt; anders de stand op dezelfde
+  // weekdag als vandaag, zodat de huidige week gelijk is aan de workoutpagina.
+  const { fase: bouwfase } = useBouwfase({ id: clientId }, db)
+  const faseRegel = (() => {
+    if (!bouwfase) return null
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const standen = Array.from({ length: 7 }, (_, i) => {
+      const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7 + i); return faseStand(bouwfase, iso(d))
+    })
+    const deload = standen.find(x => x?.soort === 'deload')
+    if (deload) return { tekst: `Deload · ${deload.dagen} dagen`, kleur: '#f59e0b' }
+    const stand = standen[(new Date().getDay() + 6) % 7]
+    const bouw = stand?.soort === 'bouw' ? stand : standen.find(x => x?.soort === 'bouw')
+    return bouw ? { tekst: faseTekst(bouw), kleur: '#10b981' } : null
+  })()
   const isToekomst = weekOffset > 0
   const kanPlannen = isHuidigeWeek || isToekomst
 
@@ -478,15 +496,16 @@ export default function WeekSchedule({
     if (!sourceWorkout) return
     const targetDay = weekDays[targetIdx]
     const targetWorkout = tempSchedule[targetDay]
-    const next = { ...tempSchedule }
     if (targetWorkout && !alGedaan(targetDay)) {
-      next[targetDay] = sourceWorkout
-      next[day] = targetWorkout
-    } else {
-      next[targetDay] = sourceWorkout
-      delete next[day]
+      handleAutoSave({ ...tempSchedule, [targetDay]: sourceWorkout, [day]: targetWorkout })
+      return
     }
-    handleAutoSave(next)
+    // Doeldag is al getraind of leeg: niet wisselen, maar erbij zetten. Dit
+    // overschreef de geplande training van die dag (9 nov 2026: Legs weg, omdat
+    // op die dag Push al gedaan was en Pull ernaartoe schoof).
+    if (trainingenVanDag(tempSchedule, targetDay).includes(sourceWorkout)) return
+    // Eerst weghalen: een extra training op de brondag schuift dan door.
+    handleAutoSave(voegTrainingToe(verwijderTrainingVanDag(tempSchedule, day), targetDay, sourceWorkout))
   }
 
   // ── Training toevoegen (knop onder de week) ──
@@ -650,8 +669,11 @@ export default function WeekSchedule({
       setLocalSwapMode(true); setSelectedForSwap({ day, workoutKey })
     } else {
       if (selectedForSwap) {
-        const s = { ...tempSchedule }
-        if (selectedForSwap.workoutKey && workoutKey && alGedaan(day)) { s[day] = selectedForSwap.workoutKey; delete s[selectedForSwap.day] }
+        let s = { ...tempSchedule }
+        // Zelfde als handleShift: op een al getrainde dag erbij zetten, niet overschrijven.
+        if (selectedForSwap.workoutKey && workoutKey && alGedaan(day)) {
+          if (!trainingenVanDag(s, day).includes(selectedForSwap.workoutKey)) s = voegTrainingToe(verwijderTrainingVanDag(s, selectedForSwap.day), day, selectedForSwap.workoutKey)
+        }
         else if (selectedForSwap.workoutKey && workoutKey) { s[day] = selectedForSwap.workoutKey; s[selectedForSwap.day] = workoutKey }
         else if (selectedForSwap.workoutKey && !workoutKey) { s[day] = selectedForSwap.workoutKey; delete s[selectedForSwap.day] }
         else if (!selectedForSwap.workoutKey && workoutKey) { s[selectedForSwap.day] = workoutKey; delete s[day] }
@@ -814,6 +836,11 @@ export default function WeekSchedule({
         const cardioPerDag = cardioPerDagVan(dayDates)
         return (
           <>
+            {faseRegel && (
+              <div style={{ padding: isMobile ? '0 1rem 0.4rem' : '0 1.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: faseRegel.kleur }}>
+                {faseRegel.tekst}
+              </div>
+            )}
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
             <div style={{ padding: isMobile ? '0 0.4rem' : '0 1rem' }}>
               <WeekGrid

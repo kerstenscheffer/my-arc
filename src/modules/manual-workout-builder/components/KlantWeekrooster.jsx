@@ -51,7 +51,15 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
 
   if (!client?.id || !schema) return null
 
+  // Plandagen die nergens in de week staan. Het rooster toont alleen wat
+  // ingepland is, dus zonder deze regel lijken ze verdwenen (9 nov 2026).
+  const ingepland = new Set(Object.values(weekSchedule || {}))
+  const nietIngepland = onKiesTraining
+    ? Object.entries(getoond?.week_structure || {}).filter(([k]) => !ingepland.has(k))
+    : []
+
   return (
+    <>
     <WeekSchedule
       weekSchedule={weekSchedule}
       schema={getoond}
@@ -74,5 +82,17 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
       isMobile={isMobile}
       zonderKop={zonderKop}
     />
+    {nietIngepland.length > 0 && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.6rem' }}>
+        <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#f59e0b' }}>Niet ingepland:</span>
+        {nietIngepland.map(([k, dag]) => (
+          <button key={k} type="button" onClick={() => onKiesTraining(k)} style={{
+            height: 28, padding: '0 0.65rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(245,158,11,0.45)',
+            color: '#fff', fontSize: '0.76rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          }}>{String(dag?.name || dag?.focus || k).trim()}</button>
+        ))}
+      </div>
+    )}
+    </>
   )
 }
