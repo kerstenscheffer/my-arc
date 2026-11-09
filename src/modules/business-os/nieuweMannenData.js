@@ -23,12 +23,12 @@ const nlDag = (ms) => {
   const d = delen(ms)
   return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
 }
-const plusDagen = (dag, n) => {
+export const plusDagen = (dag, n) => {
   const d = new Date(`${dag}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
-const maandagVan = (dag) => plusDagen(dag, -((new Date(`${dag}T12:00:00Z`).getUTCDay() + 6) % 7))
+export const maandagVan = (dag) => plusDagen(dag, -((new Date(`${dag}T12:00:00Z`).getUTCDay() + 6) % 7))
 
 // 00:00 NL-tijd als UTC-tijdstip. De klok verzet op zondagnacht, dus op maandag is
 // de afwijking om middernacht gelijk aan die om 00:00 UTC.

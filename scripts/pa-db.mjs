@@ -52,6 +52,7 @@
 //     Takenronde (business-os-pa.mjs, planTaken): elke 30 min een rij soort groei met invoer.ronde = taken en invoer.kaarten,
 //     alleen als er geen loopt en er kaarten zijn. Regels: scripts/takenronde.mjs. Open kaart van wie gino, dag vandaag of eerder,
 //     zonder vast, geen open kaart van wie kersten met een eerdere dag in dezelfde fase; max 3 per ronde.
+//   node scripts/pa-db.mjs statscheck-droog [YYYY-MM-DD]  uitkomst van de vaste query's van de wekelijkse statscheck (statscheck.mjs); leest alleen
 //   node scripts/pa-db.mjs tijd [van] [tot]          Kerstens gemeten tijd per dag/categorie/uur + grootste bronnen (standaard laatste 7 dagen)
 //   node scripts/pa-db.mjs tijd-regel '{"patroon","categorie"}'   indeling bijsturen (app, domein, #tab of titel bevat patroon); werkt terug in de tijd
 //   node scripts/pa-db.mjs tijd-regel-weg "patroon"
@@ -69,6 +70,8 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { createClient } from '@supabase/supabase-js'
 import { kiesTaken, leesLopendeProjecten, vandaagNL, wijzigKaart } from './takenronde.mjs'
+import { statscheckQueries, statscheckWeek } from './statscheck.mjs'
+import { maandagVan } from '../src/modules/business-os/nieuweMannenData.js'
 import { schrijfPlan } from '../src/modules/business-os/projectStappen.js'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -334,6 +337,17 @@ if (cmd === 'lees') {
   const { data, error } = await leesLopendeProjecten(sb)
   if (error) { uit({ fout: error.message }); process.exit(1) }
   uit({ vandaag, ...kiesTaken(data, vandaag) })
+} else if (cmd === 'statscheck-droog') {
+  // Dezelfde vaste query's als de wekelijkse ronde (statscheck.mjs); leest alleen, zet geen herinnering.
+  const maandag = maandagVan(/^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : vandaagNL())
+  // Wanneer de ronde start: maandag 07:00 NL of later, winter- en zomertijd.
+  const planning = Object.fromEntries(['2026-11-09T05:59:00Z', '2026-11-09T06:00:00Z', '2026-11-09T22:59:00Z', '2026-11-09T23:00:00Z', '2026-11-08T12:00:00Z', '2026-06-01T04:59:00Z', '2026-06-01T05:00:00Z'].map(t => [t, statscheckWeek(Date.parse(t))]))
+  const res = { maandag, ronde_nu: statscheckWeek(), planning }
+  for (const [naam, p_sql] of Object.entries(statscheckQueries(maandag))) {
+    const { data, error } = await sb.rpc('business_os_lees', { p_sql })
+    res[naam] = error ? { fout: error.message } : data
+  }
+  uit(res)
 } else if (cmd === 'experiment') {
   // Strategie zet zelf proeven op: wat doen we, wat verwachten we, hoe meten we.
   let e
