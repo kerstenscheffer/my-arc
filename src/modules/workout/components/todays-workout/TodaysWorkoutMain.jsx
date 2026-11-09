@@ -14,6 +14,10 @@ import { ontleedPlanKey } from '../../utils/planKey'
 import { trainingenVanDag, dagVanSleutel } from '../../utils/extraTrainingen'
 import CardioVandaag from './CardioVandaag'
 import { useCardioVanDag } from './useCardioVanDag'
+// Bouwfase-tracking (9 nov 2026): na de workout een cijfer met toelichting.
+import useBouwfase from '../../bouwfase/useBouwfase'
+import FeedbackBlad from '../../bouwfase/FeedbackBlad'
+import { leesFeedbackVanDag, faseTekst } from '../../bouwfase/bouwfaseData'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
@@ -40,6 +44,19 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const [freshSchema, setFreshSchema] = useState(schema)
 
   const lastReportedSchemaUpdatedAt = useRef(null)
+
+  // ── Bouwfase: workout-feedback ──
+  const bouwfase = useBouwfase(client, db)
+  const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
+  const [wkOpen, setWkOpen] = useState(false)
+  useEffect(() => {
+    if (!bouwfase.aan || !client?.id || !db?.supabase) return undefined
+    let weg = false
+    const laad = () => leesFeedbackVanDag(db.supabase, client.id).then(d => { if (!weg) setFbDag(d) }, () => {})
+    laad()
+    window.addEventListener('myarc:training-feedback', laad)
+    return () => { weg = true; window.removeEventListener('myarc:training-feedback', laad) }
+  }, [bouwfase.aan, client?.id, db])
 
   // ── PUMP-TIMER ─────────────────────────────────────────────────────────
   // Wall-clock timer (start/stop timestamps in localStorage). Hoort hier en
@@ -139,6 +156,14 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     if (lastCount >= 2) stopTimer(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todaysLogs, todaysWorkout, timer.running])
+
+  // Laatste set van de laatste oefening gelogd → afrondvraag, één keer.
+  const workoutKlaar = isWorkoutFullyLogged(todaysWorkout?.exercises, todaysLogs)
+  const vorigKlaar = useRef(null)
+  useEffect(() => {
+    if (vorigKlaar.current === false && workoutKlaar && bouwfase.aan && !fbDag.workout) setWkOpen(true)
+    vorigKlaar.current = workoutKlaar
+  }, [workoutKlaar, bouwfase.aan, fbDag.workout])
 
   const saveTimerToSession = async (durationSec) => {
     if (!client?.id || !db?.supabase) return
@@ -431,6 +456,24 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   ) : null
 
+  // Bouwfase-regel boven de kaart, en het afrondblad met het overzicht van vandaag.
+  const faseRegel = bouwfase.aan && bouwfase.stand ? (
+    <div style={{ padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: bouwfase.stand.soort === 'deload' ? '#f59e0b' : '#10b981' }}>
+      {faseTekst(bouwfase.stand)}
+    </div>
+  ) : null
+  const afrondOefeningen = (todaysWorkout?.exercises || []).filter(ex => !ex?._overgeslagen).map(ex => {
+    const log = (todaysLogs || []).filter(l => l.exercise_name === ex.name).sort((a, b) => (b.sets?.length || 0) - (a.sets?.length || 0))[0]
+    const fb = fbDag.oefening[String(ex.name || '').toLowerCase()]
+    return { naam: ex.name, sets: Array.isArray(log?.sets) ? log.sets : [], score: fb?.score ?? null, gevoel: fb?.gevoel ?? null }
+  })
+  const afrondBlad = bouwfase.aan ? (
+    <FeedbackBlad open={wkOpen} soort="workout" client={client} db={db} fase={bouwfase.fase}
+      oefeningen={afrondOefeningen} bestaand={fbDag.workout}
+      onOpgeslagen={(rij) => setFbDag(d => ({ ...d, workout: rij }))}
+      onClose={() => setWkOpen(false)} />
+  ) : null
+
   const kaart = (
     <TodaysWorkoutCard
       workout={todaysWorkout}
@@ -468,7 +511,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
           background: '#0a0a0a',
           display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ flexShrink: 0 }}>{schakelaar}{kaart}</div>
+          <div style={{ flexShrink: 0 }}>{schakelaar}{faseRegel}{kaart}</div>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <LogModal
               workout={todaysWorkout}
@@ -479,8 +522,20 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
               schema={freshSchema}
               db={db}
             />
+            {bouwfase.aan && todaysLogs.length > 0 && (
+              <div style={{ padding: isMobile ? '0.5rem 1rem 2rem' : '0.75rem 1.5rem 2rem' }}>
+                <button onClick={() => setWkOpen(true)} style={{
+                  width: '100%', minHeight: 50, borderRadius: 14, fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer',
+                  background: fbDag.workout ? 'transparent' : '#fff', color: fbDag.workout ? '#10b981' : '#0a0a0a',
+                  border: `1px solid ${fbDag.workout ? 'rgba(16,185,129,0.5)' : '#fff'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {fbDag.workout ? `Training afgerond · ${fbDag.workout.score}/10` : 'Training afronden'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
+        {afrondBlad}
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </>
     )
@@ -490,6 +545,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     <>
       {kop}
       <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{schakelaar}{kaart}</div>
+      {faseRegel}
+      {afrondBlad}
       {/* Staat er die dag ook cardio, dan direct onder de training. */}
       <CardioVandaag lijst={cardioLijst} isMobile={isMobile} />
     </>

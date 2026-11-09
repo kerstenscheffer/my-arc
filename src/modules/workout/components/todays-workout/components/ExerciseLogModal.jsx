@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, Gauge } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 // Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
 // met de hele workoutpagina mee.
@@ -17,6 +17,12 @@ import { useRustKlokLoopt, startRustKlok, stopRustKlok } from '../rustKlok'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import ExerciseService from '../../../../../services/ExerciseService'
 import OpwarmPoort from './OpwarmPoort'
+// Bouwfase-tracking (9 nov 2026): feedback per oefening en herstelvraag, alleen
+// als de coach het voor deze klant aanzette.
+import useBouwfase from '../../../bouwfase/useBouwfase'
+import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
+import { leesFeedbackVanDag, spiergroepVan, vandaagIso } from '../../../bouwfase/bouwfaseData'
+import { plannedSetCount } from '../../../utils/exerciseCompletion'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
 import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
 import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
@@ -480,6 +486,28 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // De opwarmvraag komt vóór je eerste set van deze oefening, en alleen als je
   // 'm vandaag nog niet beantwoord hebt.
   const [poortOpen, setPoortOpen] = useState(false)
+
+  // ── Bouwfase: feedback van vandaag voor deze oefening en zijn spiergroep ──
+  const bouwfase = useBouwfase(client, db)
+  const spier = spiergroepVan(exercise)
+  // Alleen voor vandaag; een oude dag naloggen vraagt niets.
+  const bfAan = bouwfase.aan && (!datum || datum === vandaagIso())
+  const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
+  const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
+  const herstelGehad = useRef(false)
+  useEffect(() => {
+    if (!bfAan) return undefined
+    let weg = false
+    leesFeedbackVanDag(db.supabase, client.id).then(d => { if (!weg) setFbDag(d) }, () => {})
+    return () => { weg = true }
+  }, [bfAan, db, client?.id])
+  const oefFeedback = fbDag.oefening[String(exercise.name || '').toLowerCase()] || null
+  const fbOpgeslagen = (rij) => {
+    if (!rij) return
+    setFbDag(d => rij.soort === 'herstel'
+      ? { ...d, herstel: { ...d.herstel, [rij.spiergroep]: rij } }
+      : { ...d, oefening: { ...d.oefening, [String(rij.oefening || '').toLowerCase()]: rij } })
+  }
   const [opwarmVideo, setOpwarmVideo] = useState(null)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
   const [dropsetIndex, setDropsetIndex] = useState(null)
@@ -743,6 +771,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     if (rustTimerAan && editingIndex === null) startRustKlok({ oefening: exercise.name, sec: rusttijd.sec, bron: rusttijd.bron })
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
+    // Bouwfase: laatste geplande set gelogd → hoe zwaar voelde deze oefening?
+    if (bfAan && editingIndex === null && !oefFeedback && newSets.length >= plannedSetCount(exercise)) setFbOpen('oefening')
   }
 
   // De lus: timer op nul → invoerscherm voor de volgende set. Stopt vanzelf
@@ -800,6 +830,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // anders is de ene ingang wel beveiligd en de andere niet.
   const startSet = () => {
     setEditingIndex(null)
+    // Bouwfase: eerste set van de eerste oefening van deze spiergroep vandaag →
+    // eerst "Voel je je borst nog van vorige workout?". Eén keer per scherm.
+    if (bfAan && loggedSets.length === 0 && spier && !fbDag.herstel[spier] && !herstelGehad.current) {
+      herstelGehad.current = true
+      setFbOpen('herstel')
+      return
+    }
     if (loggedSets.length === 0 && isOpwarmPromptAan() && !isOpgewarmd(exercise.name)) {
       setPoortOpen(true)
       return
@@ -1401,6 +1438,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
                 <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+                {bfAan && (
+                  <Pil actief={fbOpen === 'oefening'} onClick={() => setFbOpen('oefening')} icoon={<Gauge size={12} strokeWidth={2.4} />}
+                    label={oefFeedback?.score ? `Zwaarte ${oefFeedback.score}` : 'Zwaarte'} stip={!!oefFeedback} />
+                )}
               </div>
               <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />
             </div>
@@ -1508,6 +1549,21 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           </button>
         </div>,
         document.body
+      )}
+
+      {bfAan && (
+        <FeedbackBlad
+          open={!!fbOpen} soort={fbOpen || 'oefening'} client={client} db={db} fase={bouwfase.fase}
+          oefening={exercise.name} spiergroep={spier}
+          bestaand={fbOpen === 'oefening' ? oefFeedback : null}
+          onOpgeslagen={fbOpgeslagen}
+          onClose={() => {
+            const wasHerstel = fbOpen === 'herstel'
+            setFbOpen(null)
+            // Na de herstelvraag gewoon door naar de set (of de opwarmvraag).
+            if (wasHerstel) startSet()
+          }}
+        />
       )}
 
       {/* Aantal sets kiezen — dezelfde verticale schuiflijst als bij kilo's
