@@ -1452,7 +1452,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
                 {bfAan && (
                   <Pil actief={fbOpen === 'oefening'} onClick={() => setFbOpen('oefening')} icoon={<Gauge size={12} strokeWidth={2.4} />}
-                    label={oefFeedback?.score ? `Zwaarte ${oefFeedback.score}` : 'Zwaarte'} stip={!!oefFeedback} />
+                    label={oefFeedback?.score ? `Gevoel ${oefFeedback.score}` : 'Gevoel'} stip={!!oefFeedback} />
                 )}
               </div>
               <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />

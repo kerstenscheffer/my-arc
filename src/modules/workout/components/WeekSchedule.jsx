@@ -1031,6 +1031,7 @@ export default function WeekSchedule({
       {/* Afgeronde sessie: oefeningen met hun sets, zelfde blad als de
           Realiteit-agenda van de coach. */}
       <RealiteitBlad blok={oefeningLog ? null : sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)}
+        onVerwijderd={() => { setSessieBlad(null); setSessieVersie(v => v + 1) }}
         onOefening={(ex) => setOefeningLog({ exercise: oefeningVan(ex.exercise_name, ex), datum: sessieBlad?.meta?.datum || null })}
         onHervatten={(() => {
           if (!isHuidigeWeek || !sessieBlad || !onDayClick) return null

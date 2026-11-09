@@ -5,6 +5,7 @@
 // oefeningen met hun sets. Zelfde kaarten en zelfde ophaalwegen als het
 // voedings- en trainingspaneel in het inzicht, zodat het één verhaal blijft.
 
+import { verwijderSessie } from '../workout/utils/sessieVerwijderen'
 import { useEffect, useState } from 'react'
 import { MessageSquare, Info } from 'lucide-react'
 import BladModal from '../workout/components/todays-workout/components/BladModal'
@@ -90,8 +91,17 @@ function MaaltijdInhoud({ blok, db, isMobile }) {
   )
 }
 
-function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = null }) {
+function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = null, onVerwijderd = null }) {
   const meta = blok.meta || {}
+  // Twee stappen in het blad zelf, geen window.confirm: dit staat ook in de app.
+  const [vraagWeg, setVraagWeg] = useState(false)
+  const [wegBezig, setWegBezig] = useState(false)
+  const [wegFout, setWegFout] = useState(null)
+  const verwijder = async () => {
+    setWegBezig(true); setWegFout(null)
+    try { await verwijderSessie(db.supabase, meta.sessionId); onVerwijderd?.() }
+    catch (e) { setWegFout(e.message || 'Verwijderen mislukt'); setWegBezig(false) }
+  }
   const [oefeningen, setOefeningen] = useState(null)
   useEffect(() => {
     let weg = false
@@ -177,6 +187,18 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
           Doorgaan met training
         </button>
       )}
+      {onVerwijderd && meta.sessionId && (vraagWeg ? (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', textAlign: 'center', marginBottom: 8 }}>Deze training met alle gelogde sets verwijderen? Dit kan niet ongedaan worden.</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setVraagWeg(false)} disabled={wegBezig} style={{ flex: 1, minHeight: 44, borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Annuleren</button>
+            <button onClick={verwijder} disabled={wegBezig} style={{ flex: 1, minHeight: 44, borderRadius: 12, background: '#ef4444', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', opacity: wegBezig ? 0.6 : 1 }}>{wegBezig ? 'Bezig…' : 'Verwijderen'}</button>
+          </div>
+          {wegFout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginTop: 6, textAlign: 'center' }}>{wegFout}</div>}
+        </div>
+      ) : (
+        <button onClick={() => setVraagWeg(true)} style={{ display: 'block', margin: '14px auto 4px', background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', padding: '6px 10px' }}>Training verwijderen</button>
+      ))}
     </>
   )
 }
@@ -207,13 +229,13 @@ function SlaapInhoud({ blok }) {
   )
 }
 
-export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null, onHervatten = null }) {
+export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null, onHervatten = null, onVerwijderd = null }) {
   const open = !!blok
   const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.meta?.slaap ? 'Slaap' : blok.type === 'supplement' ? 'Supplementen' : blok.sublabel || blok.label) : ''
   return (
     <BladModal open={open} titel={titel} onClose={onClose} zIndex={10600}>
       {blok?.type === 'meal' && <MaaltijdInhoud blok={blok} db={db} isMobile={isMobile} />}
-      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} onHervatten={onHervatten} />}
+      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} onHervatten={onHervatten} onVerwijderd={onVerwijderd} />}
       {blok?.meta?.slaap && <SlaapInhoud blok={blok} />}
       {blok?.type === 'supplement' && (
         <div style={{ paddingBottom: '0.75rem' }}>

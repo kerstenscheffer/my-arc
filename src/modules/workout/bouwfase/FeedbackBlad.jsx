@@ -1,21 +1,21 @@
 // src/modules/workout/bouwfase/FeedbackBlad.jsx
 //
 // Feedbackvenster van de bouwfase, in de stijl van het slaapblad:
-//   soort 'oefening' → hoe zwaar voelde deze oefening (1-10), gevoel, opmerking
-//   soort 'herstel'  → "Voel je je borst nog van vorige workout?" nee/beetje/ja
+//   soort 'oefening' → stap 1: hoe goed voelde hij (1-10); stap 2: uitvoering, en
+//                      na een keuze opent de toelichting
+//   soort 'herstel'  → "Hoe goed is je borst hersteld?" met smileys
 //   soort 'workout'  → overzicht van vandaag + cijfer 1-10 + toelichting
 // Alleen zichtbaar als de coach bouwfase-tracking aanzette (useBouwfase).
 
 import { useEffect, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, Check } from 'lucide-react'
+import { X, Check, Smile, Meh, Frown } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
 import { GEVOEL, HERSTEL, bewaarFeedback, spierWoord } from './bouwfaseData'
 
-const kleurScore = (n) => (n >= 9 ? '#ef4444' : n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : 'rgba(255,255,255,0.6)')
-const scoreWoord = (n, soort) => soort === 'workout'
-  ? (n <= 3 ? 'slecht' : n <= 5 ? 'matig' : n <= 7 ? 'goed' : n <= 9 ? 'heel goed' : 'top')
-  : (n <= 3 ? 'licht' : n <= 6 ? 'gemiddeld' : n <= 8 ? 'zwaar' : n === 9 ? 'heel zwaar' : 'maximaal')
+const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
+const scoreWoord = (n) => (n <= 3 ? 'slecht' : n <= 5 ? 'matig' : n <= 7 ? 'goed' : n <= 9 ? 'heel goed' : 'top')
+const SMILEY = { nee: Smile, beetje: Meh, ja: Frown }
 
 const veld = {
   width: '100%', minHeight: 60, padding: '0.6rem 0.75rem', boxSizing: 'border-box',
@@ -40,6 +40,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   const [opmerking, setOpmerking] = useState('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  const [stap, setStap] = useState(1) // alleen bij een oefening: 1 = gevoel, 2 = uitvoering
+  const [gekozen, setGekozen] = useState(false) // uitvoering gekozen → toelichting open
 
   useEffect(() => {
     if (!open) return
@@ -47,6 +49,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     setGevoel(bestaand?.gevoel ?? 'goed')
     setOpmerking(bestaand?.opmerking ?? '')
     setFout(null)
+    setStap(1)
+    setGekozen(!!bestaand)
   }, [open, bestaand])
 
   if (!open || !client?.id) return null
@@ -58,7 +62,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
       const rij = await bewaarFeedback(db.supabase, {
         client_id: client.id, soort, fase_id: fase?.id || null,
         oefening: soort === 'oefening' ? oefening : null,
-        // Oefening-rijen krijgen hun spiergroep mee: dan ziet de coach herstel en zwaarte per spiergroep.
+        // Oefening-rijen krijgen hun spiergroep mee: dan ziet de coach herstel en gevoel per spiergroep.
         spiergroep: soort === 'workout' ? null : (spiergroep || null),
         score: soort === 'herstel' ? null : score,
         gevoel: soort === 'workout' ? null : gevoel,
@@ -74,7 +78,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   }
 
   const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : 'Je training'
-  const sub = soort === 'oefening' ? 'Oefening klaar' : soort === 'herstel' ? 'Voor je begint' : 'Training afronden'
+  const sub = soort === 'oefening' ? `Oefening klaar · stap ${stap} van 2` : soort === 'herstel' ? 'Voor je begint' : 'Training afronden'
 
   return createPortal(
     <div onClick={onClose} style={{
@@ -102,14 +106,18 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         {soort === 'herstel' && (
           <>
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16 }}>
-              Voel je je {spierWoord(spiergroep)} nog van vorige workout?
+              Hoe goed is je {spierWoord(spiergroep)} hersteld?
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {HERSTEL.map(h => (
-                <button key={h.id} disabled={bezig} onClick={() => bewaar({ gevoel: h.id })} style={{ ...chip(false), minHeight: 56, color: h.kleur, borderColor: `${h.kleur}66` }}>
-                  {h.label}
-                </button>
-              ))}
+              {HERSTEL.map(h => {
+                const Smiley = SMILEY[h.id]
+                return (
+                  <button key={h.id} disabled={bezig} onClick={() => bewaar({ gevoel: h.id })} style={{ ...chip(false), minHeight: 92, color: h.kleur, borderColor: `${h.kleur}66`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <Smiley size={32} strokeWidth={2.2} />
+                    {h.label}
+                  </button>
+                )
+              })}
             </div>
           </>
         )}
@@ -133,28 +141,40 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
                 ))}
               </div>
             )}
-            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
-              {soort === 'oefening' ? 'Hoe zwaar voelde deze oefening?' : 'Hoe goed voelde de training vandaag?'}
-            </div>
-            <HorizontaleSlider waarden={Array.from({ length: 10 }, (_, k) => k + 1)} waarde={score} onChange={setScore} itemBreedte={64} />
-            <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: soort === 'workout' ? (score >= 7 ? '#10b981' : score >= 5 ? '#f59e0b' : '#ef4444') : kleurScore(score), marginTop: 2 }}>
-              {scoreWoord(score, soort)}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 14px' }}>
-              {soort === 'oefening' ? <><span>1 = heel licht</span><span>10 = maximaal</span></> : <><span>1 = slecht</span><span>10 = top</span></>}
-            </div>
-            {soort === 'oefening' && (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {GEVOEL.map(g => <button key={g.id} onClick={() => setGevoel(g.id)} style={chip(gevoel === g.id)}>{g.label}</button>)}
-              </div>
+            {(soort === 'workout' || stap === 1) && (
+              <>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
+                  {soort === 'oefening' ? 'Hoe goed voelde deze oefening?' : 'Hoe goed voelde de training vandaag?'}
+                </div>
+                <HorizontaleSlider waarden={Array.from({ length: 10 }, (_, k) => k + 1)} waarde={score} onChange={setScore} itemBreedte={64} />
+                <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kleurScore(score), marginTop: 2 }}>{scoreWoord(score)}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 14px' }}>
+                  <span>1 = slecht</span><span>10 = top</span>
+                </div>
+              </>
             )}
-            <textarea value={opmerking} onChange={e => setOpmerking(e.target.value)} rows={2}
-              placeholder={soort === 'oefening' ? 'Opmerking (mag leeg)' : 'Wil je dat cijfer toelichten? (mag leeg)'}
-              style={{ ...veld, marginBottom: 14 }} />
-            {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
-            <button onClick={() => bewaar()} disabled={bezig} style={primair(bezig)}>
-              <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : bestaand ? 'Bijwerken' : 'Opslaan'}
-            </button>
+            {soort === 'oefening' && stap === 1 && (
+              <button onClick={() => setStap(2)} style={primair(false)}>Volgende</button>
+            )}
+            {soort === 'oefening' && stap === 2 && (
+              <>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>Hoe goed ging de uitvoering?</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                  {GEVOEL.map(g => <button key={g.id} onClick={() => { setGevoel(g.id); setGekozen(true) }} style={chip(gekozen && gevoel === g.id)}>{g.label}</button>)}
+                </div>
+              </>
+            )}
+            {(soort === 'workout' || (stap === 2 && gekozen)) && (
+              <>
+                <textarea value={opmerking} onChange={e => setOpmerking(e.target.value)} rows={2}
+                  placeholder={soort === 'oefening' ? 'Toelichting (mag leeg)' : 'Wil je dat cijfer toelichten? (mag leeg)'}
+                  style={{ ...veld, marginBottom: 14 }} />
+                {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
+                <button onClick={() => bewaar()} disabled={bezig} style={primair(bezig)}>
+                  <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : bestaand ? 'Bijwerken' : 'Opslaan'}
+                </button>
+              </>
+            )}
           </>
         )}
         {fout && soort === 'herstel' && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginTop: 10 }}>{fout}</div>}

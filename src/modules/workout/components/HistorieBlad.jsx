@@ -34,6 +34,7 @@ export default function HistorieBlad({ db, clientId, isMobile, client = null }) 
   const [zoek, setZoek] = useState('')
   const [sessies, setSessies] = useState(null)
   const [cardio, setCardio] = useState([])
+  const [versie, setVersie] = useState(0) // omhoog na een verwijderde training
   const [open, setOpen] = useState(null) // { type: 'training', blok } | { type: 'cardio', log }
   const [oefeningLog, setOefeningLog] = useState(null) // { exercise, datum }
   const [limiet, setLimiet] = useState(40)
@@ -77,7 +78,7 @@ export default function HistorieBlad({ db, clientId, isMobile, client = null }) 
       setLimiet(40)
     })
     return () => { weg = true }
-  }, [clientId, db, periode])
+  }, [clientId, db, periode, versie])
 
   // Eén lijst van dagen, nieuwste eerst, met daarin trainingen en cardio.
   const dagen = useMemo(() => {
@@ -205,6 +206,7 @@ export default function HistorieBlad({ db, clientId, isMobile, client = null }) 
       )}
 
       <RealiteitBlad blok={open?.type === 'training' && !oefeningLog ? open.blok : null} db={db} isMobile={isMobile} onClose={() => setOpen(null)}
+        onVerwijderd={() => { setOpen(null); setVersie(n => n + 1) }}
         onOefening={(ex) => { const sets = Array.isArray(ex?.sets) ? ex.sets : []; setOefeningLog({ exercise: { name: ex.exercise_name, sets: sets.length || 3, reps: sets[0]?.reps || 10 }, datum: open?.blok?.meta?.datum || null }) }} />
       {oefeningLog && (
         <ExerciseLogModal db={db} client={client || { id: clientId }} exercise={oefeningLog.exercise} datum={oefeningLog.datum} isMobile={isMobile}

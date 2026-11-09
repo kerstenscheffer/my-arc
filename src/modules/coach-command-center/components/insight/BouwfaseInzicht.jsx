@@ -114,8 +114,8 @@ export default function BouwfaseInzicht({ db, client, isMobile }) {
                     {PIJL}
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <b style={{ fontWeight: 900 }}>{spierLabel(k)}:</b>{' '}
-                      {h ? <span style={{ color: h.kleur, fontWeight: 800 }}>voelt nog: {h.label.toLowerCase()}</span> : 'geen herstelvraag'}
-                      {gem != null ? ` · zwaarte ${String(gem).replace('.', ',')}` : ''}
+                      {h ? <span style={{ color: h.kleur, fontWeight: 800 }}>herstel {h.label.toLowerCase()}</span> : 'geen herstelvraag'}
+                      {gem != null ? ` · gevoel ${String(gem).replace('.', ',')}/10` : ''}
                       {s.pijn ? ` · ${s.pijn}× pijntje` : ''}{s.techniek ? ` · ${s.techniek}× techniek brak` : ''}
                     </span>
                     {ind && <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: ind.kleur }}>{ind.tekst}</span>}
@@ -144,7 +144,7 @@ export default function BouwfaseInzicht({ db, client, isMobile }) {
                 <div key={o.id} style={REGEL}>
                   {PIJL}
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <b style={{ fontWeight: 900 }}>{o.oefening}:</b> zwaarte {o.score ?? '–'}
+                    <b style={{ fontWeight: 900 }}>{o.oefening}:</b> gevoel {o.score ?? '–'}/10
                     {o.gevoel && o.gevoel !== 'goed' ? <span style={{ color: '#f59e0b', fontWeight: 800 }}> · {GEVOEL.find(g => g.id === o.gevoel)?.label.toLowerCase()}</span> : ''}
                     {o.opmerking ? ` · ${o.opmerking}` : ''}
                     <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{kort(o.datum)}</span>

@@ -1,5 +1,5 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { voorstelPlan } from './dagTitel'
 import { createPortal } from '../../client/paginaPortal'
 import useHistoryState from './hooks/useHistoryState'
@@ -93,6 +93,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Bewerken van een bestaand sjabloon (9 nov 2026): null, of { soort: 'plan' | 'dag', id, naam }.
   // Zolang dat open staat werk je zonder klant: Opslaan schrijft in het sjabloon zelf.
   const [bewerk, setBewerk] = useState(null)
+  // Dag-id in de builder → sleutel in het opgeslagen plan ('dag3'). Opslaan
+  // hernummert de dagen; hiermee schuift het rooster van de klant mee.
+  const dagSleutels = useRef(new Map())
 
   const effectiveClient = bewerk ? null : (localClient || selectedClient)
 
@@ -232,13 +235,15 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     if (!schema?.week_structure) return
     const days = Object.entries(schema.week_structure)
       .sort((a, b) => parseInt(a[0].replace('dag', '')) - parseInt(b[0].replace('dag', '')))
-      .map(([, day], index) => ({
+      .map(([key, day], index) => ({
+        _bronKey: key,
         id: Date.now() + index,
         name: day.name || `DAG ${index + 1}`,
         focus: day.focus || '',
         geschatteTijd: day.geschatteTijd || '60 minutes',
         exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() }))
       }))
+    dagSleutels.current = new Map(days.map(d => [d.id, d._bronKey]))
     history.reset({
       name: schema.name || '', description: schema.description || '',
       primary_goal: schema.primary_goal || 'muscle_gain',
@@ -473,10 +478,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     if (selectedSchemaId) {
       setSaving(true)
       try {
+        // Plan en rooster in één transactie: de dagen krijgen bij opslaan
+        // nieuwe nummers, en een rooster dat daar niet in meeging wees naar de
+        // verkeerde of een niet-bestaande dag (9 nov 2026).
+        const map = {}
+        workoutPlan.days.forEach((d, i) => { const k = dagSleutels.current.get(d.id); if (k) map[k] = `dag${i + 1}` })
+        const { error: rFout } = await db.supabase.rpc('bewaar_plan_dagen', { p_schema_id: selectedSchemaId, p_week: buildWeekStructure(), p_map: map })
+        if (rFout) throw rFout
+        dagSleutels.current = new Map(workoutPlan.days.map((d, i) => [d.id, `dag${i + 1}`]))
         const { error } = await db.supabase.from('workout_schemas').update({
-          name: planNaam, description: workoutPlan.description || '',
-          week_structure: buildWeekStructure(), days_per_week: workoutPlan.days.length,
-          updated_at: new Date().toISOString()
+          name: planNaam, description: workoutPlan.description || '', updated_at: new Date().toISOString()
         }).eq('id', selectedSchemaId)
         if (error) throw error
         setBewaardeStand(huidigeStand)

@@ -242,7 +242,10 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       // Map naar het Schema-formaat (eerste hoofdletter), bv 'monday' → 'Monday'.
       const todayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1)
       // Alle trainingen van de dag (hoofd + extra's); de gekozen tegel wint.
+      // Een sleutel die niet meer in het plan bestaat (dag weg uit het plan) slaan
+      // we over; anders blokkeert hij de andere training van die dag.
       const sleutelsVanDag = trainingenVanDag(savedSchedule, todayName)
+        .filter(k => !/^dag\d+$/.test(k) || schemaWithOverrides.week_structure?.[k])
       setDagSleutels(sleutelsVanDag)
       let workoutKey = (gekozenKey && sleutelsVanDag.includes(gekozenKey)) ? gekozenKey : (sleutelsVanDag[0] || null)
 
@@ -335,6 +338,12 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   }
 
   const triggerReload = () => setReloadKey(prev => prev + 1)
+  // Training verwijderd vanuit het rooster of de historie: logs van vandaag opnieuw.
+  useEffect(() => {
+    const opnieuw = () => setReloadKey(prev => prev + 1)
+    window.addEventListener('myarc:workout-verwijderd', opnieuw)
+    return () => window.removeEventListener('myarc:workout-verwijderd', opnieuw)
+  }, [])
 
   const handleLogsUpdate = async (options) => {
     if (options?.reloadSchema) {

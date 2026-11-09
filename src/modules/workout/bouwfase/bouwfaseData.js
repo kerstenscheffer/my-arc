@@ -15,9 +15,10 @@ export const GEVOEL = [
   { id: 'pijn', label: 'Pijntje' },
 ]
 export const HERSTEL = [
-  { id: 'nee', label: 'Nee', kleur: '#10b981' },
-  { id: 'beetje', label: 'Beetje', kleur: '#f59e0b' },
-  { id: 'ja', label: 'Ja', kleur: '#ef4444' },
+  // id = voelt hij nog? (nee = hersteld); blijft zo staan voor de indicator.
+  { id: 'nee', label: 'Goed', kleur: '#10b981' },
+  { id: 'beetje', label: 'Matig', kleur: '#f59e0b' },
+  { id: 'ja', label: 'Niet', kleur: '#ef4444' },
 ]
 
 export const vandaagIso = () => {
