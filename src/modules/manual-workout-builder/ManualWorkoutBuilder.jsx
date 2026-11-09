@@ -29,6 +29,7 @@ import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Ale
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
+import { minutenVoorOefeningen } from './trainingsTijd'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -363,7 +364,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
   }
 
-  const schatMinuten = (exercises) => Math.max(10, Math.round(exercises.reduce((n, e) => n + (Number(e.sets) || 3) * 2.5, 0) + 5))
+  const schatMinuten = (exercises) => Math.max(10, minutenVoorOefeningen(exercises))
 
   const addExercise = (exercise) => {
     if (!activeDay) return

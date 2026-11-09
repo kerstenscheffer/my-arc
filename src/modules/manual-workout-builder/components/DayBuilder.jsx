@@ -5,6 +5,8 @@ import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 import useSleepVolgorde from './useSleepVolgorde'
 import { voorstelDag } from '../dagTitel'
+import { minutenVoorOefeningen } from '../trainingsTijd'
+import { setsPerSpierDag, spierLabel } from '../spierGroepen'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
@@ -90,8 +92,24 @@ export default function DayBuilder({
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
 
+  // Dagstats (9 nov 2026): tijd volgens de 9-minutenregel en sets per spiergroep.
+  const dagSpieren = setsPerSpierDag(day.exercises)
+  const dagMinuten = minutenVoorOefeningen(day.exercises)
+
   if (zonderKop) return (
     <div>
+      {day.exercises.length > 0 && (
+        <div style={{ margin: isMobile ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            {dagMinuten}<span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
+          </span>
+          {dagSpieren.map(([k, n]) => (
+            <span key={k} style={{ fontSize: '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
+              {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
+            </span>
+          ))}
+        </div>
+      )}
       {day.exercises.length > 0 && (
         <div style={{ margin: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.55rem' }}>
           <button onClick={() => setBulkOpen(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.7rem', background: bulkOpen ? '#fff' : 'transparent', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 9, color: bulkOpen ? '#0a0a0a' : '#fff', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>

@@ -6,25 +6,8 @@
 
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-
-const LABEL = {
-  chest: 'Borst', back: 'Rug', shoulders: 'Schouders', biceps: 'Biceps', triceps: 'Triceps',
-  legs: 'Benen', glutes: 'Billen', calves: 'Kuiten', abs: 'Buik', traps: 'Traps', onbekend: 'Geen spiergroep',
-}
-// Nederlandse en afwijkende spelling naar één sleutel.
-const GELIJK = {
-  borst: 'chest', rug: 'back', schouders: 'shoulders', schouder: 'shoulders', tricep: 'triceps', bicep: 'biceps',
-  benen: 'legs', billen: 'glutes', kuiten: 'calves', calf: 'calves', buik: 'abs', core: 'abs', trap: 'traps',
-}
-
-function spierVan(ex) {
-  const ruw = String(ex.primairSpieren || '').split(/[,/]/)[0].trim().toLowerCase()
-  if (ruw) return GELIJK[ruw] || ruw
-  // Geen spier ingevuld: een paar namen herkennen we zelf.
-  const n = String(ex.name || '').toLowerCase()
-  if (/cr?h?un?s?ch|sit.?up|zit.?up|plank|leg raise/.test(n)) return 'abs'
-  return 'onbekend'
-}
+import { minutenVoorOefeningen } from '../trainingsTijd'
+import { spierVan, spierLabel } from '../spierGroepen'
 
 // Per spiergroep: totaal sets en de oefeningen erachter (zelfde naam op
 // meerdere dagen = één regel met de dagen erbij).
@@ -56,7 +39,7 @@ export default function PlanInfo({ days = [] }) {
   const rijen = setsPerSpier(days)
   const totaal = rijen.reduce((n, [, s]) => n + s, 0)
   const max = rijen[0]?.[1] || 1
-  const label = (k) => LABEL[k] || k.charAt(0).toUpperCase() + k.slice(1)
+  const label = spierLabel
 
   return (
     <div style={{ marginTop: '0.6rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.75rem 0.85rem' }}>
@@ -101,8 +84,19 @@ export default function PlanInfo({ days = [] }) {
           </div>
         )
       })}
+      {days.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Tijd per training</div>
+          {days.map((d, i) => (
+            <div key={d.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 3, fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(d.name || '').trim() || `Dag ${i + 1}`}</span>
+              <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(d.exercises || [])} min</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ marginTop: 8, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-        Tik op een spiergroep voor de oefeningen. Elke dag telt als één training per week. Alleen de primaire spier telt.
+        Tijd: 9 min per oefening (2 sets, incl. warming-up en rust), +3 min per extra set. Tik op een spiergroep voor de oefeningen. Elke dag telt als één training per week. Alleen de primaire spier telt.
       </div>
     </div>
   )
