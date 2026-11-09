@@ -25,9 +25,10 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3 } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
+import PlanInfo from './components/PlanInfo'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -42,6 +43,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // gekozen zijn. Valt de selectie weg (dag verwijderd, ander plan geladen),
   // dan pakken we de eerste.
   const [instellingenOpen, setInstellingenOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false) // Planinfo: sets per spiergroep
   const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
@@ -85,7 +87,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [clientSearch, setClientSearch] = useState('')
   const [trainingInfo, setTrainingInfo] = useState(null)
 
-  const effectiveClient = localClient || selectedClient
+  // Bewerken van een bestaand sjabloon (9 nov 2026): null, of { soort: 'plan' | 'dag', id, naam }.
+  // Zolang dat open staat werk je zonder klant: Opslaan schrijft in het sjabloon zelf.
+  const [bewerk, setBewerk] = useState(null)
+
+  const effectiveClient = bewerk ? null : (localClient || selectedClient)
 
   useEffect(() => { loadTemplates(); loadDayTemplates() }, [])
 
@@ -551,6 +557,74 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setShowTemplateManager(false)
   }
 
+  // ── Sjabloon bewerken: plan-template of dag-template ──
+  const startBewerk = (soort, tpl) => {
+    if (soort === 'plan') loadTemplate(tpl)
+    else {
+      const base = Date.now()
+      history.reset({
+        name: tpl.name || '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate',
+        split_type: 'custom', days_per_week: 1, equipment: [],
+        days: [{
+          id: base, name: tpl.name || '', focus: tpl.focus || '', geschatteTijd: tpl.geschatte_tijd || '60 minutes',
+          exercises: (tpl.exercises || []).map((ex, i) => ({ ...ex, id: base + i + 1 + Math.random() })),
+        }],
+      })
+      setActiveDay(base)
+    }
+    setBewerk({ soort, id: tpl.id, naam: tpl.name || '' })
+    setSelectedSchemaId(null)
+    if (soort === 'plan') setActiveDay(null)
+    setBewaardeStand(null)
+    setShowTemplateManager(false)
+    setShowDayPicker(false)
+  }
+
+  const stopBewerk = async () => {
+    if (nietOpgeslagen && !confirm('Je wijzigingen zijn nog niet opgeslagen. Toch sluiten?')) return
+    setBewerk(null)
+    setActiveDay(null)
+    setBewaardeStand(null)
+    history.reset({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: 'custom', days_per_week: 0, equipment: [], days: [] })
+    const klant = localClient || selectedClient
+    if (klant) await loadClientSchemas(klant)
+  }
+
+  const bewaarBewerk = async () => {
+    if (!bewerk) return
+    if (workoutPlan.days.length === 0) { alert('Voeg minimaal één dag toe'); return }
+    setSaving(true)
+    try {
+      const nu = new Date().toISOString()
+      let res
+      if (bewerk.soort === 'plan') {
+        res = await db.supabase.from('workout_schemas').update({
+          name: (workoutPlan.name || '').trim() || bewerk.naam, description: workoutPlan.description || '',
+          primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
+          split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length,
+          week_structure: buildWeekStructure(), equipment: workoutPlan.equipment.slice(0, 10), updated_at: nu,
+        }).eq('id', bewerk.id).eq('is_template', true).select('id')
+      } else {
+        const dag = workoutPlan.days[0]
+        res = await db.supabase.from('workout_day_templates').update({
+          // De dagnaam in de dagkop wint; anders de titel bovenin.
+          name: (dag.name || workoutPlan.name || '').trim() || bewerk.naam,
+          focus: dag.focus || '', geschatte_tijd: dag.geschatteTijd || '60 minutes',
+          // client-only id per oefening eruit, net als bij saveDayAsTemplate.
+          exercises: (dag.exercises || []).map(({ id, ...ex }) => ex), // eslint-disable-line no-unused-vars
+          updated_at: nu,
+        }).eq('id', bewerk.id).select('id')
+      }
+      if (res.error) throw res.error
+      if (!res.data?.length) throw new Error('niets bijgewerkt (geen rechten op dit sjabloon?)')
+      setBewaardeStand(huidigeStand)
+      setNetOpgeslagen(true)
+      setTimeout(() => setNetOpgeslagen(false), 2500)
+      if (bewerk.soort === 'plan') loadTemplates(); else loadDayTemplates()
+    } catch (e) { alert('❌ Opslaan mislukt: ' + (e.message || e)) }
+    finally { setSaving(false) }
+  }
+
   const clientName = effectiveClient ? `${effectiveClient.first_name || ''} ${effectiveClient.last_name || ''}`.trim() : ''
 
   const DAY_ABBR = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr', zaterdag: 'Za', zondag: 'Zo' }
@@ -648,11 +722,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
-  const geenDoel = !selectedSchemaId && !effectiveClient?.id
-  // De naam telt niet mee: die bewaart de kopbalk zelf al (bewaarTitel).
-  const huidigeStand = JSON.stringify([workoutPlan.description || '', buildWeekStructure()])
-  const nietOpgeslagen = !!selectedSchemaId && bewaardeStand !== null && bewaardeStand !== huidigeStand
-  const isOpgeslagen = !!selectedSchemaId && !saving && !nietOpgeslagen
+  const geenDoel = !bewerk && !selectedSchemaId && !effectiveClient?.id
+  // De naam telt niet mee bij klantplannen: die bewaart de kopbalk zelf al
+  // (bewaarTitel). Bij een sjabloon in bewerking gaat de naam mee met Opslaan.
+  const huidigeStand = JSON.stringify([bewerk ? workoutPlan.name || '' : '', workoutPlan.description || '', buildWeekStructure()])
+  const heeftDoel = !!selectedSchemaId || !!bewerk
+  const nietOpgeslagen = heeftDoel && bewaardeStand !== null && bewaardeStand !== huidigeStand
+  const isOpgeslagen = heeftDoel && !saving && !nietOpgeslagen
   const leegPlan = workoutPlan.days.length === 0
   const opslaanKnop = (vol) => ({
     height: 36, padding: '0 0.9rem', borderRadius: 9, flexShrink: 0,
@@ -673,6 +749,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
     { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
     { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
+    { id: 'info', icon: <BarChart3 size={16} />, label: 'Planinfo', onClick: () => setInfoOpen(v => !v), actief: infoOpen },
     { id: 'instellingen', icon: <ChevronDown size={16} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none' }} />, label: 'Planinstellingen', onClick: () => setInstellingenOpen(v => !v), actief: instellingenOpen },
   ]
 
@@ -692,6 +769,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         minHeight: 52, maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box',
         padding: m ? '0.5rem 0.75rem' : '0 0 0 max(0px, calc(110px - (100vw - 1200px) / 2))',
       }}>
+        {bewerk ? (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 800, color: '#10b981' }}>
+            <Pencil size={14} strokeWidth={2.6} /> {bewerk.soort === 'dag' ? 'Dag-template' : 'Plan-template'} bewerken
+            <button onClick={stopBewerk} title="Sluiten en terug naar de builder" aria-label="Bewerken sluiten" style={{ ...iconKnop(), width: 28, height: 28, background: 'transparent', border: 'none' }}><X size={15} strokeWidth={2.6} /></button>
+          </div>
+        ) : (
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button onClick={() => setShowClientPicker(v => !v)} style={{ background: 'none', border: 'none', padding: '4px 2px', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             <Users size={14} /> {clientName || 'Kies een klant'} <ChevronDown size={14} strokeWidth={2.8} />
@@ -715,6 +798,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
           )}
         </div>
+        )}
 
         {/* Plan: naam (tik = aanpassen), wissel, extra plan, verwijderen. */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -749,18 +833,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={16} /></button>
         <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw" aria-label="Opnieuw" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canRedo ? 1 : 0.3 }}><Redo2 size={16} /></button>
-        <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} style={{ ...opslaanKnop(false), opacity: leegPlan ? 0.45 : 1 }}>
+        {!bewerk && <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} style={{ ...opslaanKnop(false), opacity: leegPlan ? 0.45 : 1 }}>
           <Save size={14} strokeWidth={2.6} /> Als template
-        </button>
-        <button onClick={saveToClientSchema} disabled={saving || geenDoel || leegPlan}
-          title={geenDoel ? 'Kies eerst een klant' : !selectedSchemaId && effectiveClient?.id
+        </button>}
+        <button onClick={bewerk ? bewaarBewerk : saveToClientSchema} disabled={saving || geenDoel || leegPlan}
+          title={bewerk ? 'Wijzigingen opslaan in het sjabloon. Plannen die klanten al hebben veranderen niet mee.' : geenDoel ? 'Kies eerst een klant' : !selectedSchemaId && effectiveClient?.id
             ? (clientSchemas.length > 0
               ? `Nieuw plan voor ${effectiveClient.first_name || 'deze klant'}: komt naast het huidige plan; actief maken doe je met de wisselknop.`
               : `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`)
             : undefined}
           style={{ ...opslaanKnop(!isOpgeslagen), ...(isOpgeslagen ? { color: '#10b981', borderColor: netOpgeslagen ? '#10b981' : 'rgba(16,185,129,0.35)' } : {}), opacity: (geenDoel || leegPlan) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
           {isOpgeslagen ? <CircleCheck size={14} strokeWidth={2.6} /> : <Save size={14} strokeWidth={2.6} />}
-          {saving ? 'Opslaan…' : isOpgeslagen ? 'Opgeslagen' : nietOpgeslagen ? <>Opslaan<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', marginLeft: 2 }} /></> : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
+          {saving ? 'Opslaan…' : isOpgeslagen ? 'Opgeslagen' : nietOpgeslagen ? <>Opslaan<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', marginLeft: 2 }} /></> : bewerk ? 'Template opslaan' : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
         </button>
       </div>
       </div>
@@ -792,13 +876,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </button>
             )
           })}
-          <button onClick={() => setShowDayPicker(true)} style={{
+          {bewerk?.soort !== 'dag' && <button onClick={() => setShowDayPicker(true)} style={{
             flex: '0 0 auto', minWidth: m ? 96 : 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent',
             color: '#fff', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', padding: '0 0.75rem',
           }}>
             <Plus size={15} strokeWidth={2.8} /> Nieuwe dag
-          </button>
+          </button>}
         </div>
       </div>}
 
@@ -916,7 +1000,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                   <span style={{ display: 'flex', color: g.actief && m ? '#0a0a0a' : 'rgba(255,255,255,0.7)' }}>{g.icon}</span>
                   <span style={{ flex: m ? undefined : 1 }}>{g.label}</span>
                   {g.badge != null && <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)' }}>{g.badge}</span>}
-                  {!m && g.id !== 'instellingen' && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
+                  {!m && g.id !== 'instellingen' && g.id !== 'info' && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
                 </button>
               ))}
               {!m && (
@@ -930,6 +1014,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </button>
               )}
             </div>
+
+            {infoOpen && <PlanInfo days={workoutPlan.days} />}
 
             {instellingenOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.6rem' }}>
@@ -1083,12 +1169,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         document.body
       )}
 
-      {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
+      {showTemplateManager && <TemplateManager templates={templates} onLoad={(t) => { setBewerk(null); loadTemplate(t) }} onBewerk={(t) => startBewerk('plan', t)} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
       {showDayPicker && (
         <DayTemplatePickerModal
           templates={dayTemplates}
           onPickEmpty={addEmptyDay}
           onPickTemplate={addDayFromTemplate}
+          onEditTemplate={(t) => startBewerk('dag', t)}
           onDeleteTemplate={deleteDayTemplate}
           onClose={() => setShowDayPicker(false)}
           isMobile={isMobile}
