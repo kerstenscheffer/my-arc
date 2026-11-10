@@ -16,7 +16,7 @@ import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
 // Eén tegel: foto, verloop, eyebrow + titel linksonder, pijltjes onderin.
-function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null }) {
+function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null }) {
   // Als variabele met hoofdletter, anders telt de lint-regel de JSX-aanroep niet.
   const Icoon = icoon
   return (
@@ -37,6 +37,12 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
         <div style={{ fontSize: isMobile ? '0.68rem' : '0.78rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {titel}
         </div>
+        {/* Soort training van een cardioblok (sublabel), bv. 'Zone 2'. */}
+        {soortTraining && (
+          <div style={{ fontSize: isMobile ? '0.54rem' : '0.58rem', fontWeight: 800, color: '#06b6d4', textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {soortTraining}
+          </div>
+        )}
         {sub && (
           <div style={{ fontSize: isMobile ? '0.54rem' : '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 6px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {sub}
@@ -258,6 +264,7 @@ export default function DayCard({
             <Tegel
               foto={cardioFoto(cardio[0].soort)}
               eyebrow="Cardio" titel={cardio[0].soort + (cardio.length > 1 ? ` +${cardio.length - 1}` : '')}
+              soortTraining={cardio[0].sublabel || null}
               sub={`${cardio[0].tijd}${cardio[0].duur ? ` · ${cardio[0].duur} min` : ''}`}
               klaar={cardioKlaar}
               kanSchuiven={!cardioKlaar && kanPlannen && !!onCardioShiftLeft}

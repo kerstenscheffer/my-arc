@@ -231,7 +231,9 @@ function SlaapInhoud({ blok }) {
 
 export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null, onHervatten = null, onVerwijderd = null }) {
   const open = !!blok
-  const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.meta?.slaap ? 'Slaap' : blok.type === 'supplement' ? 'Supplementen' : blok.sublabel || blok.label) : ''
+  // Cardioblok ('Cardio · <sport>'): '<sport> · <soort training>'.
+  const cardioSport = blok?.type === 'custom' && /^Cardio\s*·\s*/.test(String(blok.label || '')) ? String(blok.label).replace(/^Cardio\s*·\s*/, '') : null
+  const titel = cardioSport ? (blok.sublabel ? `${cardioSport} · ${blok.sublabel}` : cardioSport) : blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.meta?.slaap ? 'Slaap' : blok.type === 'supplement' ? 'Supplementen' : blok.sublabel || blok.label) : ''
   return (
     <BladModal open={open} titel={titel} onClose={onClose} zIndex={10600}>
       {blok?.type === 'meal' && <MaaltijdInhoud blok={blok} db={db} isMobile={isMobile} />}

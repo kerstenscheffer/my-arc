@@ -634,7 +634,7 @@ export default function WeekSchedule({
     setTrainingWegFout(null)
     setTrainingWeg({ key, day, titel: w?.name || w?.focus || 'Training', workout: w })
   }
-  const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.soort, permanent: !c.eenmalig, item: c })
+  const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.sublabel ? `${c.soort} · ${c.sublabel}` : c.soort, permanent: !c.eenmalig, item: c })
   const voerUit = async (hoe) => {
     const v = verwijderVraag
     setVerwijderVraag(null)

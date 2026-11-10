@@ -36,11 +36,13 @@ export default function KlantCardioOverzicht({ client, db, isMobile = false, ref
   const eenmalig = blokken.filter(b => !!b.week_start)
   const perSoort = [...new Set(vast.map(b => b.soort))].map(s => ({ soort: s, blokken: vast.filter(b => b.soort === s) }))
 
-  const Regel = ({ soort, sub, dagen, extra }) => (
+  // soortTraining = sublabel van het blok (bv. 'Zone 2'), alleen bij eenmalige
+  // blokken; het 'elke week'-groepje blijft op sport.
+  const Regel = ({ soort, soortTraining = null, sub, dagen, extra }) => (
     <button onClick={onOpen} title="Cardio aanpassen" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: '#fff', width: '100%', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 8, backgroundImage: `url(${cardioFoto(soort)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soort}</div>
+        <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soort}{soortTraining ? <span style={{ color: '#06b6d4' }}> · {soortTraining}</span> : null}</div>
         <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{sub}{extra ? <span style={{ color: '#06b6d4', fontWeight: 800 }}> · {extra}</span> : null}</div>
       </div>
       <div style={{ display: 'flex', gap: 3, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: isMobile ? 120 : 200 }}>
@@ -68,7 +70,7 @@ export default function KlantCardioOverzicht({ client, db, isMobile = false, ref
             dagen={g.blokken.map(b => kort(b.day))} />
         ))}
         {eenmalig.map(b => (
-          <Regel key={b.id} soort={b.soort}
+          <Regel key={b.id} soort={b.soort} soortTraining={b.sublabel || null}
             sub={[b.tijd, b.duur ? `${b.duur} min` : null].filter(Boolean).join(' · ')}
             extra={`week van ${fmtWeek(b.week_start)}`}
             dagen={[kort(b.day)]} />

@@ -201,7 +201,12 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   const slotOpFoto = hoogte >= 52
   const metMacros = hoogte >= 74
 
-  const soort = isMaaltijd ? (block.label || 'Maaltijd')
+  // Gepland cardioblok (custom, label 'Cardio · <sport>'): toon '<sport> ·
+  // <soort training>' in plaats van alleen de sublabel.
+  const cardioSport = block.type === 'custom' && /^Cardio\s*·\s*/.test(String(block.label || ''))
+    ? String(block.label).replace(/^Cardio\s*·\s*/, '') : null
+  const soort = cardioSport ? 'Cardio'
+    : isMaaltijd ? (block.label || 'Maaltijd')
     : isTraining ? 'Training'
     : block.type === 'sleep' ? 'Slaap'
     : block.type === 'work' ? (block.label || 'Werk')
@@ -210,7 +215,8 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     : block.type === 'checkin' ? 'Check-in'
     : block.type === 'cardio' ? 'Cardio'
     : (block.label || 'Blok')
-  const naam = block.sublabel || (isMaaltijd ? null : block.label)
+  const naam = cardioSport ? (block.sublabel ? `${cardioSport} · ${block.sublabel}` : cardioSport)
+    : block.sublabel || (isMaaltijd ? null : block.label)
   const tijdTekst = `${formatTime(block.start)}${isPlaceholderTime ? ' *' : ''}`
 
   const buiten = {

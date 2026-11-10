@@ -49,10 +49,11 @@ export function CardioInfoBlad({ open, cardio, isMobile, onClose }) {
     ['Tijd', cardio.tijd || '–'],
     ['Duur', cardio.duur ? `${cardio.duur} min` : '–'],
     ['Herhaling', cardio.eenmalig ? 'Alleen deze week' : 'Elke week'],
-    ...(cardio.sublabel ? [['Van je coach', cardio.sublabel]] : []),
   ]
+  // Soort training (sublabel) achter de sport: 'Handbiken · Zone 2'.
+  const titel = cardio.soort ? (cardio.sublabel ? `${cardio.soort} · ${cardio.sublabel}` : cardio.soort) : 'Cardio'
   return (
-    <BladModal open={open} titel={cardio.soort || 'Cardio'} onClose={onClose} zIndex={2147483500}>
+    <BladModal open={open} titel={titel} onClose={onClose} zIndex={2147483500}>
       <div style={{ padding: isMobile ? '0.75rem 1rem 1.25rem' : '1rem 1.25rem 1.5rem' }}>
         <div style={{ width: '100%', height: isMobile ? 140 : 170, borderRadius: 14, backgroundImage: `url(${cardioFoto(cardio.soort)})`, backgroundSize: 'cover', backgroundPosition: 'center', marginBottom: 12 }} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
