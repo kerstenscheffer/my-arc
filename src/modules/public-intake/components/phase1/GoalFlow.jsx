@@ -327,7 +327,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
             value={data.target_body_fat ? String(data.target_body_fat) : (data.target_body_fat === null ? 'geen' : null)}
             onChange={v => {
               update('target_body_fat', v === 'geen' ? null : parseInt(v))
-              go('timeline')
+              go('urgentie')
             }}
             isMobile={isMobile}
             extraOption={data.primary_goal !== 'fat_loss'}
@@ -358,8 +358,8 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
             autoFocus
             style={{ width: '100%', boxSizing: 'border-box', padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 500, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.6 }}
           />
-          <NextBtn onClick={() => go('timeline')} disabled={!data.lichaam_omschrijving?.trim()} isMobile={isMobile} />
-          <button onClick={() => go('timeline')} style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.2)', fontSize: isMobile?'0.68rem':'0.7rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit', padding:'0.2rem 0', touchAction:'manipulation', WebkitTapHighlightColor:'transparent' }}>Overslaan →</button>
+          <NextBtn onClick={() => go('urgentie')} disabled={!data.lichaam_omschrijving?.trim()} isMobile={isMobile} />
+          <button onClick={() => go('urgentie')} style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.2)', fontSize: isMobile?'0.68rem':'0.7rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit', padding:'0.2rem 0', touchAction:'manipulation', WebkitTapHighlightColor:'transparent' }}>Overslaan →</button>
         </>
 
       case 'streef_vet_recomp':
@@ -373,37 +373,6 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
             isMobile={isMobile}
             extraOption={false}
           />
-        </>
-
-      // ── TIMELINE (niet bij recomp) ──────────────────────────────────────
-
-      case 'timeline':
-        return <>
-          <BackBtn onBack={goBack} />
-          <Q isMobile={isMobile}>Wanneer wil je dit bereiken?</Q>
-          {[
-            { value: '3',      label: '3 maanden',  sub: 'Snel, intensief' },
-            { value: '6',      label: '6 maanden',  sub: 'Realistisch en haalbaar' },
-            { value: '12',     label: '12 maanden', sub: 'Rustig en duurzaam' },
-            { value: 'no_rush', label: 'Geen haast', sub: 'Ik doe het op mijn eigen tempo' },
-          ].map(opt => (
-            <BigOption
-              key={opt.value}
-              label={opt.label} sub={opt.sub}
-              onClick={() => {
-                let deadlineDate = null
-                if (opt.value !== 'no_rush') {
-                  const d = new Date()
-                  d.setMonth(d.getMonth() + parseInt(opt.value))
-                  deadlineDate = d.toISOString().split('T')[0]
-                }
-                updateMultiple({ goal_timeline: opt.value, goal_deadline_date: deadlineDate })
-                go('urgentie')
-              }}
-              selected={data.goal_timeline === opt.value}
-              isMobile={isMobile}
-            />
-          ))}
         </>
 
       // ── URGENTIE ────────────────────────────────────────────────────────

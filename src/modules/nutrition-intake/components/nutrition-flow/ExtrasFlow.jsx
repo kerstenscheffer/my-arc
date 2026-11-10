@@ -10,13 +10,6 @@ const SUPPS_OPTIONS = [
   { value: 'nee',         label: 'Nee, helemaal niet',     sub: 'Geen interesse in supplementen' },
 ]
 
-const CHEAT_OPTIONS = [
-  { value: 'nooit',    label: 'Ik wil het plan strikt volgen', sub: 'Geen uitzonderingen, ik ga er volledig voor' },
-  { value: '1x_week',  label: '1 keer per week iets extra',    sub: 'Bijv. vrijdagavond pizza of een biertje' },
-  { value: 'weekend',  label: 'Weekenden flexibel',             sub: 'Door de week strict, weekend losser' },
-  { value: 'als_nodig',label: 'Als het nodig is',              sub: 'Verjaardagen, etentjes, met gezond verstand' },
-]
-
 const SOCIAAL_OPTIONS = [
   { value: 'zelden',    label: 'Zelden of nooit',          sub: 'Ik eet bijna altijd thuis' },
   { value: '1x_week',  label: '1 keer per week',           sub: 'Etentje, restaurant of sociale gelegenheid' },
@@ -29,7 +22,8 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
   const update = (field, value) => onChange({ ...data, [field]: value })
 
   const goBack = () => {
-    if (step > 1) setStep(step - 1)
+    // Cheat meals (stap 2) is op 10 nov 2026 weggehaald: terug van 3 naar 1.
+    if (step > 1) setStep(1)
     else if (onBack) onBack()
   }
 
@@ -50,7 +44,7 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
             selected={data.supps_openheid === opt.value}
             onClick={() => {
               update('supps_openheid', opt.value)
-              setTimeout(() => setStep(2), 200)
+              setTimeout(() => setStep(3), 200)
             }}
             isMobile={isMobile}
           />
@@ -81,33 +75,10 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
     </div>
   )
 
-  // Stap 2 — Flexibel eten
-  if (step === 2) return (
-    <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
-      <Q isMobile={isMobile}>Hoe wil je omgaan met cheat meals?</Q>
-      <Hint isMobile={isMobile}>Geen enkel antwoord is fout, eerlijk is beter</Hint>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-        {CHEAT_OPTIONS.map(opt => (
-          <BigOption
-            key={opt.value}
-            label={opt.label}
-            sub={opt.sub}
-            selected={data.cheat_aanpak === opt.value}
-            onClick={() => {
-              update('cheat_aanpak', opt.value)
-              setTimeout(() => setStep(3), 200)
-            }}
-            isMobile={isMobile}
-          />
-        ))}
-      </div>
-    </div>
-  )
-
   // Stap 3 — Hoe vaak sociaal eten
   if (step === 3) return (
     <div style={{ padding: pad }}>
+      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Hoe vaak eet je buiten de deur of bij anderen?</Q>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.25rem' }}>
         {SOCIAAL_OPTIONS.map(opt => (

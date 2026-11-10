@@ -3,7 +3,6 @@ import React, { useState } from 'react'
 import ExperienceFlow from './phase3/ExperienceFlow'
 import CurrentTrainingFlow from './phase3/CurrentTrainingFlow'
 import PracticalFlow from './phase3/PracticalFlow'
-import FocusFlow from './phase3/FocusFlow'
 import CardioFlow from './phase3/CardioFlow'
 import LimitationsFlow from './phase3/LimitationsFlow'
 import { Q, Hint, NextBtn, SkipBtn, TextField } from './phase1/FlowStep'
@@ -56,8 +55,9 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
 
   const sharedProps = { data, onChange, isMobile }
 
-  // Beginner flow: 0=experience, 1=practical, 2=focus, 3=cardio, 4=limitations
-  // Ervaren flow:  0=experience, 1=currentTraining, 2=practical, 3=focus, 4=cardio, 5=limitations
+  // Beginner flow: 0=experience, 1=practical, 2=cardio, 3=limitations
+  // Ervaren flow:  0=experience, 1=currentTraining, 2=practical, 3=cardio, 4=limitations
+  // (Focus + stretching/mobiliteit eruit gehaald op 10 nov 2026.)
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.25rem' }}>
@@ -98,12 +98,9 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
         <PracticalFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={true} />
       )}
       {isBeginner && section === 2 && (
-        <FocusFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={true} />
-      )}
-      {isBeginner && section === 3 && (
         <CardioFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={true} />
       )}
-      {isBeginner && section === 4 && (
+      {isBeginner && section === 3 && (
         <LimitationsFlow {...sharedProps} onNext={handleComplete} onBack={goBack} />
       )}
 
@@ -115,12 +112,9 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
         <PracticalFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={false} />
       )}
       {isExperienced && section === 3 && (
-        <FocusFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={false} />
-      )}
-      {isExperienced && section === 4 && (
         <CardioFlow {...sharedProps} onNext={goNext} onBack={goBack} isBeginner={false} />
       )}
-      {isExperienced && section === 5 && (
+      {isExperienced && section === 4 && (
         <LimitationsFlow {...sharedProps} onNext={handleComplete} onBack={goBack} />
       )}
 

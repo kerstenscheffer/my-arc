@@ -345,8 +345,8 @@ const PART1_SECTIONS = [
       { key: 'quick_win_2weeks', label: 'Klein succes in 2 weken' },
       { key: 'motivation_verbatim', label: 'Waarom — eigen woorden' },
       { key: 'fitness_doel_tags', label: 'Fitnessdoelen', fmt: fmtArr() },
-      { key: 'goal_timeline', label: 'Tijdlijn', fmt: fmtMap(MAPS.goal_timeline) },
-      { key: 'goal_deadline', label: 'Deadline', fmt: fmtDate },
+      { key: 'goal_timeline', label: 'Tijdlijn', fmt: fmtMap(MAPS.goal_timeline), alleenIngevuld: true },
+      { key: 'goal_deadline', label: 'Deadline', fmt: fmtDate, alleenIngevuld: true },
       { key: 'goal_urgency', label: 'Urgentie', fmt: fmtNum('/ 10') },
       { key: 'motivation', label: 'Motivatie' }
     ]
@@ -359,7 +359,7 @@ const PART1_SECTIONS = [
       { key: 'preferred_training_days', label: 'Trainingsdagen', fmt: fmtArr(MAPS.days) },
       { key: 'training_time', label: 'Trainingstijd' },
       { key: 'sleep_hours', label: 'Slaap', fmt: fmtNum('uur') },
-      { key: 'cooking_time', label: 'Kooktijd', fmt: fmtNum('min') },
+      { key: 'cooking_time', label: 'Kooktijd', fmt: fmtNum('min'), alleenIngevuld: true },
       { key: 'stress_level', label: 'Stressniveau', fmt: fmtNum('/ 10') }
     ]
   },
@@ -414,9 +414,9 @@ const PART2_SECTIONS = [
     title: 'Begeleiding & praktisch',
     fields: [
       { key: 'intake_guidance_level', label: 'Hoe wil je begeleid worden', fmt: fmtMap(N.guidance) },
-      { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum() },
-      { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget) },
-      { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking) }
+      { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum(), alleenIngevuld: true },
+      { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget), alleenIngevuld: true },
+      { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking), alleenIngevuld: true }
     ]
   },
   {
@@ -454,7 +454,7 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_supps', label: 'Supplementen', fmt: fmtMap(N.supps) },
       { key: 'intake_supps_huidige', label: 'Slikt nu' },
-      { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat) },
+      { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat), alleenIngevuld: true },
       { key: 'intake_sociaal', label: 'Buiten de deur eten', fmt: fmtMap(N.social) }
     ]
   },
@@ -506,8 +506,8 @@ const PART3_SECTIONS = [
     title: 'Focus',
     fields: [
       { key: '_split_pref', label: 'Huidige training' },
-      { key: '_split_focus', label: 'Focus', fmt: fmtArr() },
-      { key: 'emphasize_stretch', label: 'Nadruk op stretch', fmt: fmtBool },
+      { key: '_split_focus', label: 'Focus', fmt: fmtArr(), alleenIngevuld: true },
+      { key: 'emphasize_stretch', label: 'Nadruk op stretch', fmt: fmtBool, alleenIngevuld: true, verbergNee: true },
       { key: 'prioritize_compounds', label: 'Compound-prioriteit', fmt: fmtBool }
     ]
   },
@@ -760,7 +760,11 @@ function renderSections(sections, data, toonLeeg = true) {
     .map((section) => {
       const rows = section.fields
         .map((f) => {
-          const raw = data?.[f.key]
+          // Vragen die op 10 nov 2026 uit de intake gingen staan op
+          // alleenIngevuld: oude klanten zien hun antwoord nog, nieuwe geen
+          // lege regel. emphasize_stretch wordt standaard false opgeslagen,
+          // dus daar telt "nee" ook als leeg.
+          const raw = f.verbergNee && data?.[f.key] === false ? null : data?.[f.key]
           const leeg = isEmpty(raw)
           const value = leeg ? null : (f.fmt ? f.fmt(raw) : String(raw))
           // Onbeantwoorde vragen blijven staan: de coach wil zien wát er

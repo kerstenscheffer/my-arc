@@ -54,7 +54,8 @@ function mapToNutritionPreferences(flowData) {
       custom_allergens:   flowData.allergen_overig  || null,
     },
     meal_schedule: {
-      num_meals: flowData.num_meals ? parseInt(flowData.num_meals) : 4,
+      // Vraag weggehaald 10 nov 2026: niet meer gokken op 4, leeg laten.
+      num_meals: flowData.num_meals ? parseInt(flowData.num_meals) : null,
     },
     wishes: {
       // Maaltijdpatroon — drill-down categorieën en subcategorieën
@@ -236,9 +237,9 @@ export default function NutritionIntakePage() {
         await new IntakeFlowService(DatabaseService.supabase).processIntake(clientId, prefs)
         console.log('✅ [submit] IntakeFlowService klaar')
       } catch (e) { console.error('❌ IntakeFlowService CRASHED:', e.message) }
-      setIsSuccess(true); setIsSubmitting(false)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      setTimeout(() => { window.location.href = '/myintake?phase=3' }, 2000)
+      // Direct door naar training, zonder "Voeding opgeslagen!"-scherm.
+      setIsSuccess(true)
+      window.location.href = '/myintake?phase=3'
     } catch (err) {
       console.error('❌ handleSubmit failed:', err)
       alert('Er ging iets mis bij het opslaan.')
@@ -302,12 +303,8 @@ export default function NutritionIntakePage() {
   if (isSuccess) return (
     <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-          <span style={{ fontSize: '1.2rem', color: '#ffffff' }}>✓</span>
-        </div>
-        <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>Voeding opgeslagen!</div>
-        <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>Je coach ontvangt een melding. Je wordt doorgestuurd...</div>
-        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#ffffff', borderRadius: '50%', margin: '1.5rem auto 0', animation: 'spin 0.8s linear infinite' }} />
+        {/* Alleen een spinner zolang de volgende pagina laadt. */}
+        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#ffffff', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>

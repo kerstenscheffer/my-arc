@@ -512,9 +512,19 @@ export default function PublicIntakePage() {
         console.warn('⚠️ Coach-notificatie voor intake mislukt (intake zelf is opgeslagen):', notifyErr)
       }
 
-      console.log('✅ Opgeslagen! Naar phase 2...')
+      // Geen tussenscherm meer ("gegevens opgeslagen", account, knop): de
+      // klant gaat direct door naar voeding, zodat de intake als één geheel
+      // voelt. Inloggegevens staan op het eindscherm (phase 4).
+      console.log('✅ Opgeslagen! Direct door naar voeding...')
       setIntakeId(clientId)
-      setPhase(2)
+      try {
+        localStorage.setItem('myarc_intake_email', personalData.email)
+        // Fase 2 meteen vastleggen: wie later terugkomt, belandt niet weer
+        // aan het begin van de gegevens.
+        localStorage.setItem(DRAFT_LS_KEY, JSON.stringify({ personalData: data, workoutData, phase: 2 }))
+      } catch {}
+      window.location.href = '/nutritionintake'
+      return
     } catch(e) { console.error('❌ Save exception:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }
     setSaving(false)
   }
@@ -739,17 +749,7 @@ export default function PublicIntakePage() {
       {/* ── Phase 2: Tussenstap voeding ── */}
       {phase === 2 && (
         <div style={{ maxWidth: '520px', margin: '0 auto', padding: isMobile ? '2rem 1rem 3rem' : '3rem 1.25rem 4rem' }}>
-          {accountInfo && (
-            <div style={{ marginBottom: '1.25rem', padding: '0.9rem 1rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)' }}>
-              <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', marginBottom: 4 }}>Je account staat klaar</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
-                {accountInfo.wachtwoord
-                  ? <>Log straks in op de app met <strong style={{ color: '#fff' }}>{accountInfo.email}</strong> en wachtwoord <strong style={{ color: '#fff', fontFamily: 'ui-monospace, monospace' }}>{accountInfo.wachtwoord}</strong>. Je kunt het daarna zelf aanpassen.</>
-                  : <>Je kunt straks inloggen met <strong style={{ color: '#fff' }}>{accountInfo.email}</strong> en je bestaande wachtwoord. Vergeten? Kies op het inlogscherm "wachtwoord vergeten".</>}
-              </div>
-            </div>
-          )}
-
+          {/* Alleen nog zichtbaar bij hervatten; normaal gaat fase 1 direct door naar /nutritionintake. */}
           <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
               <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
