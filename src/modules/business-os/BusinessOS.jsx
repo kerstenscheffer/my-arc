@@ -873,7 +873,10 @@ function Invoer({ label, waarde, onChange }) {
   )
 }
 
-export default function BusinessOS({ isMobile, beperkt = false }) {
+// zwevend (10 nov 2026): op elke andere CoachHub-pagina staat Gino als
+// zwevende bol aan de zijkant; klik = het chatblok (zelfde gesprekken, die
+// staan per apparaat in localStorage). Geen pagina, geen ring, geen panelen.
+export default function BusinessOS({ isMobile, beperkt = false, zwevend = false }) {
   const [data, setData] = useState(null)
   const [fout, setFout] = useState(null)
   const [doel, setDoel] = useState(() => lees(DOEL_KEY, 10000))
@@ -1067,8 +1070,11 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   const boven = !!kalender || podiumOpen
   // Klein venster: bol en chatbalk samen in een sleepbaar blokje, zodat de pagina de ruimte
   // krijgt. Blijft hetzelfde element, dus een lopend gesprek of de stem gaat gewoon door.
-  const [mini, setMini] = useState(() => { try { return localStorage.getItem('bos_mini') === '1' } catch { return false } })
-  const [miniPos, setMiniPos] = useState(() => { try { return JSON.parse(localStorage.getItem('bos_mini_pos')) } catch { return null } })
+  // Eigen opslag voor de zwevende Gino, zodat de Business OS-pagina zelf
+  // niet ineens als bolletje opent (en andersom).
+  const OPSLAG = zwevend ? 'bos_zw_' : 'bos_'
+  const [mini, setMini] = useState(() => { try { return localStorage.getItem(`${OPSLAG}mini`) === '1' } catch { return false } })
+  const [miniPos, setMiniPos] = useState(() => { try { return JSON.parse(localStorage.getItem(`${OPSLAG}mini_pos`)) } catch { return null } })
   const miniVak = useRef(null)
   const miniSleep = useRef(false)
   const binnenBeeld = useCallback((p) => {
@@ -1077,36 +1083,36 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
     return { x: Math.max(8, Math.min(window.innerWidth - b - 8, p.x)), y: Math.max(8, Math.min(window.innerHeight - h - 8, p.y)) }
   }, [])
   // Zijkant: alleen de bol tegen de rand van het scherm. Klik = terug naar het blokje.
-  const [zijkant, setZijkant] = useState(() => { try { return localStorage.getItem('bos_zijkant') === '1' } catch { return false } })
+  const [zijkant, setZijkant] = useState(() => { try { return localStorage.getItem(`${OPSLAG}zijkant`) === '1' } catch { return false } })
   const zetZijkant = (aan) => {
     setZijkant(aan)
-    try { localStorage.setItem('bos_zijkant', aan ? '1' : '0') } catch { /* privémodus */ }
+    try { localStorage.setItem(`${OPSLAG}zijkant`, aan ? '1' : '0') } catch { /* privémodus */ }
     if (!aan) {
       setMini(true)
-      try { localStorage.setItem('bos_mini', '1') } catch { /* privémodus */ }
+      try { localStorage.setItem(`${OPSLAG}mini`, '1') } catch { /* privémodus */ }
     }
   }
   // Het pijltje wijst naar links, dus daar komt de bol ook terecht.
   const naarLinks = () => {
     const p = binnenBeeld({ x: 0, y: miniPos?.y ?? 80 })
     setMiniPos(p)
-    try { localStorage.setItem('bos_mini_pos', JSON.stringify(p)) } catch { /* privémodus */ }
+    try { localStorage.setItem(`${OPSLAG}mini_pos`, JSON.stringify(p)) } catch { /* privémodus */ }
     zetZijkant(true)
   }
   const wisselMini = () => {
     setMini((o) => {
-      try { localStorage.setItem('bos_mini', o ? '0' : '1') } catch { /* privémodus */ }
+      try { localStorage.setItem(`${OPSLAG}mini`, o ? '0' : '1') } catch { /* privémodus */ }
       return !o
     })
   }
   // Eerste keer onderin het midden; en altijd terug in beeld als het venster kleiner wordt.
   useEffect(() => {
-    if ((!mini && !zijkant) || isMobile) return undefined
+    if ((!mini && !zijkant && !zwevend) || isMobile) return undefined
     const pas = () => setMiniPos(p => binnenBeeld(p || { x: (window.innerWidth - (miniVak.current?.offsetWidth || 760)) / 2, y: window.innerHeight - 130 }))
     pas()
     window.addEventListener('resize', pas)
     return () => window.removeEventListener('resize', pas)
-  }, [mini, zijkant, isMobile, binnenBeeld])
+  }, [mini, zijkant, zwevend, isMobile, binnenBeeld])
   // Overal in de balk vastpakken. Typen, knoppen en links blijven gewoon werken, en de bol blijft
   // klikbaar: pas na 4 pixels bewegen is het slepen.
   const sleepMini = (e) => {
@@ -1129,7 +1135,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
       window.removeEventListener('pointermove', beweeg)
       window.removeEventListener('pointerup', los)
       window.removeEventListener('pointercancel', los)
-      try { localStorage.setItem('bos_mini_pos', JSON.stringify(laatste)) } catch { /* privémodus */ }
+      try { localStorage.setItem(`${OPSLAG}mini_pos`, JSON.stringify(laatste)) } catch { /* privémodus */ }
     }
     window.addEventListener('pointermove', beweeg)
     window.addEventListener('pointerup', los)
@@ -1139,8 +1145,9 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
   const naMiniSleep = (e) => {
     if (miniSleep.current) { e.stopPropagation(); e.preventDefault(); miniSleep.current = false }
   }
-  const isZij = zijkant && !isMobile
-  const isMini = (mini || isZij) && !isMobile
+  // Zwevend: altijd blokje of zijkant; nog niets gekozen = bol aan de zijkant.
+  const isZij = (zijkant || (zwevend && !mini)) && !isMobile
+  const isMini = (mini || isZij || zwevend) && !isMobile
   // Telefoon met agenda of beeld open: bol klein naast de balk, anders houdt de pagina maar de helft over.
   const telefoonKlein = isMobile && boven
   // Bol naast de balk (klein blokje of telefoon met agenda): maten voor één lijn met de statusregel.
@@ -1203,8 +1210,9 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
     return { schakels, zwakste, omzet, prognose, p, som: { sales, calls, reacties, leads } }
   }, [data, doel, prijs, dagenVoorbij, dagenInMaand])
 
-  if (fout) return <div style={{ background: C.bg, color: C.rood, padding: 24 }}>Business OS laadt niet: {fout}</div>
-  if (!a) return <div style={{ background: C.bg, color: C.zacht, padding: 24, minHeight: '60vh', fontWeight: 700 }}>Laden…</div>
+  if (zwevend && isMobile) return null
+  if (fout) return zwevend ? null : <div style={{ background: C.bg, color: C.rood, padding: 24 }}>Business OS laadt niet: {fout}</div>
+  if (!a) return zwevend ? null : <div style={{ background: C.bg, color: C.zacht, padding: 24, minHeight: '60vh', fontWeight: 700 }}>Laden…</div>
 
   // Beperkt (Marcel): Kerstens agenda komt nergens in beeld en niet in Gino's context.
   const agendaVandaag = !beperkt && Array.isArray(data.agendaVandaag) ? data.agendaVandaag : []
@@ -1359,7 +1367,11 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
     // screen de hele helft). Alleen de chatlijst scrolt. Ring en chatbalk
     // staan als één groep in het midden; de ring schaalt mee met de
     // hoogte zodat de groep altijd past.
-    <div data-bos-pagina="" style={{
+    <div data-bos-pagina="" style={zwevend ? {
+      // Zwevend: geen eigen pagina; alleen het blokje/de bol (position fixed)
+      // is klikbaar, de pagina eronder blijft gewoon werken.
+      position: 'fixed', inset: 0, zIndex: 59, pointerEvents: 'none', color: C.tekst,
+    } : {
       background: C.bg, color: C.tekst, position: 'relative', overflow: 'hidden',
       // Mobiel: ook de icoonrij boven de onderbalk en de safe-area vrijhouden.
       height: isMobile
@@ -1370,17 +1382,17 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
     }}>
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
-      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
+      {!zwevend && <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
         position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
         width: 36, height: 36, borderRadius: '50%', border: `1.5px solid ${kalender ? colors.success : '#fff'}`,
         background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <CalendarDays size={16} strokeWidth={2.6} />
-      </button>
+      </button>}
 
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
-      <div style={{ position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
+      {!zwevend && <div style={{ position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
           width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff',
           background: menu ? colors.surface : 'transparent', color: C.wit, cursor: 'pointer',
@@ -1410,31 +1422,31 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       {/* ── Ring en chatbalk onderaan; erboven ruimte voor Gino (kalender, beelden) ── */}
       <div ref={midden} style={{
         flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'flex-end',
       }}>
-        {kalender && (
+        {kalender && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
               onVraag={(t, o) => stuurRef.current?.(t, o)} inspring={telefoonKlein ? KLEIN_BOL + 6 : 0} />
           </div>
         )}
-        {podiumOpen && (
+        {podiumOpen && !zwevend && (
           <div ref={setPodiumEl} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 44 }} />
         )}
         {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
-        <div ref={miniVak} onPointerDown={isMini ? sleepMini : undefined} onClickCapture={isMini ? naMiniSleep : undefined} style={isZij ? {
+        <div ref={miniVak} data-bos-blok="" onPointerDown={isMini ? sleepMini : undefined} onClickCapture={isMini ? naMiniSleep : undefined} style={isZij ? {
           cursor: 'grab', userSelect: 'none',
-          position: 'fixed', top: miniPos?.y ?? 80, zIndex: 60, ...(zijLinks ? { left: 0, borderRadius: '0 18px 18px 0' } : { right: 0, borderRadius: '18px 0 0 18px' }),
-          display: 'flex', padding: 6, boxSizing: 'border-box',
-          background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
+          // Alleen de bol tegen de rand, zonder vak eromheen (10 nov 2026).
+          position: 'fixed', top: miniPos?.y ?? 80, zIndex: 60, pointerEvents: 'auto', ...(zijLinks ? { left: 8 } : { right: 8 }),
+          display: 'flex', boxSizing: 'border-box',
         } : isMini ? {
           cursor: 'grab', userSelect: 'none',
-          position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, width: 'min(760px, calc(100vw - 16px))',
+          position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, pointerEvents: 'auto', width: 'min(760px, calc(100vw - 16px))',
           display: 'flex', alignItems: 'flex-end', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
         } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'flex-end', gap: 6, flexShrink: 0, paddingTop: STATUS_H + STATUS_GAT } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
@@ -1458,7 +1470,7 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
@@ -1509,14 +1521,14 @@ export default function BusinessOS({ isMobile, beperkt = false }) {
       </div>
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
-      <GinoToneel visueel={kalender ? null : visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+      {!zwevend && <GinoToneel visueel={kalender ? null : visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
-        onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />
+        onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />}
 
-      {previewId && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
+      {previewId && !zwevend && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 
-      {blad && (
+      {blad && !zwevend && (
         <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} onSluit={sluitBlad}>
           {inhoud(blad)}
         </Blad>

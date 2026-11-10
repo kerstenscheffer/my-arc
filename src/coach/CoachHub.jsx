@@ -1214,6 +1214,15 @@ export default function CoachHub() {
         />
       )}
 
+      {/* Gino op elke pagina (10 nov 2026): zwevende bol aan de zijkant, klik =
+          het chatblok met dezelfde gesprekken. Niet als Business OS zelf al in
+          beeld is (hoofdtab of split), anders praten er twee Gino's door elkaar. */}
+      {(isEigenaar || isTeamlid) && !clientMode && !isMobile && activeTab !== 'business-os' && splitTab !== 'business-os' && (
+        <Suspense fallback={null}>
+          <BusinessOS zwevend isMobile={isMobile} beperkt={!isEigenaar} />
+        </Suspense>
+      )}
+
       {timerTask && (
         <FloatingTaskTimer
           task={timerTask.task}

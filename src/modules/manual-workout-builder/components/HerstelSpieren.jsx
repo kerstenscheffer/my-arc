@@ -19,7 +19,7 @@ const KLEUR = { groen: '#10b981', oranje: '#f59e0b', rood: '#ef4444' }
 const kort = (d) => new Date(`${String(d).slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
 
 export const HerstelStip = ({ stand, maat = 7 }) => (stand
-  ? <span title={stand === 'groen' ? 'Goed hersteld' : stand === 'oranje' ? 'Matig hersteld' : 'Niet hersteld of pijntje'}
+  ? <span title={stand === 'groen' ? 'Goed hersteld' : stand === 'oranje' ? 'Matig hersteld of 1x pijntje' : 'Niet hersteld of 2x achter elkaar pijn'}
       style={{ display: 'inline-block', width: maat, height: maat, borderRadius: '50%', background: KLEUR[stand], marginLeft: 5, verticalAlign: 'middle', flexShrink: 0 }} />
   : null)
 
@@ -113,6 +113,22 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
                 )}
               </div>
             )}
+            {advies?.bronnen?.length > 0 && (<>
+              <div style={titel}>Oefeningen</div>
+              {advies.bronnen.map(b => (
+                <div key={b.naam} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.25rem 0.8rem' }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.naam}</span>
+                    <span style={{ display: 'block', fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {b.dagen.join(', ')}{b.gewicht < 1 ? ' · telt half' : ''}
+                    </span>
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: '0.78rem', fontWeight: 900, color: b.gewicht < 1 ? 'rgba(255,255,255,0.55)' : '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                    {b.sets} sets{b.gewicht < 1 ? ` → ${getal(Math.round(b.sets * b.gewicht * 10) / 10)}` : ''}
+                  </span>
+                </div>
+              ))}
+            </>)}
             {info && (<>
               <div style={titel}>Klant, laatste 7 dagen</div>
               {info.herstel.map(r => {

@@ -6,10 +6,16 @@ Code: `src/modules/manual-workout-builder/volumeRegels.js` (getallen) en `volume
 Zichtbaar in de Workout Builder → Alle dagen: pijltje achter de spiergroep, klik = advies + knop.
 
 ## Tellen
+- Been-compounds tellen voor beide groepen volledig (Kersten, 10 nov): squat/hack/leg press/lunge → quads 1 + billen 1,
+  deadlift/RDL → hamstrings 1 + billen 1. Bovenlichaam-synergisten blijven 0,5.
 - Fractionele harde sets per spier per week: prime mover 1, synergist in een compound 0,5
   (bibliotheek `secundair_spieren`, anders op naam: press → triceps/schouders, row/pulldown → biceps, squat/deadlift → billen).
 - Alleen werksets (0-3 RIR, 6-20 reps). Warm-ups tellen niet. Weekreps en volume load zijn geen valuta.
-- 'Benen' = quads + hamstrings samen: range × 1,5. Billen: alleen plafond (compounds dekken het). Buik/traps: geen doel.
+- Spiergroepen fijn (10 nov 2026): front/side/rear delts en quads/hamstrings apart. Staat er alleen 'shoulders'/'legs'
+  bij een oefening, dan bepaalt de naam het (lateral → side, rear/reverse/face pull → rear, rest → front; curl/RDL/deadlift → hamstrings, rest → quads).
+  Synergisten: rows/pulldowns → biceps + rear delts, presses → triceps + front delts, overhead press → triceps + side delts.
+- Billen en front delts: alleen plafond (compounds dekken het). Buik/traps: geen doel.
+- Oude herstelantwoorden 'legs'/'shoulders' gelden voor alle fijne groepen eronder.
 
 ## Range (sets/week)
 | Status | Build | Onderhoud | Cut | Max per sessie |
@@ -22,8 +28,8 @@ Status = clients.training_experience, anders intake; onbekend = intermediair (ge
 Fase = lopende client_phases (build → build, cut → cut, geen → onderhoud).
 
 ## Beslisregel per spier (in deze volgorde)
-0. Pijntje bij een oefening → die oefening wisselen (knop opent het wisselvenster), sets blijven gelijk.
-   Ligt meestal aan de oefening (vooral borst), niet aan het volume.
+0. 2 trainingen achter elkaar pijn bij een oefening → die oefening wisselen (knop opent het wisselvenster), sets blijven gelijk.
+   Ligt meestal aan de oefening (vooral borst), niet aan het volume. 1x pijn = oranje, in de gaten houden.
 1. Niet hersteld (herstelvraag 'Niet') of kracht daalt 2 weken (niet in cut) → 1/3 minder sets.
 2. Cut + kracht daalt → eerst kcal/eiwit/slaap; alleen terug als boven de range.
 3. Onder de vloer (startwaarde) → erbij, max +2 per week.

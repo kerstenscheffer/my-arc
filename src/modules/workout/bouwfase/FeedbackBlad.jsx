@@ -106,7 +106,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         {soort === 'herstel' && (
           <>
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16 }}>
-              Hoe goed is je {spierWoord(spiergroep)} hersteld?
+              Hoe goed {['chest', 'back', 'abs', 'shoulders'].includes(spiergroep) ? 'is' : 'zijn'} je {spierWoord(spiergroep)} hersteld?
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {HERSTEL.map(h => {

@@ -1413,7 +1413,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false, macPlek = null }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false, macPlek = null, zwevend = false }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2012,7 +2012,10 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   useEffect(() => {
     let diepte = 0
     const zichtbaar = () => !!wortel.current?.getClientRects().length
-    const metBestand = (e) => Array.from(e.dataTransfer?.types || []).includes('Files') && zichtbaar()
+    // Zwevende Gino (op andere pagina's): alleen bestanden die je óp het
+    // Gino-blok sleept, anders kaapt hij uploads van de pagina eronder.
+    const opGino = (e) => !zwevend || !!wortel.current?.closest('[data-bos-blok]')?.contains(e.target)
+    const metBestand = (e) => Array.from(e.dataTransfer?.types || []).includes('Files') && zichtbaar() && opGino(e)
     const binnen = (e) => { if (!metBestand(e)) return; e.preventDefault(); diepte++; setSleept(true) }
     const over = (e) => { if (!metBestand(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }
     const buiten = (e) => { if (!metBestand(e)) return; diepte = Math.max(0, diepte - 1); if (!diepte) setSleept(false) }

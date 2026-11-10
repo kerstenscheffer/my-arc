@@ -25,24 +25,32 @@ export const LEEFTIJD_40PLUS = 40
 // Elke spier minimaal zo vaak per week.
 export const MIN_FREQUENTIE = 2
 
-// Onze spiergroep 'legs' is quads + hamstrings samen: range × deze factor.
-// Billen krijgen genoeg via squats/lunges/deadlifts (RP: MEV 0): alleen een plafond.
-// Buik en traps: geen weekdoel, wel meetellen.
-export const FACTOR = { legs: 1.5 }
-export const ALLEEN_PLAFOND = new Set(['glutes'])
+// Range × factor per spier (1 = de tabel hierboven). Sinds de opsplitsing in
+// quads/hamstrings en front/side/rear delts (10 nov 2026) is er geen factor meer nodig.
+// Billen en front delts krijgen genoeg via compounds (squats, presses; RP: MEV 0):
+// alleen een plafond. Buik en traps: geen weekdoel, wel meetellen.
+export const FACTOR = {}
+export const ALLEEN_PLAFOND = new Set(['glutes', 'front_delts'])
 export const GEEN_DOEL = new Set(['abs', 'traps', 'core', 'forearms', 'onbekend'])
 
 // Een set telt voor de synergist half mee. Bibliotheek (secundair_spieren) gaat voor;
 // zonder die info herkennen we de bekende compounds aan de naam.
 export const SYNERGIST_GEWICHT = 0.5
+// Per regel: [naam-patroon, synergisten, gewicht]. Zonder gewicht geldt SYNERGIST_GEWICHT.
+// Been-compounds tellen voor beide groepen volledig (Kersten, 10 nov 2026): een hack
+// squat is evengoed een billen-oefening als een quads-oefening.
 export const SYNERGISTEN_OP_NAAM = [
-  [/bench|chest press|push.?up|dip|incline press|decline press|floor press/i, ['triceps', 'shoulders']],
-  [/overhead press|shoulder press|military|arnold|push press/i, ['triceps']],
-  [/row|pulldown|pull.?up|chin.?up|pullover/i, ['biceps']],
-  [/squat|leg press|lunge|split squat|step.?up|hack/i, ['glutes']],
-  [/deadlift|rdl|romanian|good morning|hip hinge/i, ['glutes']],
-  [/hip thrust|glute bridge/i, ['legs']],
+  [/overhead press|shoulder press|military|arnold|push press/i, ['triceps', 'side_delts']],
+  [/bench|chest press|(incline|decline|flat|floor)\b.*press|push.?up|\bdips?\b/i, ['triceps', 'front_delts']],
+  [/row|pulldown|pull.?up|chin.?up|pullover/i, ['biceps', 'rear_delts']],
+  [/squat|leg press|lunge|split squat|step.?up|hack/i, ['glutes'], 1],
+  [/deadlift|rdl|romanian|good morning|hip hinge/i, ['glutes'], 1],
+  [/hip thrust|glute bridge/i, ['hamstrings']],
 ]
+// Bibliotheek zegt alleen 'shoulders' of 'legs' als synergist: welke precies hangt af van de beweging.
+export const TREK = /row|pulldown|pull.?up|chin.?up|face.?pull|pullover/i
+export const BOVEN_DRUK = /overhead press|shoulder press|military|arnold|push press/i
+export const HEUP = /deadlift|rdl|romanian|good.?morning|hip|hinge|thrust|bridge/i
 
 // Prestatie: beste set per week (geschatte 1RM) op de oefeningen in het plan.
 // "Twee weken niet stijgen" = de laatste twee weekstappen elk minder dan +0,5%.

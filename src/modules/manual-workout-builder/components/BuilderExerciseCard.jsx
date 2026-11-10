@@ -8,7 +8,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
-import { LABEL as SPIER_LABEL, spierVan } from '../spierGroepen'
+import { LABEL as SPIER_LABEL, KEUZE as SPIER_KEUZE, spierVan } from '../spierGroepen'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
 const _equipCache = { data: null, promise: null }
@@ -377,8 +377,8 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                   <select value={spierVan(exercise) === 'onbekend' ? '' : spierVan(exercise)} onChange={(e) => onField('primairSpieren', e.target.value)}
                     style={{ ...input, colorScheme: 'dark', cursor: 'pointer' }}>
                     <option value="">Kies…</option>
-                    {Object.entries(SPIER_LABEL).filter(([k]) => k !== 'onbekend').map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                    {!SPIER_LABEL[spierVan(exercise)] && <option value={spierVan(exercise)}>{spierVan(exercise)}</option>}
+                    {SPIER_KEUZE.map(k => <option key={k} value={k}>{SPIER_LABEL[k]}</option>)}
+                    {spierVan(exercise) !== 'onbekend' && !SPIER_KEUZE.includes(spierVan(exercise)) && <option value={spierVan(exercise)}>{spierVan(exercise)}</option>}
                   </select>
                 </div>
               </div>

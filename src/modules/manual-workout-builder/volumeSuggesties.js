@@ -10,18 +10,32 @@ import { spierVan } from './spierGroepen'
 import { minutenVoorOefeningen, MIN_PER_EXTRA_SET } from './trainingsTijd'
 import {
   RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS, MIN_FREQUENTIE, FACTOR, ALLEEN_PLAFOND, GEEN_DOEL,
-  SYNERGIST_GEWICHT, SYNERGISTEN_OP_NAAM, STIJGING_MIN, DALING_MIN, PLUS_PER_STAP, MAX_STAP, MIN_FRACTIE, LABEL_STATUS, LABEL_FASE,
+  SYNERGIST_GEWICHT, SYNERGISTEN_OP_NAAM, TREK, BOVEN_DRUK, HEUP, STIJGING_MIN, DALING_MIN, PLUS_PER_STAP, MAX_STAP, MIN_FRACTIE, LABEL_STATUS, LABEL_FASE,
 } from './volumeRegels'
 
 const rond = (v) => Math.round(v * 10) / 10
 const sleutel = (naam) => String(naam || '').trim().toLowerCase()
 
-// Synergisten van een oefening: bibliotheek eerst, anders op naam.
+// Synergisten van een oefening als [[spier, gewicht]]: bibliotheek eerst, anders op
+// naam. Het gewicht komt uit de naamregel als die er een heeft (been-compounds = 1),
+// ook als de spieren uit de bibliotheek komen.
 function synergistenVan(ex, secMap, primair) {
-  const uitBib = secMap?.[sleutel(ex.name)]
-  const ruw = Array.isArray(uitBib) && uitBib.length ? uitBib
-    : (SYNERGISTEN_OP_NAAM.find(([re]) => re.test(ex.name || ''))?.[1] || [])
-  return [...new Set(ruw.map(s => spierVan({ primairSpieren: s })))].filter(s => s !== primair && s !== 'onbekend')
+  const naam = ex.name || ''
+  const regel = SYNERGISTEN_OP_NAAM.find(([re]) => re.test(naam))
+  const gewicht = regel?.[2] ?? SYNERGIST_GEWICHT
+  const uitBib = secMap?.[sleutel(naam)]
+  const ruw = Array.isArray(uitBib) && uitBib.length ? uitBib : (regel?.[1] || [])
+  const fijn = (s) => {
+    const k = String(s).trim().toLowerCase()
+    if (k === 'shoulders' || k === 'delts') return TREK.test(naam) ? 'rear_delts' : BOVEN_DRUK.test(naam) ? 'side_delts' : 'front_delts'
+    if (k === 'legs') return HEUP.test(naam) ? 'hamstrings' : 'quads'
+    return spierVan({ primairSpieren: k })
+  }
+  const spieren = [...new Set(ruw.map(fijn))].filter(s => s !== primair && s !== 'onbekend')
+  // Volle telling alleen voor de spieren die de regel noemt (billen bij een squat),
+  // niet voor wat de bibliotheek er nog bij zet (bv. buik): die blijven half.
+  const vol = new Set((regel?.[1] || []).map(fijn))
+  return spieren.map(s => [s, vol.has(s) ? gewicht : SYNERGIST_GEWICHT])
 }
 
 // Fractionele sets per spier voor een lijst oefeningen: { spier: { frac, direct } }.
@@ -34,7 +48,7 @@ export function fractioneleSets(exercises = [], secMap = {}) {
     if (!sets) continue
     const p = spierVan(ex)
     bij(p, sets, sets)
-    for (const s of synergistenVan(ex, secMap, p)) bij(s, sets * SYNERGIST_GEWICHT, 0)
+    for (const [s, w] of synergistenVan(ex, secMap, p)) bij(s, sets * w, 0)
   }
   return t
 }
@@ -101,23 +115,29 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     const a = { spier, frac: rond(frac), direct, freq, hoogsteSessie: rond(hoogsteSessie), maxSessie, range, herstel: h, trend: t, oordeel: 'houden', tekst: '', redenen: [], actie: null }
 
     const redenTrend = t === 'stijgt' ? 'kracht stijgt' : t === 'stagneert' ? 'kracht staat 2 weken stil' : t === 'daalt' ? 'kracht daalt 2 weken' : null
-    const redenHerstel = h === 'groen' ? 'goed hersteld' : h === 'oranje' ? 'matig hersteld' : h === 'rood' ? 'niet hersteld of pijntje' : null
+    // Reden uit de herstelvraag zelf, niet uit de stip (die telt pijn ook mee).
+    const hv = herstel[spier]?.herstel?.[0]?.gevoel
+    const redenHerstel = hv === 'nee' ? 'goed hersteld' : hv === 'beetje' ? 'matig hersteld' : null
     if (redenHerstel) a.redenen.push(redenHerstel)
     if (redenTrend) a.redenen.push(redenTrend)
 
     // Pijntje bij een oefening ligt meestal aan die oefening (vooral borst), niet aan
-    // het volume: wissel de oefening, sets blijven staan (Kersten, 10 nov 2026).
+    // het volume. Pas bij 2 trainingen achter elkaar pijn: wisselen, sets blijven
+    // staan. Eén keer: alleen in de gaten houden (Kersten, 10 nov 2026).
     // Alleen echt niet hersteld (herstel 'ja') blijft een reden voor minder sets.
-    const pijnNamen = [...new Set((herstel[spier]?.oefeningen || []).filter(r => r.gevoel === 'pijn').map(r => sleutel(r.oefening)))]
-    const pijnInPlan = days.flatMap(d => (d.exercises || []).filter(ex => pijnNamen.includes(sleutel(ex.name))).map(ex => ({ d, ex })))
+    const pijnReeks = (herstel[spier]?.pijnReeks || []).map(sleutel)
+    const pijnEens = [...new Set((herstel[spier]?.oefeningen || []).filter(r => r.gevoel === 'pijn').map(r => r.oefening))].filter(n => !pijnReeks.includes(sleutel(n)))
+    const pijnInPlan = days.flatMap(d => (d.exercises || []).filter(ex => pijnReeks.includes(sleutel(ex.name))).map(ex => ({ d, ex })))
     const nietHersteld = herstel[spier]?.herstel?.[0]?.gevoel === 'ja'
+    a.redenen = a.redenen.filter(r => r !== 'niet hersteld of pijntje')
+    if (nietHersteld) a.redenen.unshift('niet hersteld')
+    if (pijnEens.length) a.redenen.push(`1x pijntje bij ${pijnEens.join(', ')}: in de gaten houden`)
 
-    if (pijnNamen.length && !nietHersteld) {
+    if (pijnReeks.length && !nietHersteld) {
       a.oordeel = 'let op'
-      a.redenen = a.redenen.filter(r => r !== 'niet hersteld of pijntje')
-      a.redenen.unshift('pijntje bij een oefening')
+      a.redenen.unshift('2 trainingen achter elkaar pijn')
       if (pijnInPlan.length) {
-        a.tekst = `Pijntje bij ${pijnInPlan[0].ex.name}: wissel die oefening, sets blijven gelijk.`
+        a.tekst = `2x achter elkaar pijn bij ${pijnInPlan[0].ex.name}: wissel die oefening, sets blijven gelijk.`
         a.actie = { soort: 'wissel' }
         a.wissel = pijnInPlan.map(({ d, ex }) => ({ dayId: d.id, exId: ex.id, naam: ex.name, dagNaam: d.name }))
       } else {
@@ -170,7 +190,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     if (range && hoogsteSessie > maxSessie) a.redenen.push(`${rond(hoogsteSessie)} sets in één training (max ${maxSessie})`)
 
     // Wat de knop doet.
-    if (a.actie?.soort === 'plus') a.wijzigingen = plusPlan(perDag, spier, a.actie.aantal, maxSessie, budget)
+    if (a.actie?.soort === 'plus') a.wijzigingen = plusPlan(perDag, spier, a.actie.aantal, maxSessie, budget, new Set([...pijnReeks, ...pijnEens.map(sleutel)]))
     if (a.actie?.soort === 'min') a.wijzigingen = minPlan(days, spier, a.actie.aantal)
     if (a.actie && a.actie.soort !== 'wissel' && !a.wijzigingen?.length) {
       if (a.actie.soort === 'plus') {
@@ -180,6 +200,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
       a.actie = null
     }
     a.context = `${LABEL_STATUS[status]} · ${LABEL_FASE[fase]}${plus40 ? ' · 40+' : ''}`
+    a.bronnen = bronnenVan(days, spier, secMap)
     uit[spier] = a
   }
   return uit
@@ -189,7 +210,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
 // het per-sessie plafond het toelaten. Liefst een dag die de spier nog niet traint
 // als hij onder de minimale frequentie zit; dat lukt alleen als er daar een oefening
 // van die spier staat, dus anders de laagste.
-function plusPlan(perDag, spier, aantal, maxSessie, budget) {
+function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set()) {
   const stand = perDag.map(p => ({ dag: p.dag, min: p.min, frac: p.sets[spier]?.frac || 0, oefs: (p.dag.exercises || []).map(ex => ({ ex, sets: Number(ex.sets) || 2 })) }))
   const wijz = []
   for (let i = 0; i < aantal; i++) {
@@ -197,7 +218,7 @@ function plusPlan(perDag, spier, aantal, maxSessie, budget) {
     for (const d of stand) {
       if (d.min + MIN_PER_EXTRA_SET > budget || d.frac + 1 > maxSessie) continue
       for (const o of d.oefs) {
-        if (o.ex.type === 'cardio' || spierVan(o.ex) !== spier) continue
+        if (o.ex.type === 'cardio' || spierVan(o.ex) !== spier || pijn.has(sleutel(o.ex.name))) continue // geen set erbij op een oefening met pijn
         if (!beste || o.sets < beste.o.sets || (o.sets === beste.o.sets && d.frac < beste.d.frac)) beste = { d, o }
       }
     }
@@ -220,6 +241,28 @@ function minPlan(days, spier, aantal) {
     wijz.push({ dayId: o.d.id, exId: o.ex.id, naam: o.ex.name, dagNaam: o.d.name, delta: -1 })
   }
   return samenvoegen(wijz)
+}
+
+// Welke oefeningen tellen mee voor deze spier: per oefening (zelfde naam samen) de
+// sets, het gewicht (1 = direct, 0,5 = via compound) en op welke dagen.
+function bronnenVan(days, spier, secMap) {
+  const m = new Map()
+  for (const d of days) {
+    for (const ex of d.exercises || []) {
+      if (ex.type === 'cardio') continue
+      const sets = Number(ex.sets) || 0
+      if (!sets) continue
+      const p = spierVan(ex)
+      const w = p === spier ? 1 : (synergistenVan(ex, secMap, p).find(([s]) => s === spier)?.[1] || 0)
+      if (!w) continue
+      const k = sleutel(ex.name)
+      const x = m.get(k) || { naam: ex.name, sets: 0, gewicht: w, dagen: [] }
+      x.sets += sets
+      if (d.name && !x.dagen.includes(d.name)) x.dagen.push(d.name)
+      m.set(k, x)
+    }
+  }
+  return [...m.values()].sort((a, b) => b.gewicht - a.gewicht || b.sets * b.gewicht - a.sets * a.gewicht)
 }
 
 function samenvoegen(wijz) {

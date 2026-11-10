@@ -14,9 +14,11 @@ import { spierVan, spierLabel } from '../spierGroepen'
 
 // Vaste kleur per spiergroep (kleur volgt de spier, niet de rang). Gecontroleerd
 // op zwart: alle 8 >= 3:1, kleurenblind-afstand >= 8,4 in deze volgorde.
+// Sinds de opsplitsing (10 nov 2026) zijn er meer dan 8 groepen: de 8 die het meest
+// bekeken worden krijgen een kleur, billen/kuiten/front delts/buik zijn grijs.
 const KLEUR = {
-  chest: '#3987e5', back: '#d95926', legs: '#199e70', shoulders: '#c98500',
-  biceps: '#d55181', glutes: '#008300', triceps: '#9085e9', calves: '#e66767',
+  chest: '#3987e5', back: '#d95926', quads: '#199e70', side_delts: '#c98500',
+  biceps: '#d55181', hamstrings: '#008300', triceps: '#9085e9', rear_delts: '#e66767',
 }
 const OVERIG = 'rgba(255,255,255,0.45)'
 const PERIODES = [[4, '4 wk'], [8, '8 wk'], [12, '12 wk'], [26, '6 mnd']]
