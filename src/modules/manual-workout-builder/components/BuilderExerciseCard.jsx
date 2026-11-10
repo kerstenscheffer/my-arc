@@ -8,6 +8,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
+import { LABEL as SPIER_LABEL, spierVan } from '../spierGroepen'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
 const _equipCache = { data: null, promise: null }
@@ -364,6 +365,23 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
             </>
           ) : (
             <>
+              {/* Naam en spiergroep zelf aanpassen (10 nov 2026): de bibliotheek
+                  zet soms de verkeerde spier (Calf extension stond op Chest). */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1.6, minWidth: 0 }}>
+                  <label style={label}>Naam</label>
+                  <input value={exercise.name ?? ''} onChange={(e) => onField('name', e.target.value)} placeholder="Naam van de oefening" style={input} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <label style={label}>Spiergroep</label>
+                  <select value={spierVan(exercise) === 'onbekend' ? '' : spierVan(exercise)} onChange={(e) => onField('primairSpieren', e.target.value)}
+                    style={{ ...input, colorScheme: 'dark', cursor: 'pointer' }}>
+                    <option value="">Kies…</option>
+                    {Object.entries(SPIER_LABEL).filter(([k]) => k !== 'onbekend').map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    {!SPIER_LABEL[spierVan(exercise)] && <option value={spierVan(exercise)}>{spierVan(exercise)}</option>}
+                  </select>
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.6rem' }}>
                 <div><label style={label}>Sets</label><input type="number" min={1} max={30} value={exercise.sets ?? 3} onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
                 <div><label style={label}>Reps</label><input value={exercise.reps ?? '10'} onChange={(e) => onField('reps', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>

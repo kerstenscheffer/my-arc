@@ -1055,7 +1055,38 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
         </div>
       )}
-      {!m && alleDagen && workoutPlan.days.length > 1 ? (
+      {!m && alleDagen && workoutPlan.days.length > 1 ? (<>
+        {/* Totaal van de hele week boven de kolommen (10 nov 2026). */}
+        {(() => {
+          const alle = workoutPlan.days.flatMap(d => d.exercises || [])
+          const kracht = alle.filter(ex => ex.type !== 'cardio')
+          const totaalMin = workoutPlan.days.reduce((n, d) => n + minutenVoorOefeningen(d.exercises || []), 0)
+          const cijfer = (v, l) => (
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
+              <b style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{v}</b>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l}</span>
+            </span>
+          )
+          return (
+            <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
+              <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.65rem 1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Week</span>
+                {cijfer(workoutPlan.days.length, 'dagen')}
+                {cijfer(totaalMin, 'min')}
+                {cijfer(kracht.length, 'oef')}
+                {cijfer(kracht.reduce((n, ex) => n + (Number(ex.sets) || 0), 0), 'sets')}
+                <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+                  {setsPerSpierDag(alle).map(([k, n]) => (
+                    <span key={k} style={{ fontSize: '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
+                      {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            </div>
+          )
+        })()}
         <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {workoutPlan.days.map((dag, i) => (
@@ -1108,7 +1139,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             ))}
           </div>
         </div>
-      ) : (
+      </>) : (
       <div style={m
         ? { paddingBottom: 120 }
         : { flex: 1, minHeight: 0, overflow: 'hidden' }}>
