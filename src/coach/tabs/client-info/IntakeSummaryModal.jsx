@@ -116,7 +116,7 @@ const isEmpty = (v) =>
 
 const N = {
   // Zelfde woorden als de klant in de intake zag (PracticalFlow GUIDANCE_OPTIONS).
-  guidance: { strict: 'Coach bouwt alles voor me', flexible: 'Plan met targets', free: 'Alleen richtlijnen' },
+  guidance: { strict: 'Strak voedingsplan', flexible: 'Plan met targets en flexibiliteit', free: 'Alleen richtlijnen' },
   budget: { '30-40': '€30–40 p/w', '40-60': '€40–60 p/w', '60-80': '€60–80 p/w', '80+': '€80+ p/w' },
   cooking: { graag: 'Kookt graag', neutraal: 'Neutraal', niet_graag: 'Kookt niet graag' },
   diet: { geen: 'Geen', vegetarisch: 'Vegetarisch', veganistisch: 'Veganistisch', halal: 'Halal', pescotarisch: 'Pescotarisch' },
@@ -167,6 +167,13 @@ function flattenNp(np) {
   put('intake_macros_kennis', pi.macros_kennis)
   put('intake_calorieen_geteld', pi.calorieen_geteld)
   put('intake_plan_gevolgd', pi.plan_gevolgd)
+  // Variatie per maaltijd → direct de planstructuur (1 / 2 / 7 gerechten).
+  if (pi.variatie_per_maaltijd) {
+    const tekst = { vast: 'Vast: 1 gerecht, elke dag hetzelfde', afwisselen: 'Afwisselen: 2 gerechten om en om', variatie: 'Variatie: 7 gerechten, elke dag anders' }
+    const naam = { ontbijt: 'Ontbijt', lunch: 'Lunch', diner: 'Avondeten', snack: 'Snacks' }
+    put('intake_variatie', Object.entries(pi.variatie_per_maaltijd)
+      .map(([k, v]) => `${naam[k] || k}: ${tekst[v] || v}`).join('\n') || null)
+  }
   put('intake_supps', sp.openness)
   put('intake_supps_huidige', sp.huidige)
   put('intake_wat_werkt_goed', np.wat_werkt_goed)
@@ -426,7 +433,8 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_macros_kennis', label: "Kent macro's", fmt: fmtMap(N.jbn) },
       { key: 'intake_calorieen_geteld', label: 'Ooit calorieën geteld', fmt: fmtMap(N.jsn) },
-      { key: 'intake_plan_gevolgd', label: 'Eerder voedingsplan gevolgd', fmt: fmtMap(N.jn) }
+      { key: 'intake_plan_gevolgd', label: 'Eerder voedingsplan gevolgd', fmt: fmtMap(N.jn) },
+      { key: 'intake_variatie', label: 'Variatie per maaltijd', alleenIngevuld: true }
     ]
   },
   {
@@ -549,7 +557,8 @@ const VRAGEN = {
   intake_nu_lunch: 'Wat eet je meestal als lunch?',
   intake_nu_diner: 'Wat eet je meestal als avondeten?',
   intake_nu_snack: 'Wat snack je meestal tussendoor?',
-  intake_eerder_geprobeerd: 'Wat heb je al geprobeerd met je voeding?',
+  intake_variatie: 'Hoeveel variatie wil je per maaltijd?',
+  intake_eerder_geprobeerd: 'Wat heb je al geprobeerd met je voeding om je doel te bereiken?',
   intake_ontbijt: 'Ontbijt: wat eet je of vind je lekker?',
   intake_lunch: 'Lunch: wat eet je of vind je lekker?',
   intake_diner: 'Avondeten: wat eet je of vind je lekker?',

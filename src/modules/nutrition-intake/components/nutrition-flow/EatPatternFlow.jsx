@@ -602,15 +602,18 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
         ))}
       </div>
       {data.wat_werkte === 'ja' && (
-        <div style={{ marginBottom: '0.5rem' }}>
-          <input type="text" placeholder="Wat deed je toen?"
+        <div style={{ margin: '0.6rem 0 0.7rem' }}>
+          <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.45rem' }}>Wat deed je toen?</div>
+          <input type="text" placeholder="Bijv: elke dag mijn eten bijgehouden, veel eiwit, geen snoep door de week"
             value={data.wat_werkte_toelichting || ''}
             onChange={e => update('wat_werkte_toelichting', e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.2)', borderLeft: '2px solid rgba(255,255,255,0.4)', borderRadius: '0 8px 8px 0', color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontFamily: 'inherit', outline: 'none' }}
+            autoFocus
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 48, padding: isMobile ? '0.75rem 0.9rem' : '0.8rem 1rem', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 14, color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 600, fontFamily: 'inherit', outline: 'none' }}
           />
         </div>
       )}
-      <NextBtn onClick={onNext} disabled={!data.wat_werkte} isMobile={isMobile} onBack={goBack} />
+      {/* Bij "ja" is "Wat deed je toen?" verplicht (10 nov 2026). */}
+      <NextBtn onClick={onNext} disabled={!data.wat_werkte || (data.wat_werkte === 'ja' && !(data.wat_werkte_toelichting || '').trim())} isMobile={isMobile} onBack={goBack} />
     </div>
   )
 

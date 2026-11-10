@@ -135,6 +135,16 @@ function mapToNutritionPreferences(flowData) {
       macros_kennis:    flowData.macros_kennis    || null,
       calorieen_geteld: flowData.calorieen_geteld || null,
       plan_gevolgd:     flowData.plan_gevolgd     || null,
+      // Variatie per maaltijd: vast (1 gerecht) / afwisselen (2, A/B) /
+      // variatie (7). Zie VARIATIE_OPTIES in PracticalFlow.
+      variatie_per_maaltijd: flowData.variatie_per_maaltijd || null,
+      // Oude veld (clients.variety_preference via IntakeFlowService) alleen
+      // als alle maaltijden hetzelfde zijn: dan klopt één woord nog.
+      ...(() => {
+        const v = Object.values(flowData.variatie_per_maaltijd || {})
+        const map = { vast: 'repetitive', afwisselen: 'abab', variatie: 'varied' }
+        return v.length && v.every(x => x === v[0]) ? { variety_preference: map[v[0]] } : {}
+      })(),
     },
   }
 }

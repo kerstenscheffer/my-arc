@@ -733,7 +733,7 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
         <>
           {/* Wat is er al geprobeerd: voorkomt dat je iets voorstelt dat
               vorig jaar al is mislukt. */}
-          <Q isMobile={isMobile}>Wat heb je al geprobeerd met je voeding?</Q>
+          <Q isMobile={isMobile}>Wat heb je al geprobeerd met je voeding om je doel te bereiken?</Q>
           <Hint isMobile={isMobile}>Diëten, apps, periodes waarin het lukte of juist niet. Nog nooit iets geprobeerd? Schrijf dat dan op.</Hint>
           <textarea
             value={data.eerder_geprobeerd || ''}
