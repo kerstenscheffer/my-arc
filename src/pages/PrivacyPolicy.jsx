@@ -68,7 +68,7 @@ export default function PrivacyPolicy() {
             <li><strong>Identiteitsgegevens</strong> — naam, e-mailadres, geboortedatum</li>
             <li><strong>Lichaamsgegevens</strong> — gewicht, lengte, vetpercentage, voortgangs­foto's</li>
             <li><strong>Gezondheid &amp; fitness</strong> — calorie- en macrodoelen, voedingslog, trainingsdata, workouts</li>
-            <li><strong>Stappen uit je telefoon</strong> — alleen als je de koppeling met Apple Health (iPhone) of Health Connect (Android) zelf aanzet</li>
+            <li><strong>Stappen, slaap en hartslag uit je telefoon</strong> — alleen als je de koppeling met Apple Health (iPhone) of Health Connect (Android) zelf aanzet</li>
             <li><strong>Communicatie</strong> — berichten tussen coach en cliënt binnen het platform</li>
             <li><strong>Gebruiksgegevens</strong> — inlogtijden, app-activiteit</li>
           </ul>
@@ -98,16 +98,16 @@ export default function PrivacyPolicy() {
             zet je zelf aan en je kunt hem op elk moment weer uitzetten.
           </p>
           <ul>
-            <li><strong>Wat we lezen</strong> — uitsluitend je dagelijkse aantal stappen. Niets anders: geen hartslag, geen slaap, geen locatie, geen work-outs uit andere apps.</li>
-            <li><strong>Waarvoor</strong> — om je stappen naast je trainingen en je gewicht te tonen, zodat jij en je coach zien hoe actief je week was.</li>
+            <li><strong>Wat we lezen</strong> — uitsluitend je dagelijkse aantal stappen, je slaap (duur, bedtijd, opstaan en slaapfases), je rusthartslag en je hartslagvariatie (HRV). Dat kan ook komen van een horloge (zoals Garmin of Apple Watch) dat naar Apple Health of Health Connect schrijft. Niets anders: geen locatie, geen routes, geen work-outs uit andere apps.</li>
+            <li><strong>Waarvoor</strong> — om je stappen, slaap en herstel naast je trainingen en je gewicht te tonen, zodat jij en je coach zien hoe actief je week was en hoe je herstelt.</li>
             <li><strong>Wat we schrijven</strong> — niets. De app schrijft geen enkele waarde terug naar Apple Health of Health Connect.</li>
-            <li><strong>Waar het terechtkomt</strong> — het aantal stappen per dag wordt opgeslagen in je eigen profiel in onze database, zichtbaar voor jou en je coach.</li>
+            <li><strong>Waar het terechtkomt</strong> — deze waarden worden per dag opgeslagen in je eigen profiel in onze database, zichtbaar voor jou en je coach.</li>
             <li><strong>Nooit voor advertenties</strong> — deze gegevens worden niet gedeeld met derden, niet verkocht en niet gebruikt voor reclame of profilering.</li>
           </ul>
           <p>
             Intrekken kan altijd: op een iPhone via Instellingen → Privacy &amp; beveiliging → Health → MY ARC,
             op Android via de app Health Connect → App-rechten. Daarna stopt het ophalen direct. Je eerder
-            opgeslagen stappen verwijder je door je account te verwijderen, of door je coach te vragen ze te wissen.
+            opgeslagen gegevens verwijder je door je account te verwijderen, of door je coach te vragen ze te wissen.
           </p>
         </Section>
 

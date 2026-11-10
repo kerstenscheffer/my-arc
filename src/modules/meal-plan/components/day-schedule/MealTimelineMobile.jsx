@@ -221,7 +221,7 @@ export default function MealTimelineMobile({
               </div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0.8rem' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{p.label}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{klok(p.min)} · nog niets gepland</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{klok(p.min)} · {p.sub || 'nog niets gepland'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', paddingRight: '0.9rem', color: '#fff' }}>
                 <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

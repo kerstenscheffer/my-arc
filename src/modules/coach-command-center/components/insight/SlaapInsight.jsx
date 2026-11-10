@@ -12,6 +12,11 @@
 // log_date is de ochtend waarop de klant wakker werd; de nacht ervoor hoort
 // erbij. Daarom staat elke nacht als "zo 18 → ma 19 okt". Tik een staafje
 // voor die nacht; de lijst eronder toont alle gelogde nachten met bedtijd.
+//
+// Horloge (10 nov 2026): heeft de klant een Garmin, Apple Watch e.d. die naar
+// Apple Health / Health Connect schrijft, dan vult de app de uren zelf
+// (sleep_logs.bron 'telefoon') en staan slaapfases, rusthartslag en HRV in
+// client_gezondheid_dagen. Die tonen we erbij.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Moon, ChevronDown } from 'lucide-react'
@@ -70,12 +75,21 @@ export default function SlaapInsight({ db, client, isMobile }) {
     const vanaf = new Date()
     vanaf.setDate(vanaf.getDate() - (NACHTEN - 1))
     const vanafIso = lokaalIso(vanaf)
-    const { data, error } = await db.supabase
-      .from('sleep_logs')
-      .select('log_date, hours_slept, quality, struggles, notes, bedtime, wake_time')
-      .eq('client_id', client.id)
-      .gte('log_date', vanafIso)
-      .order('log_date', { ascending: true })
+    const [{ data, error }, { data: horloge }] = await Promise.all([
+      db.supabase
+        .from('sleep_logs')
+        .select('log_date, hours_slept, quality, struggles, notes, bedtime, wake_time, bron')
+        .eq('client_id', client.id)
+        .gte('log_date', vanafIso)
+        .order('log_date', { ascending: true }),
+      db.supabase
+        .from('client_gezondheid_dagen')
+        .select('datum, slaap_diep, slaap_rem, rust_hartslag, hrv')
+        .eq('client_id', client.id)
+        .gte('datum', vanafIso)
+        .then(r => r, () => ({ data: [] })),
+    ])
+    const horlogePerDag = new Map((horloge || []).map(r => [String(r.datum).slice(0, 10), r]))
     if (error) { console.error('Slaap laden mislukt:', error); setLaden(false); return }
 
     // Elke dag een plek, ook de nachten zonder log — een gat is hier
@@ -87,7 +101,13 @@ export default function SlaapInsight({ db, client, isMobile }) {
       d.setDate(d.getDate() - i)
       const iso = lokaalIso(d)
       const rij = perDag.get(iso)
+      const h = horlogePerDag.get(iso)
       lijst.push({
+        horloge: rij?.bron === 'telefoon',
+        diep: h?.slaap_diep || null,
+        rem: h?.slaap_rem || null,
+        rust: h?.rust_hartslag != null ? Number(h.rust_hartslag) : null,
+        hrv: h?.hrv != null ? Number(h.hrv) : null,
         iso,
         uren: rij?.hours_slept != null ? Number(rij.hours_slept) : null,
         cijfer: rij?.quality != null ? Number(rij.quality) : null,
@@ -119,6 +139,10 @@ export default function SlaapInsight({ db, client, isMobile }) {
   const onder7 = gelogd.filter(n => n.uren < 7).length
   // Standaard de laatst gelogde nacht in beeld.
   const actief = nachten.find(n => n.iso === gekozen) || [...gelogd].pop()
+  const gem = (lijst) => (lijst.length ? Math.round(lijst.reduce((a, b) => a + b, 0) / lijst.length) : null)
+  const gemRust = gem(nachten.map(n => n.rust).filter(v => v != null))
+  const gemHrv = gem(nachten.map(n => n.hrv).filter(v => v != null))
+  const viaHorloge = gelogd.filter(n => n.horloge).length
   const zwak = 'rgba(255,255,255,0.4)'
 
   return (
@@ -144,6 +168,13 @@ export default function SlaapInsight({ db, client, isMobile }) {
             {(gemBed || gemOp) ? ' · ' : ''}{onder7} {onder7 === 1 ? 'nacht' : 'nachten'} onder 7 uur
             {kortste ? ` · kortst ${uurTekst(kortste.uren)} (${nachtLabel(kortste.iso)})` : ''}
           </div>
+          {(viaHorloge > 0 || gemRust != null || gemHrv != null) && (
+            <div style={{ fontSize: '0.64rem', fontWeight: 700, color: zwak, marginTop: 1 }}>
+              Horloge{viaHorloge > 0 ? `: ${viaHorloge} ${viaHorloge === 1 ? 'nacht' : 'nachten'} automatisch` : ''}
+              {gemRust != null ? ` · rusthartslag ±${gemRust}` : ''}
+              {gemHrv != null ? ` · HRV ±${gemHrv} ms` : ''}
+            </div>
+          )}
         </div>
       </div>
 
@@ -216,6 +247,17 @@ function NachtRegel({ n, vet = false }) {
         <span style={{ color: '#fff' }}>{uurTekst(n.uren)}</span>
         {n.cijfer != null && <span style={{ color: kleurVoorCijfer(n.cijfer) }}>{n.cijfer}/10</span>}
       </div>
+      {(n.diep || n.rem || n.rust != null || n.hrv != null || n.horloge) && (
+        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
+          {[
+            n.horloge ? 'horloge' : null,
+            n.diep ? `diep ${uurTekst(Math.round((n.diep / 60) * 10) / 10)}` : null,
+            n.rem ? `REM ${uurTekst(Math.round((n.rem / 60) * 10) / 10)}` : null,
+            n.rust != null ? `rust-HR ${Math.round(n.rust)}` : null,
+            n.hrv != null ? `HRV ${Math.round(n.hrv)} ms` : null,
+          ].filter(Boolean).join(' · ')}
+        </div>
+      )}
       {n.tekst && (
         <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 1 }}>{n.tekst}</div>
       )}

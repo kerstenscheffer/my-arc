@@ -109,13 +109,24 @@ async function laadPeriode(van, tot, beperkt = false) {
       klaar: c.stand === 'gepost',
     })
   })
-  ;(ta.data || []).forEach(t => items.push({
-    id: `t${t.id}`, soort: 'taak', dag: t.scheduled_date || t.deadline, tijd: null,
-    titel: t.title, sub: t.deadline && t.deadline !== t.scheduled_date ? 'deadline' : null,
-  }))
+  // Taak met begintijd = blok van begin tot eind (10 nov 2026); zonder tijd blijft hij los in de dagkop.
+  ;(ta.data || []).forEach(t => {
+    const start = tijdMin(t.scheduled_start_time)
+    const eind = tijdMin(t.scheduled_end_time)
+    const getimed = start != null && !!t.scheduled_date
+    items.push({
+      id: `t${t.id}`, soort: 'taak', dag: t.scheduled_date || t.deadline,
+      tijd: getimed ? String(t.scheduled_start_time).slice(0, 5) : null,
+      startMin: getimed ? start : null,
+      eindMin: getimed ? (eind != null && eind > start ? eind : Math.min(24 * 60, start + (Number(t.estimated_minutes) > 0 ? Number(t.estimated_minutes) : 30))) : null,
+      kleur: t.color || null,
+      titel: t.title, sub: t.deadline && t.deadline !== t.scheduled_date ? 'deadline' : null,
+    })
+  })
+  // Herinnering = moment, geen blok: de week tekent hem als dunne lijn.
   ;(he.data || []).forEach(h => items.push({
     id: `h${h.id}`, soort: 'herinnering', dag: nlDag(h.moment), tijd: nlTijd(h.moment), titel: h.tekst,
-    startMin: nlMin(h.moment), eindMin: nlMin(h.moment) + 15,
+    startMin: nlMin(h.moment), eindMin: nlMin(h.moment),
   }))
   return items
 }

@@ -440,7 +440,23 @@ export default function AIDaySchedule({
   // Snack telt als er een snack-moment is; pre-workout alleen op een
   // trainingsdag zonder pre-workout.
   const legeMomenten = (() => {
-    if (isFreeMode || alleenKijken || !activePlan?.week_structure) return []
+    // Vrij loggen (10 nov 2026): dezelfde lege kaarten voor ontbijt, lunch,
+    // snack en diner, zolang er voor dat moment nog niets gelogd is. Zo zie
+    // je ook zonder plan in één oogopslag dat je avondeten nog mist.
+    if (isFreeMode) {
+      if (alleenKijken) return []
+      const gelogd = (zoek) => (consumedMeals || []).some(m => {
+        const t = String(m.meal_type || '')
+        return zoek === 'snack' ? t.startsWith('snack') : t === zoek
+      })
+      return [
+        { slot: 'breakfast', label: 'Ontbijt', min: 8 * 60, zoek: 'breakfast', moment: 'breakfast' },
+        { slot: 'lunch', label: 'Lunch', min: 12 * 60 + 30, zoek: 'lunch', moment: 'lunch' },
+        { slot: 'snack1', label: 'Snack', min: 15 * 60, zoek: 'snack', moment: 'snack' },
+        { slot: 'dinner', label: 'Diner', min: 18 * 60 + 30, zoek: 'dinner', moment: 'dinner' },
+      ].filter(p => !gelogd(p.zoek)).map(p => ({ ...p, sub: 'nog niets gelogd' }))
+    }
+    if (alleenKijken || !activePlan?.week_structure) return []
     const dagSleutel = daysOfWeek[currentDay]?.key
     const heeft = (slot) => displayMeals.some(m => slot === 'snack' ? String(m.slot || '').startsWith('snack') : m.slot === slot)
     const lijst = [
@@ -766,7 +782,12 @@ export default function AIDaySchedule({
           legeMomenten={legeMomenten}
           onSupplementToevoegen={alleenKijken || isFreeMode ? null : supplementToevoegen}
           onSupplementVerwijderen={alleenKijken ? null : supplementVerwijderen}
-          onVoegToe={alleenKijken ? null : (plek) => onOpenAlternatives?.({
+          onVoegToe={alleenKijken ? null : isFreeMode ? (plek) => {
+            // Vrij loggen: meteen het logscherm op dat moment.
+            setEditingMeal(null)
+            setDefaultMealMoment(plek.moment || null)
+            setShowFoodLog(true)
+          } : (plek) => onOpenAlternatives?.({
             slot: plek.slot, _leeg: true, name: plek.label, display_label: plek.label,
             calories: 0, protein: 0, carbs: 0, fat: 0, timing: null,
           })}

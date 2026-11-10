@@ -8,6 +8,7 @@
 // niets te weten van de stappen-pil die ergens op een pagina staat.
 
 import StappenService, { vandaagIso } from './StappenService'
+import { syncGezondheid } from './gezondheid'
 import { stappenBijOpstart, stappenVanVandaag, stappenPerDag, isGekoppeld, stappenStatus, platform, isNative, laatsteBronnenVandaag } from './telefoonStappen'
 
 export const STAPPEN_EVENT = 'myarc:stappen-bijgewerkt'
@@ -41,6 +42,10 @@ export async function syncStappen(db, clientId, { bijOpstart = false } = {}) {
     // Pas ná het uitlezen: de eerste keer staat hierboven nog het
     // toestemmingsscherm open, en dan zou de status 'geweigerd' zijn.
     if (bijOpstart) meldStappenStatus(db, clientId)
+    // Slaap, rust-HR en HRV (horloge via Apple Health / Health Connect). Pas
+    // na het uitlezen hierboven: dan is de toestemmingsvraag al beantwoord.
+    // Niet afwachten; alleen de nieuwe app-build kan dit.
+    syncGezondheid(db, clientId, { bijOpstart })
     if (n == null) return null
     await StappenService.bewaar(db, clientId, n, { source: 'telefoon', bronnen: laatsteBronnenVandaag() })
     window.dispatchEvent(new CustomEvent(STAPPEN_EVENT, { detail: { steps: n } }))
