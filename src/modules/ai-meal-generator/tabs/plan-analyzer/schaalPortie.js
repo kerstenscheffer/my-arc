@@ -49,7 +49,20 @@ export function schaalMaaltijd(meal, factor, ingredienten) {
       ...(meal.fiber != null ? { fiber: r1((Number(meal.fiber) || 0) * factor) } : {}),
     }
   }
-  let kcal = 0, eiwit = 0, kh = 0, vet = 0, vezel = 0
+  // Macro's van de ingrediënten vóór en na het schalen. De opgeslagen macro's
+  // van de maaltijd wijken soms af van deze som (oudere maaltijden); we
+  // schalen ze daarom met de verhouding nieuw/oud, zodat +10% ook echt
+  // ongeveer 10% meer is van wat de coach op de kaart ziet.
+  const som = (items) => items.reduce((t, item) => {
+    const ing = ingredienten.get(item.ingredient_id)
+    const f = (Number(item.amount) || 0) / 100
+    t.kcal += (Number(ing.calories_per_100g) || 0) * f
+    t.eiwit += (Number(ing.protein_per_100g) || 0) * f
+    t.kh += (Number(ing.carbs_per_100g) || 0) * f
+    t.vet += (Number(ing.fat_per_100g) || 0) * f
+    t.vezel += (Number(ing.fiber_per_100g) || 0) * f
+    return t
+  }, { kcal: 0, eiwit: 0, kh: 0, vet: 0, vezel: 0 })
   const nieuw = lijst.map(item => {
     const ing = ingredienten.get(item.ingredient_id)
     let gram = Number(item.amount) || 0
@@ -60,18 +73,19 @@ export function schaalMaaltijd(meal, factor, ingredienten) {
       if (ing.min_portion_gram) gram = Math.max(Number(ing.min_portion_gram), gram)
       if (ing.max_portion_gram) gram = Math.min(Number(ing.max_portion_gram), gram)
     }
-    const f = gram / 100
-    kcal += (Number(ing.calories_per_100g) || 0) * f
-    eiwit += (Number(ing.protein_per_100g) || 0) * f
-    kh += (Number(ing.carbs_per_100g) || 0) * f
-    vet += (Number(ing.fat_per_100g) || 0) * f
-    vezel += (Number(ing.fiber_per_100g) || 0) * f
     return { ...item, amount: gram }
   })
+  const oud = som(lijst)
+  const na = som(nieuw)
+  // Opgeslagen waarde × (na / voor); zonder bruikbare 'voor' de factor zelf.
+  const verh = (k) => (oud[k] > 0 ? na[k] / oud[k] : factor)
   return {
     ...meal, ...origineel,
     ingredients_list: nieuw,
-    calories: Math.round(kcal), protein: r1(eiwit), carbs: r1(kh), fat: r1(vet),
-    ...(vezel > 0 || meal.fiber != null ? { fiber: r1(vezel) } : {}),
+    calories: Math.round((Number(meal.calories) || 0) * verh('kcal')),
+    protein: r1((Number(meal.protein) || 0) * verh('eiwit')),
+    carbs: r1((Number(meal.carbs) || 0) * verh('kh')),
+    fat: r1((Number(meal.fat) || 0) * verh('vet')),
+    ...(meal.fiber != null ? { fiber: r1((Number(meal.fiber) || 0) * verh('vezel')) } : {}),
   }
 }

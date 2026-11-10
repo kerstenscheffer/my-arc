@@ -149,7 +149,7 @@ export default function WeekKolommen({
                       }}>
                       <div style={{ width: 34, flexShrink: 0, backgroundImage: `url(${meal.image_url || foodImageFallback(meal.name, slot, 120)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                       <div style={{ flex: 1, minWidth: 0, padding: '0.3rem 0' }}>
-                        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label} · {tijd}</div>
+                        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tijd ? `${label} · ${tijd}` : label}</div>
                         <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meal.name || 'Maaltijd'}</div>
                         <div style={{ ...getallen, fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 1, whiteSpace: 'nowrap' }}>
                           {nl(meal.calories)} · E{nl(meal.protein)} K{nl(meal.carbs)} V{nl(meal.fat)}

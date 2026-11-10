@@ -23,7 +23,7 @@ const getal = (v) => Number(v) || 0
 const tijdVan = (meal, slot, standaard) => {
   const t = meal?.timing
   if (typeof t === 'string' && /^\d{1,2}:\d{2}/.test(t)) return t.slice(0, 5).padStart(5, '0')
-  return standaard[slot] || '12:00'
+  return standaard[slot] || null   // geen kloktijd (bv. de losse pre-workout): bovenaan, zonder tijd
 }
 
 export const pctKleur = (pct) => {
@@ -45,7 +45,7 @@ export function dagCijfers(weekData, { preWorkoutMeal = null, isTraining = () =>
     if (preWorkoutMeal && training && !dag?.meals?.[PRE_WORKOUT_SLOT]) {
       maaltijden.push({ slot: PRE_WORKOUT_SLOT, meal: preWorkoutMeal, tijd: tijdVan(preWorkoutMeal, PRE_WORKOUT_SLOT, standaardTijden), los: true })
     }
-    maaltijden.sort((a, b) => a.tijd.localeCompare(b.tijd))
+    maaltijden.sort((a, b) => (a.tijd || '').localeCompare(b.tijd || ''))
     const t = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
     maaltijden.forEach(({ meal }) => {
       t.kcal += getal(meal.calories)
@@ -105,11 +105,11 @@ export function weekSignalen(dagen, targets = {}) {
     if (gemR > gemT + 10) uit.push({ ernst: 'oranje', tekst: `Rustdagen hebben meer koolhydraten (${Math.round(gemR)} g) dan trainingsdagen (${Math.round(gemT)} g)`, dagen: rust.map(d => d.index) })
   }
 
-  // 4. Variatie: dezelfde maaltijd heel vaak in de week (de vaste
-  //    ontbijt-kwark is prima, dus pas vanaf 6×, en alleen grotere maaltijden).
+  // 4. Variatie: dezelfde hoofdmaaltijd heel vaak in de week. Een vast
+  //    ontbijt of tussendoortje is prima, dus pas vanaf 6× en vanaf 400 kcal.
   const telling = new Map()
   metEten.forEach(dag => dag.maaltijden.forEach(({ meal, los }) => {
-    if (los || getal(meal.calories) < 300) return
+    if (los || getal(meal.calories) < 400) return
     const sleutel = meal.meal_id || meal.id || meal.name
     if (!sleutel) return
     const t = telling.get(sleutel) || { naam: meal.name || 'Maaltijd', dagen: new Set() }
