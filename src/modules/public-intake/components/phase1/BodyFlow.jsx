@@ -7,11 +7,11 @@ import VetpercentageFoto from '../../../../components/vetpercentage/Vetpercentag
 
 // Foto's komen uit components/vetpercentage/fotos.js (gedeeld met de calculator).
 const BF_OPTIONS_MALE = [
-  { value: 10, label: '7–10%',  sub: 'Competitie, aderen zichtbaar' },
-  { value: 14, label: '10–15%', sub: 'Duidelijke sixpack, atletisch' },
-  { value: 18, label: '15–20%', sub: 'Slank, weinig definitie' },
-  { value: 23, label: '20–25%', sub: 'Gemiddeld, geen abs' },
-  { value: 33, label: '25–35%', sub: 'Duidelijk buikje' }
+  { value: 10, label: '7 tot 10%',  sub: 'Competitie, aderen zichtbaar' },
+  { value: 14, label: '10 tot 15%', sub: 'Duidelijke sixpack, atletisch' },
+  { value: 18, label: '15 tot 20%', sub: 'Slank, weinig definitie' },
+  { value: 23, label: '20 tot 25%', sub: 'Gemiddeld, geen abs' },
+  { value: 33, label: '25 tot 35%', sub: 'Duidelijk buikje' }
 ]
 
 export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
@@ -166,7 +166,7 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
 
           {data.current_body_fat && data.current_body_fat_2 && (
             <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600, textAlign: 'center' }}>
-              Tussenin — we rekenen met ~{Math.round((data.current_body_fat + data.current_body_fat_2) / 2)}%
+              Tussenin, we rekenen met ~{Math.round((data.current_body_fat + data.current_body_fat_2) / 2)}%
             </div>
           )}
 

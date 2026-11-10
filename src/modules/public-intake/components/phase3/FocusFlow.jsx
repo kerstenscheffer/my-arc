@@ -7,7 +7,7 @@ const FOCUS_OPTIONS = [
   { value: 'hypertrophy', label: 'Spieren opbouwen',    sub: 'Groter en voller worden',         img: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=300&h=200&fit=crop&q=80' },
   { value: 'conditioning',label: 'Conditie',            sub: 'Fitter, meer uithoudingsvermogen',img: 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=300&h=200&fit=crop&q=80' },
   { value: 'fat_loss',    label: 'Afvallen',            sub: 'Vet verbranden, strakker worden', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=200&fit=crop&q=80' },
-  { value: 'mix',         label: 'Alles uitbalanceren', sub: 'Geen specifiek doel — gewoon fit', img: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=300&h=200&fit=crop&q=80' },
+  { value: 'mix',         label: 'Alles uitbalanceren', sub: 'Geen specifiek doel, gewoon fit', img: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=300&h=200&fit=crop&q=80' },
 ]
 
 const STRETCH_OPTIONS = [

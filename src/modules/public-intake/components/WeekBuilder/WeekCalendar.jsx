@@ -149,7 +149,7 @@ export default function WeekCalendar({ schedule, isMobile, highlightDays = [] })
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
                       }}>
-                        {t.label}
+                        {block.label || t.label}
                       </div>
                     )}
                     {h > 14 && (
@@ -160,7 +160,7 @@ export default function WeekCalendar({ schedule, isMobile, highlightDays = [] })
                         lineHeight: 1.2,
                         whiteSpace: 'nowrap'
                       }}>
-                        {block.start}–{block.end}
+                        {block.start} tot {block.end}
                       </div>
                     )}
                   </div>

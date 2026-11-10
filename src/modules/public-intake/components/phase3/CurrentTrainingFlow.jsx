@@ -12,7 +12,7 @@ const SPLIT_OPTIONS_SIMPLE = [
 
 const SPLIT_OPTIONS_ADVANCED = [
   { value: 'full_body',     label: 'Full body',          sub: 'Heel lichaam elke training' },
-  { value: 'ppl',           label: 'Push-Pull-Legs',     sub: '3 of 6 dagen — duw, trek, benen' },
+  { value: 'ppl',           label: 'Push-Pull-Legs',     sub: '3 of 6 dagen: duw, trek, benen' },
   { value: 'upper_lower',   label: 'Upper-Lower',        sub: 'Boven- en onderlichaam afwisselen' },
   { value: 'bro_split',     label: 'Bro split',          sub: '1 spiergroep per dag' },
   { value: 'no_preference', label: 'Coach bepaalt',      sub: 'Ik heb geen voorkeur' },

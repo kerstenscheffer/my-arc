@@ -97,12 +97,12 @@ function BigOption({ label, sub, onClick, selected, isMobile }) {
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       transition: 'all 0.15s ease'
     }}>
-      <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${selected ? '#fff' : 'rgba(255,255,255,0.15)'}`, background: selected ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {selected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000' }} />}
+      <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${selected ? '#000' : 'rgba(255,255,255,0.15)'}`, background: selected ? '#000' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {selected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff' }} />}
       </div>
       <div>
-        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: selected ? '#fff' : 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{label}</div>
-        {sub && <div style={{ fontSize: isMobile ? '0.65rem' : '0.68rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: '0.2rem' }}>{sub}</div>}
+        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: selected ? '#000' : 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{label}</div>
+        {sub && <div style={{ fontSize: isMobile ? '0.65rem' : '0.68rem', color: selected ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: '0.2rem' }}>{sub}</div>}
       </div>
     </button>
   )
@@ -184,7 +184,7 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
       )}
       {value && value2 && (
         <div style={{ fontSize: isMobile ? '0.72rem' : '0.76rem', color: '#10b981', fontWeight: 800 }}>
-          ✓ {value} – {value2}
+          ✓ {value} tot {value2}
         </div>
       )}
       <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
@@ -365,11 +365,18 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         blocks.push({ type: 'training', start: trainingTime, end: endTime })
       }
 
+      // Eigen blokken (yoga, fysio...) direct mee, zodat ze meteen in de
+      // agenda verschijnen. type 'anders' zodat bestaande lezers (agenda,
+      // intake-modal) er niet over struikelen.
+      ;(eigenBlokken || []).forEach(b => {
+        if (b?.dag === day && b.start && b.eind) blocks.push({ type: 'anders', label: b.naam, start: b.start, end: b.eind })
+      })
+
       blocks.sort((a, b) => !a.start ? 1 : !b.start ? -1 : a.start.localeCompare(b.start))
       result[day] = blocks
     })
     return result
-  }, [sleepTime, wakeTime, weekendDiff, sleepWknd, wakeWknd, savedJobs, jobGroups, trainingDays, trainingTime])
+  }, [sleepTime, wakeTime, weekendDiff, sleepWknd, wakeWknd, savedJobs, jobGroups, trainingDays, trainingTime, eigenBlokken])
 
   const handleFinish = () => {
     const week_schedule = buildSchedule()
@@ -390,20 +397,10 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
       .map(id => WORK_TYPES.find(w => w.id === id)?.label || id)
     const uniekeBanen = [...new Set(baanLabels)]
 
-    // Eigen blokken als gewone blokken in het weekschema. Daardoor tellen ze
-    // mee bij het bepalen wanneer iemand kan trainen — anders zijn het losse
-    // notities die niemand meeneemt. type 'anders' zodat bestaande lezers
-    // (agenda, intake-modal) er niet over struikelen.
-    const week_schedule_met_eigen = { ...week_schedule }
-    ;(eigenBlokken || []).forEach(b => {
-      if (!b?.dag || !b.start || !b.eind) return
-      const dag = week_schedule_met_eigen[b.dag] ? [...week_schedule_met_eigen[b.dag]] : []
-      dag.push({ type: 'anders', label: b.naam, start: b.start, end: b.eind })
-      week_schedule_met_eigen[b.dag] = dag
-    })
-
+    // Eigen blokken zitten al in buildSchedule, dus tellen mee bij het
+    // bepalen wanneer iemand kan trainen.
     const result = {
-      week_schedule: week_schedule_met_eigen,
+      week_schedule,
       eigen_blokken: eigenBlokken || [],
       agenda_toelichting: toelichting || null,
       job_type: uniekeBanen.length ? uniekeBanen.join(', ') : null,
@@ -499,7 +496,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
     if (step === 'job_type_1') return (
       <>
         <BackBtn onBack={goBack} />
-        <Q isMobile={isMobile}>{numJobs === 'meer' ? 'Baan 1 — wat voor werk is dat?' : 'Wat voor werk doe je?'}</Q>
+        <Q isMobile={isMobile}>{numJobs === 'meer' ? 'Baan 1: wat voor werk is dat?' : 'Wat voor werk doe je?'}</Q>
         <WorkTypePicker value={jobTypes[0]?.id || null} onChange={v => {
           const t = WORK_TYPES.find(x => x.id === v)
           const updated = [t]
@@ -513,7 +510,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
     if (step === 'job_type_2') return (
       <>
         <BackBtn onBack={goBack} />
-        <Q isMobile={isMobile}>Baan 2 — wat voor werk is dat?</Q>
+        <Q isMobile={isMobile}>Baan 2: wat voor werk is dat?</Q>
         <WorkTypePicker value={jobTypes[1]?.id || null} onChange={v => {
           const t = WORK_TYPES.find(x => x.id === v)
           const updated = [...jobTypes.slice(0, 1), t]
@@ -528,7 +525,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         <BackBtn onBack={goBack} />
         <Q isMobile={isMobile}>Nog een derde baan?</Q>
         <BigOption
-          label={`Nee — ${jobTypes.filter(Boolean).map(j => j.label).join(' + ')}`}
+          label={`Nee, alleen ${jobTypes.filter(Boolean).map(j => j.label).join(' + ')}`}
           sub="Dit zijn alle banen"
           onClick={() => go('work_days')}
           selected={false} isMobile={isMobile}
@@ -540,7 +537,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
     if (step === 'job_type_3') return (
       <>
         <BackBtn onBack={goBack} />
-        <Q isMobile={isMobile}>Baan 3 — wat voor werk is dat?</Q>
+        <Q isMobile={isMobile}>Baan 3: wat voor werk is dat?</Q>
         <WorkTypePicker value={jobTypes[2]?.id || null} onChange={v => {
           const t = WORK_TYPES.find(x => x.id === v)
           const updated = [...jobTypes.slice(0, 2), t]
@@ -556,7 +553,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
       const jLabel = currentJob?.label || null
       const bLabel = numJobs === 'meer' ? `Baan ${currentJobIdx + 1}` : null
       const question = bLabel && jLabel
-        ? `${bLabel} (${jLabel.toLowerCase()}) — op welke dagen werk je dit?`
+        ? `${bLabel} (${jLabel.toLowerCase()}): op welke dagen werk je dit?`
         : jLabel ? `Op welke dagen werk je bij ${jLabel.toLowerCase()}?`
         : 'Op welke dagen werk je?'
 
@@ -565,7 +562,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>{question}</Q>
           <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-            {[{ l: 'Ma–Vr', d: ['ma','di','wo','do','vr'] }, { l: 'Ma–Za', d: ['ma','di','wo','do','vr','za'] }, { l: 'Weekend', d: ['za','zo'] }].map(p => {
+            {[{ l: 'Ma t/m Vr', d: ['ma','di','wo','do','vr'] }, { l: 'Ma t/m Za', d: ['ma','di','wo','do','vr','za'] }, { l: 'Weekend', d: ['za','zo'] }].map(p => {
               const active = JSON.stringify([...workDays].sort()) === JSON.stringify([...p.d].sort())
               return (
                 <button key={p.l} onClick={() => setWorkDays(p.d)} style={{ padding: '0.35rem 0.75rem', background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '20px', color: active ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>{p.l}</button>
@@ -591,7 +588,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         <BackBtn onBack={goBack} />
         <Q isMobile={isMobile}>Werk je op al die dagen op dezelfde tijden?</Q>
         <BigOption label="Ja, elke dag hetzelfde" onClick={() => { setAllSameDays('yes'); setGrpDays([...workDays]); go('grp_start') }} selected={allSameDays === 'yes'} isMobile={isMobile} />
-        <BigOption label="Nee, sommige dagen zijn anders" sub="Bijv. ma–wo anders dan do–vr" onClick={() => { setAllSameDays('no'); setGrpDays([]); go('grp_days') }} selected={allSameDays === 'no'} isMobile={isMobile} />
+        <BigOption label="Nee, sommige dagen zijn anders" sub="Bijv. ma t/m wo anders dan do t/m vr" onClick={() => { setAllSameDays('no'); setGrpDays([]); go('grp_days') }} selected={allSameDays === 'no'} isMobile={isMobile} />
       </>
     )
 
@@ -729,7 +726,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
           />
         ))}
         <BigOption
-          label="Maakt me niet uit — coach bepaalt"
+          label="Maakt me niet uit, coach bepaalt"
           sub="Je coach plant het aantal trainingsdagen in op basis van jouw week"
           onClick={() => { setTrainingFrequency(0); go('training_days') }}
           selected={trainingFrequency === 0}
@@ -743,11 +740,11 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         <BackBtn onBack={goBack} />
         <Q isMobile={isMobile}>Op welke dagen wil je trainen?</Q>
         {trainingFrequency > 0 && (
-          <Hint isMobile={isMobile}>Je wil {trainingFrequency}x per week — kies je voorkeursdagen.</Hint>
+          <Hint isMobile={isMobile}>Je wil {trainingFrequency}x per week. Kies je voorkeursdagen.</Hint>
         )}
         <DayPicker selected={trainingDays} onToggle={toggleTraining} isMobile={isMobile} />
         <BigOption
-          label="Maakt me niet uit — coach bepaalt"
+          label="Maakt me niet uit, coach bepaalt"
           sub="Je coach plant trainingsdagen in op basis van je schema"
           onClick={() => { setTrainingDays([]); go('training_time') }}
           selected={false} isMobile={isMobile}
@@ -766,10 +763,10 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         <Q isMobile={isMobile}>Hoe laat train je meestal?</Q>
         {[
           { label: 'Vroege ochtend', sub: 'voor 08:00',  time: '06:30' },
-          { label: 'Ochtend',        sub: '08:00–12:00', time: '09:00' },
-          { label: 'Middag',         sub: '12:00–17:00', time: '13:00' },
-          { label: 'Vroege avond',   sub: '17:00–19:00', time: '17:30' },
-          { label: 'Avond',          sub: '19:00–21:00', time: '19:00' },
+          { label: 'Ochtend',        sub: '08:00 tot 12:00', time: '09:00' },
+          { label: 'Middag',         sub: '12:00 tot 17:00', time: '13:00' },
+          { label: 'Vroege avond',   sub: '17:00 tot 19:00', time: '17:30' },
+          { label: 'Avond',          sub: '19:00 tot 21:00', time: '19:00' },
           { label: 'Late avond',     sub: 'na 21:00',    time: '21:30' },
           { label: 'Weet ik nog niet', sub: 'Coach bepaalt op basis van mijn schema', time: 'onbekend' },
         ].map(opt => (
@@ -794,7 +791,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
             {eigenBlokken.map((b, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.naam}</span>
-                <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{DAG_LABELS[b.dag] || b.dag} {b.start}–{b.eind}</span>
+                <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{DAG_LABELS[b.dag] || b.dag} {b.start} tot {b.eind}</span>
                 <button type="button" onClick={() => setEigenBlokken(v => v.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '1.2rem', cursor: 'pointer', padding: '0 2px', lineHeight: 1, minHeight: 32 }}>×</button>
               </div>
             ))}
@@ -824,7 +821,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         </div>
 
         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: '0.4rem', lineHeight: 1.5 }}>
-          Lukt het niet om via de knoppen je week aan te geven? Typ hier zoveel mogelijk aan mij — maar probeer eerst de knoppen.
+          Lukt het niet om via de knoppen je week aan te geven? Typ hier zoveel mogelijk aan mij, maar probeer eerst de knoppen.
         </div>
         <textarea value={toelichting} onChange={e => setToelichting(e.target.value)}
           placeholder="Bijv: ik werk onregelmatig, om de week nachtdienst…" rows={4}

@@ -3,10 +3,10 @@ import React, { useState, useRef } from 'react'
 import { Q, Hint, NextBtn, BackBtn, BigOption, OptionGrid } from '../phase1/FlowStep'
 
 const DURATION_OPTIONS = [
-  { value: 30,  label: '30–45 min', sub: 'Weinig tijd, kort en krachtig' },
-  { value: 45,  label: '45–60 min', sub: 'Compact maar compleet' },
-  { value: 60,  label: '60–75 min', sub: 'Ruim de tijd voor een goede sessie' },
-  { value: 90,  label: '75–90 min', sub: 'Uitgebreid, geen tijdsdruk' },
+  { value: 30,  label: '30 tot 45 min', sub: 'Weinig tijd, kort en krachtig' },
+  { value: 45,  label: '45 tot 60 min', sub: 'Compact maar compleet' },
+  { value: 60,  label: '60 tot 75 min', sub: 'Ruim de tijd voor een goede sessie' },
+  { value: 90,  label: '75 tot 90 min', sub: 'Uitgebreid, geen tijdsdruk' },
 ]
 
 const LOCATION_OPTIONS = [
@@ -110,7 +110,7 @@ export default function PracticalFlow({ data, onChange, isMobile, onNext, onBack
     return (
       <div>
         <Q isMobile={isMobile}>Bij welke sportschool train je?</Q>
-        <Hint isMobile={isMobile}>Optioneel — vul in als je wilt.</Hint>
+        <Hint isMobile={isMobile}>Optioneel, vul in als je wilt.</Hint>
         <input
           type="text"
           value={data.gym_name || ''}

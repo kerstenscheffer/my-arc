@@ -18,7 +18,7 @@ const NO_REASON_OPTIONS = [
 
 const EXPERIENCE_OPTIONS = [
   { value: 'beginner',     label: 'Beginner',   sub: 'Minder dan 1 jaar ervaring' },
-  { value: 'intermediate', label: 'Gemiddeld',  sub: '1–3 jaar ervaring' },
+  { value: 'intermediate', label: 'Gemiddeld',  sub: '1 tot 3 jaar ervaring' },
   { value: 'advanced',     label: 'Gevorderd',  sub: '3+ jaar ervaring' },
 ]
 
@@ -61,7 +61,7 @@ export default function ExperienceFlow({ data, onChange, isMobile, onNext, onBac
     return (
       <div>
         <Q isMobile={isMobile}>Wat houdt je tegen?</Q>
-        <Hint isMobile={isMobile}>Geen verkeerd antwoord — we begrijpen het.</Hint>
+        <Hint isMobile={isMobile}>Geen verkeerd antwoord, we begrijpen het.</Hint>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           {NO_REASON_OPTIONS.map(opt => (
             <BigOption key={opt.value} label={opt.label} sub={opt.sub}

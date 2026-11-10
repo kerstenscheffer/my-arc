@@ -67,7 +67,7 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
             Vertel alles wat je kwijt wil over jezelf, en wat je graag zou willen doen, bereiken of krijgen in de coaching.
           </Q>
           <Hint isMobile={isMobile}>
-            Laatste vraag. Schrijf zoveel als je wil — dit lees ik als eerste.
+            Laatste vraag. Schrijf zoveel als je wil, dit lees ik als eerste.
           </Hint>
           <TextField
             multiline

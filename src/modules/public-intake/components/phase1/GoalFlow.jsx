@@ -241,7 +241,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Heb je een gewichtsdoel?</Q>
           <BigOption
-            label="Nee — ik stuur op uiterlijk en kracht"
+            label="Nee, ik stuur op uiterlijk en kracht"
             onClick={() => { updateMultiple({ target_weight: null, has_weight_goal: false }); go('streef_spier') }}
             selected={data.has_weight_goal === false}
             isMobile={isMobile}
@@ -265,7 +265,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Heb je een gewichtsdoel?</Q>
           <BigOption
-            label="Nee — geen gewichtsdoel"
+            label="Nee, geen gewichtsdoel"
             onClick={() => { updateMultiple({ target_weight: null, has_weight_goal: false }); go('fitness_betekenis') }}
             selected={data.has_weight_goal === false}
             isMobile={isMobile}
@@ -349,7 +349,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
         return <>
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Omschrijf jouw ideale lichaam</Q>
-          <Hint isMobile={isMobile}>Bijv: V-shape, brede rug, volle armen, zichtbare abs — of wat het voor jou betekent.</Hint>
+          <Hint isMobile={isMobile}>Bijv: V-shape, brede rug, volle armen, zichtbare abs, of wat het voor jou betekent.</Hint>
           <textarea
             value={data.lichaam_omschrijving || ''}
             onChange={e => update('lichaam_omschrijving', e.target.value)}
@@ -366,7 +366,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
         return <>
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Tot welk lichaam wil je?</Q>
-          <Hint isMobile={isMobile}>Bij recomp blijft je gewicht ongeveer gelijk — maar je lichaam verandert van samenstelling.</Hint>
+          <Hint isMobile={isMobile}>Bij recomp blijft je gewicht ongeveer gelijk, maar je lichaam verandert van samenstelling.</Hint>
           <BfPhotoGrid
             value={data.target_body_fat ? String(data.target_body_fat) : null}
             onChange={v => { update('target_body_fat', parseInt(v)); go('urgentie') }}
@@ -432,7 +432,7 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
         return <>
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Waarom wil je dit bereiken?</Q>
-          <Hint isMobile={isMobile}>Kies wat het beste past — of schrijf het zelf.</Hint>
+          <Hint isMobile={isMobile}>Kies wat het beste past, of schrijf het zelf.</Hint>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             {MOTIVATION_OPTIONS.map(opt => (
               <BigOption

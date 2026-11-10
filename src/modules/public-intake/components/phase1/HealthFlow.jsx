@@ -16,7 +16,7 @@ export default function HealthFlow({ data, onChange, onNext, onBack, isMobile })
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       <BackBtn onBack={onBack} />
       <Q isMobile={isMobile}>Heb je medische aandoeningen?</Q>
-      <Hint isMobile={isMobile}>Optioneel — alleen wat relevant is voor je training en voeding.</Hint>
+      <Hint isMobile={isMobile}>Optioneel, alleen wat relevant is voor je training en voeding.</Hint>
 
       <BigOption
         label="Nee, niets bijzonders"

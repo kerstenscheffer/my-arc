@@ -36,7 +36,7 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
   if (step === 'toelichting') {
     return (
       <>
-        <Q isMobile={isMobile}>In je eigen woorden — hoe voel je je nu over je lichaam en je fitheid?</Q>
+        <Q isMobile={isMobile}>In je eigen woorden: hoe voel je je nu over je lichaam en je fitheid?</Q>
         <Hint isMobile={isMobile}>
           Geen goed of fout. Dit lezen we straks terug als je vooruitgang boekt.
         </Hint>
@@ -48,7 +48,7 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
           isMobile={isMobile}
         />
         <NextBtn onClick={onNext} isMobile={isMobile} onBack={terug} />
-        <SkipBtn onClick={onNext} label="Liever niet — overslaan" isMobile={isMobile} />
+        <SkipBtn onClick={onNext} label="Liever niet, overslaan" isMobile={isMobile} />
       </>
     )
   }

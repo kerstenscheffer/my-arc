@@ -29,7 +29,7 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
     return (
       <div>
         <Q isMobile={isMobile}>Heb je blessures of pijn die je training beperken?</Q>
-        <Hint isMobile={isMobile}>Denk aan knie, rug, schouder, pols — iets dat we moeten weten.</Hint>
+        <Hint isMobile={isMobile}>Denk aan knie, rug, schouder, pols: iets dat we moeten weten.</Hint>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           <BigOption label="Nee, geen blessures" sub="Ik kan alles doen"
             selected={!data.injuries}
@@ -53,7 +53,7 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
         <textarea
           value={data.injuries || ''}
           onChange={e => update('injuries', e.target.value)}
-          placeholder="Bijv. linkerknie — meniscus, al 3 maanden, geen diepe squats..."
+          placeholder="Bijv. linkerknie, meniscus, al 3 maanden, geen diepe squats..."
           rows={4}
           style={{
             width: '100%', padding: isMobile ? '0.75rem' : '0.85rem',

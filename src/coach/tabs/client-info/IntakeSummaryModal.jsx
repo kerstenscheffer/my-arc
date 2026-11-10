@@ -166,6 +166,15 @@ function flattenNp(np) {
     .map(([k, v]) => (v?.werkt_goed ? `${k}: ${v.werkt_goed}` : null))
     .filter(Boolean).join('\n') || null)
   put('intake_voeding_screenshots', np.voeding_screenshots)
+  // "Wat eet je nu op dagelijkse basis?": vrije tekst per moment, plus wat
+  // er volgens de klant goed aan werkt. Stond wel in de database maar werd
+  // nergens getoond.
+  const ch = np.current_habits || {}, pm = ch.per_moment || {}
+  ;['ontbijt', 'lunch', 'diner', 'snack'].forEach(k => {
+    put(`intake_nu_${k}`, ch[k])
+    put(`intake_nu_${k}_werkt`, pm[k]?.werkt_goed)
+  })
+  put('intake_nu_extras', (ch.extras || []).filter(Boolean).join('\n') || null)
   put('intake_cheat', cm.frequency)
   put('intake_sociaal', cm.social_frequency)
   put('intake_ontbijt', mealSummary(w, 'ontbijt'))
@@ -364,6 +373,21 @@ const PART1_SECTIONS = [
 
 const PART2_SECTIONS = [
   {
+    title: 'Wat eet je nu',
+    fields: [
+      { key: 'intake_nu_ontbijt', label: 'Ontbijt' },
+      { key: 'intake_nu_ontbijt_werkt', label: 'Ontbijt: werkt goed', alleenIngevuld: true },
+      { key: 'intake_nu_lunch', label: 'Lunch' },
+      { key: 'intake_nu_lunch_werkt', label: 'Lunch: werkt goed', alleenIngevuld: true },
+      { key: 'intake_nu_diner', label: 'Diner' },
+      { key: 'intake_nu_diner_werkt', label: 'Diner: werkt goed', alleenIngevuld: true },
+      { key: 'intake_nu_snack', label: 'Snack' },
+      { key: 'intake_nu_snack_werkt', label: 'Snack: werkt goed', alleenIngevuld: true },
+      { key: 'intake_nu_extras', label: 'Extra snacks', alleenIngevuld: true },
+      { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' }
+    ]
+  },
+  {
     title: 'Begeleiding & praktisch',
     fields: [
       { key: 'intake_guidance_level', label: 'Begeleidingsstijl', fmt: fmtMap(N.guidance) },
@@ -407,8 +431,6 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_supps', label: 'Supplementen', fmt: fmtMap(N.supps) },
       { key: 'intake_supps_huidige', label: 'Slikt nu' },
-      { key: 'intake_werkt_per_moment', label: 'Werkt goed — per moment' },
-      { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' },
       { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat) },
       { key: 'intake_sociaal', label: 'Buiten de deur eten', fmt: fmtMap(N.social) }
     ]
@@ -711,7 +733,7 @@ function renderSections(sections, data, toonLeeg = true) {
           const value = leeg ? null : (f.fmt ? f.fmt(raw) : String(raw))
           // Onbeantwoorde vragen blijven staan: de coach wil zien wát er
           // gevraagd is, ook als de klant het heeft overgeslagen.
-          if ((leeg || isEmpty(value)) && !toonLeeg) return null
+          if ((leeg || isEmpty(value)) && (!toonLeeg || f.alleenIngevuld)) return null
           const isLeeg = leeg || isEmpty(value)
           return {
             label: f.label,

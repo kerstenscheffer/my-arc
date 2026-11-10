@@ -30,7 +30,7 @@ const ERROR_TYPES = {
     lines: [
       'Gebruik het e-mailadres waarmee je coach je heeft aangemeld.',
       'Let op: geen hoofdletters, geen spaties voor of na het adres.',
-      'Voorbeeld: jan.dejong@gmail.com — niet Jan.DeJong@gmail.com',
+      'Voorbeeld: jan.dejong@gmail.com, niet Jan.DeJong@gmail.com',
     ],
     action: 'Controleer je e-mail van je coach en probeer opnieuw.'
   },
@@ -639,7 +639,7 @@ export default function PublicIntakePage() {
           background: '#10b981', color: '#fff', padding: '0.55rem 0.9rem', borderRadius: 10,
           fontSize: '0.8rem', fontWeight: 700, boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
         }}>
-          <span>✓ Je eerdere antwoorden zijn hersteld — je gaat verder waar je gebleven was.</span>
+          <span>✓ Je eerdere antwoorden zijn hersteld. Je gaat verder waar je gebleven was.</span>
           <button onClick={() => setDraftRestored(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 900, fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
       )}
@@ -920,7 +920,7 @@ export default function PublicIntakePage() {
           </div>
 
           <div style={{ fontSize: '0.42rem', color: 'rgba(255,255,255,0.15)', fontWeight: 700, letterSpacing: '0.1em' }}>
-            MY ARC — TRANSFORM YOUR LIFE
+            MY ARC · TRANSFORM YOUR LIFE
           </div>
         </div>
       )}
