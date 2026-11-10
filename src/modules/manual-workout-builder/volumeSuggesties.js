@@ -70,13 +70,21 @@ function trendPerSpier(days, logs = []) {
     o[w] = Math.max(o[w] || 0, r.kracht)
   }
   const telling = {}
+  const oef = {} // naam → { soort|null, pct } over de laatste (max) 3 weken
+  const pctSpier = {}
   for (const [k, wk] of Object.entries(perOef)) {
     const ws = Object.keys(wk).sort().slice(-3)
+    if (ws.length >= 2) {
+      const pct = (wk[ws[ws.length - 1]] / wk[ws[0]] - 1) * 100
+      oef[k] = { soort: null, pct }
+      ;(pctSpier[spierVanNaam[k]] = pctSpier[spierVanNaam[k]] || []).push(pct)
+    }
     if (ws.length < 3) continue
     const [a, b, c] = ws.map(w => wk[w])
     const stap1 = b / a - 1, stap2 = c / b - 1
     const soort = stap1 < -DALING_MIN && stap2 < -DALING_MIN ? 'daalt'
       : stap1 < STIJGING_MIN && stap2 < STIJGING_MIN ? 'stagneert' : 'stijgt'
+    oef[k].soort = soort
     const s = spierVanNaam[k]
     const x = telling[s] || (telling[s] = { stijgt: 0, stagneert: 0, daalt: 0 })
     x[soort]++
@@ -85,7 +93,8 @@ function trendPerSpier(days, logs = []) {
   for (const [s, x] of Object.entries(telling)) {
     uit[s] = x.stijgt > 0 ? 'stijgt' : x.daalt > x.stagneert ? 'daalt' : 'stagneert'
   }
-  return uit
+  const pct = Object.fromEntries(Object.entries(pctSpier).map(([s, l]) => [s, l.reduce((a, b) => a + b, 0) / l.length]))
+  return { perSpier: uit, perOef: oef, pct }
 }
 
 // ctx: { status, fase, leeftijd, secMap, logs }
@@ -97,7 +106,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
   const plus40 = Number(ctx.leeftijd) >= LEEFTIJD_40PLUS
   const maxSessie = plus40 ? Math.min(MAX_PER_SESSIE[status], MAX_PER_SESSIE_40PLUS) : MAX_PER_SESSIE[status]
   const secMap = ctx.secMap || {}
-  const trend = trendPerSpier(days, ctx.logs)
+  const { perSpier: trend, perOef: trendOef, pct: krachtPct } = trendPerSpier(days, ctx.logs)
 
   const perDag = days.map(d => ({ dag: d, sets: fractioneleSets(d.exercises || [], secMap), min: minutenVoorOefeningen(d.exercises || []) }))
   const week = fractioneleSets(days.flatMap(d => d.exercises || []), secMap)
@@ -202,7 +211,21 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     }
     a.context = `${LABEL_STATUS[status]} · ${LABEL_FASE[fase]}${plus40 ? ' · 40+' : ''}`
     a.bronnen = bronnenVan(days, spier, secMap)
-    a.koppen = dekkingKoppen(days.flatMap(d => d.exercises || []), spier)
+    a.krachtPct = krachtPct[spier] ?? null
+    // Per oefening: kracht laatste weken en de laatste feedback van de klant.
+    const fbRijen = herstel[spier]?.oefeningen || []
+    for (const b of a.bronnen) {
+      b.kracht = trendOef[sleutel(b.naam)] || null
+      b.feedback = fbRijen.find(r => sleutel(r.oefening) === sleutel(b.naam)) || null
+    }
+    // Koppen: directe oefeningen plus compounds die volledig meetellen (hack squat
+    // voor billen), die laatste als deze spier gelezen.
+    const volle = days.flatMap(d => d.exercises || []).filter(ex => ex.type !== 'cardio').flatMap(ex => {
+      const p = spierVan(ex)
+      if (p === spier) return [ex]
+      return synergistenVan(ex, secMap, p).some(([s, w]) => s === spier && w >= 1) ? [{ ...ex, primairSpieren: spier, kop: null }] : []
+    })
+    a.koppen = dekkingKoppen(volle, spier)
     uit[spier] = a
   }
   return uit
@@ -258,8 +281,9 @@ function bronnenVan(days, spier, secMap) {
       const w = p === spier ? 1 : (synergistenVan(ex, secMap, p).find(([s]) => s === spier)?.[1] || 0)
       if (!w) continue
       const k = sleutel(ex.name)
-      const x = m.get(k) || { naam: ex.name, sets: 0, gewicht: w, dagen: [], kop: p === spier ? kopLabel(spier, kopVan(ex)) : null }
+      const x = m.get(k) || { naam: ex.name, sets: 0, gewicht: w, dagen: [], items: [], kop: p === spier ? kopLabel(spier, kopVan(ex)) : null }
       x.sets += sets
+      x.items.push({ dayId: d.id, exId: ex.id, dagNaam: d.name, sets })
       if (d.name && !x.dagen.includes(d.name)) x.dagen.push(d.name)
       m.set(k, x)
     }

@@ -74,6 +74,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // sets/reps/rust blijven staan.
   const [wissel, setWissel] = useState(null)
   const [krachtOpen, setKrachtOpen] = useState(false)
+  const [roosterDicht, setRoosterDichtState] = useState(() => { try { return localStorage.getItem('mwb_rooster_dicht') === '1' } catch { return false } })
+  const setRoosterDicht = (v) => { setRoosterDichtState(v); try { localStorage.setItem('mwb_rooster_dicht', v ? '1' : '0') } catch { /* leeg */ } }
   // Uitgeklapt overzicht per spiergroep met koppen; onthouden per browser.
   const [overzichtOpen, setOverzichtOpenState] = useState(() => { try { return localStorage.getItem('mwb_spier_overzicht') === '1' } catch { return false } })
   const setOverzichtOpen = (v) => { setOverzichtOpenState(v); try { localStorage.setItem('mwb_spier_overzicht', v ? '1' : '0') } catch { /* leeg */ } }
@@ -1106,7 +1108,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           dagen en de stappen. Plan wisselen en opslaan zitten in de kopbalk. */}
       {effectiveClient && (
         <div style={{ flexShrink: 0, borderBottom: DUN }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem' }}>
+          {/* In- en uitklappen (10 nov 2026): dicht = meer ruimte voor de dagkolommen. */}
+          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.35rem 0.5rem 0' : '0.4rem 0 0' }}>
+            <button onClick={() => setRoosterDicht(!roosterDicht)} aria-expanded={!roosterDicht} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.2rem 0', background: 'none', border: 'none',
+              color: 'rgba(255,255,255,0.55)', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', fontFamily: 'inherit', cursor: 'pointer',
+            }}>
+              <ChevronDown size={14} strokeWidth={2.8} style={{ transform: roosterDicht ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }} />
+              Weekrooster
+            </button>
+          </div>
+          {!roosterDicht && <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.25rem' : '0.35rem' }}>
             <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop
               verwijderGeblokkeerd={nietOpgeslagen ? 'Sla eerst je wijzigingen op.' : null}
               onPlandagWeg={herlaadKlant}
@@ -1118,7 +1130,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 const dag = Number.isFinite(n) ? workoutPlan.days[n - 1] : null
                 if (dag) setActiveDay(dag.id)
               }} />
-          </div>
+          </div>}
         </div>
       )}
       {!m && alleDagen && workoutPlan.days.length > 1 ? (<>
@@ -1162,7 +1174,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </div>
               {overzichtOpen && (
                 <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: '42vh', overflowY: 'auto' }}>
-                  <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel} />
+                  <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel} onSets={(dayId, exId, n) => updateExercise(dayId, exId, { sets: n })} />
                 </div>
               )}
             </div>
