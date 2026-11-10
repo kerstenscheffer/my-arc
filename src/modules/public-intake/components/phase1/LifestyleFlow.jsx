@@ -2,7 +2,7 @@
 // Stap 4: Levensstijl — activiteit, WeekBuilder, koken, stress
 
 import React, { useState } from 'react'
-import { Q, Hint, NextBtn, BackBtn, BigOption, PhotoGrid, OptionGrid, Slider } from './FlowStep'
+import { Q, Hint, NextBtn, BackBtn, BigOption, PhotoGrid, OptionGrid, Slider, TextField } from './FlowStep'
 import WeekBuilder from '../WeekBuilder/WeekBuilder'
 
 export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile }) {
@@ -118,6 +118,21 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
             <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>Geen stress</span>
             <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>Heel veel stress</span>
           </div>
+          {/* Bij hoge stress (7+) willen we weten waar het vandaan komt: dat
+              bepaalt hoe hard je kunt pushen met training en voeding. */}
+          {(data.stress_level || 5) >= 7 && (
+            <div style={{ marginTop: '0.9rem' }}>
+              <Q isMobile={isMobile}>Waar komt die stress vandaan?</Q>
+              <Hint isMobile={isMobile}>Werk, thuis, gezondheid, geld: vertel wat je kwijt wil.</Hint>
+              <TextField
+                multiline
+                placeholder="Bijv: druk op werk, slaap slecht door de kinderen…"
+                value={data.stress_toelichting || ''}
+                onChange={v => update('stress_toelichting', v)}
+                isMobile={isMobile}
+              />
+            </div>
+          )}
           <NextBtn onClick={handleOnNext} isMobile={isMobile} />
         </>
 

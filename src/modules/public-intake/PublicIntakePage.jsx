@@ -429,10 +429,14 @@ export default function PublicIntakePage() {
         // ingevuld. Alleen schrijven als er iets is: anders zou een
         // heropgeslagen intake een bestaande waarde wissen.
         ...(data.job_type ? { job_type: data.job_type } : {}),
-        cooking_time: data.cooking_time ? ({ minimal: 20, low: 30, moderate: 60, high: 90 }[data.cooking_time] || null) : null,
+        // Kooktijd-vraag is weg (10 nov 2026): alleen schrijven als er een
+        // antwoord is, anders wist een nieuwe intake de oude waarde.
+        ...(data.cooking_time ? { cooking_time: ({ minimal: 20, low: 30, moderate: 60, high: 90 }[data.cooking_time] || null) } : {}),
         preferred_training_days: data.preferred_training_days || null,
         sleep_hours: data.sleep_hours ? parseFloat(data.sleep_hours) : null,
         stress_level: data.stress_level ? String(data.stress_level) : null,
+        // Alleen bij 7+ gevraagd; daaronder leeg laten.
+        stress_toelichting: (data.stress_level || 5) >= 7 ? (data.stress_toelichting?.trim() || null) : null,
         medical_conditions: data.medical_conditions || null,
         coaching_style_pref: data.coaching_style_pref || null,
         previous_coaching: data.previous_coaching || null,

@@ -265,7 +265,7 @@ const MACROS = [
   { key: 'macro_vet',   label: 'Vet',          eenheid: 'g',    kcalPerG: 9,    max: 400 },
 ]
 
-function MacroRing({ label, eenheid, waarde, vulling, onChange, placeholder, isMobile }) {
+function MacroRing({ label, eenheid, waarde, vulling, aandeel, onChange, placeholder, isMobile }) {
   const inputRef = useRef(null)
   const size = isMobile ? 132 : 140
   const stroke = 9
@@ -307,15 +307,52 @@ function MacroRing({ label, eenheid, waarde, vulling, onChange, placeholder, isM
           </div>
         </div>
       </div>
-      <div style={{ fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 900, color: '#fff' }}>{label}</div>
+      <div style={{ fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 900, color: '#fff' }}>
+        {label}
+        {aandeel != null && <span style={{ marginLeft: 5, fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{aandeel}%</span>}
+      </div>
     </div>
   )
+}
+
+// Rekent door zoals Coach Inzicht (MacroRingen.jsx): koolhydraten zijn de
+// restpost, en kcal is altijd eiwit×4 + koolh×4 + vet×9. Zo kan er nooit
+// 2000 kcal staan bij macro's die samen 2650 zijn.
+//   kcal gewijzigd          → koolh = wat overblijft na eiwit en vet
+//   eiwit/vet gewijzigd     → met kcal: koolh vult aan; zonder kcal: kcal = som
+//   koolh gewijzigd         → kcal = som
+function herbereken(data, veld, ruw) {
+  const n = (v) => parseInt(v || '0', 10) || 0
+  const set = { ...data, [veld]: ruw }
+  const e = n(set.macro_eiwit), v = n(set.macro_vet), kcal = n(set.macro_kcal)
+  const som = () => n(set.macro_eiwit) * 4 + n(set.macro_kh) * 4 + n(set.macro_vet) * 9
+  const vulKoolhAan = () => {
+    const rest = Math.round((kcal - e * 4 - v * 9) / 4)
+    if (rest >= 0) { set.macro_kh = String(rest); return true }
+    return false
+  }
+
+  // Alleen een kcal die de klant zelf typte is een doel om naartoe te
+  // rekenen; een uitgerekende kcal volgt gewoon de macro's.
+  if (veld === 'macro_kcal') {
+    set.macro_kcal_zelf = !!kcal
+    if ((e || v) && kcal) vulKoolhAan()
+  } else if (veld === 'macro_kh') {
+    set.macro_kcal = som() ? String(som()) : ''
+    set.macro_kcal_zelf = false
+  } else {
+    // eiwit of vet
+    if (!(set.macro_kcal_zelf && kcal && vulKoolhAan())) {
+      set.macro_kcal = som() ? String(som()) : ''
+      set.macro_kcal_zelf = false
+    }
+  }
+  return set
 }
 
 function MacroTargets({ data, onChange, isMobile }) {
   const getal = (k) => parseInt(data[k] || '0', 10) || 0
   const uitMacros = getal('macro_eiwit') * 4 + getal('macro_kh') * 4 + getal('macro_vet') * 9
-  const kcal = getal('macro_kcal') || uitMacros
   const heeft = data.macro_targets_heeft
 
   return (
@@ -336,7 +373,10 @@ function MacroTargets({ data, onChange, isMobile }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobile ? '1.1rem 0.5rem' : '1.3rem 1rem', marginTop: '0.9rem', justifyItems: 'center' }}>
             {MACROS.map(m => {
               const g = getal(m.key)
-              const vulling = m.kcalPerG ? (kcal > 0 ? (g * m.kcalPerG) / kcal : 0) : (g > 0 ? 1 : 0)
+              // Aandeel over de som van de macro's, net als in Coach Inzicht:
+              // dan tellen de drie percentages altijd op tot 100.
+              const aandeel = m.kcalPerG && uitMacros > 0 ? Math.round((g * m.kcalPerG / uitMacros) * 100) : null
+              const vulling = m.kcalPerG ? (aandeel || 0) / 100 : (g > 0 ? 1 : 0)
               return (
                 <MacroRing
                   key={m.key}
@@ -344,19 +384,16 @@ function MacroTargets({ data, onChange, isMobile }) {
                   eenheid={m.eenheid}
                   waarde={data[m.key] || ''}
                   vulling={vulling}
-                  // Geen kcal ingevuld maar wel macro's: reken 'm voor als hint.
-                  placeholder={m.key === 'macro_kcal' && uitMacros > 0 ? String(uitMacros) : undefined}
-                  onChange={v => onChange({ ...data, [m.key]: v })}
+                  aandeel={g > 0 ? aandeel : null}
+                  onChange={v => onChange(herbereken(data, m.key, v))}
                   isMobile={isMobile}
                 />
               )
             })}
           </div>
-          {!getal('macro_kcal') && uitMacros > 0 && (
-            <div style={{ marginTop: '0.9rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-              Uit je macro's komt dat op ongeveer {uitMacros} kcal
-            </div>
-          )}
+          <div style={{ marginTop: '0.9rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            Koolhydraten en calorieën rekenen automatisch mee.
+          </div>
         </div>
       )}
     </>

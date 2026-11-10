@@ -124,7 +124,9 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   // Upgrade sep 2026: nulmeting-toelichting, snelle winst, eigen woorden bij
   // motivatie, supplementen, weekagenda-toelichting + eigen blokken, slotwoord.
   'quick_win_2weeks', 'motivation_verbatim', 'supplementen_nu',
-  'agenda_toelichting', 'eigen_blokken', 'intake_slotwoord'
+  'agenda_toelichting', 'eigen_blokken', 'intake_slotwoord',
+  // 10 nov 2026: toelichting bij hoge stress (7+).
+  'stress_toelichting'
 ]);
 
 // De sportschool uit de intake omzetten naar een rij in client_gyms.

@@ -360,7 +360,8 @@ const PART1_SECTIONS = [
       { key: 'training_time', label: 'Trainingstijd' },
       { key: 'sleep_hours', label: 'Slaap', fmt: fmtNum('uur') },
       { key: 'cooking_time', label: 'Kooktijd', fmt: fmtNum('min'), alleenIngevuld: true },
-      { key: 'stress_level', label: 'Stressniveau', fmt: fmtNum('/ 10') }
+      { key: 'stress_level', label: 'Stressniveau', fmt: fmtNum('/ 10') },
+      { key: 'stress_toelichting', label: 'Waar komt die stress vandaan', alleenIngevuld: true }
     ]
   },
   {
@@ -571,6 +572,7 @@ const VRAGEN = {
   daily_steps: 'Hoeveel stappen zet je gemiddeld op een dag?',
   cooking_time: 'Hoeveel tijd wil je kwijt aan koken?',
   stress_level: 'Hoeveel stress heb je op dit moment?',
+  stress_toelichting: 'Waar komt die stress vandaan?',
   medical_conditions: 'Heb je medische aandoeningen?',
   previous_coaching: 'Heb je eerder coaching of een dieet gevolgd?',
   wat_werkte_eerder: 'Wat werkte er eerder wél voor jou?',
