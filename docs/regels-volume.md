@@ -53,3 +53,14 @@ Code: `src/modules/manual-workout-builder/koppen.js`. Alleen dekking (directe se
 Borst: bovenborst / midden · Rug: lats / bovenrug · Triceps: lange / laterale kop · Biceps: lange / korte kop / brachialis
 (gewone curl = beide koppen) · Quads: rectus femoris / vasti · Hamstrings: knie-buigers / heup-strekkers · Billen: max / medius.
 Kop komt uit de naam; per oefening vast te zetten in het bewerkvenster (veld `kop` in het plan).
+
+## Max per training (Kerstens regel, niet uit het onderzoek)
+Output zakt na een aantal harde sets. Max per training, alle spieren: beginner 12 · intermediair 16 · gevorderd 20 · 40+ 14
+(`MAX_SETS_PER_TRAINING`). Dagkop rood erboven; "+1 set" zet nooit een set op een volle dag en kiest bij gelijk aantal
+sets de oefening vooraan. Melding als een zware compound (squat, deadlift, press, hack…) pas vanaf de 4e plek na lichter werk komt.
+
+## Cyclus (10 nov 2026)
+`workout_schemas.cyclus` = {lengte, volgorde: ['dag1', null, …]} (null = rust), alleen de builder leest het (`cyclus.js`).
+7 dagen = de week: volgorde uit het weekrooster van de klant. Langer (8-14): volgorde in de builder (pijltjes per kolom).
+Volume en frequentie per week = per cyclus × 7 / lengte. "Geen rustdag" als dezelfde spier twee dagen achter elkaar direct getraind wordt.
+De klantapp volgt nog steeds het weekrooster; een cyclus > 7 is nu planning in de builder.

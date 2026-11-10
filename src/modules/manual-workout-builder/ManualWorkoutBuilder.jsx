@@ -26,18 +26,19 @@ import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag, spierVan } from './spierGroepen'
+import { setsPerSpierDag, spierVan, spierLabel } from './spierGroepen'
 import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
 import { useVolumeContext } from './components/useVolumeContext'
-import { volumeAdvies, fractioneleSets } from './volumeSuggesties'
+import { volumeAdvies, fractioneleSets, maxSetsPerTraining, setsVanTraining, zwaarTeLaat } from './volumeSuggesties'
 import { RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS } from './volumeRegels'
+import { cyclusVan, cyclusVoorOpslaan, cyclusUitOpslag, rustPerSpier, STANDAARD_LENGTE, MAX_LENGTE, WEEKDAG_KORT } from './cyclus'
 
 // Weektotalen per lichaamsdeel (10 nov 2026).
 const SPIER_BLOKKEN = [
@@ -318,13 +319,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() }))
       }))
     dagSleutels.current = new Map(days.map(d => [d.id, d._bronKey]))
+    const cyclusOpgeslagen = cyclusUitOpslag(schema.cyclus, new Map(days.map(d => [d._bronKey, d.id])))
     history.reset({
       name: schema.name || '', description: schema.description || '',
       primary_goal: schema.primary_goal || 'muscle_gain',
       experience_level: schema.experience_level || 'intermediate',
       split_type: schema.split_type || 'custom',
       days_per_week: days.length, equipment: schema.equipment || [], days,
-      _schemaId: schema.id
+      _schemaId: schema.id, cyclus: cyclusOpgeslagen,
     })
     setSelectedSchemaId(schema.id)
     setBewaardeStand(null)
@@ -580,6 +582,37 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   // Herstel per spiergroep uit de bouwfase-feedback van de klant (10 nov 2026).
   const herstel = useHerstel(db, effectiveClient?.id, agendaKey)
+  // Trainingscyclus (cyclus.js): standaard de week uit het rooster van de klant.
+  const cyc = useMemo(() => {
+    const keyNaarId = new Map([...dagSleutels.current.entries()].map(([id, k]) => [k, id]))
+    const actiefId = effectiveClient?.assigned_schema_id || clientSchemas[0]?.id || null
+    return cyclusVan(workoutPlan, { rooster: trainingInfo?.workout_schedule, actief: !!selectedSchemaId && actiefId === selectedSchemaId, schemaId: selectedSchemaId, keyNaarId })
+  }, [workoutPlan, trainingInfo?.workout_schedule, effectiveClient?.assigned_schema_id, clientSchemas, selectedSchemaId])
+  const zetCyclus = (lengte, slots) => setWorkoutPlan(prev => ({ ...prev, cyclus: { lengte, volgorde: slots } }))
+  const cyclusLengte = (L) => {
+    const n = workoutPlan.days.length
+    L = Math.max(STANDAARD_LENGTE, n, Math.min(MAX_LENGTE, L))
+    if (L === STANDAARD_LENGTE && cyc.bron !== 'plan') { setWorkoutPlan(prev => ({ ...prev, cyclus: null })); return }
+    let slots = [...cyc.slots]
+    while (slots.length < L) slots.push(null)
+    while (slots.length > L) { const leeg = slots.lastIndexOf(null); if (leeg === -1) break; slots.splice(leeg, 1) }
+    zetCyclus(L, slots)
+  }
+  const verschuif = (plek, richting) => {
+    const naar = plek + richting
+    if (naar < 0 || naar >= cyc.slots.length) return
+    const slots = [...cyc.slots]
+    ;[slots[plek], slots[naar]] = [slots[naar], slots[plek]]
+    zetCyclus(cyc.lengte, slots)
+  }
+  const cyclusFactor = STANDAARD_LENGTE / (cyc.lengte || STANDAARD_LENGTE)
+  // Spieren die een dag direct traint (voor rust tussen dezelfde spier).
+  const spierenVanDag = (id) => {
+    const d = workoutPlan.days.find(x => x.id === id)
+    return [...new Set((d?.exercises || []).filter(ex => ex.type !== 'cardio' && Number(ex.sets) > 0).map(ex => spierVan(ex)).filter(k => k !== 'onbekend'))]
+  }
+  const rust = useMemo(() => rustPerSpier(cyc.slots, spierenVanDag), [cyc, workoutPlan.days]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Volume-suggesties per spiergroep (volumeSuggesties.js + volumeRegels.js,
   // op basis van Kerstens volume-onderzoek, 10 nov 2026).
   const volumeCtx = useVolumeContext(db, effectiveClient?.id, agendaKey)
@@ -589,8 +622,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const sessieKeuze = Number(trainingInfo?.sessieMin) || Number(trainingInfo?.minutes_per_session) || 0
   const sessieBudget = BOVEN[sessieKeuze] || sessieKeuze || 90
   const advies = useMemo(
-    () => (effectiveClient?.id && volumeCtx ? volumeAdvies({ days: workoutPlan.days, ctx: volumeCtx, herstel, budget: sessieBudget }) : {}),
-    [effectiveClient?.id, volumeCtx, workoutPlan.days, herstel, sessieBudget],
+    () => (effectiveClient?.id && volumeCtx ? volumeAdvies({ days: workoutPlan.days, ctx: volumeCtx, herstel, budget: sessieBudget, factor: cyclusFactor, rust }) : {}),
+    [effectiveClient?.id, volumeCtx, workoutPlan.days, herstel, sessieBudget, cyclusFactor, rust],
   )
   // Pijntje: het wisselvenster openen voor die oefening.
   const wisselVanuitAdvies = (w) => {
@@ -607,6 +640,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     return {
       range: [lo, hi], start, fase, plus40,
       maxSessie: plus40 ? Math.min(MAX_PER_SESSIE[status], MAX_PER_SESSIE_40PLUS) : MAX_PER_SESSIE[status],
+      maxTraining: maxSetsPerTraining(volumeCtx),
       statusLabel: ({ beginner: 'Beginner', intermediate: 'Intermediair', advanced: 'Gevorderd' })[status] + (volumeCtx.statusBekend ? '' : ' (aangenomen)'),
       faseLabel: ({ bulk: 'Build', onderhoud: 'Onderhoud', cut: 'Cut' })[fase] + (volumeCtx.faseBekend ? '' : ' (geen lopende fase)'),
     }
@@ -739,7 +773,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         if (rFout) throw rFout
         dagSleutels.current = new Map(workoutPlan.days.map((d, i) => [d.id, `dag${i + 1}`]))
         const { error } = await db.supabase.from('workout_schemas').update({
-          name: planNaam, description: workoutPlan.description || '', updated_at: new Date().toISOString()
+          name: planNaam, description: workoutPlan.description || '', updated_at: new Date().toISOString(),
+          cyclus: cyclusVoorOpslaan(workoutPlan, cyc),
         }).eq('id', selectedSchemaId)
         if (error) throw error
         setBewaardeStand(huidigeStand)
@@ -773,6 +808,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
         split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length, time_per_session: 60,
         week_structure: buildWeekStructure(), equipment: workoutPlan.equipment.slice(0, 10),
+        cyclus: cyclusVoorOpslaan(workoutPlan, cyc),
         is_template: false, is_ai_generated: false, is_public: false,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       }).select('id').single()
@@ -996,7 +1032,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const geenDoel = !bewerk && !selectedSchemaId && !effectiveClient?.id
   // De naam telt niet mee bij klantplannen: die bewaart de kopbalk zelf al
   // (bewaarTitel). Bij een sjabloon in bewerking gaat de naam mee met Opslaan.
-  const huidigeStand = JSON.stringify([bewerk ? workoutPlan.name || '' : '', workoutPlan.description || '', buildWeekStructure()])
+  const huidigeStand = JSON.stringify([bewerk ? workoutPlan.name || '' : '', workoutPlan.description || '', buildWeekStructure(), cyclusVoorOpslaan(workoutPlan, cyc)])
   const heeftDoel = !!selectedSchemaId || !!bewerk
   const nietOpgeslagen = heeftDoel && bewaardeStand !== null && bewaardeStand !== huidigeStand
   const isOpgeslagen = heeftDoel && !saving && !nietOpgeslagen
@@ -1207,7 +1243,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         {/* Totaal van de hele week boven de kolommen (10 nov 2026). */}
         {(() => {
           const alle = workoutPlan.days.flatMap(d => d.exercises || [])
-          const sets = fractioneleSets(alle, volumeCtx?.secMap || {})
+          // Per week: bij een langere cyclus omgerekend (sets × 7 / lengte).
+          const sets = Object.fromEntries(Object.entries(fractioneleSets(alle, volumeCtx?.secMap || {}))
+            .map(([k, v]) => [k, { ...v, frac: v.frac * cyclusFactor }]))
           const gehad = new Set()
           const blokken = SPIER_BLOKKEN.map(([titel, keys]) => {
             const hier = keys.filter(k => sets[k])
@@ -1230,17 +1268,70 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
           )
         })()}
+        {/* Cyclus: lengte kiezen; 7 = de week (volgorde uit het weekrooster). */}
+        {!dagenDicht && (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0.7rem 1rem 0', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+            <span style={{ fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Cyclus</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8 }}>
+              <button onClick={() => cyclusLengte(cyc.lengte - 1)} disabled={cyc.lengte <= Math.max(STANDAARD_LENGTE, workoutPlan.days.length)} aria-label="Korter" style={{ ...iconKnop(), width: 26, height: 26, opacity: cyc.lengte <= Math.max(STANDAARD_LENGTE, workoutPlan.days.length) ? 0.3 : 1 }}><Minus size={13} /></button>
+              <span style={{ minWidth: 58, textAlign: 'center', color: '#fff', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{cyc.lengte} dagen</span>
+              <button onClick={() => cyclusLengte(cyc.lengte + 1)} disabled={cyc.lengte >= MAX_LENGTE} aria-label="Langer" style={{ ...iconKnop(), width: 26, height: 26, opacity: cyc.lengte >= MAX_LENGTE ? 0.3 : 1 }}><Plus size={13} /></button>
+            </span>
+            <span>{workoutPlan.days.length} trainingen · {cyc.lengte - workoutPlan.days.length} rust</span>
+            {cyc.lengte !== STANDAARD_LENGTE && <span title="Volume en frequentie worden omgerekend naar een week">= {String(Math.round(workoutPlan.days.length * cyclusFactor * 10) / 10).replace('.', ',')} trainingen per week</span>}
+            {cyc.bron === 'rooster' && <span title="Bij een week van 7 dagen volgt de volgorde het weekrooster van de klant; pas het daar aan">· volgorde uit weekrooster</span>}
+          </div>
+        )}
         {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
-            {workoutPlan.days.map((dag, i) => (
-              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
+            {/* Eén blok: kolommen tegen elkaar met lijnen ertussen, in de volgorde van de cyclus. */}
+            <div style={{ display: 'flex', height: 'calc(100% - 1rem)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden' }}>
+            {cyc.slots.map((slotId, plek) => {
+              const label = cyc.weekdagen ? WEEKDAG_KORT[plek] : `Dag ${plek + 1}`
+              const verplaats = cyc.bron !== 'rooster' && (
+                <span style={{ display: 'inline-flex', gap: 0, marginLeft: 'auto' }}>
+                  <button onClick={() => verschuif(plek, -1)} disabled={plek === 0} title="Eerder in de cyclus" aria-label="Eerder" style={{ ...iconKnop(), width: 20, height: 18, opacity: plek === 0 ? 0.25 : 1 }}><ChevronLeft size={13} /></button>
+                  <button onClick={() => verschuif(plek, 1)} disabled={plek === cyc.slots.length - 1} title="Later in de cyclus" aria-label="Later" style={{ ...iconKnop(), width: 20, height: 18, opacity: plek === cyc.slots.length - 1 ? 0.25 : 1 }}><ChevronRight size={13} /></button>
+                </span>
+              )
+              const slotKop = (
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 0.55rem 0 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+                  {verplaats}
+                </div>
+              )
+              if (slotId == null) return (
+                <div key={`rust-${plek}`} style={{ width: 84, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 6px, transparent 6px 12px)' }}>
+                  {slotKop}
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '1rem', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Rust</div>
+                </div>
+              )
+              const i = workoutPlan.days.findIndex(d => d.id === slotId)
+              const dag = workoutPlan.days[i]
+              if (!dag) return null
+              // Spieren die de vorige cyclusdag ook al direct trainde: geen rustdag ertussen.
+              const vorige = cyc.slots[(plek - 1 + cyc.slots.length) % cyc.slots.length]
+              const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
+              return (
+              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+                {slotKop}
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
                   <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                    {minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef ·{' '}
+                    {(() => {
+                      // Max harde sets per training (output zakt daarna); alleen met klant.
+                      const n = setsVanTraining(dag.exercises || [])
+                      const max = volumeCtx ? maxSetsPerTraining(volumeCtx) : null
+                      return max && n > max
+                        ? <span title={`Meer dan ${max} harde sets in één training: de output van de latere sets zakt.`} style={{ color: '#ef4444', fontWeight: 900 }}>{n} sets / max {max}</span>
+                        : <>{n} sets</>
+                    })()}
+                  </span>
                   </button>
                   {(dag.exercises || []).length > 1 && (
                     <button onClick={() => sorteerOpSpier(dag.id)} title="Sorteer op spiergroep (zelfde spieren bij elkaar)" aria-label="Sorteer op spiergroep" style={{ ...iconKnop(), width: 24, height: 24, marginRight: -4 }}>
@@ -1248,6 +1339,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                     </button>
                   )}
                   </div>
+                  {ookGisteren.length > 0 && (
+                    <span title="Geen rustdag tussen twee trainingen van dezelfde spier." style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>
+                      ! {ookGisteren.map(k => spierLabel(k)).join(', ')} ook de dag ervoor
+                    </span>
+                  )}
+                  {(() => {
+                    const laat = zwaarTeLaat(dag.exercises || [])
+                    return laat ? (
+                      <span title="Zware compounds vooraan: daar is de output het hoogst (ACSM: de lift waarin je sterker wilt worden eerst)." style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>
+                        ! {laat.naam} pas als {laat.plek}e oefening
+                      </span>
+                    ) : null
+                  })()}
                   {/* Sets per spiergroep in de dagkop, niet in de lijst eronder. */}
                   {(dag.exercises || []).length > 0 && (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
@@ -1282,7 +1386,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                   <Plus size={16} strokeWidth={3} /> Oefening toevoegen
                 </button>
               </div>
-            ))}
+              )
+            })}
+            </div>
           </div>
         </div>}
       </>) : dagenDicht && !m ? null : (

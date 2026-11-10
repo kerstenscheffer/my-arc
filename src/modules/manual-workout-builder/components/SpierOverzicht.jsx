@@ -211,6 +211,7 @@ function RegelsUitleg({ kader }) {
         <div style={{ ...regel, color: '#fff', fontWeight: 900 }}>{pijl()}{r ? `${getal(r[0])}–${getal(r[1])} harde sets per spier per week` : '—'}{kader.start && kader.start !== r?.[0] ? ` (blok start op ${kader.start})` : ''}</div>
         <div style={regel}>{pijl()}{kader.statusLabel} · {kader.faseLabel}{kader.plus40 ? ' · 40+' : ''}</div>
         <div style={regel}>{pijl()}Elke spier minimaal 2x per week, max {kader.maxSessie} sets per spier per training</div>
+        {kader.maxTraining && <div style={regel}>{pijl()}Max {kader.maxTraining} harde sets per training in totaal: daarna zakt de output. Zware compounds vooraan</div>}
         <div style={regel}>{pijl()}De eerste 10 sets leveren het meest op; 10–20 vangt bijna alle winst, daarboven steeds minder</div>
         {cut && <div style={regel}>{pijl()}In een cut presteert 12 sets even goed als 20, zolang de gewichten blijven staan</div>}
       </div>

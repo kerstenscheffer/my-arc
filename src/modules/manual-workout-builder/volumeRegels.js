@@ -22,6 +22,15 @@ export const MAX_PER_SESSIE = { beginner: 5, intermediate: 8, advanced: 10 }
 export const MAX_PER_SESSIE_40PLUS = 7
 export const LEEFTIJD_40PLUS = 40
 
+// Max harde sets per training, alle spieren samen (10 nov 2026, Kerstens regel, niet
+// uit het onderzoek): na zoveel sets zakt de output van elke volgende set.
+export const MAX_SETS_PER_TRAINING = { beginner: 12, intermediate: 16, advanced: 20 }
+export const MAX_SETS_PER_TRAINING_40PLUS = 14
+// Zware compounds horen vooraan (ACSM: de lift waarin je sterker wilt worden eerst).
+// Staat er een vanaf deze plek (0 = eerste) na lichter werk, dan een melding.
+export const ZWAAR = /squat|deadlift|rdl|romanian|bench|overhead press|shoulder press|military|leg press|hack|hip thrust|pull.?up|chin.?up|t.?bar row|barbell row/i
+export const ZWAAR_VANAF_PLEK = 3
+
 // Elke spier minimaal zo vaak per week.
 export const MIN_FREQUENTIE = 2
 

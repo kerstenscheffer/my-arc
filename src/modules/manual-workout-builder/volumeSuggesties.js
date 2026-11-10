@@ -11,7 +11,7 @@ import { dekkingKoppen, kopVan, kopLabel, ONDERRUG_DIRECT, ONDERRUG_HEUP } from 
 import { minutenVoorOefeningen, MIN_PER_EXTRA_SET } from './trainingsTijd'
 import {
   RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS, MIN_FREQUENTIE, FACTOR, ALLEEN_PLAFOND, GEEN_DOEL,
-  SYNERGIST_GEWICHT, SYNERGISTEN_OP_NAAM, TREK, BOVEN_DRUK, HEUP, STIJGING_MIN, DALING_MIN, PLUS_PER_STAP, MAX_STAP, MIN_FRACTIE, LABEL_STATUS, LABEL_FASE,
+  SYNERGIST_GEWICHT, SYNERGISTEN_OP_NAAM, MAX_SETS_PER_TRAINING, MAX_SETS_PER_TRAINING_40PLUS, ZWAAR, ZWAAR_VANAF_PLEK, TREK, BOVEN_DRUK, HEUP, STIJGING_MIN, DALING_MIN, PLUS_PER_STAP, MAX_STAP, MIN_FRACTIE, LABEL_STATUS, LABEL_FASE,
 } from './volumeRegels'
 
 const rond = (v) => Math.round(v * 10) / 10
@@ -97,23 +97,46 @@ function trendPerSpier(days, logs = []) {
   return { perSpier: uit, perOef: oef, pct }
 }
 
+// Max harde sets per training voor deze klant.
+export function maxSetsPerTraining(ctx = {}) {
+  const status = MAX_SETS_PER_TRAINING[ctx.status] ? ctx.status : 'intermediate'
+  const m = MAX_SETS_PER_TRAINING[status]
+  return Number(ctx.leeftijd) >= LEEFTIJD_40PLUS ? Math.min(m, MAX_SETS_PER_TRAINING_40PLUS) : m
+}
+// Directe sets van een training (cardio telt niet).
+export const setsVanTraining = (exercises = []) => exercises.reduce((n, ex) => n + (ex.type === 'cardio' ? 0 : (Number(ex.sets) || 0)), 0)
+// Zware compound die pas laat komt, na lichter werk: { naam, plek } of null.
+export function zwaarTeLaat(exercises = []) {
+  const lijst = exercises.filter(ex => ex.type !== 'cardio')
+  for (let i = ZWAAR_VANAF_PLEK; i < lijst.length; i++) {
+    if (ZWAAR.test(lijst[i].name || '') && lijst.slice(0, i).some(ex => !ZWAAR.test(ex.name || ''))) return { naam: lijst[i].name, plek: i + 1 }
+  }
+  return null
+}
+
 // ctx: { status, fase, leeftijd, secMap, logs }
 // herstel: uit useHerstel ({ spier: { stand: 'groen'|'oranje'|'rood' } })
 // budget: max minuten per training
-export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 }) {
+// factor: 7 / cycluslengte (sets per cyclus → per week). rust: { spier: kleinste aantal
+// rustdagen tussen twee trainingen van die spier } (cyclus.js).
+export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90, factor = 1, rust = {} }) {
   const status = RANGE[ctx.status] ? ctx.status : 'intermediate'
   const fase = ['bulk', 'onderhoud', 'cut'].includes(ctx.fase) ? ctx.fase : 'onderhoud'
   const plus40 = Number(ctx.leeftijd) >= LEEFTIJD_40PLUS
   const maxSessie = plus40 ? Math.min(MAX_PER_SESSIE[status], MAX_PER_SESSIE_40PLUS) : MAX_PER_SESSIE[status]
   const secMap = ctx.secMap || {}
+  const maxTraining = maxSetsPerTraining({ ...ctx, status })
   const { perSpier: trend, perOef: trendOef, pct: krachtPct } = trendPerSpier(days, ctx.logs)
 
-  const perDag = days.map(d => ({ dag: d, sets: fractioneleSets(d.exercises || [], secMap), min: minutenVoorOefeningen(d.exercises || []) }))
+  const perDag = days.map(d => ({ dag: d, sets: fractioneleSets(d.exercises || [], secMap), min: minutenVoorOefeningen(d.exercises || []), totaal: setsVanTraining(d.exercises || []) }))
   const week = fractioneleSets(days.flatMap(d => d.exercises || []), secMap)
   const uit = {}
 
-  for (const [spier, { frac, direct }] of Object.entries(week)) {
-    const freq = perDag.filter(p => (p.sets[spier]?.frac || 0) > 0).length
+  for (const [spier, perCyclus] of Object.entries(week)) {
+    // Per week: een cyclus van 9 dagen telt voor 7/9.
+    const frac = perCyclus.frac * factor
+    const direct = Math.round(perCyclus.direct * factor * 10) / 10
+    const freq = Math.round(perDag.filter(p => (p.sets[spier]?.frac || 0) > 0).length * factor * 10) / 10
     const hoogsteSessie = Math.max(0, ...perDag.map(p => p.sets[spier]?.frac || 0))
     const [lo, hi, startW] = RANGE[status][fase]
     const f = FACTOR[spier] || 1
@@ -196,16 +219,20 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     }
 
     // Frequentie en per-sessie plafond: altijd melden, los van het oordeel.
-    if (range && frac > 0 && freq < MIN_FREQUENTIE) a.redenen.push(`maar ${freq}x per week (minimaal ${MIN_FREQUENTIE}x)`)
+    if (range && frac > 0 && freq < MIN_FREQUENTIE) a.redenen.push(`maar ${String(freq).replace('.', ',')}x per week (minimaal ${MIN_FREQUENTIE}x)`)
+    if (rust[spier] === 0) a.redenen.push('2 dagen achter elkaar getraind, geen rustdag ertussen')
     if (range && hoogsteSessie > maxSessie) a.redenen.push(`${rond(hoogsteSessie)} sets in één training (max ${maxSessie})`)
 
     // Wat de knop doet.
-    if (a.actie?.soort === 'plus') a.wijzigingen = plusPlan(perDag, spier, a.actie.aantal, maxSessie, budget, new Set([...pijnReeks, ...pijnEens.map(sleutel)]))
+    if (a.actie?.soort === 'plus') a.wijzigingen = plusPlan(perDag, spier, a.actie.aantal, maxSessie, budget, new Set([...pijnReeks, ...pijnEens.map(sleutel)]), maxTraining)
     if (a.actie?.soort === 'min') a.wijzigingen = minPlan(days, spier, a.actie.aantal)
     if (a.actie && a.actie.soort !== 'wissel' && !a.wijzigingen?.length) {
       if (a.actie.soort === 'plus') {
         const eigen = days.some(d => (d.exercises || []).some(ex => ex.type !== 'cardio' && spierVan(ex) === spier))
-        a.tekst += eigen ? ' Geen training met tijd of ruimte over.' : ' Er staat geen eigen oefening voor deze spier in het plan: voeg er een toe.'
+        const vol = perDag.some(p => p.totaal + 1 > maxTraining && (p.sets[spier]?.frac || 0) > 0)
+        a.tekst += !eigen ? ' Er staat geen eigen oefening voor deze spier in het plan: voeg er een toe.'
+          : vol ? ` Geen ruimte: de trainingen zitten vol (max ${maxTraining} sets per training). Extra training of deload.`
+            : ' Geen training met tijd of ruimte over.'
       }
       a.actie = null
     }
@@ -238,20 +265,22 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
 // het per-sessie plafond het toelaten. Liefst een dag die de spier nog niet traint
 // als hij onder de minimale frequentie zit; dat lukt alleen als er daar een oefening
 // van die spier staat, dus anders de laagste.
-function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set()) {
-  const stand = perDag.map(p => ({ dag: p.dag, min: p.min, frac: p.sets[spier]?.frac || 0, oefs: (p.dag.exercises || []).map(ex => ({ ex, sets: Number(ex.sets) || 2, van: Number(ex.sets) || 2 })) }))
+function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set(), maxTraining = Infinity) {
+  const stand = perDag.map(p => ({ dag: p.dag, min: p.min, totaal: p.totaal, frac: p.sets[spier]?.frac || 0, oefs: (p.dag.exercises || []).map((ex, plek) => ({ ex, plek, sets: Number(ex.sets) || 2, van: Number(ex.sets) || 2 })) }))
   const wijz = []
   for (let i = 0; i < aantal; i++) {
     let beste = null
     for (const d of stand) {
-      if (d.min + MIN_PER_EXTRA_SET > budget || d.frac + 1 > maxSessie) continue
+      if (d.min + MIN_PER_EXTRA_SET > budget || d.frac + 1 > maxSessie || d.totaal + 1 > maxTraining) continue
       for (const o of d.oefs) {
         if (o.ex.type === 'cardio' || spierVan(o.ex) !== spier || pijn.has(sleutel(o.ex.name))) continue // geen set erbij op een oefening met pijn
-        if (!beste || o.sets < beste.o.sets || (o.sets === beste.o.sets && d.frac < beste.d.frac)) beste = { d, o }
+        // Minste sets eerst; gelijk: liefst vooraan in de training (output is daar hoger),
+        // dan de dag waar deze spier het minst krijgt.
+        if (!beste || o.sets < beste.o.sets || (o.sets === beste.o.sets && (o.plek < beste.o.plek || (o.plek === beste.o.plek && d.frac < beste.d.frac)))) beste = { d, o }
       }
     }
     if (!beste) break
-    beste.o.sets++; beste.d.frac++; beste.d.min += MIN_PER_EXTRA_SET
+    beste.o.sets++; beste.d.frac++; beste.d.min += MIN_PER_EXTRA_SET; beste.d.totaal++
     wijz.push({ dayId: beste.d.dag.id, exId: beste.o.ex.id, naam: beste.o.ex.name, dagNaam: beste.d.dag.name, van: beste.o.van, delta: 1 })
   }
   return samenvoegen(wijz)
