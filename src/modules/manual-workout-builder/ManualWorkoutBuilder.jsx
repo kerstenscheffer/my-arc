@@ -1,5 +1,5 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { voorstelPlan } from './dagTitel'
 import { createPortal } from '../../client/paginaPortal'
 import useHistoryState from './hooks/useHistoryState'
@@ -32,9 +32,11 @@ import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag, spierVan } from './spierGroepen'
+import { setsPerSpierDag } from './spierGroepen'
 import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
+import { useVolumeContext } from './components/useVolumeContext'
+import { volumeAdvies, fractioneleSets } from './volumeSuggesties'
 import KrachtGrafiek from './components/KrachtGrafiek'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -521,33 +523,35 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   // Herstel per spiergroep uit de bouwfase-feedback van de klant (10 nov 2026).
   const herstel = useHerstel(db, effectiveClient?.id, agendaKey)
-  // Waar een extra set van spiergroep `k` landt: de oefening met de minste sets,
-  // op een dag waar nog 3 minuten bij kunnen binnen de trainingsduur van de klant
-  // (intake, anders 60 min). Gelijk aantal sets: de eerste dag.
-  const plusSetDoel = (k) => {
-    // Intake-keuzes zijn bandbreedtes (30 = "30 tot 45 min"): we nemen de bovenkant.
-    // Niets ingevuld = coach bepaalt = 60-90 min, dus 90.
-    const BOVEN = { 30: 45, 45: 60, 60: 75, 75: 90, 90: 90 }
-    const keuze = Number(trainingInfo?.sessieMin) || Number(trainingInfo?.minutes_per_session) || 0
-    const budget = BOVEN[keuze] || keuze || 90
-    let beste = null
-    workoutPlan.days.forEach((d, i) => {
-      if (minutenVoorOefeningen(d.exercises || []) + 3 > budget) return
-      for (const ex of d.exercises || []) {
-        if (ex.type === 'cardio' || spierVan(ex) !== k) continue
-        const sets = Number(ex.sets) || 2
-        if (!beste || sets < beste.sets) beste = { dayId: d.id, exId: ex.id, sets, oefening: ex.name || 'oefening', dagNaam: d.name || `Dag ${i + 1}` }
-      }
-    })
-    return beste
+  // Volume-suggesties per spiergroep (volumeSuggesties.js + volumeRegels.js,
+  // op basis van Kerstens volume-onderzoek, 10 nov 2026).
+  const volumeCtx = useVolumeContext(db, effectiveClient?.id, agendaKey)
+  // Intake-keuzes zijn bandbreedtes (30 = "30 tot 45 min"): we nemen de bovenkant.
+  // Niets ingevuld = coach bepaalt = 60-90 min, dus 90.
+  const BOVEN = { 30: 45, 45: 60, 60: 75, 75: 90, 90: 90 }
+  const sessieKeuze = Number(trainingInfo?.sessieMin) || Number(trainingInfo?.minutes_per_session) || 0
+  const sessieBudget = BOVEN[sessieKeuze] || sessieKeuze || 90
+  const advies = useMemo(
+    () => (effectiveClient?.id && volumeCtx ? volumeAdvies({ days: workoutPlan.days, ctx: volumeCtx, herstel, budget: sessieBudget }) : {}),
+    [effectiveClient?.id, volumeCtx, workoutPlan.days, herstel, sessieBudget],
+  )
+  // Pijntje: het wisselvenster openen voor die oefening.
+  const wisselVanuitAdvies = (w) => {
+    const ex = workoutPlan.days.find(d => d.id === w.dayId)?.exercises?.find(e => e.id === w.exId)
+    if (ex) setWissel({ dayId: w.dayId, ex })
   }
-  const voegSetToe = (doel) => {
-    if (!doel) return
+  const voerAdviesUit = (a) => {
+    const wijz = a?.wijzigingen || []
+    if (!wijz.length) return
     setWorkoutPlan(prev => ({
       ...prev,
       days: prev.days.map(d => {
-        if (d.id !== doel.dayId) return d
-        const exercises = d.exercises.map(ex => (ex.id === doel.exId ? { ...ex, sets: (Number(ex.sets) || 2) + 1 } : ex))
+        const hier = wijz.filter(w => w.dayId === d.id)
+        if (!hier.length) return d
+        const exercises = d.exercises.map(ex => {
+          const w = hier.find(x => x.exId === ex.id)
+          return w ? { ...ex, sets: Math.max(1, (Number(ex.sets) || 2) + w.delta) } : ex
+        })
         return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
       }),
     }))
@@ -1119,15 +1123,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
               <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.2rem 0' }}>
                 <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Week</span>
+                {volumeCtx && effectiveClient?.id && (
+                  <span title={`Volumedoel volgens ${volumeCtx.statusBekend ? 'ervaring uit de intake' : 'aanname: ervaring onbekend'} en ${volumeCtx.faseBekend ? 'de lopende fase' : 'geen lopende fase'}`} style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+                    {({ beginner: 'Beginner', intermediate: 'Intermediair', advanced: 'Gevorderd' })[volumeCtx.status]}{volumeCtx.statusBekend ? '' : '?'} · {({ bulk: 'Build', onderhoud: 'Onderhoud', cut: 'Cut' })[volumeCtx.fase]}
+                  </span>
+                )}
                 {cijfer(workoutPlan.days.length, 'dagen')}
                 {cijfer(totaalMin, 'min')}
                 {cijfer(kracht.length, 'oef')}
                 {cijfer(kracht.reduce((n, ex) => n + (Number(ex.sets) || 0), 0), 'sets')}
                 <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-                  {setsPerSpierDag(alle).map(([k, n]) => {
-                    const doel = herstel[k]?.stand === 'groen' ? plusSetDoel(k) : null
-                    return <SpierChip key={k} spier={k} sets={n} info={herstel[k]} doel={doel} onPlusSet={() => voegSetToe(doel)} />
+                  {Object.entries(fractioneleSets(alle, volumeCtx?.secMap || {})).sort((x, y) => y[1].frac - x[1].frac).map(([k, v]) => {
+                    return <SpierChip key={k} spier={k} sets={String(Math.round(v.frac * 10) / 10).replace('.', ',')} info={herstel[k]} advies={advies[k]} onActie={voerAdviesUit} onWissel={wisselVanuitAdvies} />
                   })}
                 </span>
                 {effectiveClient?.id && (
@@ -1154,8 +1162,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                   {(dag.exercises || []).length > 0 && (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
                       {setsPerSpierDag(dag.exercises).map(([k, n]) => {
-                        const doel = herstel[k]?.stand === 'groen' ? plusSetDoel(k) : null
-                        return <SpierChip key={k} klein spier={k} sets={n} info={herstel[k]} doel={doel} onPlusSet={() => voegSetToe(doel)} />
+                        return <SpierChip key={k} klein spier={k} sets={n} info={herstel[k]} advies={advies[k]} onActie={voerAdviesUit} onWissel={wisselVanuitAdvies} />
                       })}
                     </span>
                   )}
