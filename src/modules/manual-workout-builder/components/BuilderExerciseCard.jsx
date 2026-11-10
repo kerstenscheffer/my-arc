@@ -9,6 +9,7 @@ import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLef
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
 import { LABEL as SPIER_LABEL, KEUZE as SPIER_KEUZE, spierVan } from '../spierGroepen'
+import { KOPPEN, kopVan } from '../koppen'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
 const _equipCache = { data: null, promise: null }
@@ -382,6 +383,16 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                   </select>
                 </div>
               </div>
+              {/* Kop / deel binnen de spiergroep: automatisch uit de naam, of vastzetten. */}
+              {KOPPEN[spierVan(exercise)] && (
+                <div>
+                  <label style={label}>Kop / deel</label>
+                  <select value={exercise.kop || ''} onChange={(e) => onField('kop', e.target.value || null)} style={{ ...input, colorScheme: 'dark', cursor: 'pointer' }}>
+                    <option value="">Automatisch{kopVan({ ...exercise, kop: null }) ? ` (${KOPPEN[spierVan(exercise)].koppen.find(([k]) => k === kopVan({ ...exercise, kop: null }))?.[1]})` : ' (beide koppen)'}</option>
+                    {KOPPEN[spierVan(exercise)].koppen.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.6rem' }}>
                 <div><label style={label}>Sets</label><input type="number" min={1} max={30} value={exercise.sets ?? 3} onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
                 <div><label style={label}>Reps</label><input value={exercise.reps ?? '10'} onChange={(e) => onField('reps', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>

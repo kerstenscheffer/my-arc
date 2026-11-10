@@ -7,6 +7,7 @@
 // doet als de coach hem indrukt.
 
 import { spierVan } from './spierGroepen'
+import { dekkingKoppen, kopVan, kopLabel } from './koppen'
 import { minutenVoorOefeningen, MIN_PER_EXTRA_SET } from './trainingsTijd'
 import {
   RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS, MIN_FREQUENTIE, FACTOR, ALLEEN_PLAFOND, GEEN_DOEL,
@@ -201,6 +202,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     }
     a.context = `${LABEL_STATUS[status]} · ${LABEL_FASE[fase]}${plus40 ? ' · 40+' : ''}`
     a.bronnen = bronnenVan(days, spier, secMap)
+    a.koppen = dekkingKoppen(days.flatMap(d => d.exercises || []), spier)
     uit[spier] = a
   }
   return uit
@@ -211,7 +213,7 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
 // als hij onder de minimale frequentie zit; dat lukt alleen als er daar een oefening
 // van die spier staat, dus anders de laagste.
 function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set()) {
-  const stand = perDag.map(p => ({ dag: p.dag, min: p.min, frac: p.sets[spier]?.frac || 0, oefs: (p.dag.exercises || []).map(ex => ({ ex, sets: Number(ex.sets) || 2 })) }))
+  const stand = perDag.map(p => ({ dag: p.dag, min: p.min, frac: p.sets[spier]?.frac || 0, oefs: (p.dag.exercises || []).map(ex => ({ ex, sets: Number(ex.sets) || 2, van: Number(ex.sets) || 2 })) }))
   const wijz = []
   for (let i = 0; i < aantal; i++) {
     let beste = null
@@ -224,7 +226,7 @@ function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set()) {
     }
     if (!beste) break
     beste.o.sets++; beste.d.frac++; beste.d.min += MIN_PER_EXTRA_SET
-    wijz.push({ dayId: beste.d.dag.id, exId: beste.o.ex.id, naam: beste.o.ex.name, dagNaam: beste.d.dag.name, delta: 1 })
+    wijz.push({ dayId: beste.d.dag.id, exId: beste.o.ex.id, naam: beste.o.ex.name, dagNaam: beste.d.dag.name, van: beste.o.van, delta: 1 })
   }
   return samenvoegen(wijz)
 }
@@ -232,13 +234,13 @@ function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set()) {
 // Sets eraf: telkens van de oefening met de meeste sets, nooit onder 1.
 function minPlan(days, spier, aantal) {
   const oefs = days.flatMap(d => (d.exercises || []).filter(ex => ex.type !== 'cardio' && spierVan(ex) === spier)
-    .map(ex => ({ d, ex, sets: Number(ex.sets) || 2 })))
+    .map(ex => ({ d, ex, sets: Number(ex.sets) || 2, van: Number(ex.sets) || 2 })))
   const wijz = []
   for (let i = 0; i < aantal; i++) {
     const o = oefs.filter(x => x.sets > 1).sort((a, b) => b.sets - a.sets)[0]
     if (!o) break
     o.sets--
-    wijz.push({ dayId: o.d.id, exId: o.ex.id, naam: o.ex.name, dagNaam: o.d.name, delta: -1 })
+    wijz.push({ dayId: o.d.id, exId: o.ex.id, naam: o.ex.name, dagNaam: o.d.name, van: o.van, delta: -1 })
   }
   return samenvoegen(wijz)
 }
@@ -256,7 +258,7 @@ function bronnenVan(days, spier, secMap) {
       const w = p === spier ? 1 : (synergistenVan(ex, secMap, p).find(([s]) => s === spier)?.[1] || 0)
       if (!w) continue
       const k = sleutel(ex.name)
-      const x = m.get(k) || { naam: ex.name, sets: 0, gewicht: w, dagen: [] }
+      const x = m.get(k) || { naam: ex.name, sets: 0, gewicht: w, dagen: [], kop: p === spier ? kopLabel(spier, kopVan(ex)) : null }
       x.sets += sets
       if (d.name && !x.dagen.includes(d.name)) x.dagen.push(d.name)
       m.set(k, x)

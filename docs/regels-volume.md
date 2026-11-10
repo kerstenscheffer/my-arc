@@ -47,3 +47,9 @@ Niets gaat automatisch; de coach drukt op de knop en slaat het plan op.
 ## Nog niet in de code
 Deload na 4-6 weken (sets −30-50%), krachtdoelen (2-4 zware sets eerst), vrouwen kortere rust,
 extra sport/cardio, vakantie-onderhoud (4-6 sets in 1 sessie).
+
+## Koppen / delen (Kerstens indeling, geen onderzoek)
+Code: `src/modules/manual-workout-builder/koppen.js`. Alleen dekking (directe sets per kop, oranje bij 0), geen setdoel of advies.
+Borst: bovenborst / midden · Rug: lats / bovenrug · Triceps: lange / laterale kop · Biceps: lange / korte kop / brachialis
+(gewone curl = beide koppen) · Quads: rectus femoris / vasti · Hamstrings: knie-buigers / heup-strekkers · Billen: max / medius.
+Kop komt uit de naam; per oefening vast te zetten in het bewerkvenster (veld `kop` in het plan).

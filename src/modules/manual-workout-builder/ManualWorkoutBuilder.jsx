@@ -32,12 +32,23 @@ import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag } from './spierGroepen'
+import { setsPerSpierDag, spierLabel } from './spierGroepen'
 import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
 import { useVolumeContext } from './components/useVolumeContext'
 import { volumeAdvies, fractioneleSets } from './volumeSuggesties'
+
+// Weektotalen per lichaamsdeel (10 nov 2026).
+const SPIER_BLOKKEN = [
+  ['Borst', ['chest']],
+  ['Rug', ['back', 'traps']],
+  ['Schouders', ['front_delts', 'side_delts', 'rear_delts', 'shoulders']],
+  ['Armen', ['biceps', 'triceps']],
+  ['Benen', ['quads', 'hamstrings', 'glutes', 'calves', 'legs']],
+  ['Buik', ['abs', 'core']],
+]
 import KrachtGrafiek from './components/KrachtGrafiek'
+import SpierOverzicht from './components/SpierOverzicht'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -63,6 +74,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // sets/reps/rust blijven staan.
   const [wissel, setWissel] = useState(null)
   const [krachtOpen, setKrachtOpen] = useState(false)
+  // Uitgeklapt overzicht per spiergroep met koppen; onthouden per browser.
+  const [overzichtOpen, setOverzichtOpenState] = useState(() => { try { return localStorage.getItem('mwb_spier_overzicht') === '1' } catch { return false } })
+  const setOverzichtOpen = (v) => { setOverzichtOpenState(v); try { localStorage.setItem('mwb_spier_overzicht', v ? '1' : '0') } catch { /* leeg */ } }
   // Selecteren door te slepen in Alle dagen (10 nov 2026): sleutels `${dagId}|${oefId}`.
   const [selectie, setSelectie] = useState(() => new Set())
   const [lasso, setLasso] = useState(null)
@@ -1111,39 +1125,46 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         {/* Totaal van de hele week boven de kolommen (10 nov 2026). */}
         {(() => {
           const alle = workoutPlan.days.flatMap(d => d.exercises || [])
-          const kracht = alle.filter(ex => ex.type !== 'cardio')
-          const totaalMin = workoutPlan.days.reduce((n, d) => n + minutenVoorOefeningen(d.exercises || []), 0)
-          const cijfer = (v, l) => (
-            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
-              <b style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{v}</b>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l}</span>
-            </span>
-          )
+          const sets = fractioneleSets(alle, volumeCtx?.secMap || {})
+          const gehad = new Set()
+          const blokken = SPIER_BLOKKEN.map(([titel, keys]) => {
+            const hier = keys.filter(k => sets[k])
+            hier.forEach(k => gehad.add(k))
+            return [titel, hier]
+          })
+          const rest = Object.keys(sets).filter(k => !gehad.has(k))
+          if (rest.length) blokken.push(['Overig', rest])
+          const gevuld = blokken.filter(([, ks]) => ks.length)
           return (
             <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
               <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.2rem 0' }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Week</span>
-                {volumeCtx && effectiveClient?.id && (
-                  <span title={`Volumedoel volgens ${volumeCtx.statusBekend ? 'ervaring uit de intake' : 'aanname: ervaring onbekend'} en ${volumeCtx.faseBekend ? 'de lopende fase' : 'geen lopende fase'}`} style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
-                    {({ beginner: 'Beginner', intermediate: 'Intermediair', advanced: 'Gevorderd' })[volumeCtx.status]}{volumeCtx.statusBekend ? '' : '?'} · {({ bulk: 'Build', onderhoud: 'Onderhoud', cut: 'Cut' })[volumeCtx.fase]}
-                  </span>
-                )}
-                {cijfer(workoutPlan.days.length, 'dagen')}
-                {cijfer(totaalMin, 'min')}
-                {cijfer(kracht.length, 'oef')}
-                {cijfer(kracht.reduce((n, ex) => n + (Number(ex.sets) || 0), 0), 'sets')}
-                <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
-                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-                  {Object.entries(fractioneleSets(alle, volumeCtx?.secMap || {})).sort((x, y) => y[1].frac - x[1].frac).map(([k, v]) => {
-                    return <SpierChip key={k} spier={k} sets={String(Math.round(v.frac * 10) / 10).replace('.', ',')} info={herstel[k]} advies={advies[k]} onActie={voerAdviesUit} onWissel={wisselVanuitAdvies} />
-                  })}
+                {/* Per lichaamsdeel gegroepeerd (borst, rug, schouders, armen, benen). */}
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 26px' }}>
+                  {(() => {
+                    return gevuld.map(([titel, ks]) => (
+                      <span key={titel} style={{ display: 'inline-flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{titel}</span>
+                        {ks.map(k => (
+                          <SpierChip key={k} spier={k} toonNaam={!(ks.length === 1 && spierLabel(k) === titel)} sets={String(Math.round(sets[k].frac * 10) / 10).replace('.', ',')} info={herstel[k]} advies={advies[k]} onActie={voerAdviesUit} onWissel={wisselVanuitAdvies} />
+                        ))}
+                      </span>
+                    ))
+                  })()}
                 </span>
+                <button onClick={() => setOverzichtOpen(!overzichtOpen)} aria-expanded={overzichtOpen} title="Per spiergroep met koppen" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.75rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', background: overzichtOpen ? '#fff' : 'transparent', color: overzichtOpen ? '#000' : '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                  Overzicht <ChevronDown size={14} strokeWidth={2.6} style={{ transform: overzichtOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
                 {effectiveClient?.id && (
                   <button onClick={() => setKrachtOpen(true)} title="Krachtverloop per spiergroep" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.75rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
                     <BarChart3 size={14} strokeWidth={2.6} /> Kracht
                   </button>
                 )}
               </div>
+              {overzichtOpen && (
+                <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: '42vh', overflowY: 'auto' }}>
+                  <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel} />
+                </div>
+              )}
             </div>
           )
         })()}

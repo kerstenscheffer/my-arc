@@ -35,9 +35,12 @@ const OORDEEL = {
 const TREND = { stijgt: 'Kracht stijgt', stagneert: 'Kracht staat stil', daalt: 'Kracht daalt' }
 const getal = (v) => String(v).replace('.', ',')
 
-export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein = false }) {
+export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein = false, toonNaam = true }) {
   const [open, setOpen] = useState(false)
   const [plek, setPlek] = useState(null)
+  // Eerst laten zien wat er verandert, pas na Akkoord uitvoeren (10 nov 2026).
+  const [bevestig, setBevestig] = useState(false)
+  useEffect(() => { if (!open) setBevestig(false) }, [open])
   const knop = useRef(null)
   const paneel = useRef(null)
   const stand = info?.stand || null
@@ -70,7 +73,7 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
         fontFamily: 'inherit', cursor: klikbaar ? 'pointer' : 'default', whiteSpace: 'nowrap',
         fontSize: klein ? '0.7rem' : '0.8rem', fontWeight: 800, color: onbekend ? '#f59e0b' : 'rgba(255,255,255,0.65)',
       }}>
-        {spierLabel(spier)} <b style={{ fontWeight: 900, color: onbekend ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{sets}</b>
+        {toonNaam && spierLabel(spier)} <b style={{ fontWeight: 900, color: onbekend ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{sets}</b>
         <HerstelStip stand={stand} maat={klein ? 6 : 7} />
         {o && <span style={{ fontSize: klein ? '0.68rem' : '0.76rem', fontWeight: 900, color: o.kleur, marginLeft: 1 }}>{o.teken}</span>}
       </button>
@@ -113,6 +116,16 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
                 )}
               </div>
             )}
+            {advies?.koppen?.length > 0 && (<>
+              <div style={titel}>Koppen · directe sets</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', padding: '0.15rem 0.8rem 0.2rem' }}>
+                {advies.koppen.map(k => (
+                  <span key={k.label} title={k.sets === 0 ? 'Geen oefening voor deze kop' : undefined} style={{ fontSize: '0.78rem', fontWeight: 800, color: k.sets === 0 ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
+                    {k.label} <b style={{ fontWeight: 900, color: k.sets === 0 ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{k.sets}</b>
+                  </span>
+                ))}
+              </div>
+            </>)}
             {advies?.bronnen?.length > 0 && (<>
               <div style={titel}>Oefeningen</div>
               {advies.bronnen.map(b => (
@@ -120,7 +133,7 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.naam}</span>
                     <span style={{ display: 'block', fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {b.dagen.join(', ')}{b.gewicht < 1 ? ' · telt half' : ''}
+                      {[b.kop, b.dagen.join(', '), b.gewicht < 1 ? 'telt half' : null].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                   <span style={{ flexShrink: 0, fontSize: '0.78rem', fontWeight: 900, color: b.gewicht < 1 ? 'rgba(255,255,255,0.55)' : '#fff', fontVariantNumeric: 'tabular-nums' }}>
@@ -173,13 +186,32 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
           )}
           {advies?.actie && advies.actie.soort !== 'wissel' && advies.wijzigingen?.length > 0 && (
             <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0.6rem 0.8rem' }}>
-              <button onClick={() => { onActie?.(advies); setOpen(false) }} style={{
-                width: '100%', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: '#fff', color: '#000', border: 'none', borderRadius: 9, fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-              }}>
-                {advies.actie.soort === 'plus' ? <Plus size={15} strokeWidth={3} /> : <Minus size={15} strokeWidth={3} />}
-                {advies.actie.soort === 'plus' ? 'Sets toevoegen' : 'Sets weghalen'}
-              </button>
+              {bevestig ? (<>
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginBottom: 6 }}>Dit wordt aangepast:</div>
+                {advies.wijzigingen.map(w => (
+                  <div key={`${w.dayId}|${w.exId}`} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.2rem 0' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {w.naam}{w.dagNaam ? <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}> · {w.dagNaam}</span> : null}
+                    </span>
+                    <span style={{ flexShrink: 0, fontSize: '0.78rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                      {w.van} → {Math.max(1, w.van + w.delta)} sets
+                    </span>
+                  </div>
+                ))}
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', margin: '6px 0 8px' }}>Pas definitief na Opslaan; terugdraaien kan met ongedaan maken.</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setBevestig(false)} style={{ flex: 1, height: 38, background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 9, fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Annuleren</button>
+                  <button onClick={() => { onActie?.(advies); setOpen(false) }} style={{ flex: 1.4, height: 38, background: '#fff', color: '#000', border: 'none', borderRadius: 9, fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Akkoord, aanpassen</button>
+                </div>
+              </>) : (
+                <button onClick={() => setBevestig(true)} style={{
+                  width: '100%', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  background: '#fff', color: '#000', border: 'none', borderRadius: 9, fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                }}>
+                  {advies.actie.soort === 'plus' ? <Plus size={15} strokeWidth={3} /> : <Minus size={15} strokeWidth={3} />}
+                  {advies.actie.soort === 'plus' ? 'Sets toevoegen' : 'Sets weghalen'}
+                </button>
+              )}
             </div>
           )}
         </div>,
