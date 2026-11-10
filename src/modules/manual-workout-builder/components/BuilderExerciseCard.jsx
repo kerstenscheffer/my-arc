@@ -37,6 +37,9 @@ export default function BuilderExerciseCard({
   // Zelfde vorm als de maaltijdkaart in de Plan Analyzer: foto links met het
   // nummer, naam en sets rechts, en een knoppenrij eronder.
   kaartStijl = false,
+  // Alle dagen naast elkaar (10 nov 2026): één regel, kleine letters, geen
+  // knoppenrij. Tik op de kaart = bewerken, foto = video.
+  compact = false,
 }) {
   const { imageUrls, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 64 : 76
@@ -70,6 +73,45 @@ export default function BuilderExerciseCard({
   const statText = isCardio
     ? [exercise.duration, exercise.distance, exercise.intensity].filter(Boolean).join(' · ') || 'Cardio'
     : `${exercise.sets ?? 2} × ${exercise.reps ?? '8-12'}  ·  ${exercise.rust ?? exercise.rest ?? '2 min'} rust`
+
+  if (compact) {
+    const icoon = { width: 24, height: 24, padding: 0, background: 'transparent', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
+    return (
+      <div {...greep} onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken" style={{
+        ...greep?.style,
+        margin: '0 0.6rem', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, padding: 5, paddingRight: 4,
+        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10, cursor: 'pointer',
+      }}>
+        <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
+          width: 38, height: 38, flexShrink: 0, position: 'relative', overflow: 'hidden', borderRadius: 7, background: '#1a1a1a',
+        }}>
+          <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
+          <span style={{ position: 'absolute', left: 4, bottom: 2, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{index + 1}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+          </div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+            {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}</>}
+          </div>
+        </div>
+        <button data-geen-sleep onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={icoon}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }} onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)' }}>
+          <Trash2 size={13} strokeWidth={2.4} />
+        </button>
+        {editing && (
+          <ExerciseEditModal
+            exercise={exercise} isCardio={isCardio} isMobile={isMobile}
+            hasVid={hasVid} onField={onField} onVideo={onVideo}
+            coachEquip={coachEquip}
+            onClose={() => setEditing(false)}
+          />
+        )}
+      </div>
+    )
+  }
 
   if (kaartStijl) {
     const m = isMobile

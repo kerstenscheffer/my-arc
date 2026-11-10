@@ -777,7 +777,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
-      height: m ? 'auto' : 'calc(100vh - 120px)', overflow: 'hidden', background: '#0a0a0a',
+      height: m ? 'auto' : 'calc(100vh - 120px)', overflow: 'hidden', background: '#000',
     }}>
 
       {/* ══════════════ KOPBALK ══════════════
@@ -942,20 +942,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       )}
       {!m && alleDagen && workoutPlan.days.length > 1 ? (
         <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
-          <div style={{ display: 'flex', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {workoutPlan.days.map((dag, i) => (
-              <div key={dag.id} style={{ width: 330, flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.75rem 0.85rem 0.6rem', background: 'none', border: 'none',
+                  flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 7, padding: '0.6rem 0.7rem 0.5rem', background: 'none', border: 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
                 }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
                 </button>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.7rem 0 130px', scrollbarWidth: 'thin' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0 130px', scrollbarWidth: 'thin' }}>
                   <DayBuilder
-                    key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop
+                    key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop compact
                     onActivate={() => setActiveDay(dag.id)}
                     onUpdate={(updates) => updateDay(dag.id, updates)}
                     onDelete={() => deleteDay(dag.id)}

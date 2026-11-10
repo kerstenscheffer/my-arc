@@ -932,6 +932,16 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
   // Standaard alleen wat de klant echt invulde. Lege of overgeslagen vragen
   // pas op verzoek, voor als je wil checken wat iemand heeft overgeslagen.
   const [toonLeeg, setToonLeeg] = useState(false)
+  // Conceptplan laten bouwen door de plan-bouwer (edge function). Draait op de
+  // server op de achtergrond; de coach krijgt een melding als het klaar is en
+  // opent het in de Plan Analyzer. Gaat nooit naar de klant (concept).
+  const [planStatus, setPlanStatus] = useState(null) // null | 'bezig' | 'gestart' | foutmelding
+  const maakConcept = async () => {
+    if (!client?.id || planStatus === 'bezig') return
+    setPlanStatus('bezig')
+    const { error } = await db.supabase.functions.invoke('plan-bouwer', { body: { client_id: client.id } })
+    setPlanStatus(error ? `Starten mislukt: ${error.message || error}` : 'gestart')
+  }
   const leegKnop = (
     <div style={{ display: 'flex', justifyContent: 'center', padding: '0.4rem 0 0.8rem' }}>
       <button onClick={() => setToonLeeg(v => !v)} style={{
@@ -1271,6 +1281,21 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
               </div>
             ) : (
               <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+                  <button onClick={maakConcept} disabled={planStatus === 'bezig'} style={{
+                    minHeight: 40, padding: '0 1rem', borderRadius: 12, border: 'none',
+                    background: '#fff', color: '#000', fontSize: '0.82rem', fontWeight: 900,
+                    fontFamily: 'inherit', cursor: planStatus === 'bezig' ? 'wait' : 'pointer',
+                  }}>
+                    {planStatus === 'bezig' ? 'Starten…' : 'Maak conceptplan'}
+                  </button>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: planStatus && planStatus !== 'bezig' && planStatus !== 'gestart' ? '#ef4444' : 'rgba(255,255,255,0.55)' }}>
+                    {planStatus === 'gestart'
+                      ? 'Wordt gebouwd (1 à 2 min). Je krijgt een melding, daarna staat het als concept in de Plan Analyzer.'
+                      : planStatus && planStatus !== 'bezig' ? planStatus
+                      : 'Bouwt een voedingsplan uit deze intake, agenda en macro\'s. Alleen als concept.'}
+                  </span>
+                </div>
                 <Screenshots urls={np?.voeding_screenshots} isMobile={isMobile} />
                 {renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) }, toonLeeg)}
                 {leegKnop}

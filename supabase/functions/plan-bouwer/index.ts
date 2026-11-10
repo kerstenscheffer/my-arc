@@ -266,6 +266,85 @@ Regels:
 - Houd je strikt aan allergieën, dieet en wat de klant niet lekker vindt.
 - "opmerkingen": max 3 korte zinnen voor de coach (bv. wat je hebt aangevuld en waarom). Nederlands, geen gedachtestreepjes.`
 
+// ── 6. Week opbouwen (puur: geen database, makkelijk lokaal te testen) ──────
+type Gerecht = { naam: string; bron: string; ingr: Ingr[]; mist: string[] }
+type Dag = { nl: string; en: string; idx: number; training: boolean; maaltijden: Maaltijd[] }
+export function bouwWeek(dagen: Dag[], gerechten: Record<string, Gerecht[]>, dag: Macro) {
+  const ICON: Record<string, string> = { pre: '🏋️', post: '💪' }
+  const FUNCTIE: Record<string, string> = { pre: 'PRE-WORKOUT', post: 'POST-WORKOUT HERSTEL' }
+  const week: Record<string, any> = {}
+  const afwijkingen: string[] = []
+  for (const d of dagen) {
+    const dagObj: any = { is_training_day: d.training }
+    const tot = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    const gekozen = d.maaltijden.map(m => {
+      const lijst = gerechten[m.moment] || []
+      return lijst.length ? { m, gerecht: lijst[d.idx % lijst.length] } : null
+    })
+    d.maaltijden.forEach((m, k) => { if (!gekozen[k]) afwijkingen.push(`${d.nl}: geen gerecht voor ${m.moment}`) })
+    // Dagbalans: wat de dag te veel of te weinig heeft, verdelen over alle
+    // maaltijden (naar verhouding van hun doel) en opnieuw rekenen. Een paar
+    // rondes, want gerechten hebben ondergrenzen (een wrap, een appel).
+    const doelen = gekozen.map(x => x ? { ...x.m.doel! } : null)
+    let berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
+    for (let ronde = 0; ronde < 10; ronde++) {
+      const som = berekend.reduce<Macro>((s, b) => b ? { p: s.p + b.tot.p, c: s.c + b.tot.c, f: s.f + b.tot.f } : s, { p: 0, c: 0, f: 0 })
+      const fout = { p: dag.p - som.p, c: dag.c - som.c, f: dag.f - som.f }
+      if (Math.abs(fout.p) < 3 && Math.abs(fout.c) < 5 && Math.abs(fout.f) < 2) break
+      const somDoel = doelen.reduce<Macro>((s, t) => t ? { p: s.p + t.p, c: s.c + t.c, f: s.f + t.f } : s, { p: 0, c: 0, f: 0 })
+      // Carb timing beschermen: een teveel aan koolhydraten gaat vooral van de
+      // gewone maaltijden af, een tekort gaat vooral naar de post-workout. Zo
+      // blijft de post-workout de grootste koolhydraatmaaltijd van de dag.
+      const rolVan = (k: number) => gekozen[k]?.m.rol
+      const cGewicht = doelen.map((t, k) => {
+        if (!t) return 0
+        // Dagtotaal gaat voor: pre/post schuiven ook mee, maar half zo hard.
+        if (fout.c < 0) return rolVan(k) === 'normaal' ? t.c : 0.5 * t.c
+        return rolVan(k) === 'post' ? 3 * t.c : t.c
+      })
+      let cSom = cGewicht.reduce((s, x) => s + x, 0)
+      if (!cSom) { doelen.forEach((t, k) => { cGewicht[k] = t ? t.c : 0 }); cSom = cGewicht.reduce((s, x) => s + x, 0) }
+      doelen.forEach((t, k) => {
+        if (!t) return
+        t.p = Math.max(5, t.p + fout.p * (t.p / (somDoel.p || 1)))
+        t.c = Math.max(3, t.c + fout.c * (cGewicht[k] / (cSom || 1)))
+        t.f = Math.max(1, t.f + fout.f * (t.f / (somDoel.f || 1)))
+      })
+      berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
+    }
+    for (let k = 0; k < gekozen.length; k++) {
+      const x = gekozen[k]; if (!x) continue
+      const { m, gerecht } = x
+      const { regels, tot: t } = berekend[k]!
+      dagObj[m.slot] = {
+        name: gerecht.naam,
+        timing: naarTijd(m.tijd),
+        function: FUNCTIE[m.rol] || '',
+        icon: ICON[m.rol] || undefined,
+        calories: Math.round(t.kcal), protein: Math.round(t.p), carbs: Math.round(t.c), fat: Math.round(t.f),
+        ingredients_list: regels.map(({ i, g }) => ({ ingredient_id: i.id, name: i.naam, amount: g, unit: 'g' })),
+        bron: gerecht.bron,
+      }
+      tot.kcal += t.kcal; tot.protein += t.p; tot.carbs += t.c; tot.fat += t.f
+    }
+    dagObj.totals = { kcal: Math.round(tot.kcal), protein: Math.round(tot.protein), carbs: Math.round(tot.carbs), fat: Math.round(tot.fat) }
+    week[d.en] = dagObj
+    const doelKcal = dag.p * 4 + dag.c * 4 + dag.f * 9
+    if (Math.abs(tot.kcal - doelKcal) / doelKcal > 0.03) afwijkingen.push(`${d.nl}: ${Math.round(tot.kcal)} kcal i.p.v. ${Math.round(doelKcal)}`)
+    if (Math.abs(tot.protein - dag.p) > 8) afwijkingen.push(`${d.nl}: ${Math.round(tot.protein)} g eiwit i.p.v. ${dag.p}`)
+    // Carb timing: post-workout hoort duidelijk de meeste koolhydraten te
+    // hebben. Lukt dat niet met de eigen gerechten (vaste stuks zoals een
+    // wrap of appel), dan melden we het: de coach kiest wat er schuift.
+    const postK = gekozen.findIndex(x => x?.m.rol === 'post')
+    if (postK >= 0) {
+      const postC = berekend[postK]!.tot.c
+      const maxAnder = Math.max(0, ...berekend.map((b, k) => (k === postK || !b || gekozen[k]?.m.rol !== 'normaal') ? 0 : b.tot.c))
+      if (postC < 1.3 * maxAnder) afwijkingen.push(`${d.nl}: post-workout heeft ${Math.round(postC)} g koolh., niet duidelijk meer dan de andere maaltijden (max ${Math.round(maxAnder)} g). Gerechten met vaste stuks laten weinig ruimte.`)
+    }
+  }
+  return { week, afwijkingen }
+}
+
 // ── Hoofdlogica ──────────────────────────────────────────────────────────────
 async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) {
   const { data: c, error: ce } = await sb.from('clients')
@@ -379,69 +458,7 @@ async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) 
     }
   }
 
-  // Week opbouwen
-  const ICON: Record<string, string> = { pre: '🏋️', post: '💪' }
-  const FUNCTIE: Record<string, string> = { pre: 'PRE-WORKOUT', post: 'POST-WORKOUT HERSTEL' }
-  const week: Record<string, any> = {}
-  const afwijkingen: string[] = []
-  for (const d of dagen) {
-    const dagObj: any = { is_training_day: d.training }
-    const tot = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-    const gekozen = d.maaltijden.map(m => {
-      const lijst = gerechten[m.moment] || []
-      return lijst.length ? { m, gerecht: lijst[d.idx % lijst.length] } : null
-    })
-    d.maaltijden.forEach((m, k) => { if (!gekozen[k]) afwijkingen.push(`${d.nl}: geen gerecht voor ${m.moment}`) })
-    // Dagbalans: wat de dag te veel of te weinig heeft, verdelen over alle
-    // maaltijden (naar verhouding van hun doel) en opnieuw rekenen. Een paar
-    // rondes, want gerechten hebben ondergrenzen (een wrap, een appel).
-    const doelen = gekozen.map(x => x ? { ...x.m.doel! } : null)
-    let berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
-    for (let ronde = 0; ronde < 6; ronde++) {
-      const som = berekend.reduce<Macro>((s, b) => b ? { p: s.p + b.tot.p, c: s.c + b.tot.c, f: s.f + b.tot.f } : s, { p: 0, c: 0, f: 0 })
-      const fout = { p: dag.p - som.p, c: dag.c - som.c, f: dag.f - som.f }
-      if (Math.abs(fout.p) < 3 && Math.abs(fout.c) < 5 && Math.abs(fout.f) < 2) break
-      const somDoel = doelen.reduce<Macro>((s, t) => t ? { p: s.p + t.p, c: s.c + t.c, f: s.f + t.f } : s, { p: 0, c: 0, f: 0 })
-      // Carb timing beschermen: een teveel aan koolhydraten gaat eerst van de
-      // gewone maaltijden af, een tekort gaat eerst naar de post-workout. Zo
-      // blijft de post-workout de grootste koolhydraatmaaltijd van de dag.
-      const rolVan = (k: number) => gekozen[k]?.m.rol
-      const cGewicht = doelen.map((t, k) => {
-        if (!t) return 0
-        if (fout.c < 0) return rolVan(k) === 'normaal' ? t.c : 0
-        return rolVan(k) === 'post' ? 1 : 0
-      })
-      let cSom = cGewicht.reduce((s, x) => s + x, 0)
-      if (!cSom) { doelen.forEach((t, k) => { cGewicht[k] = t ? t.c : 0 }); cSom = cGewicht.reduce((s, x) => s + x, 0) }
-      doelen.forEach((t, k) => {
-        if (!t) return
-        t.p = Math.max(5, t.p + fout.p * (t.p / (somDoel.p || 1)))
-        t.c = Math.max(3, t.c + fout.c * (cGewicht[k] / (cSom || 1)))
-        t.f = Math.max(1, t.f + fout.f * (t.f / (somDoel.f || 1)))
-      })
-      berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
-    }
-    for (let k = 0; k < gekozen.length; k++) {
-      const x = gekozen[k]; if (!x) continue
-      const { m, gerecht } = x
-      const { regels, tot: t } = berekend[k]!
-      dagObj[m.slot] = {
-        name: gerecht.naam,
-        timing: naarTijd(m.tijd),
-        function: FUNCTIE[m.rol] || '',
-        icon: ICON[m.rol] || undefined,
-        calories: Math.round(t.kcal), protein: Math.round(t.p), carbs: Math.round(t.c), fat: Math.round(t.f),
-        ingredients_list: regels.map(({ i, g }) => ({ ingredient_id: i.id, name: i.naam, amount: g, unit: 'g' })),
-        bron: gerecht.bron,
-      }
-      tot.kcal += t.kcal; tot.protein += t.p; tot.carbs += t.c; tot.fat += t.f
-    }
-    dagObj.totals = { kcal: Math.round(tot.kcal), protein: Math.round(tot.protein), carbs: Math.round(tot.carbs), fat: Math.round(tot.fat) }
-    week[d.en] = dagObj
-    const doelKcal = dag.p * 4 + dag.c * 4 + dag.f * 9
-    if (Math.abs(tot.kcal - doelKcal) / doelKcal > 0.03) afwijkingen.push(`${d.nl}: ${Math.round(tot.kcal)} kcal i.p.v. ${Math.round(doelKcal)}`)
-    if (Math.abs(tot.protein - dag.p) > 8) afwijkingen.push(`${d.nl}: ${Math.round(tot.protein)} g eiwit i.p.v. ${dag.p}`)
-  }
+  const { week, afwijkingen } = bouwWeek(dagen, gerechten, dag)
 
   const ontbrekend = Object.values(gerechten).flat().flatMap(g => g.mist)
   const rapport = {

@@ -15,6 +15,8 @@ export default function DayBuilder({
   // cijfers, dag-acties) staat dan in de linkerkolom; hier alleen de
   // oefeningen, zonder kader eromheen en zonder eigen scrollvak.
   zonderKop = false,
+  // Alle dagen naast elkaar: kleine kaarten, minder ruis (10 nov 2026).
+  compact = false,
 }) {
   const [editingName, setEditingName] = useState(false)
   const [editingFocus, setEditingFocus] = useState(false)
@@ -99,18 +101,18 @@ export default function DayBuilder({
   if (zonderKop) return (
     <div>
       {day.exercises.length > 0 && (
-        <div style={{ margin: isMobile ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px' }}>
-          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-            {dagMinuten}<span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
+        <div style={{ margin: compact ? '0 0.6rem 0.55rem' : isMobile ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: compact ? '2px 10px' : '4px 14px' }}>
+          <span style={{ fontSize: compact ? '0.78rem' : '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            {dagMinuten}<span style={{ fontSize: compact ? '0.66rem' : '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
           </span>
           {dagSpieren.map(([k, n]) => (
-            <span key={k} style={{ fontSize: '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
+            <span key={k} style={{ fontSize: compact ? '0.7rem' : '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
               {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
             </span>
           ))}
         </div>
       )}
-      {day.exercises.length > 0 && (
+      {day.exercises.length > 0 && !compact && (
         <div style={{ margin: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.55rem' }}>
           <button onClick={() => setBulkOpen(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.7rem', background: bulkOpen ? '#fff' : 'transparent', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 9, color: bulkOpen ? '#0a0a0a' : '#fff', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             <SlidersHorizontal size={13} strokeWidth={2.6} /> Alle oefeningen tegelijk
@@ -132,7 +134,7 @@ export default function DayBuilder({
         </div>
       )}
 
-      <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, overflow: sleep.bezig ? 'hidden' : 'visible' }}>
+      <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 10, overflow: sleep.bezig ? 'hidden' : 'visible' }}>
         {day.exercises.map((exercise, index) => (
           <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
             <BuilderExerciseCard
@@ -141,7 +143,7 @@ export default function DayBuilder({
               onField={(field, value) => handleExerciseField(exercise.id, field, value)}
               onDelete={() => onDeleteExercise(exercise.id)}
               onVideo={() => setVideoEditing(exercise)}
-              kaartStijl
+              kaartStijl compact={compact}
             />
           </div>
         ))}

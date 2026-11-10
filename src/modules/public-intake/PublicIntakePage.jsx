@@ -575,7 +575,7 @@ export default function PublicIntakePage() {
       })
     } catch (e) { console.warn('clients spiegel-write mislukt (niet-blokkerend):', e?.message) }
 
-    return { ok: true }
+    return { ok: true, clientId: client.id }
   }
 
   // Directe autosave van fase 3: elk training-antwoord wordt meteen bewaard
@@ -605,6 +605,13 @@ export default function PublicIntakePage() {
       }
       setPhase(4)
       try { localStorage.removeItem('myarc_intake_email') } catch {}
+      // Intake compleet: concept-voedingsplan laten bouwen op de server
+      // (edge function plan-bouwer). Niet wachten, niets tonen aan de klant;
+      // de coach krijgt een melding als het concept klaarstaat.
+      if (res.clientId) {
+        supabase.functions.invoke('plan-bouwer', { body: { client_id: res.clientId } })
+          .then(r => r, e => console.warn('plan-bouwer niet gestart:', e?.message || e))
+      }
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }
     setSaving(false)
   }

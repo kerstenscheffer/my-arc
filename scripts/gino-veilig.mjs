@@ -313,6 +313,15 @@ function vrijSegment(schoon, o, opdracht, lees) {
 function vulVarsIn(cmd) {
   let s = String(cmd || '')
   for (const [naam, waarde] of tijdelijkeVars(s)) s = s.replace(new RegExp(`"\\$\\{?${naam}\\}?"|\\$\\{?${naam}\\}?(?!\\w)`, 'g'), waarde)
+  // Ook een variabele die één keer vast op een map in ~/Gino gezet wordt (D=~/Gino/x), 10 nov 2026.
+  const kaal = s.replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\2(?=\n|$)/g, '<<H$3')
+  for (const m of kaal.matchAll(/(^|[;&|\n]\s*)([A-Za-z_]\w*)=([^\s;&|"'`$()]+)(?=\s*(?:$|[;&|\n]))/g)) {
+    const [, , naam, waarde] = m
+    if (!/\/Gino(\/|$)/.test(waarde) || !VRIJE_MAP.test(`${waarde}/`) || waarde.includes('..')) continue
+    if ((kaal.match(new RegExp(`(^|[^\\w$])${naam}=`, 'g')) || []).length !== 1) continue
+    if (new RegExp(`\\b(read|for|export|local|declare|unset)\\s[^;&|\\n]*\\b${naam}\\b`).test(kaal)) continue
+    s = s.replace(new RegExp(`"\\$\\{?${naam}\\}?"|\\$\\{?${naam}\\}?(?!\\w)`, 'g'), waarde)
+  }
   return s.replace(/\$PWD\//g, '')
 }
 
@@ -448,6 +457,7 @@ const STUB = {
 }
 const stubLees = (p) => STUB[p] ?? null
 const VRIJE_FAMILIE = [
+  [`D=/Users/k/Gino/p/dagen; mkdir -p $D; for n in a b; do node scripts/pa-db.mjs lees "select 1" > $D/$n.json; done; python3 -c "\nimport json\nprint(json.load(open('$D/a.json')))"`, 'python'],
   [`cd ~/Gino/p && python3 overzicht.py erwin | grep -v totals; python3 -c "\nimport json\nprint(json.load(open('dagen/a.json')))"`, 'python'],
   ["cd ~/Gino; python3 -I - <<'E'\nimport json\nprint(1)\nE", 'python'],
   ['node -e "console.log(1)"', 'node'],
@@ -511,6 +521,7 @@ const BLIJFT_KAART = [
   'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
 ]
 const GEEN_VRIJE_FAMILIE = [
+  'D=~/Gino/x; D=~/.ssh; echo a > $D/b', 'D=~/Ginox; echo a > $D/b', 'D=~/Gino/../.ssh; echo a > $D/b',
   'cd ~/Gino/p && python3 stuur.py', 'cd ~/Gino/p && python3 schrijf.py', 'cd src && python3 overzicht.py', 'python3 overzicht.py',
   'python3 /tmp/x.py', 'cd ~/Gino; python3 -I x.py', 'node /tmp/x.mjs', 'node scripts/slecht.mjs', 'node scripts/laadt.mjs', 'node scripts/mail.mjs',
   'node scripts/stiekem.mjs', 'node scripts/onbekend.mjs', 'npm run release', 'npm install x', 'git commit -m a', 'mv a b', 'cp a b', 'launchctl list', 'gh pr list',
