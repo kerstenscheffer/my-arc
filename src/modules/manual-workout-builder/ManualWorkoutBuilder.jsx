@@ -35,6 +35,7 @@ import { minutenVoorOefeningen } from './trainingsTijd'
 import { setsPerSpierDag, spierVan } from './spierGroepen'
 import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
+import KrachtGrafiek from './components/KrachtGrafiek'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -59,6 +60,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Wissel (10 nov 2026): { dayId, ex } — de gekozen oefening vervangt deze,
   // sets/reps/rust blijven staan.
   const [wissel, setWissel] = useState(null)
+  const [krachtOpen, setKrachtOpen] = useState(false)
   // Selecteren door te slepen in Alle dagen (10 nov 2026): sleutels `${dagId}|${oefId}`.
   const [selectie, setSelectie] = useState(() => new Set())
   const [lasso, setLasso] = useState(null)
@@ -1128,6 +1130,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                     return <SpierChip key={k} spier={k} sets={n} info={herstel[k]} doel={doel} onPlusSet={() => voegSetToe(doel)} />
                   })}
                 </span>
+                {effectiveClient?.id && (
+                  <button onClick={() => setKrachtOpen(true)} title="Krachtverloop per spiergroep" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.75rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                    <BarChart3 size={14} strokeWidth={2.6} /> Kracht
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -1405,6 +1412,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </div>,
         document.body,
       )}
+      {krachtOpen && effectiveClient?.id && <KrachtGrafiek db={db} client={effectiveClient} plan={workoutPlan} onClose={() => setKrachtOpen(false)} />}
       {wissel && <ExerciseSelector titel={`${wissel.ex.name || 'Oefening'} wisselen`} onSelect={wisselOefening} onClose={() => setWissel(null)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {/* Titel-venster voor een nieuwe template. Bewust een eigen naam: het plan
