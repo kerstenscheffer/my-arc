@@ -25,34 +25,15 @@
 
         </activity>
 
-        <!-- Health Connect: waarom we stappen lezen. Google Play weigert een
-             app die gezondheidsdata leest zonder dit scherm. De activiteit
-             zelf komt uit capacitor-health.
-
-             Twee declaraties, allebei verplicht. Android 13 opent de activity
-             zelf (ACTION_SHOW_PERMISSIONS_RATIONALE); Android 14+ gaat via de
-             alias eronder. Ontbreekt de <activity>, dan verwijst de alias naar
-             niets en weigert Android het hele pakket al bij installeren
-             ("Bad activity-alias"). Dat was de reden van de Play-afwijzing van
-             6 okt 2026: "Je app wordt niet geïnstalleerd voor gebruikers". -->
-        <activity
-            android:name="com.fit_up.health.capacitor.PermissionsRationaleActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
-            </intent-filter>
-        </activity>
-
-        <activity-alias
-            android:name="ViewPermissionUsageActivity"
-            android:exported="true"
-            android:targetActivity="com.fit_up.health.capacitor.PermissionsRationaleActivity"
-            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
-                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
-            </intent-filter>
-        </activity-alias>
+        <!-- Health Connect: waarom we gezondheidsdata lezen. Google Play weigert
+             een app die dit leest zonder dit scherm. Sinds 10 nov 2026 komen de
+             <activity> én de <activity-alias> uit @capgo/capacitor-health zelf
+             (zijn eigen manifest declareert ze allebei, met de juiste
+             targetActivity). Niet hier opnieuw declareren: een alias die naar
+             een niet-bestaande activity wijst laat Android het hele pakket
+             weigeren ("Bad activity-alias", Play-afwijzing 6 okt 2026). De link
+             naar het privacybeleid staat in strings.xml
+             (health_connect_privacy_policy_url). -->
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -74,22 +55,59 @@
 
     <!-- Permissions -->
 
-    <!-- capacitor-health declareert in zijn eigen manifest twaalf leesrechten.
-         Wij gebruiken er maar een: READ_STEPS (zie telefoonStappen.js). Google
-         Play laat je elk gezondheidsrecht apart verantwoorden en weigert rechten
-         die de app niet gebruikt; READ_EXERCISE_ROUTE heeft zelfs een eigen
-         goedkeuringstraject. Daarom strepen we de rest hier weg. Voeg een recht
-         hier pas weer toe als de app het ook echt opvraagt. -->
-    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <!-- @capgo/capacitor-health declareert in zijn eigen manifest ruim veertig
+         lees- en schrijfrechten. Wij lezen er vier: stappen, slaap,
+         rusthartslag en HRV (telefoonStappen.js / gezondheid.js) en schrijven
+         niets. Google Play laat je elk gezondheidsrecht apart verantwoorden en
+         weigert rechten die de app niet gebruikt. Daarom strepen we de rest hier
+         weg. Voeg een recht pas weer toe als de app het ook echt opvraagt, en
+         verantwoord het in de Play Console (Gezondheidsapps-declaratie). -->
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTE" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE_VARIABILITY" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_VO2_MAX" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_FLOORS_CLIMBED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BASAL_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_METABOLIC_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BASAL_METABOLIC_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_MINDFULNESS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_MINDFULNESS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_NUTRITION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" tools:node="remove" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Barcodescanner: de WebView krijgt de camera alleen als dit recht hier staat.

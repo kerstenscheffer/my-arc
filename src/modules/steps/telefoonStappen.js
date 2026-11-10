@@ -1,7 +1,13 @@
 // src/modules/steps/telefoonStappen.js
 //
-// Stappen uit Apple Health (iOS) of Health Connect (Android), via
-// capacitor-health.
+// Stappen uit Apple Health (iOS) of Health Connect (Android).
+//
+// Twee plugins (10 nov 2026). Nieuwe app-builds hebben @capgo/capacitor-health
+// (native naam 'Health'): die leest ook slaap, rusthartslag en HRV, zodat een
+// Garmin, Apple Watch of Oura via Apple Health / Health Connect binnenkomt (zie
+// gezondheid.js). Oudere app-builds hebben nog capacitor-health (native naam
+// 'HealthPlugin') en krijgen deze JS via de live-update; die blijven gewoon
+// stappen lezen via de oude aanroepen. Welke er is bepaalt welkePlugin().
 //
 // Twee dingen die dit bestand bewust regelt:
 //
@@ -23,7 +29,28 @@
 //   · testen op een écht toestel; de simulator heeft geen stappen.
 // De twee Info.plist-teksten staan er al in.
 
-import { Health } from 'capacitor-health'
+import { registerPlugin } from '@capacitor/core'
+import { Health as Nieuw } from '@capgo/capacitor-health'
+
+// De oude plugin, zonder het npm-pakket: dat kan niet naast de nieuwe staan
+// (beide native klassen heten HealthPlugin). In een oude app-schil zit de
+// native kant er nog wel in.
+const Oud = registerPlugin('HealthPlugin')
+
+// 'nieuw' | 'oud' | null
+export function welkePlugin() {
+  try {
+    const C = window?.Capacitor
+    if (!C?.isNativePlatform?.()) return null
+    if (C.isPluginAvailable?.('Health')) return 'nieuw'
+    if (C.isPluginAvailable?.('HealthPlugin')) return 'oud'
+  } catch { /* geen Capacitor */ }
+  return null
+}
+
+// Wat de nieuwe plugin bij het koppelen vraagt. Op Android moet elk hiervan
+// ook in de manifest staan (de rest is daar weggestreept).
+export const NIEUWE_LEESRECHTEN = ['steps', 'sleep', 'restingHeartRate', 'heartRateVariability']
 
 const ONTHOUD_SLEUTEL = 'myarc_stappen_health_gekoppeld'
 const GEVRAAGD_SLEUTEL = 'myarc_stappen_health_gevraagd'
@@ -42,7 +69,9 @@ export const isNative = () => {
 export async function heeftTelefoonBron() {
   if (!isNative()) return false
   try {
-    const { available } = await Health.isHealthAvailable()
+    const p = welkePlugin()
+    if (!p) return false
+    const { available } = p === 'nieuw' ? await Nieuw.isAvailable() : await Oud.isHealthAvailable()
     return !!available
   } catch (e) {
     console.warn('Health niet beschikbaar:', e?.message || e)
@@ -72,7 +101,9 @@ const onthoud = (ja) => {
 export async function koppel() {
   if (!(await heeftTelefoonBron())) return null
   try {
-    await Health.requestHealthPermissions({ permissions: ['READ_STEPS'] })
+    if (welkePlugin() === 'nieuw') await Nieuw.requestAuthorization({ read: NIEUWE_LEESRECHTEN })
+    else await Oud.requestHealthPermissions({ permissions: ['READ_STEPS'] })
+    noteerNieuwGevraagd()
   } catch (e) {
     console.warn('Toestemming voor stappen geweigerd:', e?.message || e)
     return null
@@ -95,6 +126,18 @@ const noteerGevraagd = () => {
   try { localStorage.setItem(GEVRAAGD_SLEUTEL, 'ja') } catch { /* private mode */ }
 }
 
+// Wie al stappen deelde, kreeg nooit de vraag voor slaap en hartslag. Met de
+// nieuwe plugin vragen we die daarom één keer apart (iOS toont dan alleen de
+// nieuwe soorten). Eigen sleutel, zodat het ook na de update nog één keer is.
+const NIEUW_GEVRAAGD_SLEUTEL = 'myarc_health_v2_gevraagd'
+const alNieuwGevraagd = () => {
+  try { return localStorage.getItem(NIEUW_GEVRAAGD_SLEUTEL) === 'ja' } catch { return false }
+}
+function noteerNieuwGevraagd() {
+  if (welkePlugin() !== 'nieuw') return
+  try { localStorage.setItem(NIEUW_GEVRAAGD_SLEUTEL, 'ja') } catch { /* private mode */ }
+}
+
 // Bij het openen van de app: de eerste keer vraagt dit toestemming, daarna
 // leest het alleen nog. Geeft het aantal stappen van vandaag terug, of null.
 export async function stappenBijOpstart() {
@@ -104,6 +147,7 @@ export async function stappenBijOpstart() {
     return koppel()
   }
   if (!isGekoppeld()) return null
+  if (welkePlugin() === 'nieuw' && !alNieuwGevraagd()) return koppel()
   return stappenVanVandaag()
 }
 
@@ -144,13 +188,14 @@ const perKalenderdag = (rijen) => {
 // queryRecords). Null = gewoon het totaal gebruiken zoals voorheen.
 async function stappenPerApp(startIso, eindIso) {
   if (platform() !== 'android') return null
+  if (welkePlugin() === 'nieuw') return stappenPerAppNieuw(startIso, eindIso)
   try {
-    const { records } = await Health.queryRecords({ startDate: startIso, endDate: eindIso, dataType: 'steps' })
+    const { records } = await Oud.queryRecords({ startDate: startIso, endDate: eindIso, dataType: 'steps' })
     const apps = [...new Set((records || []).map(r => r?.sourceBundleId).filter(Boolean))]
     if (apps.length < 2) return null
     const uit = {}
     for (const app of apps) {
-      const res = await Health.queryAggregated({
+      const res = await Oud.queryAggregated({
         startDate: startIso, endDate: eindIso, dataType: 'steps', bucket: 'day', dataOrigins: [app],
       })
       perKalenderdag(res?.aggregatedData).forEach((n, iso) => {
@@ -158,6 +203,31 @@ async function stappenPerApp(startIso, eindIso) {
         uit[iso][app] = Math.round(n)
       })
     }
+    return uit
+  } catch (e) {
+    console.warn('Stappen per app lezen mislukt, totaal gebruikt:', e?.message || e)
+    return null
+  }
+}
+
+// Nieuwe plugin: queryAggregated kent geen filter per app, maar elke ruwe
+// stappen-rij draagt zijn app (sourceId). Binnen één app overlappen rijen niet,
+// dus per app per dag optellen klopt.
+async function stappenPerAppNieuw(startIso, eindIso) {
+  try {
+    const { samples } = await Nieuw.readSamples({ dataType: 'steps', startDate: startIso, endDate: eindIso, limit: 20000 })
+    const uit = {}
+    const apps = new Set()
+    ;(samples || []).forEach(r => {
+      const iso = isoVan(r?.startDate)
+      const app = r?.sourceId || r?.sourceName
+      if (!iso || !app) return
+      apps.add(app)
+      if (!uit[iso]) uit[iso] = {}
+      uit[iso][app] = (uit[iso][app] || 0) + (Number(r?.value) || 0)
+    })
+    if (apps.size < 2) return null
+    Object.values(uit).forEach(d => Object.keys(d).forEach(k => { d[k] = Math.round(d[k]) }))
     return uit
   } catch (e) {
     console.warn('Stappen per app lezen mislukt, totaal gebruikt:', e?.message || e)
@@ -189,13 +259,18 @@ export async function stappenPerDag(dagenTerug = 7) {
   start.setHours(0, 0, 0, 0)
   const eind = new Date()
   try {
-    const res = await Health.queryAggregated({
-      startDate: start.toISOString(),
-      endDate: eind.toISOString(),
-      dataType: 'steps',
-      bucket: 'day',
-    })
-    const totaal = perKalenderdag(res?.aggregatedData)
+    // Het totaal per dag. Op iOS ontdubbelt HealthKit hier telefoon + horloge.
+    const nieuw = welkePlugin() === 'nieuw'
+    const res = nieuw
+      ? await Nieuw.queryAggregated({
+        startDate: start.toISOString(), endDate: eind.toISOString(),
+        dataType: 'steps', bucket: 'day', aggregation: 'sum',
+      })
+      : await Oud.queryAggregated({
+        startDate: start.toISOString(), endDate: eind.toISOString(),
+        dataType: 'steps', bucket: 'day',
+      })
+    const totaal = perKalenderdag(nieuw ? res?.samples : res?.aggregatedData)
     const perApp = await stappenPerApp(start.toISOString(), eind.toISOString())
     const dagen = new Set([...totaal.keys(), ...Object.keys(perApp || {})])
     return [...dagen]
@@ -257,8 +332,9 @@ export const platform = () => {
 
 export async function stappenStatus() {
   if (!isNative()) return 'web'
+  if (!welkePlugin()) return 'oude_app'
   try {
-    const { available } = await Health.isHealthAvailable()
+    const { available } = welkePlugin() === 'nieuw' ? await Nieuw.isAvailable() : await Oud.isHealthAvailable()
     if (!available) return 'geen_bron'
   } catch (e) {
     const tekst = String(e?.message || e || '').toLowerCase()
@@ -274,7 +350,7 @@ export async function stappenStatus() {
 // het toestemmingsscherm dan opnieuw; iOS toont het maar één keer per app en
 // geeft daarna stil terug, dan helpt alleen de instellingen openen.
 export async function vraagOpnieuw() {
-  try { localStorage.removeItem(GEVRAAGD_SLEUTEL) } catch { /* private mode */ }
+  try { localStorage.removeItem(GEVRAAGD_SLEUTEL); localStorage.removeItem(NIEUW_GEVRAAGD_SLEUTEL) } catch { /* private mode */ }
   noteerGevraagd()
   return koppel()
 }
@@ -282,8 +358,14 @@ export async function vraagOpnieuw() {
 // De plek waar de klant het zelf aan kan zetten.
 export async function openStappenInstellingen() {
   try {
-    if (platform() === 'ios') await Health.openAppleHealthSettings()
-    else await Health.openHealthConnectSettings()
+    const nieuw = welkePlugin() === 'nieuw'
+    if (platform() === 'ios') {
+      // De nieuwe plugin heeft geen knop naar Apple Health; de instellingen
+      // van de app zelf zijn het dichtstbij (Gezondheid staat daaronder).
+      if (nieuw) window.location.href = 'app-settings:'
+      else await Oud.openAppleHealthSettings()
+    } else if (nieuw) await Nieuw.openHealthConnectSettings()
+    else await Oud.openHealthConnectSettings()
     return true
   } catch (e) {
     console.warn('Instellingen openen mislukt:', e?.message || e)

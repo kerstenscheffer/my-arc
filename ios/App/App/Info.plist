@@ -27,7 +27,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>MY ARC gebruikt je camera voor profielfoto's en voortgangsfoto's.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>MY ARC leest je stappen uit Apple Health, zodat je dagelijkse stappen automatisch in je plan staan en je coach je voortgang ziet.</string>
+	<string>MY ARC leest je stappen, slaap, rusthartslag en hartslagvariatie (HRV) uit Apple Health, ook als je horloge (Garmin, Apple Watch) daarheen schrijft. Zo staan ze automatisch in je plan en ziet je coach hoe je herstelt.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>MY ARC schrijft geen gegevens naar Apple Health.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
