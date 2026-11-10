@@ -69,7 +69,7 @@ type Ingr = {
 
 // ── 1. Dagindeling uit de agenda ─────────────────────────────────────────────
 function dagIndeling(dagNl: string, opts: {
-  ws: any; trainingsdag: boolean; trainStartStd: number; trainDuur: number; momenten: Set<string>
+  ws: any; trainingsdag: boolean; trainStartStd: number; trainDuur: number; momenten: Set<string>; minMaaltijden?: number
 }) {
   const blokken: any[] = Array.isArray(opts.ws?.[dagNl]) ? opts.ws[dagNl] : []
   const slaap = blokken.find(b => b?.type === 'slaap')
@@ -94,6 +94,17 @@ function dagIndeling(dagNl: string, opts: {
   // Minstens 4 eiwitmaaltijden: avondsnack erbij als het past.
   if (m.length < 4 && opts.momenten.has('snack') && bedAbs - 90 > 20 * 60) zet('snack2', 'snack', 21 * 60)
   if (m.length < 4) zet('snack2', 'snack', Math.min(21 * 60, bedAbs - 90))
+  // Veel eiwit (hoge doelen): extra eiwitmomenten zodat een maaltijd niet
+  // boven ~45 g eiwit uitkomt (geen 500 g kwark in één keer). Alleen waar
+  // het past: binnen wakker-zijn en minstens 2 uur van andere maaltijden.
+  const extra = [10 * 60 + 30, 21 * 60, 17 * 60]
+  for (const t of extra) {
+    if (m.length >= (opts.minMaaltijden || 4) || !opts.momenten.has('snack')) break
+    const vrijSlot = ['snack2', 'snack3', 'snack4'].find(s => !m.some(x => x.slot === s))
+    if (!vrijSlot || t < wakker + 120 || t > bedAbs - 60) continue
+    if (m.some(x => Math.abs(x.tijd - t) < 120)) continue
+    zet(vrijSlot, 'snack', t)
+  }
 
   if (tStart != null && tEind != null) {
     // Pre: een gewone maaltijd 0-3 uur voor de training wordt de pre-workout.
@@ -110,7 +121,7 @@ function dagIndeling(dagNl: string, opts: {
     const na = m.filter(x => x.rol === 'normaal' && x.tijd >= postTijd).sort((a, b) => a.tijd - b.tijd)
     if (na[0] && na[0].tijd <= tEind + 75) { na[0].rol = 'post'; na[0].tijd = postTijd }
     else if (postTijd < bedAbs - 60) {
-      const vrij = ['snack3', 'snack4', 'snack5', 'snack2'].find(s => !m.some(x => x.slot === s))!
+      const vrij = ['snack3', 'snack4', 'snack5', 'snack6', 'snack2'].find(s => !m.some(x => x.slot === s))!
       m.push({ slot: vrij, moment: 'post_workout', tijd: postTijd, rol: 'post' })
     }
     // Volgende maaltijd minstens 2,5 uur na de post (post-post), als het past.
@@ -165,7 +176,10 @@ function rekenGrammen(ingr: Ingr[], doel: Macro) {
   // Ondergrens: een koolhydraatbron onder ~40% van een normale portie wordt
   // een raar bord (11 g rijst); vet mag klein (olie).
   const lo = vrij.map(i => Math.max(i.rol === 'vet' ? 2 : 5, (i.rol === 'koolhydraat' ? 0.4 : 0.2) * i.g0))
-  const hi = vrij.map(i => Math.max(4 * i.g0, i.rol === 'vet' ? 30 : 80))
+  // Bovengrens: hooguit 2,5x een normale portie, en een harde grens per rol
+  // (geen 1 liter amandeldrink of 500 g tofu in één maaltijd).
+  const MAX = { eiwit: 350, koolhydraat: 250, vet: 40, vast: 9999 } as Record<Rol, number>
+  const hi = vrij.map(i => Math.max(i.g0, Math.min(2.5 * i.g0, MAX[i.rol])))
   // Coördinaat-afdaling met exacte stap per ingrediënt: snel en stabiel,
   // ook als een ingrediënt maar een paar gram is (olie).
   // Eiwit telt het zwaarst (regels: eiwit per maaltijd is de basis), dan vet, dan koolh.
@@ -197,7 +211,44 @@ function rekenGrammen(ingr: Ingr[], doel: Macro) {
 
 // ── 4. Ingrediënten opzoeken in onze eigen database ──────────────────────────
 const NIET_RAUW = ['gekookt', 'gebakken', 'gegrild', 'gestoomd', 'gefrituurd']
-async function zoekIngredient(sb: SupabaseClient, term: string, rol: Rol, clientId: string, cache: Map<string, any>) {
+// Dieet en allergieën hard bewaken: de zoekfunctie kent die niet (bv.
+// "plantaardig eiwitpoeder" gaf whey terug), en een allergie mag nooit
+// alleen van de AI afhangen. Zoeken op stukjes woord, zodat samenstellingen
+// als "rundergehakt" of "kipfilet" ook gevangen worden.
+const VLEES = /(kip|kalkoen|rund|gehakt|varken|\bham\b|hamlap|\bspek|bacon|worst|salami|vlees|biefstuk|lams|eend|gelatine|chorizo|carpaccio)/i
+const VARKEN = /(varken|\bham\b|hamlap|\bspek|bacon|salami|chorizo|worst|gelatine)/i
+const VIS = /(zalm|tonijn|kabeljauw|\bvis\b|vissticks|makreel|haring|sardine|ansjovis|pangasius|tilapia|forel|koolvis)/i
+const SCHAAL = /(garnal|kreeft|mossel|krab|scampi|inktvis|oester)/i
+const ZUIVEL = /(melk|(?<!pinda)kaas|kwark|yoghurt|skyr|boter|room|whey|caseïne|caseine|hüttenkäse|huttenkase|mozzarella|feta|ricotta)/i
+const EI = /(\bei\b|eieren|\beiwit\b(?!poeder)|omelet|roerei)/i
+const PLANTAARDIG = /(soja|plantaardig|vegan|haver|amandel|kokos|erwt|rijstdrink|tofu|tempeh|lactosevrij)/i
+const ALLERGEEN: Record<string, RegExp> = {
+  lactose: ZUIVEL, ei: EI, vis: VIS, schaaldieren: SCHAAL,
+  gluten: /(brood|\bpasta|tarwe|wrap|couscous|muesli|havermout|spelt|rogge|bulgur|noedel|crackers|beschuit|cracker|ontbijtkoek|croissant)/i,
+  noten: /(amandel|walnoot|walnoten|cashew|hazelno|pecan|pistache|macadamia|\bnoten\b|notenpasta|paranoot)/i,
+  pinda: /pinda/i,
+  soja: /(soja|tofu|tempeh|edamame)/i,
+}
+type Klant = { dieet: string; allergenen: string[] }
+function pastBijKlant(naam: string, k: Klant) {
+  const d = String(k.dieet || '').toLowerCase()
+  if (d === 'vegetarisch' && (VLEES.test(naam) || VIS.test(naam) || SCHAAL.test(naam))) return false
+  if (d === 'pescotarisch' && VLEES.test(naam)) return false
+  if (d === 'halal' && VARKEN.test(naam)) return false
+  if (d === 'veganistisch' && (VLEES.test(naam) || VIS.test(naam) || SCHAAL.test(naam) || /honing/i.test(naam) ||
+      ((ZUIVEL.test(naam) || EI.test(naam)) && !PLANTAARDIG.test(naam)))) return false
+  for (const a of k.allergenen) {
+    const re = ALLERGEEN[a]
+    if (!re || !re.test(naam)) continue
+    // "glutenvrij", "lactosevrij" e.d. mogen wel
+    if (new RegExp(`${a}vrij|${a === 'lactose' ? 'lactosevrij' : a + 'vrij'}`, 'i').test(naam)) continue
+    if (a === 'lactose' && PLANTAARDIG.test(naam)) continue
+    return false
+  }
+  return true
+}
+
+async function zoekIngredient(sb: SupabaseClient, term: string, rol: Rol, clientId: string, cache: Map<string, any>, klant: Klant) {
   const sleutel = `${term.toLowerCase()}|${rol}`
   if (cache.has(sleutel)) return cache.get(sleutel)
   const { data } = await sb.rpc('zoek_ingredienten', { p_q: term, p_client: clientId, p_limit: 12 })
@@ -205,6 +256,7 @@ async function zoekIngredient(sb: SupabaseClient, term: string, rol: Rol, client
   // Altijd rauw/ongekookt wegen (Kersten): bereide varianten alleen als er niets anders is.
   const rauw = rijen.filter(r => !NIET_RAUW.includes(String(r.bereiding || '').toLowerCase()))
   if (rauw.length) rijen = rauw
+  rijen = rijen.filter(r => pastBijKlant(r.name, klant))
   // Eigen coach-producten eerst, dan de zoekscore.
   rijen.sort((a, b) => (b.source === 'coach' ? 1 : 0) - (a.source === 'coach' ? 1 : 0) || Number(b.score) - Number(a.score))
   const r = rijen[0] || null
@@ -348,11 +400,12 @@ export function bouwWeek(dagen: Dag[], gerechten: Record<string, Gerecht[]>, dag
 // ── Hoofdlogica ──────────────────────────────────────────────────────────────
 async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) {
   const { data: c, error: ce } = await sb.from('clients')
-    .select('id, first_name, auth_user_id, coach_id, trainer_id, target_calories, target_protein, target_carbs, target_fat, training_time, preferred_training_days, workout_schedule, work_schedule, allergies, hated_foods')
+    .select('id, first_name, auth_user_id, coach_id, trainer_id, current_weight, target_calories, target_protein, target_carbs, target_fat, training_time, preferred_training_days, workout_schedule, work_schedule, allergies, hated_foods')
     .eq('id', clientId).single()
   if (ce || !c) throw new Error('Klant niet gevonden')
   const dag: Macro = { p: Number(c.target_protein), c: Number(c.target_carbs), f: Number(c.target_fat) }
-  if (!dag.p || !dag.c || !dag.f) throw new Error('Klant heeft nog geen macro-doelen (target_protein/carbs/fat)')
+  if (!dag.p || !dag.f || c.target_carbs == null) throw new Error('Klant heeft nog geen macro-doelen (target_protein/carbs/fat)')
+  if (dag.c < 0) throw new Error(`Macro-doelen kloppen niet: ${dag.c} g koolhydraten (negatief). Controleer gewicht/lengte en de macro's van de klant.`)
 
   const { data: np } = await sb.from('nutrition_preferences').select('*').eq('client_id', clientId).maybeSingle()
   const ids = [c.auth_user_id, c.id].filter(Boolean)
@@ -371,10 +424,12 @@ async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) 
     ? DAGEN.filter(d => wsDagen.includes(d.En)).map(d => d.nl)
     : (c.preferred_training_days || []))
   const trainStartStd = naarMin(c.training_time, 18 * 60)
+  // 4 tot 6 eiwitmaaltijden, zo dat er per maaltijd niet meer dan ~45 g eiwit in zit.
+  const minMaaltijden = Math.min(6, Math.max(4, Math.ceil(dag.p / 45)))
 
   // Dagindeling + macro's per maaltijd
   const dagen = DAGEN.map((d, idx) => {
-    const ind = dagIndeling(d.nl, { ws: c.work_schedule, trainingsdag: trainingsdagen.has(d.nl), trainStartStd, trainDuur, momenten })
+    const ind = dagIndeling(d.nl, { ws: c.work_schedule, trainingsdag: trainingsdagen.has(d.nl), trainStartStd, trainDuur, momenten, minMaaltijden })
     verdeelMacros(ind.maaltijden, dag)
     return { ...d, idx, training: trainingsdagen.has(d.nl), ...ind }
   })
@@ -437,7 +492,12 @@ async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) 
   usage = res.usage
   }
 
-  // Ingrediënten opzoeken
+  // Ingrediënten opzoeken (met harde dieet- en allergiecontrole)
+  const al = np?.allergens || {}
+  const klant: Klant = {
+    dieet: al.diet_preference || 'geen',
+    allergenen: [...(al.selected_allergens || []), ...(al.intolerances || [])].map((x: any) => String(x).toLowerCase()),
+  }
   const cache = new Map<string, any>()
   const gerechten: Record<string, { naam: string; bron: string; ingr: Ingr[]; mist: string[] }[]> = {}
   for (const mom of keuze.momenten || []) {
@@ -445,7 +505,7 @@ async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) 
     for (const g of mom.gerechten || []) {
       const ingr: Ingr[] = [], mist: string[] = []
       for (const i of g.ingredienten || []) {
-        const r = await zoekIngredient(sb, i.zoekterm, i.rol, clientId, cache)
+        const r = await zoekIngredient(sb, i.zoekterm, i.rol, clientId, cache, klant)
         if (!r) { mist.push(i.zoekterm); continue }
         ingr.push({
           id: r.id, naam: r.name, rol: i.rol, g0: Math.max(1, Number(i.gram) || 50),
@@ -459,6 +519,9 @@ async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) 
   }
 
   const { week, afwijkingen } = bouwWeek(dagen, gerechten, dag)
+  // Te weinig koolhydraten om met normale maaltijden te halen (groente, brood
+  // en fruit hebben altijd wat). Bovenaan melden: dit is een macro-keuze.
+  if (dag.c < 80) afwijkingen.unshift(`Macro-doel heeft maar ${dag.c} g koolhydraten bij ${dag.p} g eiwit. Met gewone maaltijden is dat nauwelijks te halen; controleer de macro's (berekening: eiwit ${Math.round(dag.p / Math.max(1, Number(c.current_weight) || 1) * 10) / 10} g/kg, vet ${Math.round(dag.f / Math.max(1, Number(c.current_weight) || 1) * 10) / 10} g/kg).`)
 
   const ontbrekend = Object.values(gerechten).flat().flatMap(g => g.mist)
   const rapport = {

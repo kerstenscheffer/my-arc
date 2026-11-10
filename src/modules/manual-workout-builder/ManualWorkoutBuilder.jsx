@@ -32,7 +32,9 @@ import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag, spierLabel } from './spierGroepen'
+import { setsPerSpierDag, spierLabel, spierVan } from './spierGroepen'
+import { SpierChip, HerstelStip } from './components/HerstelSpieren'
+import { useHerstel } from './components/useHerstel'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -503,6 +505,36 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       }),
     }))
     setSelectie(new Set())
+  }
+
+  // Herstel per spiergroep uit de bouwfase-feedback van de klant (10 nov 2026).
+  const herstel = useHerstel(db, effectiveClient?.id, agendaKey)
+  // Waar een extra set van spiergroep `k` landt: de oefening met de minste sets,
+  // op een dag waar nog 3 minuten bij kunnen binnen de trainingsduur van de klant
+  // (intake, anders 60 min). Gelijk aantal sets: de eerste dag.
+  const plusSetDoel = (k) => {
+    const budget = parseInt(trainingInfo?.minutes_per_session, 10) || 60
+    let beste = null
+    workoutPlan.days.forEach((d, i) => {
+      if (minutenVoorOefeningen(d.exercises || []) + 3 > budget) return
+      for (const ex of d.exercises || []) {
+        if (ex.type === 'cardio' || spierVan(ex) !== k) continue
+        const sets = Number(ex.sets) || 2
+        if (!beste || sets < beste.sets) beste = { dayId: d.id, exId: ex.id, sets, oefening: ex.name || 'oefening', dagNaam: d.name || `Dag ${i + 1}` }
+      }
+    })
+    return beste
+  }
+  const voegSetToe = (doel) => {
+    if (!doel) return
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== doel.dayId) return d
+        const exercises = d.exercises.map(ex => (ex.id === doel.exId ? { ...ex, sets: (Number(ex.sets) || 2) + 1 } : ex))
+        return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      }),
+    }))
   }
 
   const wisselOefening = (nieuw) => {
@@ -1069,7 +1101,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )
           return (
             <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
-              <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.65rem 1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
+              <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.2rem 0' }}>
                 <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Week</span>
                 {cijfer(workoutPlan.days.length, 'dagen')}
                 {cijfer(totaalMin, 'min')}
@@ -1077,11 +1109,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 {cijfer(kracht.reduce((n, ex) => n + (Number(ex.sets) || 0), 0), 'sets')}
                 <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-                  {setsPerSpierDag(alle).map(([k, n]) => (
-                    <span key={k} style={{ fontSize: '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
-                      {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
-                    </span>
-                  ))}
+                  {setsPerSpierDag(alle).map(([k, n]) => {
+                    const doel = herstel[k]?.stand === 'groen' ? plusSetDoel(k) : null
+                    return <SpierChip key={k} spier={k} sets={n} info={herstel[k]} doel={doel} onPlusSet={() => voegSetToe(doel)} />
+                  })}
                 </span>
               </div>
             </div>
@@ -1106,6 +1137,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                       {setsPerSpierDag(dag.exercises).map(([k, n]) => (
                         <span key={k} style={{ fontSize: '0.7rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
                           {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
+                          <HerstelStip stand={herstel[k]?.stand} maat={6} />
                         </span>
                       ))}
                     </span>
