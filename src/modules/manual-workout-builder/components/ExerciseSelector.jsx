@@ -12,6 +12,7 @@
 // één zoekveld dat alles vindt.
 
 import { useState, useEffect, useMemo } from 'react'
+import { zoekScore } from '../oefeningZoeken'
 import { X, Search, Dumbbell, Plus, Trash2, Check } from 'lucide-react'
 import Keuze from '../../meal-plan/components/Keuze'
 import OefeningThumb from '../../workout/components/OefeningThumb'
@@ -110,9 +111,14 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   }
 
   const lijst = useMemo(() => {
-    const q = zoek.trim().toLowerCase()
-    return [...bibliotheek, ...eigen].filter(ex => {
-      if (q && !ex.name.toLowerCase().includes(q)) return false
+    const q = zoek.trim()
+    const score = new Map()
+    const uit = [...bibliotheek, ...eigen].filter(ex => {
+      if (q) {
+        const sc = zoekScore(ex.name, q)
+        if (!sc) return false
+        score.set(ex, sc)
+      }
       if (spier !== 'alles' && String(ex.spier || '').toLowerCase() !== spier) return false
       if (materiaal !== 'alles' && String(ex.materiaal || '').toLowerCase() !== materiaal) return false
       if (bron === 'bibliotheek' && ex.bron !== 'bibliotheek') return false
@@ -123,6 +129,8 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
       if (bron === 'thuis' && !ex.thuis) return false
       return true
     })
+    // Beste treffers bovenaan; bij gelijke score blijft de volgorde staan.
+    return q ? uit.sort((x, y) => score.get(y) - score.get(x)) : uit
   }, [bibliotheek, eigen, zoek, spier, materiaal, bron])
 
   // Standaard van de coach: 2 sets, 8-12, 2 minuten rust. Brengt de oefening
