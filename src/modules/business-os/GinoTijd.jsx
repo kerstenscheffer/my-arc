@@ -14,6 +14,10 @@
 // Dag openen (5 nov 2026): klik op een staaf, of Gino's focus op een datum. Dan
 // toont het hele scherm die dag: dezelfde RPC met van = tot, plus een tijdlijn
 // per uur (veld uren) met de afspraken uit agenda_events ernaast.
+//
+// Schakelaar Agenda | Staven (10 nov 2026): Agenda (standaard) = weekrooster
+// 06-23 uur, per dag de RPC met van = tot (veld uren); klik op een dagkop opent
+// de dag. Staven = het oude overzicht.
 
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
@@ -271,7 +275,171 @@ function TijdDag({ dag, focusSoort, isMobile, onTerug }) {
   )
 }
 
+// Weekagenda (10 nov 2026): rooster als een agenda-app, 06:00-23:00. Per uur
+// een vak dat vult met de gemeten minuten per categorie (60 min = vol), geld
+// onderin; afspraken als omlijning met titel over de uren heen.
+const AG_VAN = 6, AG_TOT = 23
+const UUR_H = 34
+const AG_UREN = Array.from({ length: AG_TOT - AG_VAN }, (_, i) => AG_VAN + i)
+const AG_VOLGORDE = [...TIJD_SOORTEN.filter(s => s[2]), ...TIJD_SOORTEN.filter(s => !s[2])].map(s => s[0])
+
+function WeekAgenda({ dagen, focusSoort, focusDag, isMobile, onKiesDag }) {
+  const keys = useMemo(() => dagen.map(iso), [dagen])
+  const [stand, setStand] = useState(null)
+  useEffect(() => {
+    let weg = false
+    const start = nlMiddernacht(keys[0]).toISOString()
+    const eind = nlMiddernacht(volgendeDag(keys[keys.length - 1])).toISOString()
+    Promise.all([
+      ...keys.map(k => supabase.rpc('business_os_tijd_overzicht', { van: k, tot: k }).then(r => r, e => ({ error: e }))),
+      supabase.from('agenda_events').select('id, titel, start_at, end_at, hele_dag, soort')
+        .lt('start_at', eind).or(`end_at.gt.${start},and(end_at.is.null,start_at.gte.${start})`)
+        .order('start_at').limit(300).then(r => r, e => ({ error: e })),
+    ]).then((res) => {
+      if (weg) return
+      const agenda = res.pop()
+      setStand({ dagen: res.map(r => r.data?.uren || []), agenda: agenda.data || [], fout: res.some(r => r.error) || !!agenda.error })
+    })
+    return () => { weg = true }
+  }, [keys])
+
+  const kolommen = useMemo(() => {
+    if (!stand) return []
+    return keys.map((k, i) => {
+      const perUur = {}
+      let geld = 0
+      for (const r of stand.dagen[i]) {
+        ;(perUur[r.uur] ||= {})[r.categorie] = r.minuten
+        if (GELD.has(r.categorie)) geld += r.minuten
+      }
+      const d0 = nlMiddernacht(k).getTime(), d1 = nlMiddernacht(volgendeDag(k)).getTime()
+      const heleDag = [], blokken = []
+      for (const e of stand.agenda) {
+        const s = new Date(e.start_at).getTime()
+        const t = e.end_at ? new Date(e.end_at).getTime() : s + 30 * 60000
+        if (t <= d0 || s >= d1) continue
+        if (e.hele_dag) { heleDag.push(e); continue }
+        const a = Math.max(AG_VAN * 60, (Math.max(s, d0) - d0) / 60000)
+        const b = Math.min(AG_TOT * 60, (Math.min(t, d1) - d0) / 60000)
+        if (b > a) blokken.push({ e, a, b })
+      }
+      // Overlap: elke volgende afspraak een baan naar rechts.
+      const banen = []
+      for (const bl of blokken) {
+        let baan = banen.findIndex(eind => eind <= bl.a)
+        if (baan < 0) { baan = banen.length; banen.push(0) }
+        banen[baan] = bl.b
+        bl.baan = baan
+      }
+      return { k, perUur, geld, heleDag, blokken }
+    })
+  }, [stand, keys])
+
+  const vandaag = iso(new Date())
+  const minKol = isMobile ? 86 : 92
+  const raster = { display: 'grid', gridTemplateColumns: `44px repeat(${keys.length}, minmax(${minKol}px, 1fr))`, columnGap: 6, minWidth: 44 + keys.length * (minKol + 6) }
+  const links = { position: 'sticky', left: 0, zIndex: 2, background: '#000' }
+
+  if (!stand) return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+      <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gt-draai 1.2s linear infinite' }} />
+    </div>
+  )
+
+  return (
+    <div className="gk-scroll" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <div style={raster}>
+        {/* Kop: dag + geldtijd, vast bovenin */}
+        <div style={{ ...links, top: 0, zIndex: 4 }} />
+        {kolommen.map((c, i) => {
+          const d = dagen[i]
+          return (
+            <button key={c.k} type="button" className="gt-dag" onClick={() => onKiesDag(c.k)} aria-label={`${WEEKDAG[i]} ${d.getDate()}: ${uren(c.geld)} geldtijd`} style={{
+              position: 'sticky', top: 0, zIndex: 3, background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              padding: '4px 0 8px', margin: 0, border: 'none', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit', minWidth: 0,
+            }}>
+              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, maxWidth: '100%', opacity: focusDag && focusDag !== c.k ? 0.3 : 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: c.k === vandaag ? G : 'rgba(255,255,255,0.55)' }}>{WEEKDAG[i]} {d.getDate()}</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: c.geld ? '#fff' : 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
+                {c.geld ? (c.geld / 60).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + 'u' : '–'}
+              </span>
+              {c.heleDag.map(e => (
+                <span key={e.id} title={e.titel || 'Afspraak'} style={{ maxWidth: '100%', fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.titel || 'Afspraak'}</span>
+              ))}
+              </span>
+            </button>
+          )
+        })}
+
+        {/* Uurlabels vast links */}
+        <div style={{ ...links, height: AG_UREN.length * UUR_H }}>
+          {AG_UREN.map(u => (
+            <div key={u} style={{ height: UUR_H, fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, transform: 'translateY(-5px)' }}>
+              {String(u).padStart(2, '0')}:00
+            </div>
+          ))}
+        </div>
+
+        {/* Per dag een kolom: uurvakken + afspraken eroverheen */}
+        {kolommen.map(c => (
+          <div key={c.k} style={{ position: 'relative', height: AG_UREN.length * UUR_H, opacity: focusDag && focusDag !== c.k ? 0.3 : 1, transition: 'opacity .3s' }}>
+            {AG_UREN.map(u => {
+              const soorten = c.perUur[u] || {}
+              const tot = Object.values(soorten).reduce((a, b) => a + b, 0)
+              const schaal = Math.max(60, tot)
+              return (
+                <div key={u} style={{ height: UUR_H, borderTop: '1px solid rgba(255,255,255,0.07)', padding: '2px 0', boxSizing: 'border-box' }}>
+                  <div title={tot ? AG_VOLGORDE.filter(s => soorten[s]).map(s => `${LABEL[s]} ${uren(soorten[s])}`).join(' · ') : undefined}
+                    style={{ height: '100%', display: 'flex', flexDirection: 'column-reverse', borderRadius: 4, overflow: 'hidden' }}>
+                    {AG_VOLGORDE.filter(s => soorten[s]).map(s => (
+                      <span key={s} style={{ height: `${(soorten[s] / schaal) * 100}%`, flexShrink: 0, background: KLEUR[s], opacity: focusSoort && s !== focusSoort ? 0.22 : 1, transition: 'opacity .3s' }} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            {c.blokken.map(({ e, a, b, baan }) => {
+              const call = IS_CALL.has(e.soort)
+              const hoog = ((b - a) / 60) * UUR_H
+              return (
+                <div key={e.id} title={`${nlTijd(e.start_at)}${e.end_at ? `–${nlTijd(e.end_at)}` : ''} ${e.titel || 'Afspraak'}`} style={{
+                  position: 'absolute', top: ((a - AG_VAN * 60) / 60) * UUR_H, height: Math.max(hoog, 6), left: baan * 8, right: 0, zIndex: 1 + baan,
+                  border: `1.5px solid ${call ? G : 'rgba(255,255,255,0.75)'}`, borderRadius: 5, boxSizing: 'border-box', pointerEvents: 'none',
+                  padding: '1px 5px', overflow: 'hidden',
+                }}>
+                  {hoog >= 14 && (
+                    <span style={{ display: 'block', fontSize: 10.5, fontWeight: 800, lineHeight: 1.25, color: '#fff', textShadow: '0 1px 3px #000, 0 0 2px #000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.titel || 'Afspraak'}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      {stand.fout && <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', padding: '12px 4px' }}>Niet alles kon laden.</div>}
+    </div>
+  )
+}
+
+function Schakelaar({ vorm, onVorm }) {
+  return (
+    <div role="group" aria-label="Weergave" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      {[['agenda', 'Agenda'], ['staven', 'Staven']].map(([id, l]) => {
+        const aan = vorm === id
+        return (
+          <button key={id} type="button" onClick={() => onVorm(id)} aria-pressed={aan} style={{
+            minHeight: 34, padding: '0 14px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+            border: 'none', background: aan ? colors.surface : 'transparent', color: aan ? G : 'rgba(255,255,255,0.6)',
+            boxShadow: aan ? `inset 0 0 0 1.5px ${G}` : `inset 0 0 0 1px ${colors.borderSubtle}`,
+          }}>{l}</button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GinoTijd({ dagen, focus, isMobile = false }) {
+  const [vorm, setVorm] = useState('agenda')
   const [data, setData] = useState(null)
   const van = iso(dagen[0]), tot = iso(dagen[dagen.length - 1])
   useEffect(() => {
@@ -303,26 +471,19 @@ export default function GinoTijd({ dagen, focus, isMobile = false }) {
 
   if (gekozen) return <TijdDag key={gekozen} dag={gekozen} focusSoort={f.soort} isMobile={isMobile} onTerug={() => setKeuze(null)} />
 
-  if (!data) return (
+  const stavenInhoud = !data ? (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gt-draai 1.2s linear infinite' }} />
-      <style>{'@keyframes gt-draai { to { transform: rotate(360deg) } }'}</style>
     </div>
-  )
-
-  if (!som.totaal) return (
+  ) : !som.totaal ? (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
         Gino meet vanaf nu elke minuut waar je tijd achter de Mac heen gaat.<br />
         <span style={{ color: '#fff' }}>Zodra er een paar uur in staat, zie je hier waar de winst zit.</span>
       </div>
     </div>
-  )
-
-  return (
-    <div className="gk-scroll" style={{ position: 'absolute', inset: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 22, padding: '6px 4px 4px' }}>
-      <style>{STIJL}</style>
-
+  ) : (
+    <div className="gk-scroll" style={{ position: 'absolute', inset: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 22, padding: '2px 0 0' }}>
       <TijdStats som={som} focusSoort={f.soort} isMobile={isMobile} />
 
       {/* Per dag, gestapeld: geld onderin */}
@@ -351,6 +512,19 @@ export default function GinoTijd({ dagen, focus, isMobile = false }) {
           )
         })}
       </div>
+    </div>
+  )
+
+  // Schakelaar bovenin; daaronder agenda of staven.
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 12, padding: '6px 4px 4px' }}>
+      <style>{STIJL}</style>
+      <Schakelaar vorm={vorm} onVorm={setVorm} />
+      {vorm === 'agenda' ? (
+        <WeekAgenda key={van} dagen={dagen} focusSoort={f.soort} focusDag={f.dag} isMobile={isMobile} onKiesDag={(k) => setKeuze({ dag: k, week: van })} />
+      ) : (
+        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>{stavenInhoud}</div>
+      )}
     </div>
   )
 }
