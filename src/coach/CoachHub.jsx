@@ -23,6 +23,7 @@ import ClientProblemsWidget from '../components/ClientProblemsWidget'
 import WidgetSidebar from '../components/WidgetSidebar'
 import '../services/SpotsService'
 import FloatingTaskTimer from '../modules/productivity/components/kanban/FloatingTaskTimer'
+import { zetPagina } from '../lib/huidigePagina'
 import WeekGoalsBar from './components/WeekGoalsBar'
 import StartTaskModal from '../modules/productivity/components/kanban/StartTaskModal'
 import ProductivityService from '../modules/productivity/ProductivityService'
@@ -297,6 +298,17 @@ export default function CoachHub() {
   // Client context panel (floating)
   const [mealPanelClientId, setMealPanelClientId] = useState(null)
   const [workoutPanelClientId, setWorkoutPanelClientId] = useState(null)
+  // Gino weet waar je bent: tabblad, adres (met id's na ':'), split en open
+  // klantpanelen. De zichtbare tekst leest huidigePagina zelf bij het sturen.
+  useEffect(() => {
+    const naam = (id) => [...PRIMARY_TABS, ...MORE_CATEGORIES.flatMap(c => c.items || c.tabs || [])].find(t => t.id === id)?.label || id
+    zetPagina({
+      tabblad: activeTab, pagina: naam(activeTab),
+      adres: typeof window !== 'undefined' ? window.location.hash : '',
+      split: splitTab ? naam(splitTab) : null,
+      extra: { openMaaltijdPaneelKlant: mealPanelClientId || null, openWorkoutPaneelKlant: workoutPanelClientId || null },
+    })
+  }, [activeTab, splitTab, mealPanelClientId, workoutPanelClientId])
 
   // WeekGoalsBar reports whether it renders (it hides itself on a week
   // without goals) so we only reserve top padding when it's actually there.
@@ -975,7 +987,7 @@ export default function CoachHub() {
         </button>
       )}
 
-      <main style={{
+      <main data-coach-hoofd="" style={{
         minHeight: 'calc(100vh - 100px)',
         // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
         // ClientDashboard) — anders verdwijnt content onder de balk.

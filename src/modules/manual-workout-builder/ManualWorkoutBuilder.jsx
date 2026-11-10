@@ -75,6 +75,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // sets/reps/rust blijven staan.
   const [wissel, setWissel] = useState(null)
   const [krachtOpen, setKrachtOpen] = useState(false)
+  // Dag-editor helemaal dicht (10 nov 2026): nog een klik op het actieve
+  // weergave-icoon sluit hem, een klik op een icoon opent die weergave weer.
+  const [dagenDicht, setDagenDicht] = useState(false)
+  const kiesWeergave = (alle) => {
+    if (alleDagen === alle && !dagenDicht) { setDagenDicht(true); return }
+    setAlleDagen(alle); setDagenDicht(false)
+  }
   const [roosterDicht, setRoosterDichtState] = useState(() => { try { return localStorage.getItem('mwb_rooster_dicht') === '1' } catch { return false } })
   const setRoosterDicht = (v) => { setRoosterDichtState(v); try { localStorage.setItem('mwb_rooster_dicht', v ? '1' : '0') } catch { /* leeg */ } }
   // Uitgeklapt overzicht per spiergroep met koppen; onthouden per browser.
@@ -1111,8 +1118,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )}
           {!m && workoutPlan.days.length > 1 && (<>
             {kopScheiding}
-            <button onClick={() => setAlleDagen(false)} aria-pressed={!alleDagen} title="Eén dag tegelijk" aria-label="1 dag" style={iconKnop(false, !alleDagen)}><RectangleVertical size={17} /></button>
-            <button onClick={() => setAlleDagen(true)} aria-pressed={alleDagen} title="Alle dagen naast elkaar" aria-label="Alle dagen" style={iconKnop(false, alleDagen)}><Columns3 size={17} /></button>
+            <button onClick={() => kiesWeergave(false)} aria-pressed={!alleDagen && !dagenDicht} title={!alleDagen && !dagenDicht ? 'Dag-editor sluiten' : 'Eén dag tegelijk'} aria-label="1 dag" style={iconKnop(false, !alleDagen && !dagenDicht)}><RectangleVertical size={17} /></button>
+            <button onClick={() => kiesWeergave(true)} aria-pressed={alleDagen && !dagenDicht} title={alleDagen && !dagenDicht ? 'Dagen sluiten' : 'Alle dagen naast elkaar'} aria-label="Alle dagen" style={iconKnop(false, alleDagen && !dagenDicht)}><Columns3 size={17} /></button>
           </>)}
           {kopScheiding}
           <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken (Cmd+Z)" aria-label="Ongedaan maken" style={{ ...iconKnop(), opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={17} /></button>
@@ -1223,7 +1230,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
           )
         })()}
-        <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
+        {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {workoutPlan.days.map((dag, i) => (
               <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
@@ -1277,8 +1284,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </div>
             ))}
           </div>
-        </div>
-      </>) : (
+        </div>}
+      </>) : dagenDicht && !m ? null : (
       <div style={m
         ? { paddingBottom: 120 }
         : { flex: 1, minHeight: 0, overflow: 'hidden' }}>

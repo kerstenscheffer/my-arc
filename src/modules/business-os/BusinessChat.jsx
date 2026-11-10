@@ -46,7 +46,8 @@
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
+import { paginaVoorGino } from '../../lib/huidigePagina'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ScanEye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { waNummer } from './berichtTekst'
 import { colors } from '../../ui/tokens'
@@ -1999,6 +2000,29 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       setFout(e.message || 'Afbeelding kon niet gelezen worden')
     }
   }
+  // Kijk mee: screenshot van de pagina onder de zwevende Gino, als bijlage bij
+  // het volgende bericht. Gino-blok zelf en de navigatiebalk blijven buiten beeld.
+  const [kijkBezig, setKijkBezig] = useState(false)
+  const kijkMee = async () => {
+    if (kijkBezig) return
+    setKijkBezig(true); setFout(null)
+    try {
+      const { default: html2canvas } = await import('html2canvas')
+      const canvas = await html2canvas(document.body, {
+        backgroundColor: '#0a0a0a', useCORS: true, logging: false, scale: 1,
+        x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight,
+        ignoreElements: (el) => !!el.closest?.('[data-bos-blok]'),
+      })
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85))
+      if (!blob) throw new Error('Screenshot mislukt')
+      await neemBeelden([new File([blob], 'pagina.jpg', { type: 'image/jpeg' })])
+      veld.current?.focus()
+    } catch (e) {
+      setFout(`Meekijken lukte niet: ${e.message || e}`)
+    } finally {
+      setKijkBezig(false)
+    }
+  }
   const plak = (e) => {
     const items = Array.from(e.clipboardData?.items || []).filter(it => it.type.startsWith('image/'))
     if (!items.length) return
@@ -2186,7 +2210,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
       return
     }
     const berichten = naarBerichten(nieuw)
-    const contextNu = metAfgewezen(context, gesprekken)
+    // Zwevende Gino: de pagina waar je nu bent vooraan (de context wordt na
+    // 4000 tekens afgekapt, dus dit moet als eerste mee).
+    const contextNu = zwevend
+      ? { 'Huidige pagina (waar Kersten nu naar kijkt)': paginaVoorGino(), ...metAfgewezen(context, gesprekken) }
+      : metAfgewezen(context, gesprekken)
     let laatsteDeel = ''
     const opDeel = (t) => { if (t) laatsteDeel = t; setDeelPer(d => ({ ...d, [id]: t })) }
     const signaal = { id: null, gestopt: false }
@@ -2708,6 +2736,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 }}>
                 {modus === 'slim' ? 'Slim' : 'Snel'}
               </button>}
+              {zwevend && !isEditor(actief) && (
+                <button onClick={kijkMee} disabled={kijkBezig} title="Kijk mee: stuur een screenshot van deze pagina mee" aria-label="Kijk mee met deze pagina"
+                  style={{ ...rondeKnop, width: 32, flexShrink: 0, background: 'transparent', color: kijkBezig ? colors.textMuted : '#fff', cursor: kijkBezig ? 'wait' : 'pointer' }}>
+                  <ScanEye size={17} strokeWidth={2.4} />
+                </button>
+              )}
               {!isEditor(actief) && (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => { if (!menu && stem.beschikbaar()) stem.tegoed(); setMenu(m => !m) }} title="Meer" aria-label="Meer opties"

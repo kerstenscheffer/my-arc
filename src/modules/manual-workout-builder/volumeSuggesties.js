@@ -7,7 +7,7 @@
 // doet als de coach hem indrukt.
 
 import { spierVan } from './spierGroepen'
-import { dekkingKoppen, kopVan, kopLabel } from './koppen'
+import { dekkingKoppen, kopVan, kopLabel, ONDERRUG_DIRECT, ONDERRUG_HEUP } from './koppen'
 import { minutenVoorOefeningen, MIN_PER_EXTRA_SET } from './trainingsTijd'
 import {
   RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS, MIN_FREQUENTIE, FACTOR, ALLEEN_PLAFOND, GEEN_DOEL,
@@ -222,6 +222,9 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90 })
     // voor billen), die laatste als deze spier gelezen.
     const volle = days.flatMap(d => d.exercises || []).filter(ex => ex.type !== 'cardio').flatMap(ex => {
       const p = spierVan(ex)
+      // Onderrug: direct werk en heup-strekkers tellen voor de kop, ook als ze bij
+      // hamstrings/billen horen. Alleen dekking; de rug-sets veranderen niet.
+      if (spier === 'back' && (ONDERRUG_DIRECT.test(ex.name || '') || ONDERRUG_HEUP.test(ex.name || ''))) return [{ ...ex, primairSpieren: 'back', kop: 'onderrug' }]
       if (p === spier) return [ex]
       return synergistenVan(ex, secMap, p).some(([s, w]) => s === spier && w >= 1) ? [{ ...ex, primairSpieren: spier, kop: null }] : []
     })

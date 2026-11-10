@@ -10,6 +10,10 @@
 
 import { spierVan } from './spierGroepen'
 
+// Onderrug: direct werk, en heup-strekkers die hem flink belasten.
+export const ONDERRUG_DIRECT = /back extension|hyper.?extension|reverse hyper|superman|lower back|onderrug|rug.?strek/i
+export const ONDERRUG_HEUP = /deadlift|rdl|romanian|good.?morning|stiff.?leg/i
+
 // spier → { koppen: [[sleutel, label, patroon|null]], standaard: sleutel|null }
 export const KOPPEN = {
   chest: {
@@ -17,7 +21,13 @@ export const KOPPEN = {
     standaard: 'midden',
   },
   back: {
-    koppen: [['lats', 'Lats', /pulldown|pull.?up|chin.?up|pullover|straight.?arm|\blat\b/i], ['bovenrug', 'Bovenrug', null]],
+    // Onderrug (10 nov 2026): alleen dekking, geen doel. Telt ook heup-strekkers
+    // (RDL, deadlift, good morning) die bij hamstrings/billen horen: zie ONDERRUG.
+    koppen: [
+      ['onderrug', 'Onderrug', ONDERRUG_DIRECT],
+      ['lats', 'Lats', /pulldown|pull.?up|chin.?up|pullover|straight.?arm|\blat\b/i],
+      ['bovenrug', 'Bovenrug', null],
+    ],
     standaard: 'bovenrug',
   },
   triceps: {
