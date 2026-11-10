@@ -171,7 +171,8 @@ function PlanWijzigingen({ db, client, isMobile }) {
   )
 }
 
-export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
+// alleenSessies: alleen de gelogde sessies (pop-up in de workout-builder).
+export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose, alleenSessies = false }) {
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
@@ -362,7 +363,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         {/* In de kolomkop: plan, voortgang en knoppen (zie KolomKop). */}
-        <KolomKopInhoud>
+        {!alleenSessies && <KolomKopInhoud>
           <span title={workoutData?.schema ? `${workoutData.schema.name || 'Workout Plan'} · ${workoutData.schema.days_per_week || '-'}d/week · ${workoutData.schema.experience_level || '-'}` : 'Geen schema'}
             style={{ ...kopInfoStijl, flex: 1 }}>
             {workoutData?.schema ? (
@@ -388,7 +389,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
               <ExternalLink size={11} /> {workoutData?.schema ? 'Plan' : 'Nieuw plan'}
             </button>
           )}
-        </KolomKopInhoud>
+        </KolomKopInhoud>}
         {/* Modal boven het inzichtpaneel; zIndex hoger dan dat paneel. */}
         <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)} zIndex={12000}>
           <KrachtBlad db={db} client={client} isMobile={isMobile} />
@@ -397,6 +398,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio
               en stappen per dag, met pijlen naar eerdere weken. */}
+          {!alleenSessies && <>
           <div style={{ padding: isMobile ? '0.5rem 0.25rem 0' : '0.6rem 0.5rem 0', overflowX: 'auto' }}>
             <KlantWeekrooster client={client} db={db} isMobile={isMobile} />
           </div>
@@ -410,8 +412,9 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <PlanWijzigingen db={db} client={client} isMobile={isMobile} />
           {/* Blijvende wijzigingen door de klant, met terugzetten. */}
           <KlantPlanTerugzetten db={db} client={client} soort="workout" isMobile={isMobile} />
+          </>}
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
-          {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
+          {workouts.length > 0 ? workouts.slice(0, alleenSessies ? 60 : 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
             const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
             const FeelingIcon = feelingCfg?.icon
