@@ -17,6 +17,8 @@ export default function DayBuilder({
   zonderKop = false,
   // Alle dagen naast elkaar: kleine kaarten, minder ruis (10 nov 2026).
   compact = false,
+  onSwapExercise,
+  selectie = null, // Set met `${day.id}|${exercise.id}`
 }) {
   const [editingName, setEditingName] = useState(false)
   const [editingFocus, setEditingFocus] = useState(false)
@@ -39,7 +41,7 @@ export default function DayBuilder({
       ...ex,
       ...(bulkSets ? { sets: parseInt(bulkSets, 10) } : {}),
       ...(bulkReps ? { reps: bulkReps } : {}),
-      ...(bulkRest ? { rest: bulkRest } : {}),
+      ...(bulkRest ? { rust: bulkRest, rest: bulkRest } : {}), // klant leest 'rust'
     }))
     onUpdate({ ...day, exercises: updated })
     setBulkSets(''); setBulkReps(''); setBulkRest(''); setBulkOpen(false)
@@ -102,9 +104,9 @@ export default function DayBuilder({
     <div>
       {day.exercises.length > 0 && (
         <div style={{ margin: compact ? '0 0.6rem 0.55rem' : isMobile ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: compact ? '2px 10px' : '4px 14px' }}>
-          <span style={{ fontSize: compact ? '0.78rem' : '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-            {dagMinuten}<span style={{ fontSize: compact ? '0.66rem' : '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
-          </span>
+          {!compact && <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            {dagMinuten}<span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
+          </span>}
           {dagSpieren.map(([k, n]) => (
             <span key={k} style={{ fontSize: compact ? '0.7rem' : '0.8rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap' }}>
               {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
@@ -136,13 +138,15 @@ export default function DayBuilder({
 
       <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 10, overflow: sleep.bezig ? 'hidden' : 'visible' }}>
         {day.exercises.map((exercise, index) => (
-          <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
+          <div key={exercise.id} data-sleep-index={index} data-oef={`${day.id}|${exercise.id}`} style={sleep.kaartStijl(index)}>
             <BuilderExerciseCard
               exercise={exercise} index={index} isMobile={isMobile} db={db} client={client}
+              geselecteerd={!!selectie?.has(`${day.id}|${exercise.id}`)}
               greep={sleep.greep(index)}
               onField={(field, value) => handleExerciseField(exercise.id, field, value)}
               onDelete={() => onDeleteExercise(exercise.id)}
               onVideo={() => setVideoEditing(exercise)}
+              onSwap={onSwapExercise ? () => onSwapExercise(exercise) : undefined}
               kaartStijl compact={compact}
             />
           </div>
@@ -154,7 +158,7 @@ export default function DayBuilder({
         )}
       </div>
 
-      <button onClick={onAddExercise} style={{
+      {!compact && <button onClick={onAddExercise} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         width: isMobile ? 'calc(100% - 1rem)' : 'calc(100% - 1.5rem)', margin: isMobile ? '0.55rem 0.5rem 0' : '0.7rem 0.75rem 0',
         minHeight: 44, borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent',
@@ -162,7 +166,7 @@ export default function DayBuilder({
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
         <Plus size={16} strokeWidth={2.8} /> Oefening toevoegen
-      </button>
+      </button>}
 
       <ExerciseVideoEditor
         isOpen={!!videoEditing}

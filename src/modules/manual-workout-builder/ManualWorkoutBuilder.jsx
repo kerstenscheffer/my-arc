@@ -52,6 +52,15 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const setAlleDagen = (v) => { setAlleDagenState(v); try { localStorage.setItem('mwb_alle_dagen', v ? '1' : '0') } catch { /* leeg */ } }
   const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
+  // Wissel (10 nov 2026): { dayId, ex } — de gekozen oefening vervangt deze,
+  // sets/reps/rust blijven staan.
+  const [wissel, setWissel] = useState(null)
+  // Selecteren door te slepen in Alle dagen (10 nov 2026): sleutels `${dagId}|${oefId}`.
+  const [selectie, setSelectie] = useState(() => new Set())
+  const [lasso, setLasso] = useState(null)
+  const [bulk, setBulk] = useState({ sets: '', reps: '', rust: '' })
+  const lassoRef = useRef(null)
+  const kolommenRef = useRef(null)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
   // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
@@ -121,6 +130,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   useEffect(() => {
     if (!selectedClient) return
+    // Klant gewisseld via CoachHub: een eerder in de builder gekozen klant mag
+    // niet blijven hangen, anders tonen kop en rooster nog de oude (10 nov 2026).
+    setLocalClient(null)
     loadClientSchemas(selectedClient)
     // Ook de intake ophalen. Dat gebeurde alleen bij het kiezen van een klant
     // ín de builder; kwam je hier binnen met een klant al geselecteerd vanuit
@@ -128,21 +140,38 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     loadTrainingInfo(selectedClient.id)
   }, [selectedClient?.id])
 
+  // Laatste klant waarvoor geladen wordt: snel wisselen mag een trager
+  // antwoord van de vorige klant niet over de nieuwe heen zetten.
+  const laadVoor = useRef(null)
   const loadClientSchemas = async (client) => {
     if (!client) return
+    laadVoor.current = client.id
+    setSelectie(new Set())
+    let schemas = []
     try {
-      const schemas = await db.getClientSchemas(client.id)
-      setClientSchemas(schemas || [])
-      // Het actieve plan van de klant voorop; anders het nieuwste.
-      const actief = (schemas || []).find(x => x.id === client.assigned_schema_id) || schemas?.[0]
-      if (actief) loadSchemaIntoBuilder(actief)
+      schemas = (await db.getClientSchemas(client.id)) || []
     } catch (e) {
       console.error('❌ getClientSchemas failed, falling back:', e)
       try {
         const schema = await db.getClientSchema(client.id)
-        if (schema) loadSchemaIntoBuilder(schema)
+        if (schema) schemas = [schema]
       } catch {}
     }
+    // Geen actief plan gezet, wel plannen op naam van de klant: die tonen.
+    if (!schemas.length && db.getClientWorkoutPlans) {
+      try { schemas = (await db.getClientWorkoutPlans(client.id)) || [] } catch { schemas = [] }
+    }
+    if (laadVoor.current !== client.id) return
+    setClientSchemas(schemas)
+    // Het actieve plan van de klant voorop; anders het nieuwste.
+    const actief = schemas.find(x => x.id === client.assigned_schema_id) || schemas[0]
+    if (actief) { loadSchemaIntoBuilder(actief); return }
+    // Geen plan: leeg beginnen, niet het plan van de vorige klant laten staan
+    // (dat zou je bij Opslaan zo bij deze klant zetten).
+    dagSleutels.current = new Map()
+    history.reset({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: 'custom', days_per_week: 0, equipment: [], days: [] })
+    setSelectedSchemaId(null)
+    setBewaardeStand(null)
   }
 
   // Het plan dat nu in de builder staat: wat de coach ziet en de klant draait.
@@ -402,6 +431,89 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Cardio zit niet meer ín een trainingsdag maar los bij de klant (zie
   // CardioPlanModal). buildWeekStructure schrijft bestaande cardio-items nog
   // wel weg, zodat oudere schema's die ze al hebben niet stilletjes leeglopen.
+
+  // Muis vasthouden op een kaart of de lege ruimte en slepen: alles wat het
+  // kader raakt wordt geselecteerd. Shift/Cmd = erbij. Klik zonder slepen op
+  // een kaart = die aan/uit, op de lege ruimte = selectie weg.
+  const startLasso = (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    if (e.target.closest?.('button, input, textarea, select, a, [data-geen-sleep], [data-greep]')) return
+    e.preventDefault()
+    const erbij = e.shiftKey || e.metaKey
+    lassoRef.current = { x: e.clientX, y: e.clientY, basis: erbij ? new Set(selectie) : new Set(), bewogen: false, kaart: e.target.closest?.('[data-oef]')?.dataset.oef }
+    const beweeg = (ev) => {
+      const st = lassoRef.current
+      if (!st) return
+      if (!st.bewogen && Math.hypot(ev.clientX - st.x, ev.clientY - st.y) < 5) return
+      st.bewogen = true
+      const r = { l: Math.min(st.x, ev.clientX), r: Math.max(st.x, ev.clientX), t: Math.min(st.y, ev.clientY), b: Math.max(st.y, ev.clientY) }
+      setLasso(r)
+      const nieuw = new Set(st.basis)
+      kolommenRef.current?.querySelectorAll('[data-oef]').forEach(el => {
+        const b = el.getBoundingClientRect()
+        if (b.right > r.l && b.left < r.r && b.bottom > r.t && b.top < r.b) nieuw.add(el.dataset.oef)
+      })
+      setSelectie(nieuw)
+    }
+    const los = () => {
+      window.removeEventListener('pointermove', beweeg)
+      window.removeEventListener('pointerup', los)
+      const st = lassoRef.current
+      lassoRef.current = null
+      setLasso(null)
+      if (!st || st.bewogen) return
+      if (st.kaart) setSelectie(prev => { const n = new Set(prev); if (n.has(st.kaart)) n.delete(st.kaart); else n.add(st.kaart); return n })
+      else if (!erbij) setSelectie(new Set())
+    }
+    window.addEventListener('pointermove', beweeg)
+    window.addEventListener('pointerup', los)
+  }
+  useEffect(() => {
+    if (!selectie.size) return undefined
+    const esc = (e) => { if (e.key === 'Escape') setSelectie(new Set()) }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [selectie])
+
+  const pasSelectieAan = () => {
+    const upd = {
+      ...(bulk.sets ? { sets: parseInt(bulk.sets, 10) || 2 } : {}),
+      ...(bulk.reps ? { reps: bulk.reps } : {}),
+      ...(bulk.rust ? { rust: bulk.rust, rest: bulk.rust } : {}), // klant leest 'rust'
+    }
+    if (!Object.keys(upd).length) return
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (!d.exercises.some(ex => selectie.has(`${d.id}|${ex.id}`))) return d
+        const exercises = d.exercises.map(ex => (selectie.has(`${d.id}|${ex.id}`) ? { ...ex, ...upd } : ex))
+        return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      }),
+    }))
+    setBulk({ sets: '', reps: '', rust: '' })
+  }
+  const wisSelectie = () => {
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        const exercises = d.exercises.filter(ex => !selectie.has(`${d.id}|${ex.id}`))
+        return exercises.length === d.exercises.length ? d : { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      }),
+    }))
+    setSelectie(new Set())
+  }
+
+  const wisselOefening = (nieuw) => {
+    if (!wissel) return
+    updateExercise(wissel.dayId, wissel.ex.id, {
+      name: nieuw.name, equipment: nieuw.equipment || '', primairSpieren: nieuw.primairSpieren || '',
+      type: nieuw.type || 'compound', _isCustom: nieuw._isCustom || false, video_url: null, thumbnail_url: null,
+    })
+    if (nieuw.equipment && !workoutPlan.equipment.includes(nieuw.equipment)) {
+      setWorkoutPlan(prev => ({ ...prev, equipment: [...prev.equipment, nieuw.equipment] }))
+    }
+    setWissel(null)
+  }
 
   const updateExercise = (dayId, exerciseId, updates) => {
     setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: d.exercises.map(ex => ex.id === exerciseId ? { ...ex, ...updates } : ex) } : d) }))
@@ -941,19 +1053,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </div>
       )}
       {!m && alleDagen && workoutPlan.days.length > 1 ? (
-        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+        <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {workoutPlan.days.map((dag, i) => (
-              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{
                   flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 7, padding: '0.6rem 0.7rem 0.5rem', background: 'none', border: 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
                 }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
                 </button>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0 130px', scrollbarWidth: 'thin' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0', scrollbarWidth: 'thin' }}>
                   <DayBuilder
                     key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop compact
                     onActivate={() => setActiveDay(dag.id)}
@@ -964,9 +1076,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                     onAddExercise={() => { setActiveDay(dag.id); setShowExerciseSelector(true) }}
                     onUpdateExercise={(exerciseId, updates) => updateExercise(dag.id, exerciseId, updates)}
                     onDeleteExercise={(exerciseId) => deleteExercise(dag.id, exerciseId)}
+                    onSwapExercise={(ex) => setWissel({ dayId: dag.id, ex })}
+                    selectie={selectie}
                     isMobile db={db} client={effectiveClient}
                   />
                 </div>
+                {/* Altijd in beeld onderaan de kolom, ook bij een lange dag. */}
+                <button onClick={() => { setActiveDay(dag.id); setShowExerciseSelector(true) }} style={{
+                  flexShrink: 0, width: '100%', height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  background: '#fff', color: '#000', border: 'none', borderRadius: 0, fontSize: '0.85rem', fontWeight: 900,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}>
+                  <Plus size={16} strokeWidth={3} /> Oefening toevoegen
+                </button>
               </div>
             ))}
           </div>
@@ -1169,6 +1291,33 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       </div>
       )}
 
+      {lasso && createPortal(
+        <div style={{ position: 'fixed', left: lasso.l, top: lasso.t, width: lasso.r - lasso.l, height: lasso.b - lasso.t, border: '1px solid rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.07)', borderRadius: 4, pointerEvents: 'none', zIndex: 2147483000 }} />,
+        document.body,
+      )}
+      {alleDagen && !m && selectie.size > 0 && createPortal(
+        <div onPointerDown={(e) => e.stopPropagation()} style={{
+          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 2147483000,
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px 8px 14px',
+          background: '#111', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+        }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', marginRight: 4 }}>{selectie.size} geselecteerd</span>
+          {[['sets', 'Sets', '2'], ['reps', 'Reps', '8-12'], ['rust', 'Rust', '2 min']].map(([k, l, ph]) => (
+            <input key={k} value={bulk[k]} placeholder={`${l} · ${ph}`} inputMode={k === 'sets' ? 'numeric' : 'text'}
+              onChange={(e) => setBulk(b => ({ ...b, [k]: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') pasSelectieAan() }}
+              style={{ width: k === 'sets' ? 78 : 96, height: 36, padding: '0 0.6rem', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, color: '#fff', fontSize: '0.82rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none' }} />
+          ))}
+          <button onClick={pasSelectieAan} disabled={!bulk.sets && !bulk.reps && !bulk.rust} style={{
+            height: 36, padding: '0 0.9rem', borderRadius: 9, border: 'none', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            background: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.12)' : '#fff', color: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.4)' : '#000',
+          }}>Toepassen</button>
+          <button onClick={wisSelectie} title="Geselecteerde oefeningen verwijderen" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash2 size={15} /></button>
+          <button onClick={() => setSelectie(new Set())} title="Selectie opheffen (Esc)" style={{ width: 36, height: 36, borderRadius: 9, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} /></button>
+        </div>,
+        document.body,
+      )}
+      {wissel && <ExerciseSelector titel={`${wissel.ex.name || 'Oefening'} wisselen`} onSelect={wisselOefening} onClose={() => setWissel(null)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {/* Titel-venster voor een nieuwe template. Bewust een eigen naam: het plan
           in beeld heet vaak iets klantspecifieks, en dat wil je niet terugzien

@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical } from 'lucide-react'
+import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
 
@@ -33,12 +33,11 @@ const EQUIPMENT_OPTIONS = [
 ]
 
 export default function BuilderExerciseCard({
-  exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo,
+  exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo, onSwap, geselecteerd = false,
   // Zelfde vorm als de maaltijdkaart in de Plan Analyzer: foto links met het
   // nummer, naam en sets rechts, en een knoppenrij eronder.
   kaartStijl = false,
-  // Alle dagen naast elkaar (10 nov 2026): één regel, kleine letters, geen
-  // knoppenrij. Tik op de kaart = bewerken, foto = video.
+  // Alle dagen naast elkaar (10 nov 2026): kleine letters, smalle knoppenrij.
   compact = false,
 }) {
   const { imageUrls, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
@@ -75,32 +74,51 @@ export default function BuilderExerciseCard({
     : `${exercise.sets ?? 2} × ${exercise.reps ?? '8-12'}  ·  ${exercise.rust ?? exercise.rest ?? '2 min'} rust`
 
   if (compact) {
-    const icoon = { width: 24, height: 24, padding: 0, background: 'transparent', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
+    const DIV = 'rgba(255,255,255,0.06)'
+    const actie = (kleur) => ({
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '0.3rem 0.3rem',
+      background: 'transparent', border: 'none', color: kleur || 'rgba(255,255,255,0.7)', fontSize: '0.66rem', fontWeight: 800,
+      cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    })
     return (
-      <div {...greep} onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken" style={{
-        ...greep?.style,
-        margin: '0 0.6rem', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, padding: 5, paddingRight: 4,
-        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10, cursor: 'pointer',
+      // Herschikken alleen via het greepje: de rest van de kaart is voor
+      // selecteren door te slepen (ManualWorkoutBuilder, alle dagen).
+      <div onClick={stop} style={{
+        margin: '0 0.6rem', minWidth: 0, overflow: 'hidden', userSelect: 'none', WebkitUserSelect: 'none',
+        background: geselecteerd ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.025)',
+        border: `1px solid ${geselecteerd ? '#fff' : 'rgba(255,255,255,0.05)'}`, borderRadius: 10,
       }}>
-        <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
-          width: 38, height: 38, flexShrink: 0, position: 'relative', overflow: 'hidden', borderRadius: 7, background: '#1a1a1a',
-        }}>
-          <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
-          <span style={{ position: 'absolute', left: 4, bottom: 2, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{index + 1}</span>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, padding: 5 }}>
+          <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
+            width: 38, height: 38, flexShrink: 0, position: 'relative', overflow: 'hidden', borderRadius: 7, background: '#1a1a1a', cursor: 'pointer',
+          }}>
+            <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
+            <span style={{ position: 'absolute', left: 4, bottom: 2, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{index + 1}</span>
           </div>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
-            {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}</>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+            </div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+              {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}</>}
+            </div>
+          </div>
+          <div {...greep} data-greep title="Slepen om te verplaatsen" style={{ ...greep?.style, width: 20, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)' }}>
+            <GripVertical size={14} strokeWidth={2.4} />
           </div>
         </div>
-        <button data-geen-sleep onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={icoon}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }} onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)' }}>
-          <Trash2 size={13} strokeWidth={2.4} />
-        </button>
+        <div style={{ display: 'flex', borderTop: `1px solid ${DIV}` }}>
+          <button onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video' : 'Video koppelen'} style={actie()}><Video size={14} /></button>
+          <div style={{ width: 1, background: DIV }} />
+          <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken" style={actie()}><Pencil size={13} /></button>
+          <div style={{ width: 1, background: DIV }} />
+          {onSwap && <>
+            <button onClick={(e) => { stop(e); onSwap() }} title="Wisselen" style={actie()}><ArrowLeftRight size={13} /></button>
+            <div style={{ width: 1, background: DIV }} />
+          </>}
+          <button onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={actie('#ef4444')}><Trash2 size={13} /></button>
+        </div>
         {editing && (
           <ExerciseEditModal
             exercise={exercise} isCardio={isCardio} isMobile={isMobile}

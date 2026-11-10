@@ -51,7 +51,7 @@ const bronOpties = [
   { id: 'coach', label: 'Coach DB' },
 ]
 
-export default function ExerciseSelector({ onSelect, onClose, isMobile, db, selectedClient }) {
+export default function ExerciseSelector({ onSelect, onClose, isMobile, db, selectedClient, titel = 'Oefening toevoegen' }) {
   const [zoek, setZoek] = useState('')
   const [spier, setSpier] = useState('alles')
   const [materiaal, setMateriaal] = useState('alles')
@@ -187,7 +187,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
         <div style={{ padding: isMobile ? '0.85rem 1rem 0.6rem' : '1rem 1.5rem 0.7rem', borderBottom: `1px solid ${LIJN}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: '0.7rem' }}>
             <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
-              Oefening toevoegen
+              {titel}
             </div>
             <button onClick={onClose} aria-label="Sluit" style={{
               width: 36, height: 36, flexShrink: 0, borderRadius: 10,
