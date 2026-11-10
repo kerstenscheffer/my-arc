@@ -2,6 +2,7 @@
 // Stap 1-4: Eetpatroon drill-down — 2 kolommen via flex, lijst klapt uit onder card
 import React, { useState, useRef } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
+import { Check, SkipForward, PenLine, X } from 'lucide-react'
 import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
 
 // Minimum aantal "dingen" dat per maaltijd ingevuld moet zijn vóór doorgaan.
@@ -186,6 +187,45 @@ export const MAALTIJD_CONFIG = {
       ]},
     { id: 'diner_anders',       label: 'Iets anders',        image: 'https://images.unsplash.com/photo-1493770348161-369560ae357d?w=400&h=160&fit=crop&q=80', subs: [], hasTextField: true },
   ]},
+  // Snacks (10 nov 2026): zelfde opbouw als de maaltijden, voor de
+  // keuze-modal bij "Wat snack je meestal tussendoor?".
+  snack: { label: 'Snack', categories: [
+    { id: 'snack_zuivel', label: 'Kwark of yoghurt', image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=160&fit=crop&q=80',
+      subs: [
+        { id: 'snack_kwark', label: 'Kwark', image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_griekse_yoghurt', label: 'Griekse yoghurt', image: 'https://images.unsplash.com/photo-1584278860047-22db9ff82bed?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_skyr', label: 'Skyr', image: 'https://images.unsplash.com/photo-1559598467-f8b76c8155d0?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_yoghurt_naturel', label: 'Yoghurt', image: 'https://images.unsplash.com/photo-1571212515416-fca988083f0f?w=200&h=120&fit=crop&q=80' },
+      ]},
+    { id: 'snack_fruit_cat', label: 'Fruit', image: 'https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?w=400&h=160&fit=crop&q=80',
+      subs: [
+        { id: 'snack_vers_fruit', label: 'Vers fruit', image: 'https://images.unsplash.com/photo-1467825487722-7e6f7060cd44?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_smoothie', label: 'Smoothie', image: 'https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_fruit_yoghurt', label: 'Fruit + yoghurt', image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&h=120&fit=crop&q=80' },
+      ]},
+    { id: 'snack_eiwit', label: 'Eiwitsnacks', image: 'https://images.unsplash.com/photo-1622484212973-65b7b4b10b2b?w=400&h=160&fit=crop&q=80',
+      subs: [
+        { id: 'snack_eiwitreep', label: 'Proteïnereep', image: 'https://images.unsplash.com/photo-1622484212973-65b7b4b10b2b?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_eiwitshake', label: 'Eiwitshake', image: 'https://images.unsplash.com/photo-1693996046865-19217d179161?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_ei', label: 'Gekookt ei', image: 'https://images.unsplash.com/photo-1607690424560-35d967d46cfa?w=200&h=120&fit=crop&q=80' },
+      ]},
+    { id: 'snack_hartig', label: 'Hartig', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&h=160&fit=crop&q=80',
+      subs: [
+        { id: 'snack_crackers', label: 'Crackers of rijstwafels', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_kaas', label: 'Kaas', image: 'https://images.unsplash.com/photo-1766085683489-18b663437308?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_noten_cat', label: 'Noten', image: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_boterham', label: 'Boterham', image: 'https://images.unsplash.com/photo-1528736235302-52922df5c122?w=200&h=120&fit=crop&q=80' },
+      ]},
+    { id: 'snack_zoet', label: 'Zoet of chips', image: 'https://images.unsplash.com/photo-1749281592570-2f743d7d2824?w=400&h=160&fit=crop&q=80',
+      subs: [
+        { id: 'snack_chips', label: 'Chips', image: 'https://images.unsplash.com/photo-1749281592570-2f743d7d2824?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_koekjes', label: 'Koekjes', image: 'https://images.unsplash.com/photo-1767339300211-00be83435c63?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_chocola', label: 'Chocola', image: 'https://images.unsplash.com/photo-1626697556651-67ebdcb8cbd6?w=200&h=120&fit=crop&q=80' },
+        { id: 'snack_snoep', label: 'Snoep', image: 'https://images.unsplash.com/photo-1617627191898-1408bf607b4d?w=200&h=120&fit=crop&q=80' },
+      ]},
+    { id: 'skip_snack', label: 'Neem ik niet', image: '', subs: [] },
+    { id: 'snack_anders', label: 'Iets anders', image: '', subs: [], hasTextField: true },
+  ]},
 }
 
 const WERKTE_OPTIONS = [
@@ -193,6 +233,25 @@ const WERKTE_OPTIONS = [
   { value: 'beetje', label: 'Een beetje',             sub: 'Maar ben gestopt of werkte matig' },
   { value: 'nee',    label: 'Nee, ik weet het niet', sub: 'Nog nooit echt succesvol geweest' },
 ]
+
+// Vinkje rechts in een rij: groen gevuld als het aan staat, lege ring als
+// het uit staat. Zo zie je in één oogopslag wat je hebt gekozen, zonder dat
+// de tekst grijs hoeft te worden.
+function Vink({ aan }) {
+  return (
+    <div style={{ width: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        width: 20, height: 20, borderRadius: '50%', boxSizing: 'border-box',
+        background: aan ? '#10b981' : 'transparent',
+        border: aan ? 'none' : '1.5px solid rgba(255,255,255,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.15s ease',
+      }}>
+        {aan && <Check size={13} strokeWidth={3.5} color="#fff" />}
+      </div>
+    </div>
+  )
+}
 
 // ── Enkelvoudige categorie kolom ──────────────────────────────────────────────
 // Elke kolom rendert zijn eigen cards + uitgeklapte lijsten
@@ -256,14 +315,83 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
           (customItems[cat.id] || []).some(v => `${cat.id}_custom_${v}` === s)
         ).length
 
+        // "Sla ik over" en "Iets anders": geen fotokaart, maar een compacte
+        // rij met een icoon. Scheelt veel ruimte.
+        const isCompact = cat.id.startsWith('skip_') || cat.hasTextField
+        if (isCompact) {
+          const Icoon = cat.id.startsWith('skip_') ? SkipForward : PenLine
+          return (
+            <div key={cat.id}>
+              <button onClick={() => toggleCat(cat.id)} style={{
+                width: '100%', minHeight: 46, padding: '0 0 0 0.75rem',
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: isSel ? 'rgba(16,185,129,0.12)' : '#0d0d0d',
+                border: `1px solid ${isSel ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
+              }}>
+                <Icoon size={17} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.8rem' : '0.84rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.label}</span>
+                <Vink aan={isSel} />
+              </button>
+              {/* "Iets anders": meerdere regels. Typ, tik op het vinkje (of
+                  Enter) en de regel staat in de lijst; het veld is weer leeg
+                  voor de volgende. Gaat via de bestaande eigen-items
+                  (`_custom`), dus telt mee en komt in het invulvak. */}
+              {isSel && cat.hasTextField && (
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {/* Oude losse tekst (van vóór 10 nov) blijft zichtbaar en wisbaar */}
+                  {(textFields[cat.id] || '').trim() && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40, padding: '0 0 0 0.7rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 10 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{textFields[cat.id]}</span>
+                      <button onClick={() => updateText(cat.id, '')} aria-label="Weghalen" style={{ width: 36, alignSelf: 'stretch', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} strokeWidth={2.6} /></button>
+                    </div>
+                  )}
+                  {(customItems[cat.id] || []).map(val => (
+                    <div key={val} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40, padding: '0 0 0 0.7rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 10 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+                      <button onClick={() => removeCustom(cat.id, val)} aria-label={`${val} weghalen`} style={{ width: 36, alignSelf: 'stretch', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} strokeWidth={2.6} /></button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input type="text"
+                      ref={el => { addRefs.current[cat.id] = el }}
+                      placeholder={(customItems[cat.id] || []).length ? 'Nog iets?' : 'Wat eet je dan?'}
+                      value={addInputs[cat.id] || ''}
+                      onChange={e => updateAddInput(cat.id, e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(cat.id) } }}
+                      autoFocus
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', minHeight: 42, padding: '0 0.7rem', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, color: '#fff', fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 600, fontFamily: 'inherit', outline: 'none' }}
+                    />
+                    {(() => {
+                      const kan = !!(addInputs[cat.id] || '').trim()
+                      return (
+                        <button onClick={() => addCustom(cat.id)} disabled={!kan} aria-label="Toevoegen" style={{
+                          width: 42, height: 42, flexShrink: 0, borderRadius: 10, padding: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: kan ? '#10b981' : 'rgba(255,255,255,0.06)',
+                          border: kan ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                          color: kan ? '#fff' : 'rgba(255,255,255,0.3)',
+                          cursor: kan ? 'pointer' : 'default', transition: 'all 0.15s ease',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}><Check size={18} strokeWidth={3} /></button>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        }
+
         return (
           <div key={cat.id}>
             {/* Card */}
             <button onClick={() => toggleCat(cat.id)} style={{
               width: '100%', padding: 0, overflow: 'hidden',
               background: isSel ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
-              border: `1px solid ${isSel ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
-              borderRadius: isMobile ? '8px' : '10px',
+              border: `1px solid ${isSel ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 10,
               cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               transition: 'all 0.15s ease',
@@ -275,8 +403,8 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
               <div style={{ width: '100%', height: isMobile ? '70px' : '80px', backgroundImage: `url(${cat.image})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', inset: 0, background: isSel ? 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.15))' : 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.3))' }} />
                 {isSel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }} />}
-                <div style={{ position: 'absolute', bottom: '0.35rem', right: '0.35rem', width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSel ? '#fff' : 'rgba(255,255,255,0.2)'}`, background: isSel ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}>
-                  {isSel && <span style={{ fontSize: '0.48rem', fontWeight: 800, color: '#000' }}>✓</span>}
+                <div style={{ position: 'absolute', bottom: '0.35rem', right: '0.35rem', width: '20px', height: '20px', borderRadius: '50%', boxSizing: 'border-box', border: isSel ? 'none' : '1.5px solid rgba(255,255,255,0.6)', background: isSel ? '#10b981' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}>
+                  {isSel && <Check size={13} strokeWidth={3.5} color="#fff" />}
                 </div>
               </div>
               {/* Label */}
@@ -285,7 +413,7 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                   {cat.label}
                 </div>
                 {isSel && cat.subs.length > 0 && (
-                  <div style={{ fontSize: '0.48rem', fontWeight: 700, color: subCount > 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', marginTop: '0.1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: subCount > 0 ? '#10b981' : 'rgba(255,255,255,0.6)', marginTop: '0.15rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {subCount > 0 ? `${subCount} ↓` : 'Kies ↓'}
                   </div>
                 )}
@@ -294,32 +422,26 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
 
             {/* Subcategorieen — zelfde breedte als card */}
             {isSel && cat.subs.length > 0 && (
-              <div style={{ marginTop: '0.15rem', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '2px solid rgba(255,255,255,0.2)', borderRadius: '0 6px 6px 0', overflow: 'hidden' }}>
+              <div style={{ marginTop: '0.25rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, overflow: 'hidden', background: '#0d0d0d' }}>
                 {/* Vaste subs */}
-                {cat.subs.map((sub, i) => {
+                {cat.subs.map((sub) => {
                   const isSubSel = selSubs.includes(sub.id)
                   return (
                     <button key={sub.id} onClick={() => toggleSub(sub.id)} style={{
                       width: '100%', display: 'flex', alignItems: 'stretch',
-                      background: isSubSel ? 'rgba(255,255,255,0.04)' : 'transparent',
-                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      background: isSubSel ? 'rgba(16,185,129,0.12)' : 'transparent',
+                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)',
                       cursor: 'pointer', fontFamily: 'inherit',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                       transition: 'background 0.15s ease', minHeight: '40px',
                     }}>
                       <div style={{ width: '40px', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${sub.image})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSubSel ? 0.7 : 0.35, transition: 'opacity 0.15s ease' }} />
+                        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${sub.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0, padding: '0 0.5rem', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: isSubSel ? 800 : 600, color: isSubSel ? '#fff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.label}</span>
+                        <span style={{ fontSize: isMobile ? '0.8rem' : '0.82rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.label}</span>
                       </div>
-                      {isSubSel && (
-                        <div style={{ width: '32px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ fontSize: '0.42rem', fontWeight: 800, color: '#000' }}>✓</span>
-                          </div>
-                        </div>
-                      )}
+                      <Vink aan={isSubSel} />
                     </button>
                   )
                 })}
@@ -328,55 +450,57 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                 {(customItems[cat.id] || []).map(val => {
                   const isSubSel = selSubs.includes(`${cat.id}_custom_${val}`)
                   return (
-                    <div key={val} style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: '40px', background: isSubSel ? 'rgba(255,255,255,0.04)' : 'transparent' }}>
+                    <div key={val} style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(255,255,255,0.07)', minHeight: '40px', background: isSubSel ? 'rgba(16,185,129,0.12)' : 'transparent' }}>
                       <button onClick={() => toggleCustom(cat.id, val)} style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                         <div style={{ width: '40px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: '0.42rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>EIGEN</span>
+                          <PenLine size={14} strokeWidth={2.4} color="#fff" />
                         </div>
-                        <span style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: isSubSel ? 800 : 600, color: isSubSel ? '#fff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>{val}</span>
+                        <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: isMobile ? '0.8rem' : '0.82rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</span>
+                        <Vink aan={isSubSel} />
                       </button>
                       <button onClick={() => removeCustom(cat.id, val)} style={{ width: '32px', flexShrink: 0, background: 'transparent', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '0.65rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>✕</button>
                     </div>
                   )
                 })}
 
-                {/* Zelf toevoegen. Het veld en de knop zijn altijd zichtbaar:
-                    eerder verscheen de knop pas ná het typen en zag het veld
-                    eruit als een grijs regeltje, waardoor het leek alsof je er
-                    maar één ding in kwijt kon. */}
-                <div style={{ display: 'flex', alignItems: 'stretch', gap: 6, marginTop: '0.35rem' }}>
-                  <input type="text"
-                    ref={el => { addRefs.current[cat.id] = el }}
-                    placeholder="Typ zelf iets…"
-                    value={addInputs[cat.id] || ''}
-                    onChange={e => updateAddInput(cat.id, e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(cat.id) } }}
-                    style={{
-                      flex: 1, minWidth: 0, minHeight: 40,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      outline: 'none', color: '#fff',
-                      fontSize: isMobile ? '0.8rem' : '0.82rem',
-                      fontWeight: 600, fontFamily: 'inherit', padding: '0 0.6rem',
-                    }}
-                  />
-                  <button
-                    onClick={() => addCustom(cat.id)}
-                    disabled={!(addInputs[cat.id] || '').trim()}
-                    style={{
-                      flexShrink: 0, padding: '0 0.9rem', minHeight: 40,
-                      background: (addInputs[cat.id] || '').trim() ? '#fff' : 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      color: (addInputs[cat.id] || '').trim() ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
-                      fontSize: '0.75rem', fontWeight: 900, fontFamily: 'inherit',
-                      cursor: (addInputs[cat.id] || '').trim() ? 'pointer' : 'default',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >Toevoegen</button>
-                </div>
-                <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.25rem', paddingLeft: 2 }}>
-                  Je kunt er zoveel toevoegen als je wil.
-                </div>
+                {/* Zelf toevoegen: laatste rij van de lijst, zelfde maat als
+                    de andere rijen. Typ, tik op het vinkje (of Enter), en het
+                    veld is leeg voor de volgende. */}
+                {(() => {
+                  const kan = !!(addInputs[cat.id] || '').trim()
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 40 }}>
+                      <div style={{ width: 40, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
+                        <PenLine size={14} strokeWidth={2.4} />
+                      </div>
+                      <input type="text"
+                        ref={el => { addRefs.current[cat.id] = el }}
+                        placeholder="Zelf iets toevoegen…"
+                        value={addInputs[cat.id] || ''}
+                        onChange={e => updateAddInput(cat.id, e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(cat.id) } }}
+                        style={{
+                          flex: 1, minWidth: 0, padding: '0 0.5rem',
+                          background: 'none', border: 'none', outline: 'none', color: '#fff',
+                          fontSize: isMobile ? '0.8rem' : '0.82rem', fontWeight: 700, fontFamily: 'inherit',
+                        }}
+                      />
+                      <button onClick={() => addCustom(cat.id)} disabled={!kan} aria-label="Toevoegen" style={{
+                        width: 34, flexShrink: 0, padding: 0, background: 'none', border: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: kan ? 'pointer' : 'default',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}>
+                        <div style={{
+                          width: 22, height: 22, borderRadius: '50%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: kan ? '#10b981' : 'rgba(255,255,255,0.08)',
+                          color: kan ? '#fff' : 'rgba(255,255,255,0.3)', transition: 'all 0.15s ease',
+                        }}><Check size={13} strokeWidth={3.5} /></div>
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
             )}
 

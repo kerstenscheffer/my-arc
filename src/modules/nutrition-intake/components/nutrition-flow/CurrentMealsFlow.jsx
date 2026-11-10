@@ -1,7 +1,7 @@
 // src/modules/nutrition-intake/components/nutrition-flow/CurrentMealsFlow.jsx
 // Stap 0: Huidige eetgewoonten, wat eet je op een typische dag?
 // Vaste structuur (4 slots) met toevoeg-optie, vrije tekst + suggesties
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { Lightbulb, ImagePlus, X } from 'lucide-react'
 import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
@@ -205,7 +205,7 @@ function KeuzeModal({ maaltijdKey, titel, data, onChange, onKies, onClose, isMob
 
 function MealSlot({
   slotKey, label, placeholder, value, onChange, isMobile, removable, onRemove,
-  shots = [], onShots, werktGoed, onWerktGoed, uploaden, flowData, onFlowChange, momentLabel,
+  shots = [], onShots, werktGoed, onWerktGoed, uploaden, flowData, onFlowChange, momentLabel, vraagKeuze,
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const gekozen = flowData ? gekozenNamen(slotKey, flowData) : []
@@ -214,6 +214,33 @@ function MealSlot({
   // "Wat werkt goed?" pas tonen als er iets staat: eerst vertellen wat je
   // eet, dan pas wat eraan bevalt. Blijft staan als het al was ingevuld.
   const toonWerkt = !!(value || '').trim() || !!(werktGoed || '').trim()
+
+  // Wat in de modal is aangetikt komt als tekst in het invulvak. Bij openen
+  // onthouden we wat er gekozen was; bij sluiten zetten we nieuw gekozen
+  // dingen erbij en halen we uitgevinkte weer weg (alleen als ze nog
+  // letterlijk zo in de tekst staan, eigen tekst blijft altijd staan).
+  const gekozenBijOpenen = useRef([])
+  const openKeuzes = () => { gekozenBijOpenen.current = gekozen; setShowSuggestions(true) }
+  const sluitKeuzes = () => {
+    setShowSuggestions(false)
+    if (!flowData) return
+    const nu = gekozenNamen(slotKey, flowData)
+    const eerst = gekozenBijOpenen.current
+    const klein = (x) => x.trim().toLowerCase()
+    const weg = new Set(eerst.filter(n => !nu.includes(n)).map(klein))
+    let delen = (value || '').split(',').map(x => x.trim()).filter(Boolean)
+    delen = delen.filter(d => !weg.has(klein(d)))
+    const aanwezig = new Set(delen.map(klein))
+    nu.forEach(n => { if (!aanwezig.has(klein(n))) delen.push(n) })
+    const nieuw = delen.join(', ')
+    if (nieuw !== (value || '').trim()) onChange(nieuw)
+  }
+
+  // De flow kan de modal van buitenaf openen (vangnet bij "Volgende").
+  useEffect(() => { if (vraagKeuze) openKeuzes() }, [vraagKeuze]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nog niets gekozen: de knop licht zacht op zodat niemand 'm mist.
+  const lokken = gekozen.length === 0 && !!MAALTIJD_CONFIG[slotKey]
 
   const appendSuggestion = (s) => {
     const current = value || ''
@@ -279,18 +306,23 @@ function MealSlot({
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '0.15rem 0.45rem', borderTop: '1px solid rgba(255,255,255,0.07)',
         }}>
-          <button type="button" onClick={() => setShowSuggestions(true)} aria-label="Suggesties: wat eet je of vind je lekker" style={balkIcoon}>
-            <Lightbulb size={17} strokeWidth={2.4} />
-          </button>
-          {/* Wat er in de modal is gekozen, als korte regel naast de knop */}
-          <button type="button" onClick={() => setShowSuggestions(true)} style={{
-            flex: 1, minWidth: 0, minHeight: 30, padding: '0 0.1rem', background: 'none', border: 'none',
+          {/* Lampje + tekst zijn samen één knop: groot tikvlak, duidelijk
+              wat het doet. */}
+          <button type="button" onClick={openKeuzes} aria-label="Kies wat je lekker vindt" style={{
+            flex: 1, minWidth: 0, minHeight: 32, padding: '0 0.1rem', background: 'none', border: 'none',
+            display: 'flex', alignItems: 'center', gap: 6,
             textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-            fontSize: '0.75rem', fontWeight: 700, color: gekozen.length ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            color: lokken ? '#FFD700' : '#fff',
+            animation: lokken ? 'keuzeLok 1.6s ease-in-out infinite' : 'none',
           }}>
-            {gekozen.length ? gekozen.join(', ') : 'Wat vind je lekker?'}
+            <Lightbulb size={17} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {gekozen.length ? `${gekozen.length} gekozen · aanpassen` : MAALTIJD_CONFIG[slotKey] ? 'Kies wat je lekker vindt' : 'Suggesties'}
+            </span>
           </button>
+          {/* Geel oplichten: gloed rond lampje en tekst die aan- en uitgaat. */}
+          <style>{'@keyframes keuzeLok { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px rgba(255,215,0,0.75)) } 50% { opacity: 0.6; filter: drop-shadow(0 0 0 rgba(255,215,0,0)) } }'}</style>
           <label aria-label="Screenshot toevoegen" style={{ ...balkIcoon, cursor: uploaden ? 'wait' : 'pointer', opacity: uploaden ? 0.5 : 1 }}>
             <ImagePlus size={17} strokeWidth={2.4} />
             <input type="file" accept="image/*" multiple disabled={uploaden} style={{ display: 'none' }}
@@ -308,7 +340,7 @@ function MealSlot({
           data={flowData || {}}
           onChange={onFlowChange}
           onKies={appendSuggestion}
-          onClose={() => setShowSuggestions(false)}
+          onClose={sluitKeuzes}
           isMobile={isMobile}
         />
       )}
@@ -582,11 +614,25 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
   }
 
   const naarStap = (i) => {
+    setVraagKeuze(0)   // anders opent de modal meteen op het volgende scherm
     setStap(i)
     setUploadFout(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  const verder = () => (stap < STAPPEN.length - 1 ? naarStap(stap + 1) : onNext())
+  // Vangnet: bij ontbijt/lunch/diner met minder dan 3 keuzes opent de
+  // keuze-modal één keer vanzelf. Daarna mag je gewoon door.
+  const [vraagKeuze, setVraagKeuze] = useState(0)
+  const alGevraagd = useRef(new Set())
+  const verder = () => {
+    const k = STAPPEN[stap]
+    if (MAALTIJD_CONFIG[k] && !alGevraagd.current.has(k)
+      && !isMealSkipped(k, data) && countMealItems(k, data) < MIN_ITEMS_PER_MEAL) {
+      alGevraagd.current.add(k)
+      setVraagKeuze(n => n + 1)
+      return
+    }
+    return stap < STAPPEN.length - 1 ? naarStap(stap + 1) : onNext()
+  }
   const terug = () => (stap > 0 ? naarStap(stap - 1) : onBack?.())
 
   const huidig = STAPPEN[stap]
@@ -632,6 +678,7 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
               flowData={data}
               onFlowChange={onChange}
               momentLabel={slot.label}
+              vraagKeuze={vraagKeuze}
             />
 
             {/* Extra snackmomenten horen bij het snack-scherm */}
@@ -640,7 +687,9 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
                 {extraSlots.map((id, idx) => (
                   <MealSlot
                     key={id}
-                    slotKey="snack"
+                    // Eigen sleutel: anders delen extra snacks de keuzes van
+                    // het gewone snack-moment. Krijgt de losse suggesties.
+                    slotKey="extra"
                     label={`Extra snack ${idx + 1}`}
                     placeholder="Bijv: eiwitreep, appel met nootjes"
                     value={data[`current_meals_extra_${idx}`]}
@@ -685,7 +734,7 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
           {/* Wat is er al geprobeerd: voorkomt dat je iets voorstelt dat
               vorig jaar al is mislukt. */}
           <Q isMobile={isMobile}>Wat heb je al geprobeerd met je voeding?</Q>
-          <Hint isMobile={isMobile}>Diëten, apps, periodes waarin het lukte of juist niet. Optioneel.</Hint>
+          <Hint isMobile={isMobile}>Diëten, apps, periodes waarin het lukte of juist niet. Nog nooit iets geprobeerd? Schrijf dat dan op.</Hint>
           <textarea
             value={data.eerder_geprobeerd || ''}
             onChange={e => onChange({ ...data, eerder_geprobeerd: e.target.value })}
@@ -698,7 +747,11 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
 
       <NextBtn
         onClick={verder}
-        label={ingevuld ? 'VOLGENDE →' : 'OVERSLAAN →'}
+        // Overslaan kan niet meer (10 nov 2026): eerst iets invullen. Wie een
+        // maaltijd niet eet kiest in de modal "Sla ik over", dat komt dan in
+        // het vak te staan.
+        label="VOLGENDE →"
+        disabled={!ingevuld}
         isMobile={isMobile}
         onBack={stap > 0 || onBack ? terug : undefined}
       />

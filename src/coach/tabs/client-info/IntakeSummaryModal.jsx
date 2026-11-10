@@ -202,6 +202,7 @@ function flattenNp(np) {
   put('intake_ontbijt', mealSummary(w, 'ontbijt'))
   put('intake_lunch', mealSummary(w, 'lunch'))
   put('intake_diner', mealSummary(w, 'diner'))
+  put('intake_snack_lekker', mealSummary(w, 'snack'))
   put('tdee', np.tdee)
   put('target_calories', np.calorie_target)
   put('intake_surplus', np.surplus)
@@ -446,6 +447,7 @@ const PART2_SECTIONS = [
       { key: 'intake_ontbijt', label: 'Ontbijt: vindt lekker' },
       { key: 'intake_lunch', label: 'Lunch: vindt lekker' },
       { key: 'intake_diner', label: 'Diner: vindt lekker' },
+      { key: 'intake_snack_lekker', label: 'Snack: vindt lekker', alleenIngevuld: true },
       { key: 'intake_wat_werkte', label: 'Eerder een goede periode', fmt: fmtMap(N.jbn) },
       { key: 'intake_wat_werkte_toelichting', label: 'Toelichting' }
     ]
@@ -551,6 +553,7 @@ const VRAGEN = {
   intake_ontbijt: 'Ontbijt: wat eet je of vind je lekker?',
   intake_lunch: 'Lunch: wat eet je of vind je lekker?',
   intake_diner: 'Avondeten: wat eet je of vind je lekker?',
+  intake_snack_lekker: 'Snack: wat eet je of vind je lekker?',
   first_name: 'Wat is je voornaam?',
   last_name: 'En je achternaam?',
   email: 'Wat is je e-mailadres?',

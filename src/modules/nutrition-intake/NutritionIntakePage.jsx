@@ -71,6 +71,11 @@ function mapToNutritionPreferences(flowData) {
       diner_subs:              flowData.diner_subs             || [],
       diner_custom:            flowData.diner_custom           || {},
       diner_text:              flowData.diner_text             || {},
+      // Snacks via de keuze-modal (10 nov 2026)
+      snack_categories:        flowData.snack_categories       || [],
+      snack_subs:              flowData.snack_subs             || [],
+      snack_custom:            flowData.snack_custom           || {},
+      snack_text:              flowData.snack_text             || {},
       // Restricties
       niet_lekker:             flowData.niet_lekker            || [],
       niet_lekker_overig:      flowData.niet_lekker_overig     || null,
