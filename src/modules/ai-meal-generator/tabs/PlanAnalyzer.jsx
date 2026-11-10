@@ -1123,10 +1123,20 @@ export default function PlanAnalyzer({
           dag.totals = calculateTotals(dag.meals)
           geraakt++
         })
+      } else if (bereik === 'week') {
+        // Dit slot op alle zeven dagen, ook waar het nog leeg is. Liep eerst
+        // alleen langs gevulde slots: een nieuwe maaltijd toevoegen met "Alle
+        // dagen" in een leeg slot deed dan niets (10 nov 2026, whey shake).
+        updated.forEach(dag => {
+          if (!dag) return
+          dag.meals[slot] = withSlotTiming(newMeal, slot, dag.meals[slot])
+          dag.totals = calculateTotals(dag.meals)
+          geraakt++
+        })
       } else {
         updated.forEach(dag => {
           Object.entries(dag.meals).forEach(([s, m]) => {
-            const raak = bereik === 'week' ? s === slot : (m && (m.meal_id || m.id) === oudId)
+            const raak = m && (m.meal_id || m.id) === oudId
             if (!raak) return
             dag.meals[s] = withSlotTiming(newMeal, s, m)
             geraakt++
