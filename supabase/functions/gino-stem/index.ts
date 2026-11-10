@@ -133,7 +133,7 @@ const AZURE_SLEUTEL = Deno.env.get('AZURE_SPEECH_KEY')?.trim()
 const AZURE_REGIO = Deno.env.get('AZURE_SPEECH_REGION')?.trim().toLowerCase().replace(/\s+/g, '')
 const AZURE_KAN = !!(AZURE_SLEUTEL && AZURE_REGIO)
 const AZURE_VOICE = 'nl-NL-MaartenNeural'
-const AZURE_PITCH = '-10%' // lager = dieper
+const AZURE_PITCH = '0%' // lager = dieper
 const AZURE_RATE = '-14%' // lager = rustiger
 const AZURE_NAAM = 'Azure Maarten'
 const AZURE_TIJDSLIMIET = 10000 // stem.js geeft een stuk 15 s, inclusief de ElevenLabs-poging ervoor

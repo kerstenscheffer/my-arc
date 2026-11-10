@@ -208,6 +208,9 @@ const TIJDELIJK_DOEL = `['"\`](?:/tmp/|/private/tmp/|/var/folders/|/private/var/
 const FS_NAAR_TIJDELIJK = new RegExp(`\\b(?:fs\\.)?(?:write|append|mkdir|copy|cp)\\w*\\(\\s*${TIJDELIJK_DOEL}`, 'g')
 const OPEN_NAAR_TIJDELIJK = new RegExp(`\\bopen\\(\\s*${TIJDELIJK_DOEL}`, 'g')
 let huidigeOpties = {}
+// Map waar de opdracht met cd naartoe ging (alleen een vrije map), voor relatieve scriptpaden.
+let huidigeMap = null
+const inMapPad = (pad) => (huidigeMap && pad && !/^[/~$]/.test(pad) ? `${huidigeMap.replace(/\/$/, '')}/${pad.replace(/^\.\//, '')}` : pad)
 function metVrijSchrijven(tekst, opties = {}) {
   const t = String(tekst).replace(FS_NAAR_TIJDELIJK, 'tijdelijk(').replace(OPEN_NAAR_TIJDELIJK, 'tijdelijk(')
   if (!opties.repoSchrijven || BUITEN_WERK.test(t)) return t
@@ -225,10 +228,27 @@ function scriptSchoon(pad, opdracht, lees, diepte = 0) {
   const inhoud = lees?.(pad)
   if (typeof inhoud !== 'string') return false
   if (hardeBlokkade('Bash', { command: inhoud }) || GEVAARLIJK.test(inhoud) || VERSTUURT_OF_SCHRIJFT.test(metVrijSchrijven(inhoud, huidigeOpties)) || /\bimport\s*\(/.test(inhoud)) return false
+  // Python laadt een eigen module uit dezelfde map (import hulp): die ook nalezen.
+  if (/\.py$/.test(pad)) {
+    for (const m of inhoud.matchAll(/^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w., ]+))/gm)) {
+      for (const naam of (m[1] || m[2]).split(',').map(x => x.trim().split(/\s+/)[0].split('.')[0]).filter(Boolean)) {
+        if (!naam) return false
+        const eigen = path.posix.join(path.posix.dirname(pad), `${naam}.py`)
+        if (typeof lees?.(eigen) === 'string' && !scriptSchoon(eigen, opdracht, lees, diepte + 1)) return false
+      }
+    }
+    if (/^\s*from\s+\./m.test(inhoud)) return false
+  }
   for (const m of inhoud.matchAll(/(?:from\s+|require\(\s*|^\s*import\s+)['"](\.[^'"]+)['"]/gm)) {
     if (!scriptSchoon(path.posix.join(path.posix.dirname(pad), m[1]), opdracht, lees, diepte + 1)) return false
   }
   return true
+}
+
+// Relatief pad: in deze opdracht geschreven telt op de naam zelf, nalezen gebeurt in de cd-map.
+function scriptInMap(pad, opdracht, lees) {
+  if (pad && !/[$`*]/.test(pad) && !pad.includes('..') && ((opdracht.includes(`> ${pad}`) && /<<-?\s*['"]?\w+/.test(opdracht)) || opdracht.includes(`--outfile=${pad}`))) return true
+  return scriptSchoon(inMapPad(pad), opdracht, lees)
 }
 
 // Eigen werk van Gino zonder kaart (5 nov): nakijken en bouwen, zijn eigen projectborden.
@@ -268,12 +288,12 @@ function vrijSegment(schoon, o, opdracht, lees) {
   if (c === 'python' || c === 'python3') {
     const a = rest.filter(x => x !== '-I')
     if (a[0] === '-c' || a[0] === '-' || a[0]?.startsWith('<')) return true
-    return scriptSchoon(tekst(a[0] || ''), opdracht, lees)
+    return scriptInMap(tekst(a[0] || ''), opdracht, lees)
   }
   if (c === 'node') {
     if (rest[0] === '-e' || rest[0] === '-p' || rest[0] === '-' || /^--input-type=/.test(rest[0] || '')) return true
     if (/^(?:\/Users\/[\w.-]+\/workapp\/)?scripts\/pa-db\.mjs$/.test(rest[0] || '') && (rest.length === 1 || PA_DB_VRIJ.has(rest[1]))) return true
-    return scriptSchoon(tekst(rest[0] || ''), opdracht, lees)
+    return scriptInMap(tekst(rest[0] || ''), opdracht, lees)
   }
   if (c === 'yt-dlp') {
     if (YT_DLP_RISICO.test(voluit)) return false
@@ -318,9 +338,14 @@ export function vrijeBash(cmd, lees = null, opties = {}) {
   if (!o || !o.tekst.trim()) return null
   for (const b of o.subst) if (!vrijeBash(b, lees, opties)) return null
   let inVrijeMap = false
+  huidigeMap = null
   for (const seg of onderdelen(o.tekst)) {
     const cd = seg.match(/^cd\s+(\S+)\s*$/)
-    if (cd) { const q = cd[1].match(/^Q(\d+)Q$/); const pad = q ? o.hulp[Number(q[1])] : cd[1]; inVrijeMap = VRIJE_MAP.test(pad) && !pad.includes('..') && !/[$`]/.test(pad.replace(/^\$HOME|^\$\{HOME\}/, '')) }
+    if (cd) {
+      const q = cd[1].match(/^Q(\d+)Q$/); const pad = q ? o.hulp[Number(q[1])] : cd[1]
+      inVrijeMap = VRIJE_MAP.test(pad) && !pad.includes('..') && !/[$`]/.test(pad.replace(/^\$HOME|^\$\{HOME\}/, ''))
+      huidigeMap = inVrijeMap ? pad.replace(/^["']|["']$/g, '').replace(/^\$\{?HOME\}?/, '~') : null
+    }
     const schoon = zonderOmleiding(seg, o.hulp, inVrijeMap)
     if (schoon === null || !vrijSegment(schoon, o, s, lees)) return null
   }
@@ -417,9 +442,13 @@ const STUB = {
   'scripts/goed.mjs': "import a from './hulp.mjs'\nconsole.log(a)", 'scripts/hulp.mjs': 'export default 1',
   'scripts/slecht.mjs': "x.from('a').insert(1)", 'scripts/laadt.mjs': "import a from './slecht.mjs'", 'scripts/mail.mjs': 'send-push',
   'scripts/stiekem.mjs': "await import('./slecht.mjs')",
+  '~/Gino/p/overzicht.py': "import json,sys\nd=json.load(open(f'dagen/{sys.argv[1]}.json'))\nprint(d)",
+  '~/Gino/p/stuur.py': "import json\nimport hulp\nhulp.x()", '~/Gino/p/hulp.py': "import urllib.request\ndef x(): pass",
+  '~/Gino/p/schrijf.py': "open('/Users/k/.zshrc','w').write('x')",
 }
 const stubLees = (p) => STUB[p] ?? null
 const VRIJE_FAMILIE = [
+  [`cd ~/Gino/p && python3 overzicht.py erwin | grep -v totals; python3 -c "\nimport json\nprint(json.load(open('dagen/a.json')))"`, 'python'],
   ["cd ~/Gino; python3 -I - <<'E'\nimport json\nprint(1)\nE", 'python'],
   ['node -e "console.log(1)"', 'node'],
   ['yt-dlp --flat-playlist --print "%(id)s" "https://x"', 'yt-dlp'],
@@ -482,6 +511,7 @@ const BLIJFT_KAART = [
   'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
 ]
 const GEEN_VRIJE_FAMILIE = [
+  'cd ~/Gino/p && python3 stuur.py', 'cd ~/Gino/p && python3 schrijf.py', 'cd src && python3 overzicht.py', 'python3 overzicht.py',
   'python3 /tmp/x.py', 'cd ~/Gino; python3 -I x.py', 'node /tmp/x.mjs', 'node scripts/slecht.mjs', 'node scripts/laadt.mjs', 'node scripts/mail.mjs',
   'node scripts/stiekem.mjs', 'node scripts/onbekend.mjs', 'npm run release', 'npm install x', 'git commit -m a', 'mv a b', 'cp a b', 'launchctl list', 'gh pr list',
   "sed -i 's/a/b/' x", "sed 's/a/b/w x' y", 'echo a > src/b.js', 'node -e "1" > ~/.zshrc', 'vercel --prod', 'rm x', "python3 - <<'E'\nimport urllib.request\nE", "python3 - <<'E'\nopen('x','w').write('y')\nE", 'node -e "fetch(1)"', 'node -e "fs.writeFileSync(1)"',

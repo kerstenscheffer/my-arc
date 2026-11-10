@@ -162,7 +162,9 @@ function rekenGrammen(ingr: Ingr[], doel: Macro) {
   const basis = vast.reduce((s, i) => ({ p: s.p + i.p * i.g0, c: s.c + i.c * i.g0, f: s.f + i.f * i.g0 }), { p: 0, c: 0, f: 0 })
   const T = { p: doel.p - basis.p, c: doel.c - basis.c, f: doel.f - basis.f }
   const g = vrij.map(i => i.g0)
-  const lo = vrij.map(i => Math.max(i.rol === 'vet' ? 2 : 5, 0.2 * i.g0))
+  // Ondergrens: een koolhydraatbron onder ~40% van een normale portie wordt
+  // een raar bord (11 g rijst); vet mag klein (olie).
+  const lo = vrij.map(i => Math.max(i.rol === 'vet' ? 2 : 5, (i.rol === 'koolhydraat' ? 0.4 : 0.2) * i.g0))
   const hi = vrij.map(i => Math.max(4 * i.g0, i.rol === 'vet' ? 30 : 80))
   // Coördinaat-afdaling met exacte stap per ingrediënt: snel en stabiel,
   // ook als een ingrediënt maar een paar gram is (olie).
@@ -265,7 +267,7 @@ Regels:
 - "opmerkingen": max 3 korte zinnen voor de coach (bv. wat je hebt aangevuld en waarom). Nederlands, geen gedachtestreepjes.`
 
 // ── Hoofdlogica ──────────────────────────────────────────────────────────────
-async function bouwPlan(sb: SupabaseClient, clientId: string) {
+async function bouwPlan(sb: SupabaseClient, clientId: string, vasteKeuze?: any) {
   const { data: c, error: ce } = await sb.from('clients')
     .select('id, first_name, auth_user_id, coach_id, trainer_id, target_calories, target_protein, target_carbs, target_fat, training_time, preferred_training_days, workout_schedule, work_schedule, allergies, hated_foods')
     .eq('id', clientId).single()
@@ -336,6 +338,11 @@ async function bouwPlan(sb: SupabaseClient, clientId: string) {
     vermijdt_ook: [c.hated_foods, c.allergies].filter(Boolean),
   }
 
+  // Proefruns kunnen een eerdere AI-keuze meegeven, zodat alleen de
+  // rekenstappen opnieuw draaien (geen nieuwe AI-kosten bij bijschaven).
+  let keuze: any, usage: any = null
+  if (vasteKeuze) keuze = vasteKeuze
+  else {
   const ai = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
   const res = await ai.messages.create({
     model: MODEL,
@@ -347,7 +354,9 @@ async function bouwPlan(sb: SupabaseClient, clientId: string) {
   if (res.stop_reason === 'refusal') throw new Error('AI weigerde het verzoek')
   const tekst = (res.content as any[]).find(b => b.type === 'text')?.text
   if (!tekst) throw new Error(`Geen antwoord van de AI (stop: ${res.stop_reason})`)
-  const keuze = JSON.parse(tekst)
+  keuze = JSON.parse(tekst)
+  usage = res.usage
+  }
 
   // Ingrediënten opzoeken
   const cache = new Map<string, any>()
@@ -378,25 +387,39 @@ async function bouwPlan(sb: SupabaseClient, clientId: string) {
   for (const d of dagen) {
     const dagObj: any = { is_training_day: d.training }
     const tot = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-    // Eerst alle maaltijden op hun eigen doel. Daarna één maaltijd opnieuw
-    // rekenen op "dagdoel min de rest", zodat het dagtotaal klopt: de
-    // post-workout (koolhydraten mogen daar schuiven), anders het avondeten.
     const gekozen = d.maaltijden.map(m => {
       const lijst = gerechten[m.moment] || []
       return lijst.length ? { m, gerecht: lijst[d.idx % lijst.length] } : null
     })
     d.maaltijden.forEach((m, k) => { if (!gekozen[k]) afwijkingen.push(`${d.nl}: geen gerecht voor ${m.moment}`) })
-    const berekend = gekozen.map(x => x ? rekenGrammen(x.gerecht.ingr, x.m.doel!) : null)
-    const corrIdx = (() => {
-      const post = gekozen.findIndex(x => x?.m.rol === 'post')
-      if (post >= 0) return post
-      const diner = gekozen.findIndex(x => x?.m.slot === 'dinner')
-      return diner >= 0 ? diner : gekozen.findIndex(x => !!x)
-    })()
-    if (corrIdx >= 0) {
-      const rest = berekend.reduce((s, b, k) => (k === corrIdx || !b) ? s : { p: s.p + b.tot.p, c: s.c + b.tot.c, f: s.f + b.tot.f }, { p: 0, c: 0, f: 0 })
-      const doel = { p: Math.max(10, dag.p - rest.p), c: Math.max(5, dag.c - rest.c), f: Math.max(2, dag.f - rest.f) }
-      berekend[corrIdx] = rekenGrammen(gekozen[corrIdx]!.gerecht.ingr, doel)
+    // Dagbalans: wat de dag te veel of te weinig heeft, verdelen over alle
+    // maaltijden (naar verhouding van hun doel) en opnieuw rekenen. Een paar
+    // rondes, want gerechten hebben ondergrenzen (een wrap, een appel).
+    const doelen = gekozen.map(x => x ? { ...x.m.doel! } : null)
+    let berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
+    for (let ronde = 0; ronde < 6; ronde++) {
+      const som = berekend.reduce<Macro>((s, b) => b ? { p: s.p + b.tot.p, c: s.c + b.tot.c, f: s.f + b.tot.f } : s, { p: 0, c: 0, f: 0 })
+      const fout = { p: dag.p - som.p, c: dag.c - som.c, f: dag.f - som.f }
+      if (Math.abs(fout.p) < 3 && Math.abs(fout.c) < 5 && Math.abs(fout.f) < 2) break
+      const somDoel = doelen.reduce<Macro>((s, t) => t ? { p: s.p + t.p, c: s.c + t.c, f: s.f + t.f } : s, { p: 0, c: 0, f: 0 })
+      // Carb timing beschermen: een teveel aan koolhydraten gaat eerst van de
+      // gewone maaltijden af, een tekort gaat eerst naar de post-workout. Zo
+      // blijft de post-workout de grootste koolhydraatmaaltijd van de dag.
+      const rolVan = (k: number) => gekozen[k]?.m.rol
+      const cGewicht = doelen.map((t, k) => {
+        if (!t) return 0
+        if (fout.c < 0) return rolVan(k) === 'normaal' ? t.c : 0
+        return rolVan(k) === 'post' ? 1 : 0
+      })
+      let cSom = cGewicht.reduce((s, x) => s + x, 0)
+      if (!cSom) { doelen.forEach((t, k) => { cGewicht[k] = t ? t.c : 0 }); cSom = cGewicht.reduce((s, x) => s + x, 0) }
+      doelen.forEach((t, k) => {
+        if (!t) return
+        t.p = Math.max(5, t.p + fout.p * (t.p / (somDoel.p || 1)))
+        t.c = Math.max(3, t.c + fout.c * (cGewicht[k] / (cSom || 1)))
+        t.f = Math.max(1, t.f + fout.f * (t.f / (somDoel.f || 1)))
+      })
+      berekend = gekozen.map((x, k) => x ? rekenGrammen(x.gerecht.ingr, doelen[k]!) : null)
     }
     for (let k = 0; k < gekozen.length; k++) {
       const x = gekozen[k]; if (!x) continue
@@ -428,7 +451,8 @@ async function bouwPlan(sb: SupabaseClient, clientId: string) {
     niet_gevonden_ingredienten: [...new Set(ontbrekend)],
     trainingsdagen: [...trainingsdagen],
     dagindeling: dagen.map(d => ({ dag: d.nl, training: d.tStart != null ? `${naarTijd(d.tStart)}-${naarTijd(d.tEind!)}` : null, maaltijden: d.maaltijden.map(m => `${naarTijd(m.tijd)} ${m.slot}${m.rol !== 'normaal' ? ` (${m.rol})` : ''}`) })),
-    tokens: res.usage,
+    tokens: usage,
+    ai_keuze: keuze,
   }
   return { client: c, dag, week, rapport }
 }
@@ -464,7 +488,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
   try {
-    const { client_id, dry_run } = await req.json()
+    const { client_id, dry_run, keuze } = await req.json()
     if (!client_id) return json({ error: 'client_id ontbreekt' }, 400)
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -489,7 +513,7 @@ Deno.serve(async (req) => {
     }
 
     if (dry_run) {
-      const r = await bouwPlan(sb, client_id)
+      const r = await bouwPlan(sb, client_id, keuze)
       return json({ week: r.week, rapport: r.rapport })
     }
     // Op de achtergrond: de intake hoeft hier niet op te wachten.
