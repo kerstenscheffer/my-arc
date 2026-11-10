@@ -209,7 +209,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
         flexShrink: 0, maxWidth: 110,
         height: 22, padding: 0, border: 'none', background: 'transparent',
         color: t.section_id ? '#fff' : 'rgba(255,255,255,0.35)',
-        fontSize: '0.64rem', fontWeight: 900, fontFamily: 'inherit',
+        fontSize: 11, lineHeight: '22px', fontWeight: 900, fontFamily: 'inherit',
         letterSpacing: '-0.01em',
         outline: 'none', cursor: 'pointer',
         appearance: 'none', WebkitAppearance: 'none',
@@ -260,24 +260,24 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
       <button key={item.id} onClick={() => setFilter(item.id)} title={item.title}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-          padding: '0.34rem 0.6rem', borderRadius: 999, minHeight: 30,
-          background: active ? '#fff' : 'rgba(255,255,255,0.05)',
-          border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.09)'}`,
+          padding: '0.3rem 0.45rem', minHeight: 28,
+          background: 'transparent', border: 'none',
+          borderBottom: `2px solid ${active ? '#fff' : 'transparent'}`,
           cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
         {item.Icon
-          ? <item.Icon size={12} color={active ? '#0a0a0a' : 'rgba(255,255,255,0.5)'} style={{ flexShrink: 0 }} />
+          ? <item.Icon size={13} strokeWidth={2.6} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />
           : <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: item.color }} />}
         <span style={{
-          fontSize: '0.72rem', fontWeight: active ? 900 : 700,
-          color: active ? '#0a0a0a' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap',
+          fontSize: '0.74rem', fontWeight: 900,
+          color: active ? '#fff' : 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap',
         }}>
           {item.title}
         </span>
         {n > 0 && (
           <span style={{
             fontSize: '0.58rem', fontWeight: 900,
-            color: active ? 'rgba(10,10,10,0.5)' : 'rgba(255,255,255,0.35)',
+            color: active ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
           }}>
             {n}
           </span>
@@ -305,8 +305,8 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   const kopKnop = {
     width: 26, height: 26, flexShrink: 0, borderRadius: 7, padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-    color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+    background: 'transparent', border: 'none',
+    color: '#fff', cursor: 'pointer',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
 
@@ -337,16 +337,16 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
           <span style={{ fontSize: isMobile ? '1rem' : '1rem', fontWeight: 900, color: '#fff', flex: 1, letterSpacing: '-0.02em' }}>To-do's</span>
           {!isMobile && (
             <button onClick={() => setIngeklapt(v => !v)} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={kopKnop}>
-              <Minus size={13} />
+              <Minus size={16} strokeWidth={2.8} />
             </button>
           )}
           {!isMobile && (
             <button onClick={herstel} title="Terug naar het midden" aria-label="Terug naar het midden" style={kopKnop}>
-              <Maximize2 size={13} />
+              <Maximize2 size={15} strokeWidth={2.8} />
             </button>
           )}
           <button onClick={onClose} aria-label="Sluiten" style={kopKnop}>
-            <X size={14} />
+            <X size={17} strokeWidth={2.8} />
           </button>
         </div>
 
@@ -410,7 +410,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       const isOpen = openFilter === pill.key
                       return (
                         <button key={pill.key} type="button" onClick={() => setOpenFilter(o => o === pill.key ? null : pill.key)}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.32rem 0.65rem', borderRadius: 20, background: pill.active ? `${pill.color}1f` : 'rgba(255,255,255,0.04)', border: `1px solid ${pill.active ? pill.color + '55' : 'rgba(255,255,255,0.1)'}`, color: pill.active ? pill.color : 'rgba(255,255,255,0.6)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.2rem 0.3rem', background: 'transparent', border: 'none', color: pill.active ? pill.color : '#fff', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                           {pill.label}{pill.val ? `: ${pill.val}` : ''}
                           <span style={{ display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', fontSize: '0.55rem' }}>▾</span>
                         </button>
@@ -418,7 +418,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                     })}
                     {filtersActive && (
                       <button type="button" onClick={() => { setPrioFilter('all'); setDurFilter('all'); setOpenFilter(null) }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '0.32rem 0.5rem', borderRadius: 20, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '0.2rem 0.3rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '0.68rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation' }}>
                         <X size={11} /> wis
                       </button>
                     )}
@@ -509,11 +509,11 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverId !== t.id) setDragOverId(t.id) }}
                   onDrop={(e) => { e.preventDefault(); reorder(dragId, t.id); setDragId(null); setDragOverId(null) }}
                   onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                  style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '0.4rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderTop: (dragOverId === t.id && dragId !== t.id) ? '2px solid rgba(255,215,0,0.6)' : '2px solid transparent', opacity: dragId === t.id ? 0.4 : 1, background: dragId === t.id ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
+                  style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '0.4rem', padding: '0.28rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.06)', borderTop: (dragOverId === t.id && dragId !== t.id) ? '2px solid rgba(255,215,0,0.6)' : '2px solid transparent', opacity: dragId === t.id ? 0.4 : 1, background: dragId === t.id ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
                   <span title="Sleep om te herordenen" style={{ flexShrink: 0, cursor: 'grab', color: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', paddingTop: isMobile ? '2px' : 0 }}>
                     <GripVertical size={14} />
                   </span>
-                  <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', marginTop: isMobile ? '1px' : 0 }}
+                  <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', marginTop: isMobile ? '1px' : 0 }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16,185,129,0.12)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent' }}>
                     <Check size={13} color="#10b981" style={{ opacity: 0.85 }} />
@@ -526,7 +526,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
                         <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
                           style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                        <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, cursor: 'pointer', lineHeight: 1.3,
+                        <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: '#fff', fontWeight: 800, cursor: 'pointer', lineHeight: 1.3,
                           // Twee regels in plaats van afkappen: de titel is het
                           // enige waaraan je een to-do herkent.
                           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -549,7 +549,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       {/* Prioriteit-stip */}
                       <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
                         style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                      <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.35,
+                      <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: '#fff', fontWeight: 800, cursor: 'pointer', lineHeight: 1.35,
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {t.title}
                       </span>
@@ -576,8 +576,8 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
 
         {/* Footer */}
         <div style={{ padding: '0.6rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <button onClick={() => { onOpenProductivity && onOpenProductivity(); onClose() }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.55rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, color: 'rgba(255,255,255,0.75)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>
-            Open in Productiviteit <ArrowRight size={14} />
+          <button onClick={() => { onOpenProductivity && onOpenProductivity(); onClose() }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.35rem', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation' }}>
+            Open in Productiviteit <ArrowRight size={14} strokeWidth={2.8} />
           </button>
         </div>
         </>
