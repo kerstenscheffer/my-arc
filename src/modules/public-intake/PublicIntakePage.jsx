@@ -201,7 +201,15 @@ function buildWorkoutPrefs(data = {}, personalData = {}) {
     default_equipment: toArr(data.equipment),              // text[]
     default_primary_goal: toText(personalData?.primary_goal),
     training_time: tijdOfNull(data.training_time) || tijdOfNull(personalData?.training_time), // time HH:MM
-    split_preferences: { preferred: data.split_preference || null, focus: data.training_focus || null }, // jsonb
+    // jsonb. huidig_* = wat de klant nu doet (CurrentTrainingFlow, 10 nov 2026).
+    split_preferences: {
+      preferred: data.split_preference || null,
+      focus: data.training_focus || null,
+      huidig_dagen: toInt(data.huidig_dagen),
+      huidig_dagen_tekst: toText(data.huidig_dagen_tekst),
+      huidig_schema: Array.isArray(data.huidig_schema) ? data.huidig_schema.map(x => String(x || '').trim()) : null,
+      huidig_toelichting: toText(data.huidig_toelichting),
+    },
     emphasize_stretch: data.emphasize_stretch ?? false,
     prioritize_compounds: data.prioritize_compounds ?? false,
     cardio_interest: toText(data.cardio_interest),

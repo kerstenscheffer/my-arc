@@ -18,6 +18,7 @@ import { useModalHost } from '../../ModalHost'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
 import PlanVoorstelTab from './PlanVoorstelTab'
+import { MAALTIJD_CONFIG } from '../../../modules/nutrition-intake/components/nutrition-flow/EatPatternFlow'
 
 const GREEN = '#10b981'
 
@@ -69,7 +70,8 @@ const MAPS = {
     push_pull_legs: 'Push / Pull / Legs',
     upper_lower: 'Upper / Lower',
     bro_split: 'Bro split',
-    no_preference: 'Coach bepaalt'
+    no_preference: 'Coach bepaalt',
+    anders: 'Iets anders'
   },
   // Gevorderden (intermediate) kregen in CurrentTrainingFlow andere, gewone
   // woorden dan ervaren sporters. Toon wat de klant zelf zag.
@@ -88,7 +90,7 @@ const fmtBool = (v) => (v ? 'Ja' : 'Nee')
 const DAG_VOLUIT = { ma: 'maandag', di: 'dinsdag', wo: 'woensdag', do: 'donderdag', vr: 'vrijdag', za: 'zaterdag', zo: 'zondag' }
 const fmtBlokken = (v) => {
   if (!Array.isArray(v) || !v.length) return null
-  return v.map(b => `${b.naam} — ${DAG_VOLUIT[b.dag] || b.dag} ${b.start}-${b.eind}`).join('\n')
+  return v.map(b => `${b.naam}: ${DAG_VOLUIT[b.dag] || b.dag} ${b.start}-${b.eind}`).join('\n')
 }
 const fmtArr = (map) => (v) =>
   (Array.isArray(v) ? v : [v]).map((x) => (map ? map[x] ?? humanize(x) : humanize(x))).join(', ')
@@ -103,7 +105,7 @@ const fmtNum = (unit) => (v) => `${v}${unit ? ' ' + unit : ''}`
 // De intake slaat "Maakt me niet uit — coach bepaalt" op als 0 trainingsdagen.
 // Dat is een antwoord, geen nul: zo tonen, anders lijkt het alsof de klant
 // niet wil trainen.
-const fmtDagenPerWeek = (v) => (Number(v) === 0 ? 'Maakt me niet uit — coach bepaalt' : `${v} x`)
+const fmtDagenPerWeek = (v) => (Number(v) === 0 ? 'Maakt me niet uit, coach bepaalt' : `${v} x`)
 
 const isEmpty = (v) =>
   v === null ||
@@ -133,11 +135,20 @@ const N = {
 const mealSummary = (w, meal) => {
   if (!w || typeof w !== 'object') return undefined
   const asArr = (x) => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : [])
+  // Namen zoals de klant ze zag (uit de intake-config), niet de interne ids.
+  // Eigen items staan in de subs als "<cat>_custom_<tekst>": die slaan we daar
+  // over, want de tekst zelf komt uit `_custom`.
+  const label = {}
+  ;(MAALTIJD_CONFIG[meal]?.categories || []).forEach(c => {
+    label[c.id] = c.label
+    c.subs.forEach(sub => { label[sub.id] = sub.label })
+  })
+  const subs = asArr(w[`${meal}_subs`]).filter(id => !String(id).includes('_custom_'))
   const parts = [
-    ...asArr(w[`${meal}_subs`]),
-    ...asArr(w[`${meal}_custom`]).flat(),
-    ...asArr(w[`${meal}_text`]),
-  ].map((s) => humanize(String(s || '').replace(/_/g, ' ').trim())).filter(Boolean)
+    ...subs.map(id => label[id] || humanize(String(id || '').replace(/_/g, ' ').trim())),
+    ...asArr(w[`${meal}_custom`]).flat().map(x => String(x || '').trim()),
+    ...asArr(w[`${meal}_text`]).map(x => String(x || '').trim()),
+  ].filter(Boolean)
   const uniq = [...new Set(parts)]
   return uniq.length ? uniq.join(', ') : undefined
 }
@@ -171,8 +182,10 @@ function flattenNp(np) {
   if (pi.variatie_per_maaltijd) {
     const tekst = { vast: 'Vast: 1 gerecht, elke dag hetzelfde', afwisselen: 'Afwisselen: 2 gerechten om en om', variatie: 'Variatie: 7 gerechten, elke dag anders' }
     const naam = { ontbijt: 'Ontbijt', lunch: 'Lunch', diner: 'Avondeten', snack: 'Snacks' }
-    put('intake_variatie', Object.entries(pi.variatie_per_maaltijd)
-      .map(([k, v]) => `${naam[k] || k}: ${tekst[v] || v}`).join('\n') || null)
+    // Vaste volgorde: jsonb bewaart de sleutels niet in de volgorde van de dag.
+    put('intake_variatie', ['ontbijt', 'lunch', 'diner', 'snack']
+      .filter(k => pi.variatie_per_maaltijd[k])
+      .map(k => `${naam[k]}: ${tekst[pi.variatie_per_maaltijd[k]] || pi.variatie_per_maaltijd[k]}`).join('\n') || null)
   }
   put('intake_supps', sp.openness)
   put('intake_supps_huidige', sp.huidige)
@@ -323,13 +336,11 @@ const PART1_SECTIONS = [
   {
     title: 'Basis',
     fields: [
-      { key: 'first_name', label: 'Voornaam' },
-      { key: 'last_name', label: 'Achternaam' },
+      { key: '_naam', label: 'Naam' },
       { key: 'email', label: 'E-mail' },
       { key: 'phone', label: 'Telefoon' },
       { key: 'gender', label: 'Geslacht', fmt: fmtMap(MAPS.gender) },
-      { key: 'date_of_birth', label: 'Geboortedatum', fmt: fmtDate },
-      { key: 'age', label: 'Leeftijd', fmt: fmtNum('jaar') }
+      { key: '_geboren', label: 'Geboren' }
     ]
   },
   {
@@ -337,8 +348,7 @@ const PART1_SECTIONS = [
     fields: [
       { key: 'height', label: 'Lengte', fmt: fmtNum('cm') },
       { key: 'current_weight', label: 'Huidig gewicht', fmt: fmtNum('kg') },
-      { key: 'current_body_fat', label: 'Huidig vetpercentage', fmt: fmtNum('%') },
-      { key: 'current_body_fat_2', label: 'Vetpercentage (2e)', fmt: fmtNum('%') }
+      { key: '_vet', label: 'Huidig vetpercentage' }
     ]
   },
   {
@@ -351,7 +361,7 @@ const PART1_SECTIONS = [
       { key: 'muscle_goal_type', label: 'Spierdoel', fmt: fmtMap(MAPS.muscle_goal_type) },
       { key: 'lichaam_omschrijving', label: 'Gewenst lichaam' },
       { key: 'quick_win_2weeks', label: 'Klein succes in 2 weken' },
-      { key: 'motivation_verbatim', label: 'Waarom — eigen woorden' },
+      { key: 'motivation_verbatim', label: 'Waarom: eigen woorden' },
       { key: 'fitness_doel_tags', label: 'Fitnessdoelen', fmt: fmtArr() },
       { key: 'goal_timeline', label: 'Tijdlijn', fmt: fmtMap(MAPS.goal_timeline), alleenIngevuld: true },
       { key: 'goal_deadline', label: 'Deadline', fmt: fmtDate, alleenIngevuld: true },
@@ -416,13 +426,16 @@ const PART2_SECTIONS = [
       { key: 'intake_nu_snack', label: 'Snack' },
       { key: 'intake_nu_snack_werkt', label: 'Snack: werkt goed', alleenIngevuld: true },
       { key: 'intake_nu_extras', label: 'Extra snacks', alleenIngevuld: true },
-      { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' }
+      { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' },
+      { key: 'intake_wat_werkte', label: 'Eerder een goede periode', fmt: fmtMap(N.jbn) },
+      { key: 'intake_wat_werkte_toelichting', label: 'Wat deed je toen' }
     ]
   },
   {
     title: 'Begeleiding & praktisch',
     fields: [
       { key: 'intake_guidance_level', label: 'Hoe wil je begeleid worden', fmt: fmtMap(N.guidance) },
+      { key: 'intake_variatie', label: 'Variatie per maaltijd', alleenIngevuld: true },
       { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum(), alleenIngevuld: true },
       { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget), alleenIngevuld: true },
       { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking), alleenIngevuld: true }
@@ -433,8 +446,7 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_macros_kennis', label: "Kent macro's", fmt: fmtMap(N.jbn) },
       { key: 'intake_calorieen_geteld', label: 'Ooit calorieën geteld', fmt: fmtMap(N.jsn) },
-      { key: 'intake_plan_gevolgd', label: 'Eerder voedingsplan gevolgd', fmt: fmtMap(N.jn) },
-      { key: 'intake_variatie', label: 'Variatie per maaltijd', alleenIngevuld: true }
+      { key: 'intake_plan_gevolgd', label: 'Eerder voedingsplan gevolgd', fmt: fmtMap(N.jn) }
     ]
   },
   {
@@ -445,19 +457,17 @@ const PART2_SECTIONS = [
       { key: 'intake_allergens_limited', label: 'Beperkt (intolerantie)', fmt: fmtArr() },
       { key: 'intake_allergens_custom', label: 'Overige allergieën' },
       { key: 'intake_niet_lekker', label: 'Vindt niet lekker', fmt: fmtArr() },
-      { key: 'intake_niet_lekker_overig', label: 'Niet lekker — overig' },
+      { key: 'intake_niet_lekker_overig', label: 'Niet lekker: overig' },
       { key: 'intake_absoluut_niet', label: 'Absoluut niet', fmt: fmtArr() }
     ]
   },
   {
-    title: 'Eetpatroon',
+    title: 'Wat vind je lekker',
     fields: [
       { key: 'intake_ontbijt', label: 'Ontbijt: vindt lekker' },
       { key: 'intake_lunch', label: 'Lunch: vindt lekker' },
       { key: 'intake_diner', label: 'Diner: vindt lekker' },
-      { key: 'intake_snack_lekker', label: 'Snack: vindt lekker', alleenIngevuld: true },
-      { key: 'intake_wat_werkte', label: 'Eerder een goede periode', fmt: fmtMap(N.jbn) },
-      { key: 'intake_wat_werkte_toelichting', label: 'Toelichting' }
+      { key: 'intake_snack_lekker', label: 'Snack: vindt lekker', alleenIngevuld: true }
     ]
   },
   {
@@ -472,12 +482,12 @@ const PART2_SECTIONS = [
   {
     title: 'Voedingsvoorkeuren',
     fields: [
-      { key: 'meals_per_day', label: 'Maaltijden per dag' },
-      { key: 'loved_foods', label: 'Favoriete voeding' },
-      { key: 'hated_foods', label: 'Vermijdt liever' },
-      { key: 'allergies', label: 'Allergieën' },
-      { key: 'cooking_skill', label: 'Kookvaardigheid', fmt: (v) => humanize(v) },
-      { key: 'variety_preference', label: 'Variatie-voorkeur', fmt: (v) => humanize(v) }
+      { key: 'meals_per_day', label: 'Maaltijden per dag', alleenIngevuld: true },
+      { key: 'loved_foods', label: 'Favoriete voeding', alleenIngevuld: true },
+      { key: 'hated_foods', label: 'Vermijdt liever', alleenIngevuld: true },
+      { key: 'allergies', label: 'Allergieën', alleenIngevuld: true },
+      { key: 'cooking_skill', label: 'Kookvaardigheid', fmt: (v) => humanize(v), alleenIngevuld: true },
+      { key: 'variety_preference', label: 'Variatie-voorkeur', fmt: (v) => humanize(v), alleenIngevuld: true }
     ]
   },
   {
@@ -514,12 +524,15 @@ const PART3_SECTIONS = [
     ]
   },
   {
-    title: 'Focus',
+    title: 'Huidige training',
     fields: [
       { key: '_split_pref', label: 'Huidige training' },
+      { key: '_huidig_dagen', label: 'Traint nu per week', alleenIngevuld: true },
+      { key: '_huidig_schema', label: 'Schema nu', alleenIngevuld: true },
+      { key: '_huidig_toelichting', label: 'Toelichting huidige training', alleenIngevuld: true },
       { key: '_split_focus', label: 'Focus', fmt: fmtArr(), alleenIngevuld: true },
       { key: 'emphasize_stretch', label: 'Nadruk op stretch', fmt: fmtBool, alleenIngevuld: true, verbergNee: true },
-      { key: 'prioritize_compounds', label: 'Compound-prioriteit', fmt: fmtBool }
+      { key: 'prioritize_compounds', label: 'Compound-prioriteit', fmt: fmtBool, alleenIngevuld: true, verbergNee: true }
     ]
   },
   {
@@ -550,7 +563,10 @@ const PART3_SECTIONS = [
 // vraag als de klant beantwoordde. Staat een veld hier niet in, dan wordt het
 // label als vraag getoond.
 const VRAGEN = {
-  _split_pref: 'Hoe ziet je huidige training eruit?',
+  _split_pref: 'Welke split volg je nu?',
+  _huidig_dagen: 'Hoeveel dagen train je nu per week?',
+  _huidig_schema: 'Wat doe je op die dagen?',
+  _huidig_toelichting: 'Nog iets over je huidige training',
   intake_guidance_level: 'Hoe wil je begeleid worden?',
   intake_macro_targets: 'Heb je macro targets voor jezelf?',
   intake_nu_ontbijt: 'Wat eet je meestal als ontbijt?',
@@ -772,6 +788,23 @@ function waaromLeeg(key, data) {
 
 // ---- render helpers --------------------------------------------------------
 
+// Persoonlijk: samengevoegde regels, zodat er minder regels staan met
+// dezelfde informatie (naam in één regel, geboortedatum + leeftijd, en de
+// twee vetpercentage-keuzes als bereik).
+function verrijkPersoonlijk(c) {
+  if (!c) return c
+  const naam = [c.first_name, c.last_name].filter(Boolean).join(' ').trim()
+  const leeftijd = c.age || (c.date_of_birth ? Math.floor((Date.now() - new Date(c.date_of_birth)) / 31557600000) : null)
+  const geboren = c.date_of_birth
+    ? `${fmtDate(c.date_of_birth)}${leeftijd ? ` (${leeftijd} jaar)` : ''}`
+    : (leeftijd ? `${leeftijd} jaar` : null)
+  const v1 = c.current_body_fat, v2 = c.current_body_fat_2
+  const vet = v1 && v2 && Number(v1) !== Number(v2)
+    ? `${Math.min(v1, v2)} tot ${Math.max(v1, v2)}%`
+    : (v1 || v2 ? `${v1 || v2}%` : null)
+  return { ...c, _naam: naam || null, _geboren: geboren, _vet: vet }
+}
+
 function renderSections(sections, data, toonLeeg = true) {
   const rendered = sections
     .map((section) => {
@@ -896,6 +929,19 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
     ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
   } = useZwevendVenster({ isMobile, standaard: { w: 560, h: 720 } })
   const [activeTab, setActiveTab] = useState('part1')
+  // Standaard alleen wat de klant echt invulde. Lege of overgeslagen vragen
+  // pas op verzoek, voor als je wil checken wat iemand heeft overgeslagen.
+  const [toonLeeg, setToonLeeg] = useState(false)
+  const leegKnop = (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '0.4rem 0 0.8rem' }}>
+      <button onClick={() => setToonLeeg(v => !v)} style={{
+        background: 'none', border: 'none', padding: '0.3rem 0.5rem', cursor: 'pointer', fontFamily: 'inherit',
+        color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', fontWeight: 800, textDecoration: 'underline', textUnderlineOffset: 3,
+      }}>
+        {toonLeeg ? 'Verberg lege vragen' : 'Toon ook lege en overgeslagen vragen'}
+      </button>
+    </div>
+  )
   const [training, setTraining] = useState(null)
   const [clientTraining, setClientTraining] = useState(null)
   const [loadingTraining, setLoadingTraining] = useState(true)
@@ -1015,7 +1061,17 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
           const simpel = merged.default_experience_level !== 'advanced' ? MAPS.splitSimpel[v] : null
           return simpel || fmtMap(MAPS.split)(v)
         })(),
-        _split_focus: training?.split_preferences?.focus
+        _split_focus: training?.split_preferences?.focus,
+        // Wat de klant nu doet (sinds 10 nov 2026)
+        _huidig_dagen: (() => {
+          const sp = training?.split_preferences || {}
+          return sp.huidig_dagen ? `${sp.huidig_dagen} dagen` : (sp.huidig_dagen_tekst || undefined)
+        })(),
+        _huidig_schema: (() => {
+          const s = training?.split_preferences?.huidig_schema
+          return Array.isArray(s) && s.length ? s.map((v, i) => `Dag ${i + 1}: ${v}`).join('\n') : undefined
+        })(),
+        _huidig_toelichting: training?.split_preferences?.huidig_toelichting || undefined
       }
     : null
 
@@ -1194,7 +1250,8 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
           {activeTab === 'part1' && (
             <>
               <Nulmeting metingen={metingen} isMobile={isMobile} />
-              {renderSections(PART1_SECTIONS, client)}
+              {renderSections(PART1_SECTIONS, verrijkPersoonlijk(client), toonLeeg)}
+              {leegKnop}
             </>
           )}
           {activeTab === 'part2' &&
@@ -1215,7 +1272,8 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
             ) : (
               <>
                 <Screenshots urls={np?.voeding_screenshots} isMobile={isMobile} />
-                {renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) })}
+                {renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) }, toonLeeg)}
+                {leegKnop}
               </>
             ))}
           {activeTab === 'part3' &&
@@ -1234,7 +1292,10 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                 <Clock size={16} /> Training laden…
               </div>
             ) : (
-              renderSections(PART3_SECTIONS, trainingData)
+              <>
+                {renderSections(PART3_SECTIONS, trainingData, toonLeeg)}
+                {leegKnop}
+              </>
             ))}
         </div>
         </>
