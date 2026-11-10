@@ -25,12 +25,14 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
+import KlantAanpassingen from './components/KlantAanpassingen'
 import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
+import { setsPerSpierDag, spierLabel } from './spierGroepen'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -958,6 +960,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </select>
           )}
           {effectiveClient && (<>
+            <KlantAanpassingen db={db} client={effectiveClient} knopStijl={iconKnop()} refreshKey={agendaKey} />
             <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={iconKnop()}><RefreshCw size={15} strokeWidth={2.6} /></button>
             <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={iconKnop()}><Plus size={16} strokeWidth={2.8} /></button>
             <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...iconKnop(true), opacity: huidigPlan ? 1 : 0.4, cursor: huidigPlan ? 'pointer' : 'not-allowed' }}><Trash2 size={15} strokeWidth={2.6} /></button>
@@ -1058,12 +1061,24 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             {workoutPlan.days.map((dag, i) => (
               <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 7, padding: '0.6rem 0.7rem 0.5rem', background: 'none', border: 'none',
+                  flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', background: 'none', border: 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
                 }}>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
+                  </span>
+                  {/* Sets per spiergroep in de dagkop, niet in de lijst eronder. */}
+                  {(dag.exercises || []).length > 0 && (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+                      {setsPerSpierDag(dag.exercises).map(([k, n]) => (
+                        <span key={k} style={{ fontSize: '0.7rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
+                          {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </button>
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0', scrollbarWidth: 'thin' }}>
                   <DayBuilder

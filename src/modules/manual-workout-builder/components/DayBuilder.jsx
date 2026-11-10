@@ -102,7 +102,7 @@ export default function DayBuilder({
 
   if (zonderKop) return (
     <div>
-      {day.exercises.length > 0 && (
+      {day.exercises.length > 0 && !compact && (
         <div style={{ margin: compact ? '0 0.6rem 0.55rem' : isMobile ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: compact ? '2px 10px' : '4px 14px' }}>
           {!compact && <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
             {dagMinuten}<span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>min</span>
