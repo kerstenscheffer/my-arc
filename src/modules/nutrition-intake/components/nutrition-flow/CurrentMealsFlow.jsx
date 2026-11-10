@@ -3,7 +3,9 @@
 // Vaste structuur (4 slots) met toevoeg-optie, vrije tekst + suggesties
 import React, { useState, useRef } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
+import { Lightbulb, ImagePlus, X } from 'lucide-react'
 import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
+import { MaaltijdDrillDown, MAALTIJD_CONFIG, MIN_ITEMS_PER_MEAL, countMealItems, isMealSkipped } from './EatPatternFlow'
 
 const vrijVeld = (isMobile) => ({
   width: '100%', boxSizing: 'border-box',
@@ -43,40 +45,28 @@ const BASE_SLOTS = [
 ]
 
 
-// Voorbeeld naast de screenshot-knop: een tegel van hetzelfde formaat als een
-// geüploade screenshot, met "voorbeeld" erop. Tikken vergroot 'm. Verdwijnt
-// zodra er een echte screenshot staat — dan snapt de klant het al.
-//
-// Bewust nagebouwd in plaats van een plaatje: scherp op elk scherm, geen
-// bestand dat zoekraakt, en het volgt vanzelf de stijl van de app.
-// Echte screenshot uit de app van Kersten. Eerst nagebouwd in CSS omdat het
-// bestand onbereikbaar was; nu het er wel is, is het plaatje beter: dit is
-// letterlijk wat de klant moet nasturen, zonder verschil tussen voorbeeld en
-// werkelijkheid.
+// Voorbeeld-tegel rechts van het invulvak: laat zien wat voor screenshot we
+// willen, zodat mensen er zelf een sturen. Echte maaltijd uit de app
+// van Kersten: naam, kcal, macro's en ingrediënten met grammen. Verdwijnt
+// zodra er bij dit moment een screenshot staat. Tikken vergroot 'm.
 const VOORBEELD_SRC = '/voorbeeld-screenshot.png'
 
 function VoorbeeldTegel() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Voorbeeld van een bruikbare screenshot"
-        style={{
-          position: 'relative', width: 56, height: 56, padding: 0,
-          border: '1px dashed rgba(255,255,255,0.3)', borderRadius: 12, overflow: 'hidden',
-          background: 'none', cursor: 'zoom-in', flexShrink: 0,
-        }}
-      >
-        <img src={VOORBEELD_SRC} alt="Voorbeeld van een bruikbare screenshot"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+      <button type="button" onClick={() => setOpen(true)} title="Vergroot voorbeeld" style={{
+        width: 84, flexShrink: 0, alignSelf: 'stretch', padding: 0,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        borderRadius: 14, border: '1px dashed rgba(255,255,255,0.3)', background: '#000',
+        cursor: 'zoom-in', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <img src={VOORBEELD_SRC} alt="Voorbeeld van een goede screenshot uit een voedingsapp"
+          style={{ display: 'block', width: '100%', flex: 1, minHeight: 0, objectFit: 'cover', objectPosition: 'top left' }} />
         <span style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.75)', color: 'rgba(255,255,255,0.75)',
-          fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.04em',
-          textTransform: 'uppercase', padding: '2px 0',
-        }}>voorbeeld</span>
+          display: 'block', padding: '0.35rem 0', background: '#fff', color: '#000',
+          fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'center',
+        }}>Voorbeeld</span>
       </button>
 
       {open && createPortal(
@@ -90,7 +80,7 @@ function VoorbeeldTegel() {
             Dit wil ik graag zien
           </div>
           <img src={VOORBEELD_SRC} alt="Voorbeeld van een bruikbare screenshot"
-            style={{ maxWidth: 'min(420px, 92vw)', maxHeight: '68vh', objectFit: 'contain', border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
+            style={{ maxWidth: 'min(420px, 92vw)', maxHeight: '68vh', objectFit: 'contain', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
           <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.55, maxWidth: 300 }}>
             Naam, calorieën, de macro's en de ingrediënten met hoeveelheden. Hoe completer, hoe beter ik je plan kan maken.
           </div>
@@ -101,18 +91,126 @@ function VoorbeeldTegel() {
   )
 }
 
-// Vierkante tegel rechts naast het tekstveld: zelfde maat als de voorbeeld-
-// tegel, zodat knop en voorbeeld samen één kolom vormen.
-const TEGEL = 56
-const RADIUS = 12
+const RADIUS = 14
+
+// Vierkante icoonknop in de balk onderin de kaart, compact zoals de knoppen
+// op de meal cards in de app.
+const icoonKnop = {
+  width: 36, height: 36, flexShrink: 0, padding: 0, borderRadius: 10,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)',
+  color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
+// Kaal icoon in de balk: geen eigen vlak of rand, zodat de regel laag blijft.
+const balkIcoon = {
+  width: 30, height: 30, flexShrink: 0, padding: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
+// Wat de klant in de keuze-modal aantikte, als leesbare namen.
+function gekozenNamen(maaltijdKey, data) {
+  const cfg = MAALTIJD_CONFIG[maaltijdKey]
+  if (!cfg) return []
+  const subLabel = {}
+  cfg.categories.forEach(c => c.subs.forEach(sub => { subLabel[sub.id] = sub.label }))
+  const subs = (data[`${maaltijdKey}_subs`] || []).map(id => {
+    if (subLabel[id]) return subLabel[id]
+    const i = id.indexOf('_custom_')
+    return i >= 0 ? id.slice(i + 8) : null
+  })
+  const teksten = Object.values(data[`${maaltijdKey}_text`] || {}).map(t => (t || '').trim())
+  const overslaan = isMealSkipped(maaltijdKey, data) ? ['Sla ik over'] : []
+  return [...overslaan, ...subs, ...teksten].filter(Boolean)
+}
+
+// Keuze-modal: wat eet je of vind je lekker. Zelfde opbouw als de slaap-popup
+// in de app (SlaapKnop): donkere blur-achtergrond, kaart met kop, sluitknop,
+// witte hoofdknop onderaan. Voor ontbijt/lunch/diner de foto-kaarten uit de
+// oude voorkeurenstap (EatPatternFlow); voor snacks de losse suggesties.
+function KeuzeModal({ maaltijdKey, titel, data, onChange, onKies, onClose, isMobile }) {
+  const heeftKaarten = !!MAALTIJD_CONFIG[maaltijdKey]
+  const aantal = heeftKaarten ? countMealItems(maaltijdKey, data) : 0
+  const klaar = !heeftKaarten || isMealSkipped(maaltijdKey, data) || aantal >= MIN_ITEMS_PER_MEAL
+  return createPortal(
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 2147483100,
+      background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 480, maxHeight: '92dvh', display: 'flex', flexDirection: 'column',
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.7)', overflow: 'hidden',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1.1rem 1rem 0.8rem' }}>
+          <div style={{ width: 40 }} />
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              {titel}
+            </div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              Wat eet je of vind je lekker?
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Sluiten" style={{ ...icoonKnop, width: 40, height: 40, borderRadius: 12 }}>
+            <X size={18} strokeWidth={2.8} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem 1rem' }}>
+          {heeftKaarten ? (
+            <>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '0.9rem' }}>
+                Tik aan wat je eet of graag eet, minimaal {MIN_ITEMS_PER_MEAL}.
+              </div>
+              <MaaltijdDrillDown maaltijdKey={maaltijdKey} data={data} onChange={onChange} isMobile={isMobile} tweeKolommen />
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center' }}>
+              {(SUGGESTIONS[maaltijdKey] || SUGGESTIONS.snack).map(sug => (
+                <button key={sug} type="button" onClick={() => onKies(sug)} style={{
+                  minHeight: 38, padding: '0 0.85rem', borderRadius: 999,
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#fff', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}>{sug}</button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '0.8rem 1rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          {heeftKaarten && (
+            <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 800, marginBottom: 10, color: klaar ? '#10b981' : 'rgba(255,255,255,0.55)' }}>
+              {isMealSkipped(maaltijdKey, data) ? 'Je slaat deze maaltijd over'
+                : klaar ? `✓ ${aantal} gekozen` : `${aantal} van ${MIN_ITEMS_PER_MEAL} gekozen`}
+            </div>
+          )}
+          <button onClick={onClose} style={{
+            width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
+            fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>Klaar</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
 
 function MealSlot({
   slotKey, label, placeholder, value, onChange, isMobile, removable, onRemove,
-  shots = [], onShots, werktGoed, onWerktGoed, uploaden,
+  shots = [], onShots, werktGoed, onWerktGoed, uploaden, flowData, onFlowChange, momentLabel,
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const gekozen = flowData ? gekozenNamen(slotKey, flowData) : []
+  const [focus, setFocus] = useState(false)
   const inputRef = useRef(null)
-  const suggestions = SUGGESTIONS[slotKey] || SUGGESTIONS.snack
   // "Wat werkt goed?" pas tonen als er iets staat: eerst vertellen wat je
   // eet, dan pas wat eraan bevalt. Blijft staan als het al was ingevuld.
   const toonWerkt = !!(value || '').trim() || !!(werktGoed || '').trim()
@@ -121,117 +219,104 @@ function MealSlot({
     const current = value || ''
     const separator = current.trim() ? ', ' : ''
     onChange(current.trim() + separator + s)
-    inputRef.current?.focus()
   }
 
   return (
     <div style={{ marginBottom: '1.1rem' }}>
-      {/* Kop boven het veld: label links (alleen bij extra snacks), suggesties rechts */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: '0.4rem', minHeight: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {label && (
-            <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{label}</div>
-          )}
+      {(label || removable) && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+          <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{label}</div>
           {removable && (
-            <button onClick={onRemove} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', padding: 0, fontFamily: 'inherit', touchAction: 'manipulation' }}>
-              ✕ verwijder
+            <button onClick={onRemove} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', padding: 0, fontFamily: 'inherit', touchAction: 'manipulation' }}>
+              Verwijder
             </button>
           )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowSuggestions(p => !p)}
-          style={{
-            background: 'transparent', border: 'none', padding: '0.2rem 0',
-            color: '#fff', fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 900,
-            cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          {showSuggestions ? 'Sluit suggesties' : 'Suggesties'}
-        </button>
-      </div>
-
-      {showSuggestions && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.55rem' }}>
-          {suggestions.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => appendSuggestion(s)}
-              style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.18)',
-                borderRadius: 999,
-                color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.72rem' : '0.75rem',
-                fontWeight: 800, cursor: 'pointer', padding: '0.35rem 0.75rem',
-                fontFamily: 'inherit', touchAction: 'manipulation',
-              }}
-            >
-              {s}
-            </button>
-          ))}
         </div>
       )}
 
-      {/* Tekstveld met rechts de screenshot-knop en het voorbeeld eronder.
-          Screenshot hoort bij dít moment: zo weet je van welke maaltijd je
-          naar de getallen kijkt. */}
+      {/* Eén kaart: tekst bovenin, knoppen onderin binnen dezelfde rand.
+          Rechts ervan het voorbeeld, zolang er nog geen screenshot is. */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+      <div style={{
+        flex: 1, minWidth: 0,
+        background: '#0d0d0d', borderRadius: RADIUS,
+        border: `1px solid ${focus ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)'}`,
+        transition: 'border-color 0.15s ease', overflow: 'hidden',
+      }}>
         <textarea
           ref={inputRef}
           value={value || ''}
           onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocus(true)}
+          onBlur={() => setFocus(false)}
           placeholder={placeholder}
-          rows={4}
+          rows={3}
           style={{
-            flex: 1, minWidth: 0, boxSizing: 'border-box',
-            padding: isMobile ? '0.75rem 0.85rem' : '0.8rem 0.95rem',
-            fontSize: isMobile ? '0.88rem' : '0.9rem', fontWeight: 600,
-            background: '#0d0d0d',
-            border: '1px solid rgba(255,255,255,0.15)', borderRadius: RADIUS,
-            color: '#fff', fontFamily: 'inherit',
-            lineHeight: 1.5, resize: 'none',
-            outline: 'none', transition: 'border-color 0.15s ease',
+            display: 'block', width: '100%', boxSizing: 'border-box',
+            padding: isMobile ? '0.85rem 0.9rem 0.4rem' : '0.9rem 1rem 0.4rem',
+            fontSize: isMobile ? '0.9rem' : '0.92rem', fontWeight: 600,
+            background: 'transparent', border: 'none', outline: 'none',
+            color: '#fff', fontFamily: 'inherit', lineHeight: 1.5, resize: 'none',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-          <label style={{
-            width: TEGEL, height: TEGEL, boxSizing: 'border-box',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: RADIUS,
-            color: '#fff', fontSize: '0.6rem', fontWeight: 900, textAlign: 'center',
-            cursor: uploaden ? 'wait' : 'pointer', fontFamily: 'inherit',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+
+        {shots.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: isMobile ? '0.2rem 0.9rem 0.5rem' : '0.2rem 1rem 0.5rem' }}>
+            {shots.map((u, i) => (
+              <div key={i} style={{ position: 'relative' }}>
+                <img src={u} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
+                <button onClick={() => onShots?.(null, i)} style={{
+                  position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
+                  background: '#fff', border: 'none', color: '#000', fontWeight: 900,
+                  fontSize: '0.72rem', lineHeight: 1, cursor: 'pointer', padding: 0,
+                }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0.15rem 0.45rem', borderTop: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          <button type="button" onClick={() => setShowSuggestions(true)} aria-label="Suggesties: wat eet je of vind je lekker" style={balkIcoon}>
+            <Lightbulb size={17} strokeWidth={2.4} />
+          </button>
+          {/* Wat er in de modal is gekozen, als korte regel naast de knop */}
+          <button type="button" onClick={() => setShowSuggestions(true)} style={{
+            flex: 1, minWidth: 0, minHeight: 30, padding: '0 0.1rem', background: 'none', border: 'none',
+            textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+            fontSize: '0.75rem', fontWeight: 700, color: gekozen.length ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {uploaden ? 'Bezig…' : (<><span style={{ fontSize: '1.1rem', lineHeight: 1 }}>+</span>Screenshot</>)}
+            {gekozen.length ? gekozen.join(', ') : 'Wat vind je lekker?'}
+          </button>
+          <label aria-label="Screenshot toevoegen" style={{ ...balkIcoon, cursor: uploaden ? 'wait' : 'pointer', opacity: uploaden ? 0.5 : 1 }}>
+            <ImagePlus size={17} strokeWidth={2.4} />
             <input type="file" accept="image/*" multiple disabled={uploaden} style={{ display: 'none' }}
               onChange={e => { const f = [...(e.target.files || [])]; e.target.value = ''; if (f.length) onShots?.(f) }} />
           </label>
-          {shots.length === 0 && <VoorbeeldTegel />}
         </div>
       </div>
+      {shots.length === 0 && <VoorbeeldTegel />}
+      </div>
 
-      {shots.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginTop: '0.55rem', flexWrap: 'wrap' }}>
-          {shots.map((u, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <img src={u} alt="" style={{ width: TEGEL, height: TEGEL, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.15)', borderRadius: RADIUS, display: 'block' }} />
-              <button onClick={() => onShots?.(null, i)} style={{
-                position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
-                background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.3)', color: '#fff',
-                fontSize: '0.7rem', lineHeight: 1, cursor: 'pointer', padding: 0,
-              }}>×</button>
-            </div>
-          ))}
-        </div>
+      {showSuggestions && (
+        <KeuzeModal
+          maaltijdKey={slotKey}
+          titel={momentLabel || label || 'Snack'}
+          data={flowData || {}}
+          onChange={onFlowChange}
+          onKies={appendSuggestion}
+          onClose={() => setShowSuggestions(false)}
+          isMobile={isMobile}
+        />
       )}
 
       {/* Wat werkt er al bij dit moment: je wil weten wat je moet behouden. */}
       {toonWerkt && (
-        <div style={{ marginTop: '0.8rem' }}>
-          <div style={{ fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 900, color: '#fff', marginBottom: '0.4rem' }}>
+        <div style={{ marginTop: '0.9rem' }}>
+          <div style={{ fontSize: isMobile ? '0.88rem' : '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.45rem' }}>
             Wat werkt hier goed aan?
           </div>
           <input
@@ -239,9 +324,9 @@ function MealSlot({
             onChange={e => onWerktGoed?.(e.target.value)}
             placeholder="Bijv: hier heb ik lang genoeg aan"
             style={{
-              width: '100%', boxSizing: 'border-box', minHeight: 46,
-              padding: isMobile ? '0.65rem 0.85rem' : '0.7rem 0.95rem',
-              fontSize: isMobile ? '0.86rem' : '0.88rem', fontWeight: 600,
+              width: '100%', boxSizing: 'border-box', minHeight: 48,
+              padding: isMobile ? '0.7rem 0.9rem' : '0.75rem 1rem',
+              fontSize: isMobile ? '0.9rem' : '0.92rem', fontWeight: 600,
               background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.15)', borderRadius: RADIUS,
               color: '#fff', fontFamily: 'inherit', outline: 'none',
             }}
@@ -515,17 +600,6 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
   return (
     <div style={{ padding: isMobile ? '1.5rem 1rem 2.5rem' : '2rem 1.25rem 3rem' }}>
 
-      {/* Waar ben je: vijf korte streepjes, ingevulde stappen wit */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: '1.1rem' }}>
-        {STAPPEN.map((k, i) => (
-          <div key={k} style={{
-            flex: 1, height: 4, borderRadius: 999,
-            background: i <= stap ? '#fff' : 'rgba(255,255,255,0.12)',
-            transition: 'background 0.2s ease',
-          }} />
-        ))}
-      </div>
-
       {huidig === 'macros' ? (
         <>
           <Q isMobile={isMobile}>Wat eet je nu op dagelijkse basis?</Q>
@@ -555,6 +629,9 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
               werktGoed={data[`current_meals_${huidig}_werkt`]}
               onWerktGoed={val => handleChange(`current_meals_${huidig}_werkt`, val)}
               isMobile={isMobile}
+              flowData={data}
+              onFlowChange={onChange}
+              momentLabel={slot.label}
             />
 
             {/* Extra snackmomenten horen bij het snack-scherm */}
@@ -574,6 +651,8 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
                     werktGoed={data[`current_meals_extra_${idx}_werkt`]}
                     onWerktGoed={val => handleChange(`current_meals_extra_${idx}_werkt`, val)}
                     isMobile={isMobile}
+                    flowData={data}
+                    onFlowChange={onChange}
                     removable
                     onRemove={() => removeExtraSlot(id)}
                   />

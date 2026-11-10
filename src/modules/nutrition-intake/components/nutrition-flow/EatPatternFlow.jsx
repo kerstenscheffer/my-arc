@@ -8,16 +8,16 @@ import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/p
 // "Ding" = sub-item (specifiek gerecht), custom toegevoegd item, of een
 // niet-lege tekst bij "Iets anders". Wie de maaltijd overslaat (skip_*) mag
 // door zonder minimum.
-const MIN_ITEMS_PER_MEAL = 3
+export const MIN_ITEMS_PER_MEAL = 3
 
-const countMealItems = (key, data) => {
+export const countMealItems = (key, data) => {
   const subs = data[`${key}_subs`] || []
   const text = data[`${key}_text`] || {}
   const textCount = Object.values(text).filter(t => (t || '').trim()).length
   return subs.length + textCount
 }
 
-const isMealSkipped = (key, data) =>
+export const isMealSkipped = (key, data) =>
   (data[`${key}_categories`] || []).some(c => c.startsWith('skip_'))
 
 const canContinueMeal = (key, data) =>
@@ -68,7 +68,7 @@ function MealItemCounter({ count, skipped, label }) {
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-const MAALTIJD_CONFIG = {
+export const MAALTIJD_CONFIG = {
   ontbijt: { label: 'Ontbijt', categories: [
     { id: 'brood',         label: 'Brood of toast',      image: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=160&fit=crop&q=80',
       subs: [
@@ -401,7 +401,7 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
 }
 
 // ── Twee-kolom wrapper ────────────────────────────────────────────────────────
-function MaaltijdDrillDown({ maaltijdKey, data, onChange, isMobile }) {
+export function MaaltijdDrillDown({ maaltijdKey, data, onChange, isMobile, tweeKolommen }) {
   const cats = MAALTIJD_CONFIG[maaltijdKey].categories
   // Verdeel categorieën over 2 kolommen: links even indices, rechts oneven
   const links  = cats.filter((_, i) => i % 2 === 0)
@@ -409,7 +409,8 @@ function MaaltijdDrillDown({ maaltijdKey, data, onChange, isMobile }) {
 
   // On mobile, single column to avoid visual confusion when a card expands
   // its sub-list next to options in the adjacent column.
-  if (isMobile) return (
+  // tweeKolommen: in de keuze-modal ook op mobiel naast elkaar (10 nov 2026).
+  if (isMobile && !tweeKolommen) return (
     <div>
       <KolomCards cats={cats} maaltijdKey={maaltijdKey} data={data} onChange={onChange} isMobile={isMobile} />
     </div>
@@ -425,9 +426,12 @@ function MaaltijdDrillDown({ maaltijdKey, data, onChange, isMobile }) {
 
 // ── Hoofd flow ────────────────────────────────────────────────────────────────
 export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobile }) {
-  const [step, setStep] = useState(1)
+  // Sinds 10 nov 2026 kiest de klant wat hij lekker vindt (stap 1-3) in de
+  // Suggesties-modal bij "Wat eet je nu" (CurrentMealsFlow). Hier blijft alleen
+  // stap 4 over: eerder een goede periode gehad.
+  const [step, setStep] = useState(4)
   const update = (field, value) => onChange({ ...data, [field]: value })
-  const goBack = () => { if (step > 1) setStep(step - 1); else if (onBack) onBack() }
+  const goBack = () => { if (step > 4) setStep(step - 1); else if (onBack) onBack() }
   const pad = isMobile ? '1.25rem 1rem' : '1.5rem 1.25rem'
 
   if (step === 1) return (

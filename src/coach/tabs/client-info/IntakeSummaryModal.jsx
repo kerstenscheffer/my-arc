@@ -443,9 +443,9 @@ const PART2_SECTIONS = [
   {
     title: 'Eetpatroon',
     fields: [
-      { key: 'intake_ontbijt', label: 'Ontbijt' },
-      { key: 'intake_lunch', label: 'Lunch' },
-      { key: 'intake_diner', label: 'Diner' },
+      { key: 'intake_ontbijt', label: 'Ontbijt: vindt lekker' },
+      { key: 'intake_lunch', label: 'Lunch: vindt lekker' },
+      { key: 'intake_diner', label: 'Diner: vindt lekker' },
       { key: 'intake_wat_werkte', label: 'Eerder een goede periode', fmt: fmtMap(N.jbn) },
       { key: 'intake_wat_werkte_toelichting', label: 'Toelichting' }
     ]
@@ -548,6 +548,9 @@ const VRAGEN = {
   intake_nu_diner: 'Wat eet je meestal als avondeten?',
   intake_nu_snack: 'Wat snack je meestal tussendoor?',
   intake_eerder_geprobeerd: 'Wat heb je al geprobeerd met je voeding?',
+  intake_ontbijt: 'Ontbijt: wat eet je of vind je lekker?',
+  intake_lunch: 'Lunch: wat eet je of vind je lekker?',
+  intake_diner: 'Avondeten: wat eet je of vind je lekker?',
   first_name: 'Wat is je voornaam?',
   last_name: 'En je achternaam?',
   email: 'Wat is je e-mailadres?',
