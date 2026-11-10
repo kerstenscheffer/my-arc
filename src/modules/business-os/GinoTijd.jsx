@@ -25,11 +25,12 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
+// Volgorde per kleur: paars, oranje, grijs, geel, overig.
 const TIJD_SOORTEN = [
   ['sales', 'Sales', true],
-  ['calls', 'Calls', true],
-  ['coaching', 'Coaching', true],
   ['content', 'Content', true],
+  ['coaching', 'Coaching', true],
+  ['calls', 'Calls', true],
   ['bouwen', 'Bouwen', false],
   ['admin', 'Admin', false],
   ['social', 'Social', false],
@@ -38,12 +39,28 @@ const TIJD_SOORTEN = [
 ]
 const GELD = new Set(TIJD_SOORTEN.filter(s => s[2]).map(s => s[0]))
 const LABEL = Object.fromEntries(TIJD_SOORTEN.map(([k, l]) => [k, l]))
-// Geld in groentinten, de rest in grijzen: in één oogopslag wat iets oplevert.
+// Kleuren van Kerstens Google Agenda (10 nov 2026): gepland en gemeten zelfde tint.
+const PAARS = '#8e24aa', ORANJE = '#f4511e', GRIJS = '#616161', GRIJS_LICHT = '#8a8a8a', GEEL = '#f6bf26'
+const BLAUW = '#039be5', GROEN_AGENDA = '#0b8043'
 const KLEUR = {
-  sales: G, calls: '#4ade80', coaching: '#16a34a', content: '#86efac',
-  bouwen: 'rgba(255,255,255,0.55)', admin: 'rgba(255,255,255,0.38)', social: 'rgba(255,255,255,0.26)',
-  afleiding: 'rgba(255,255,255,0.18)', overig: 'rgba(255,255,255,0.12)',
+  sales: PAARS, content: PAARS, coaching: ORANJE, calls: ORANJE,
+  bouwen: GRIJS, admin: GRIJS_LICHT, social: GEEL, afleiding: GEEL, overig: '#27272a',
 }
+// Tekst op een blok: donker op geel, wit op de rest.
+const INKT = { social: '#1a1300', afleiding: '#1a1300' }
+// Legenda: één stip per kleur met weektotaal.
+const LEGENDA = [
+  { id: 'paars', kleur: PAARS, label: 'Sales/Content', soorten: ['sales', 'content'], geld: true },
+  { id: 'oranje', kleur: ORANJE, label: 'Coaching/Calls', soorten: ['coaching', 'calls'], geld: true },
+  { id: 'bouwen', kleur: GRIJS, label: 'Bouwen', soorten: ['bouwen'] },
+  { id: 'admin', kleur: GRIJS_LICHT, label: 'Admin', soorten: ['admin'] },
+  { id: 'geel', kleur: GEEL, label: 'Social/Afleiding', soorten: ['social', 'afleiding'] },
+  { id: 'overig', kleur: KLEUR.overig, label: 'Overig', soorten: ['overig'] },
+]
+// Hex + doorzichtigheid → rgba.
+const zacht = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`
+// Call-kleur in de agenda: salescall paars, klant-/opstartcall oranje, rest grijs.
+const callKleur = (e) => (e.soort === 'salescall' ? PAARS : e.soort === 'klantcall' || e.soort === 'opstartcall' ? ORANJE : GRIJS_LICHT)
 const WEEKDAG = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const uren = (min) => (min >= 60 ? `${Math.floor(min / 60)}u${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}` : `${min}m`)
@@ -118,7 +135,7 @@ function TijdStats({ som, focusSoort, isMobile }) {
             <span style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
               <span style={{
                 display: 'block', height: '100%', width: `${(som.perSoort[k] / maxSoort) * 100}%`, borderRadius: 3, background: KLEUR[k],
-                boxShadow: GELD.has(k) ? `0 0 8px ${G}88` : 'none', transformOrigin: 'left', animation: `gt-breed .7s cubic-bezier(.2,.8,.2,1) ${i * 60}ms both`,
+                boxShadow: GELD.has(k) ? `0 0 8px ${KLEUR[k]}88` : 'none', transformOrigin: 'left', animation: `gt-breed .7s cubic-bezier(.2,.8,.2,1) ${i * 60}ms both`,
               }} />
             </span>
             <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{uren(som.perSoort[k])}</span>
@@ -142,12 +159,12 @@ function TijdStats({ som, focusSoort, isMobile }) {
   )
 }
 
-// Eén afspraak: tijd en titel, call met groene stip.
+// Eén afspraak: tijd en titel, call met stip in de agenda-kleur.
 function Afspraak({ e }) {
   const tijd = e.hele_dag ? 'Hele dag' : `${nlTijd(e.start_at)}${e.end_at ? `–${nlTijd(e.end_at)}` : ''}`
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, alignSelf: 'center', background: IS_CALL.has(e.soort) ? G : 'rgba(255,255,255,0.35)' }} />
+      <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, alignSelf: 'center', background: IS_CALL.has(e.soort) ? callKleur(e) : 'rgba(255,255,255,0.35)' }} />
       <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{tijd}</span>
       <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.75)', minWidth: 0, overflowWrap: 'anywhere' }}>{e.titel || 'Afspraak'}</span>
     </div>
@@ -275,13 +292,57 @@ function TijdDag({ dag, focusSoort, isMobile, onTerug }) {
   )
 }
 
-// Weekagenda (10 nov 2026): rooster als een agenda-app, 06:00-23:00. Per uur
-// een vak dat vult met de gemeten minuten per categorie (60 min = vol), geld
-// onderin; afspraken als omlijning met titel over de uren heen.
+// Weekagenda (10 nov 2026, rustiger): rooster 06:00-23:00 als een agenda-app.
+// Gemeten tijd = blokken: per uur de hoofdcategorie (meeste minuten), opvolgende
+// uren met dezelfde hoofdcategorie één blok met label. Gemengd uur = binnen het
+// uur naast elkaar verdeeld naar minuten. Uren < 5 min blijven leeg.
+// Agenda: calls/afspraken als streepje links met voornaam; lange blokken (dw,
+// Gym, Paviljoen, Vrij, eten, >= 2u zonder contact) als zachte band. Slaap weg.
 const AG_VAN = 6, AG_TOT = 23
 const UUR_H = 34
 const AG_UREN = Array.from({ length: AG_TOT - AG_VAN }, (_, i) => AG_VAN + i)
 const AG_VOLGORDE = [...TIJD_SOORTEN.filter(s => s[2]), ...TIJD_SOORTEN.filter(s => !s[2])].map(s => s[0])
+const MIN_UUR = 5 // minder gemeten in een uur = leeg
+const GOOT = 7 // ruimte links voor de call-streepjes
+const IS_BAND = /^(dw|gym|paviljoen|vrij|eten)\b/i
+const IS_SLAAP = /^slaap/i
+const isPaviljoen = (e) => e.soort === 'paviljoen' || /paviljoen/i.test(e.titel || '')
+// Band-kleur als in Google Agenda: dw paars, Paviljoen groen, persoonlijk blauw.
+const bandKleur = (e) => (/^dw\b/i.test((e.titel || '').trim()) ? zacht(PAARS, 0.12)
+  : isPaviljoen(e) ? zacht(GROEN_AGENDA, 0.16) : zacht(BLAUW, 0.12))
+const uurKort = (min) => `${(min / 60).toLocaleString('nl-NL', { maximumFractionDigits: 1 })}u`
+const duurKort = (min) => (min >= 60 ? `${Math.floor(min / 60)}u${min % 60 ? String(min % 60).padStart(2, '0') : ''}` : `${min}m`)
+const naamVan = (e) => (e.contact_naam || '').trim().split(/\s+/)[0]
+  || (e.titel || 'Afspraak').replace(/\s+(en|and)\s+Kersten Scheffer\s*$/i, '').trim()
+
+// Gemeten uren → blokken met per uur de stukken (hoofdcategorie eerst).
+function maakBlokken(perUur) {
+  const blokken = []
+  for (const u of AG_UREN) {
+    const soorten = perUur[u] || {}
+    const tot = Object.values(soorten).reduce((a, b) => a + b, 0)
+    if (tot < MIN_UUR) continue
+    const hoofd = AG_VOLGORDE.reduce((best, s) => ((soorten[s] || 0) > (soorten[best] || 0) ? s : best), AG_VOLGORDE[0])
+    // Kruimels (< 5 min) tellen bij de hoofdcategorie: geen streepjes-ruis.
+    let rest = 0
+    const stukken = []
+    for (const s of AG_VOLGORDE) {
+      if (!soorten[s] || s === hoofd) continue
+      if (soorten[s] < MIN_UUR) rest += soorten[s]
+      else stukken.push([s, soorten[s]])
+    }
+    stukken.unshift([hoofd, soorten[hoofd] + rest])
+    const vorige = blokken[blokken.length - 1]
+    if (vorige && vorige.soort === hoofd && vorige.tot === u) {
+      vorige.tot = u + 1
+      vorige.minuten += soorten[hoofd]
+      vorige.rijen.push({ u, tot, stukken })
+    } else {
+      blokken.push({ soort: hoofd, van: u, tot: u + 1, minuten: soorten[hoofd], rijen: [{ u, tot, stukken }] })
+    }
+  }
+  return blokken
+}
 
 function WeekAgenda({ dagen, focusSoort, focusDag, isMobile, onKiesDag }) {
   const keys = useMemo(() => dagen.map(iso), [dagen])
@@ -292,7 +353,7 @@ function WeekAgenda({ dagen, focusSoort, focusDag, isMobile, onKiesDag }) {
     const eind = nlMiddernacht(volgendeDag(keys[keys.length - 1])).toISOString()
     Promise.all([
       ...keys.map(k => supabase.rpc('business_os_tijd_overzicht', { van: k, tot: k }).then(r => r, e => ({ error: e }))),
-      supabase.from('agenda_events').select('id, titel, start_at, end_at, hele_dag, soort')
+      supabase.from('agenda_events').select('id, titel, start_at, end_at, hele_dag, soort, contact_naam')
         .lt('start_at', eind).or(`end_at.gt.${start},and(end_at.is.null,start_at.gte.${start})`)
         .order('start_at').limit(300).then(r => r, e => ({ error: e })),
     ]).then((res) => {
@@ -303,42 +364,51 @@ function WeekAgenda({ dagen, focusSoort, focusDag, isMobile, onKiesDag }) {
     return () => { weg = true }
   }, [keys])
 
-  const kolommen = useMemo(() => {
-    if (!stand) return []
-    return keys.map((k, i) => {
+  const { kolommen, week } = useMemo(() => {
+    if (!stand) return { kolommen: [], week: {} }
+    const week = {}
+    const kolommen = keys.map((k, i) => {
       const perUur = {}
-      let geld = 0
+      let geld = 0, rest = 0
       for (const r of stand.dagen[i]) {
         ;(perUur[r.uur] ||= {})[r.categorie] = r.minuten
+        week[r.categorie] = (week[r.categorie] || 0) + r.minuten
         if (GELD.has(r.categorie)) geld += r.minuten
+        else rest += r.minuten
       }
       const d0 = nlMiddernacht(k).getTime(), d1 = nlMiddernacht(volgendeDag(k)).getTime()
-      const heleDag = [], blokken = []
+      const heleDag = [], banden = [], streepjes = []
       for (const e of stand.agenda) {
+        if (IS_SLAAP.test((e.titel || '').trim())) continue
         const s = new Date(e.start_at).getTime()
         const t = e.end_at ? new Date(e.end_at).getTime() : s + 30 * 60000
         if (t <= d0 || s >= d1) continue
         if (e.hele_dag) { heleDag.push(e); continue }
         const a = Math.max(AG_VAN * 60, (Math.max(s, d0) - d0) / 60000)
         const b = Math.min(AG_TOT * 60, (Math.min(t, d1) - d0) / 60000)
-        if (b > a) blokken.push({ e, a, b })
+        if (b <= a) continue
+        const band = IS_BAND.test((e.titel || '').trim()) || isPaviljoen(e) || (!e.contact_naam && (t - s) >= 120 * 60000)
+        ;(band ? banden : streepjes).push({ e, a, b })
       }
-      // Overlap: elke volgende afspraak een baan naar rechts.
+      // Overlappende streepjes: elk een eigen baan naar rechts.
       const banen = []
-      for (const bl of blokken) {
-        let baan = banen.findIndex(eind => eind <= bl.a)
+      for (const st of streepjes) {
+        let baan = banen.findIndex(eind => eind <= st.a)
         if (baan < 0) { baan = banen.length; banen.push(0) }
-        banen[baan] = bl.b
-        bl.baan = baan
+        banen[baan] = st.b
+        st.baan = baan
       }
-      return { k, perUur, geld, heleDag, blokken }
+      return { k, geld, rest, heleDag, banden, streepjes, blokken: maakBlokken(perUur) }
     })
+    return { kolommen, week }
   }, [stand, keys])
 
   const vandaag = iso(new Date())
-  const minKol = isMobile ? 86 : 92
+  const minKol = isMobile ? 92 : 100
   const raster = { display: 'grid', gridTemplateColumns: `44px repeat(${keys.length}, minmax(${minKol}px, 1fr))`, columnGap: 6, minWidth: 44 + keys.length * (minKol + 6) }
-  const links = { position: 'sticky', left: 0, zIndex: 2, background: '#000' }
+  const links = { position: 'sticky', left: 0, zIndex: 5, background: '#000' }
+  const y = (min) => ((min - AG_VAN * 60) / 60) * UUR_H
+  const legenda = LEGENDA.map(l => ({ ...l, min: l.soorten.reduce((a, s) => a + (week[s] || 0), 0) })).filter(l => l.min >= 1)
 
   if (!stand) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
@@ -347,76 +417,127 @@ function WeekAgenda({ dagen, focusSoort, focusDag, isMobile, onKiesDag }) {
   )
 
   return (
-    <div className="gk-scroll" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-      <div style={raster}>
-        {/* Kop: dag + geldtijd, vast bovenin */}
-        <div style={{ ...links, top: 0, zIndex: 4 }} />
-        {kolommen.map((c, i) => {
-          const d = dagen[i]
-          return (
-            <button key={c.k} type="button" className="gt-dag" onClick={() => onKiesDag(c.k)} aria-label={`${WEEKDAG[i]} ${d.getDate()}: ${uren(c.geld)} geldtijd`} style={{
-              position: 'sticky', top: 0, zIndex: 3, background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: '4px 0 8px', margin: 0, border: 'none', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit', minWidth: 0,
-            }}>
-              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, maxWidth: '100%', opacity: focusDag && focusDag !== c.k ? 0.3 : 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: c.k === vandaag ? G : 'rgba(255,255,255,0.55)' }}>{WEEKDAG[i]} {d.getDate()}</span>
-              <span style={{ fontSize: 16, fontWeight: 900, color: c.geld ? '#fff' : 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
-                {c.geld ? (c.geld / 60).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + 'u' : '–'}
-              </span>
-              {c.heleDag.map(e => (
-                <span key={e.id} title={e.titel || 'Afspraak'} style={{ maxWidth: '100%', fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.titel || 'Afspraak'}</span>
-              ))}
-              </span>
-            </button>
-          )
-        })}
-
-        {/* Uurlabels vast links */}
-        <div style={{ ...links, height: AG_UREN.length * UUR_H }}>
-          {AG_UREN.map(u => (
-            <div key={u} style={{ height: UUR_H, fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, transform: 'translateY(-5px)' }}>
-              {String(u).padStart(2, '0')}:00
-            </div>
-          ))}
-        </div>
-
-        {/* Per dag een kolom: uurvakken + afspraken eroverheen */}
-        {kolommen.map(c => (
-          <div key={c.k} style={{ position: 'relative', height: AG_UREN.length * UUR_H, opacity: focusDag && focusDag !== c.k ? 0.3 : 1, transition: 'opacity .3s' }}>
-            {AG_UREN.map(u => {
-              const soorten = c.perUur[u] || {}
-              const tot = Object.values(soorten).reduce((a, b) => a + b, 0)
-              const schaal = Math.max(60, tot)
-              return (
-                <div key={u} style={{ height: UUR_H, borderTop: '1px solid rgba(255,255,255,0.07)', padding: '2px 0', boxSizing: 'border-box' }}>
-                  <div title={tot ? AG_VOLGORDE.filter(s => soorten[s]).map(s => `${LABEL[s]} ${uren(soorten[s])}`).join(' · ') : undefined}
-                    style={{ height: '100%', display: 'flex', flexDirection: 'column-reverse', borderRadius: 4, overflow: 'hidden' }}>
-                    {AG_VOLGORDE.filter(s => soorten[s]).map(s => (
-                      <span key={s} style={{ height: `${(soorten[s] / schaal) * 100}%`, flexShrink: 0, background: KLEUR[s], opacity: focusSoort && s !== focusSoort ? 0.22 : 1, transition: 'opacity .3s' }} />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-            {c.blokken.map(({ e, a, b, baan }) => {
-              const call = IS_CALL.has(e.soort)
-              const hoog = ((b - a) / 60) * UUR_H
-              return (
-                <div key={e.id} title={`${nlTijd(e.start_at)}${e.end_at ? `–${nlTijd(e.end_at)}` : ''} ${e.titel || 'Afspraak'}`} style={{
-                  position: 'absolute', top: ((a - AG_VAN * 60) / 60) * UUR_H, height: Math.max(hoog, 6), left: baan * 8, right: 0, zIndex: 1 + baan,
-                  border: `1.5px solid ${call ? G : 'rgba(255,255,255,0.75)'}`, borderRadius: 5, boxSizing: 'border-box', pointerEvents: 'none',
-                  padding: '1px 5px', overflow: 'hidden',
-                }}>
-                  {hoog >= 14 && (
-                    <span style={{ display: 'block', fontSize: 10.5, fontWeight: 800, lineHeight: 1.25, color: '#fff', textShadow: '0 1px 3px #000, 0 0 2px #000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.titel || 'Afspraak'}</span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Legenda: één stip per kleur, geldtijd (paars, oranje) eerst */}
+      <div className="gk-scroll" style={{ display: 'flex', alignItems: 'center', gap: 14, overflowX: 'auto', whiteSpace: 'nowrap', flexShrink: 0, paddingBottom: 2 }}>
+        {legenda.map(l => (
+          <span key={l.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, opacity: focusSoort && !l.soorten.includes(focusSoort) ? 0.3 : 1 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.kleur, boxShadow: l.id === 'overig' ? 'inset 0 0 0 1px rgba(255,255,255,0.25)' : 'none' }} />
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: l.geld ? '#fff' : 'rgba(255,255,255,0.6)' }}>{l.label}</span>
+            <span style={{ fontSize: 12.5, fontWeight: l.geld ? 900 : 800, color: l.geld ? '#fff' : 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{uurKort(l.min)}</span>
+          </span>
         ))}
       </div>
-      {stand.fout && <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', padding: '12px 4px' }}>Niet alles kon laden.</div>}
+
+      <div className="gk-scroll" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <div style={raster}>
+          {/* Kop: dag + geldtijd wit/vet · rest grijs, vast bovenin */}
+          <div style={{ ...links, top: 0, zIndex: 7 }} />
+          {kolommen.map((c, i) => {
+            const d = dagen[i]
+            const isVandaag = c.k === vandaag
+            const dim = (focusDag && focusDag !== c.k) || (!focusDag && c.k > vandaag) ? 0.35 : 1
+            return (
+              <button key={c.k} type="button" className="gt-dag" onClick={() => onKiesDag(c.k)} aria-label={`${WEEKDAG[i]} ${d.getDate()}: ${uurKort(c.geld)} geldtijd, ${uurKort(c.rest)} rest`} style={{
+                position: 'sticky', top: 0, zIndex: 6, background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                padding: '4px 0 8px', margin: 0, border: 'none', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit', minWidth: 0,
+              }}>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, maxWidth: '100%', opacity: dim, transition: 'opacity .3s' }}>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: isVandaag ? G : '#fff' }}>{WEEKDAG[i]} {d.getDate()}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                    {c.geld || c.rest ? (
+                      <>
+                        <span style={{ color: '#fff', fontWeight: 900 }}>{uurKort(c.geld)}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.45)' }}> · {uurKort(c.rest)}</span>
+                      </>
+                    ) : <span style={{ color: 'rgba(255,255,255,0.3)' }}>–</span>}
+                  </span>
+                  {c.heleDag.map(e => (
+                    <span key={e.id} style={{ maxWidth: '100%', fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.titel || 'Afspraak'}</span>
+                  ))}
+                </span>
+              </button>
+            )
+          })}
+
+          {/* Uurlabels vast links */}
+          <div style={{ ...links, height: AG_UREN.length * UUR_H }}>
+            {AG_UREN.map(u => (
+              <div key={u} style={{ height: UUR_H, fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, transform: 'translateY(-5px)' }}>
+                {String(u).padStart(2, '0')}:00
+              </div>
+            ))}
+          </div>
+
+          {/* Per dag een kolom: banden, gemeten blokken, call-streepjes */}
+          {kolommen.map(c => {
+            const isVandaag = c.k === vandaag
+            const dim = (focusDag && focusDag !== c.k) || (!focusDag && c.k > vandaag) ? 0.35 : 1
+            // Waar een streepje-label bovenin een blok valt, gaat het bloklabel onderin.
+            const labelTops = c.streepjes.map(st => y(st.a))
+            return (
+              <div key={c.k} style={{
+                position: 'relative', height: AG_UREN.length * UUR_H, opacity: dim, transition: 'opacity .3s', borderRadius: 8,
+                backgroundColor: isVandaag ? `${G}0f` : 'transparent',
+                backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,0.04) 0 1px, transparent 1px ${UUR_H}px)`,
+              }}>
+                {c.banden.map(({ e, a, b }) => (
+                  <div key={e.id} style={{
+                    position: 'absolute', top: y(a), height: y(b) - y(a), left: 0, right: 0, zIndex: 0,
+                    background: bandKleur(e), borderRadius: 6, pointerEvents: 'none', overflow: 'hidden',
+                  }}>
+                    {y(b) - y(a) >= 14 && (
+                      <span style={{ display: 'block', padding: '2px 6px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.titel || 'Afspraak'}</span>
+                    )}
+                  </div>
+                ))}
+
+                {c.blokken.map(bl => {
+                  const top = y(bl.van * 60) + 1, hoog = (bl.tot - bl.van) * UUR_H - 2
+                  const onder = hoog >= 30 && labelTops.some(t => t >= top - 4 && t < top + 14)
+                  return (
+                    <div key={bl.van} style={{
+                      position: 'absolute', top, height: hoog, left: GOOT, right: 0, zIndex: 1, borderRadius: 6, overflow: 'hidden',
+                      display: 'flex', flexDirection: 'column', pointerEvents: 'none',
+                      opacity: focusSoort && bl.soort !== focusSoort ? 0.22 : 1, transition: 'opacity .3s',
+                    }}>
+                      {bl.rijen.map(r => (
+                        <div key={r.u} style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                          {r.stukken.map(([s, m]) => (
+                            <span key={s} style={{ width: `${(m / r.tot) * 100}%`, background: KLEUR[s] }} />
+                          ))}
+                        </div>
+                      ))}
+                      {hoog >= 14 && (
+                        <span style={{
+                          position: 'absolute', left: 6, right: 4, [onder ? 'bottom' : 'top']: 3, fontSize: 10.5, fontWeight: 900, lineHeight: 1.2,
+                          color: INKT[bl.soort] || '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{LABEL[bl.soort]} {duurKort(bl.minuten)}</span>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {c.streepjes.map(({ e, a, b, baan }) => {
+                  const call = IS_CALL.has(e.soort) || !!e.contact_naam
+                  const top = y(a), hoog = Math.max(y(b) - top, 6)
+                  return (
+                    <div key={e.id} style={{ position: 'absolute', top, height: hoog, left: baan * 5, zIndex: 2 + baan, pointerEvents: 'none' }}>
+                      <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, borderRadius: 2, background: call ? callKleur(e) : 'rgba(255,255,255,0.55)' }} />
+                      <span style={{
+                        position: 'absolute', top: 1 + baan * 15, left: GOOT - baan * 5 + 3, maxWidth: minKol - GOOT - 10, padding: '0 4px', borderRadius: 4,
+                        background: 'rgba(0,0,0,0.72)', fontSize: 10.5, fontWeight: 800, lineHeight: '14px', color: '#fff',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>{naamVan(e)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+        {stand.fout && <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', padding: '12px 4px' }}>Niet alles kon laden.</div>}
+      </div>
     </div>
   )
 }
