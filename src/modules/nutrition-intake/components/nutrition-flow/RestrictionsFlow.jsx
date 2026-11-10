@@ -101,7 +101,7 @@ export default function RestrictionsFlow({ data, onChange, onNext, onBack, isMob
   if (step === 1) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Is er iets dat je liever niet eet?</Q>
-      <Hint isMobile={isMobile}>Geen allergie — gewoon niet lekker. Tik alles aan dat geldt.</Hint>
+      <Hint isMobile={isMobile}>Geen allergie, gewoon niet lekker. Tik alles aan dat geldt.</Hint>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.75rem' }}>
         {NIET_LEKKER_OPTIONS.map(opt => {
           const isSelected = (data.niet_lekker || []).includes(opt.value)

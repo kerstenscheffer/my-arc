@@ -66,9 +66,18 @@ const MAPS = {
   split: {
     full_body: 'Full body',
     ppl: 'Push / Pull / Legs',
+    push_pull_legs: 'Push / Pull / Legs',
     upper_lower: 'Upper / Lower',
     bro_split: 'Bro split',
-    no_preference: 'Geen voorkeur'
+    no_preference: 'Coach bepaalt'
+  },
+  // Gevorderden (intermediate) kregen in CurrentTrainingFlow andere, gewone
+  // woorden dan ervaren sporters. Toon wat de klant zelf zag.
+  splitSimpel: {
+    full_body: 'Alles in één sessie (full body)',
+    upper_lower: 'Boven- en onderlichaam (upper / lower)',
+    bro_split: 'Per spiergroep apart (bro split)',
+    no_preference: 'Geen vaste structuur'
   },
   days: { ma: 'Ma', di: 'Di', wo: 'Wo', do: 'Do', vr: 'Vr', za: 'Za', zo: 'Zo' }
 }
@@ -106,7 +115,8 @@ const isEmpty = (v) =>
 // ---- voedingsintake (nutrition_preferences) --------------------------------
 
 const N = {
-  guidance: { strict: 'Strak schema', flexible: 'Flexibel', free: 'Vrij / losjes' },
+  // Zelfde woorden als de klant in de intake zag (PracticalFlow GUIDANCE_OPTIONS).
+  guidance: { strict: 'Coach bouwt alles voor me', flexible: 'Plan met targets', free: 'Alleen richtlijnen' },
   budget: { '30-40': '€30–40 p/w', '40-60': '€40–60 p/w', '60-80': '€60–80 p/w', '80+': '€80+ p/w' },
   cooking: { graag: 'Kookt graag', neutraal: 'Neutraal', niet_graag: 'Kookt niet graag' },
   diet: { geen: 'Geen', vegetarisch: 'Vegetarisch', veganistisch: 'Veganistisch', halal: 'Halal', pescotarisch: 'Pescotarisch' },
@@ -403,7 +413,7 @@ const PART2_SECTIONS = [
   {
     title: 'Begeleiding & praktisch',
     fields: [
-      { key: 'intake_guidance_level', label: 'Begeleidingsstijl', fmt: fmtMap(N.guidance) },
+      { key: 'intake_guidance_level', label: 'Hoe wil je begeleid worden', fmt: fmtMap(N.guidance) },
       { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum() },
       { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget) },
       { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking) }
@@ -495,7 +505,7 @@ const PART3_SECTIONS = [
   {
     title: 'Focus',
     fields: [
-      { key: '_split_pref', label: 'Split-voorkeur', fmt: fmtMap(MAPS.split) },
+      { key: '_split_pref', label: 'Huidige training' },
       { key: '_split_focus', label: 'Focus', fmt: fmtArr() },
       { key: 'emphasize_stretch', label: 'Nadruk op stretch', fmt: fmtBool },
       { key: 'prioritize_compounds', label: 'Compound-prioriteit', fmt: fmtBool }
@@ -529,6 +539,14 @@ const PART3_SECTIONS = [
 // vraag als de klant beantwoordde. Staat een veld hier niet in, dan wordt het
 // label als vraag getoond.
 const VRAGEN = {
+  _split_pref: 'Hoe ziet je huidige training eruit?',
+  intake_guidance_level: 'Hoe wil je begeleid worden?',
+  intake_macro_targets: 'Heb je macro targets voor jezelf?',
+  intake_nu_ontbijt: 'Wat eet je meestal als ontbijt?',
+  intake_nu_lunch: 'Wat eet je meestal als lunch?',
+  intake_nu_diner: 'Wat eet je meestal als avondeten?',
+  intake_nu_snack: 'Wat snack je meestal tussendoor?',
+  intake_eerder_geprobeerd: 'Wat heb je al geprobeerd met je voeding?',
   first_name: 'Wat is je voornaam?',
   last_name: 'En je achternaam?',
   email: 'Wat is je e-mailadres?',
@@ -970,7 +988,12 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
   const trainingData = hasTrainingData
     ? {
         ...merged,
-        _split_pref: training?.split_preferences?.preferred,
+        _split_pref: (() => {
+          const v = training?.split_preferences?.preferred
+          if (!v) return undefined
+          const simpel = merged.default_experience_level !== 'advanced' ? MAPS.splitSimpel[v] : null
+          return simpel || fmtMap(MAPS.split)(v)
+        })(),
         _split_focus: training?.split_preferences?.focus
       }
     : null

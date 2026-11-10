@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react'
 import { Q, Hint, NextBtn, BackBtn, BigOption, OptionGrid, PhotoGrid } from '../../../public-intake/components/phase1/FlowStep'
 
 const BUDGET_OPTIONS = [
-  { value: '30-40', label: '€30 — 40 per week',  sub: 'Bewust en betaalbaar' },
-  { value: '40-60', label: '€40 — 60 per week',  sub: 'Normaal boodschappenbudget' },
-  { value: '60-80', label: '€60 — 80 per week',  sub: 'Ruim budget, meer variatie' },
+  { value: '30-40', label: '€30 tot 40 per week',  sub: 'Bewust en betaalbaar' },
+  { value: '40-60', label: '€40 tot 60 per week',  sub: 'Normaal boodschappenbudget' },
+  { value: '60-80', label: '€60 tot 80 per week',  sub: 'Ruim budget, meer variatie' },
   { value: '80+',   label: '€80+ per week',       sub: 'Budget is geen issue' },
 ]
 
@@ -151,7 +151,7 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
       <Q isMobile={isMobile}>Hoe wil je begeleid worden?</Q>
       <Hint isMobile={isMobile}>
         {data.macros_kennis === 'nee'
-          ? 'We raden aan dat je coach alles voor je bouwt — jij hoeft alleen te volgen'
+          ? 'We raden aan dat je coach alles voor je bouwt. Jij hoeft alleen te volgen'
           : 'We hebben alvast een keuze voor je gemaakt op basis van je kennis. Je kan dit aanpassen.'}
       </Hint>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>

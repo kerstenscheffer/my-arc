@@ -6,7 +6,7 @@ import { Q, Hint, NextBtn, BackBtn, BigOption } from '../../../public-intake/com
 const MACROS_KENNIS = [
   { value: 'ja',     label: 'Ja, ik weet wat het zijn',    sub: 'Eiwitten, koolhydraten, vetten' },
   { value: 'beetje', label: 'Een beetje',                  sub: 'Ik heb er wel van gehoord' },
-  { value: 'nee',    label: 'Nee, nog nooit van gehoord',  sub: 'Geen probleem — je coach legt het uit' },
+  { value: 'nee',    label: 'Nee, nog nooit van gehoord',  sub: 'Geen probleem, je coach legt het uit' },
 ]
 
 const CALORIEEN_GETELD = [
@@ -37,7 +37,7 @@ export default function KnowledgeFlow({ data, onChange, onNext, onBack, isMobile
     <div style={{ padding: pad }}>
       <BackBtn onBack={onBack} />
       <Q isMobile={isMobile}>Ken je het woord macro's?</Q>
-      <Hint isMobile={isMobile}>Geen foute antwoorden — dit bepaalt hoe je coach met je communiceert</Hint>
+      <Hint isMobile={isMobile}>Geen foute antwoorden. Dit bepaalt hoe je coach met je communiceert</Hint>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
         {MACROS_KENNIS.map(opt => (
           <BigOption

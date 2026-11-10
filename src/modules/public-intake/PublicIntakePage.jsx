@@ -156,37 +156,6 @@ function detectErrorType(e) {
   return 'UNKNOWN'
 }
 
-// ── Motivatie reminder strip ──────────────────────────────────────────────────
-
-function MotivationReminder({ personalData, isMobile }) {
-  if (!personalData?.primary_goal && !personalData?.motivation) return null
-  return (
-    <div style={{
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-      padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem',
-      display: 'flex', gap: '0.75rem', alignItems: 'flex-start'
-    }}>
-      <div style={{ width: '2px', background: 'rgba(255,255,255,0.35)', borderRadius: '2px', alignSelf: 'stretch', flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {personalData.primary_goal && (
-          <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', marginBottom: '0.15rem' }}>
-            {GOAL_LABELS[personalData.primary_goal] || personalData.primary_goal}
-            {personalData.target_weight ? ` · ${personalData.target_weight} kg` : ''}
-          </div>
-        )}
-        {personalData.motivation ? (
-          <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, lineHeight: 1.5, fontStyle: 'italic', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-            "{personalData.motivation}"
-          </div>
-        ) : personalData.first_name ? (
-          <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>
-            Goed bezig, {personalData.first_name}.
-          </div>
-        ) : null}
-      </div>
-    </div>
-  )
-}
 
 // ── Training-antwoorden → user_workout_preferences payload ───────────────────
 // Zet elk veld om naar het TYPE dat de kolom verwacht. Dit fixt de stille
@@ -780,7 +749,6 @@ export default function PublicIntakePage() {
               </div>
             </div>
           )}
-          <MotivationReminder personalData={personalData} isMobile={isMobile} />
 
           <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
@@ -824,7 +792,6 @@ export default function PublicIntakePage() {
       {/* ── Phase 3: Training ── */}
       {phase === 3 && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <MotivationReminder personalData={personalData} isMobile={isMobile} />
           <IntakePhase3 data={workoutData} onChange={setWorkoutData} onComplete={handlePhase3Complete} clientEmail={personalData.email} personalData={personalData} isMobile={isMobile} />
 
           {saving && (

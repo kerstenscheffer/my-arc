@@ -38,7 +38,7 @@ function MealItemCounter({ count, skipped, label }) {
     ? `${label || 'Maaltijd'} overgeslagen ✓`
     : done
       ? `✓ ${count} dingen ingevuld`
-      : `${count} van ${MIN_ITEMS_PER_MEAL} — kies er nog ${remaining}`
+      : `${count} van ${MIN_ITEMS_PER_MEAL}, kies er nog ${remaining}`
 
   const pill = (
     <div style={{
@@ -433,7 +433,7 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
   if (step === 1) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als ontbijt?</Q>
-      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet, kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="ontbijt" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('ontbijt', data)} skipped={isMealSkipped('ontbijt', data)} label="Ontbijt" />
       <NextBtn onClick={() => setStep(2)} disabled={!canContinueMeal('ontbijt', data)} isMobile={isMobile} onBack={onBack} />
@@ -443,7 +443,7 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
   if (step === 2) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als lunch?</Q>
-      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet, kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="lunch" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('lunch', data)} skipped={isMealSkipped('lunch', data)} label="Lunch" />
       <NextBtn onClick={() => setStep(3)} disabled={!canContinueMeal('lunch', data)} isMobile={isMobile} onBack={goBack} />
@@ -453,7 +453,7 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
   if (step === 3) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als avondeten?</Q>
-      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet, kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="diner" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('diner', data)} skipped={isMealSkipped('diner', data)} label="Avondeten" />
       <NextBtn onClick={() => setStep(4)} disabled={!canContinueMeal('diner', data)} isMobile={isMobile} onBack={goBack} />
