@@ -48,6 +48,8 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const nlDag = (ts) => new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
 const nlTijd = (ts) => new Date(ts).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })
 const nlMin = (ts) => { const [h, m] = nlTijd(ts).split(':').map(Number); return h * 60 + m }
+// 'HH:MM[:SS]' (Postgres time) → minuten na middernacht.
+const tijdMin = (t) => { const m = String(t || '').match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null }
 const maandagVan = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x }
 const plusDagen = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 const maandVan = (s) => {
@@ -60,6 +62,29 @@ const SOORT_LABEL = { call: 'Call', agenda: 'Agenda', content: 'Content', taak: 
 const VOLGORDE = ['call', 'agenda', 'content', 'concept', 'taak', 'herinnering']
 
 const leeg = () => ({ data: null })
+
+// Kleuren van Kerstens Google Agenda (10 nov 2026): afspraken als effen blokken, tekst wit.
+const GOOGLE = { oranje: '#f4511e', lavendel: '#7986cb', donkergroen: '#0b8043', blauw: '#039be5', lichtgroen: '#33b679', grafiet: '#616161' }
+// Persoonlijke blokken zonder contact (Gym, eten, Vrij, Slaap en zo).
+const PERSOONLIJK = /^(gym|eten|vrij|slaap|hardlopen|sport|sporten|training|ontbijt|lunch|diner|avondeten|rust|wandelen|kapper)\b/i
+// 'dw' / 'deep work' staat alleen in Google zodat er niets in geboekt wordt; Gino plant daar zelf blokken in.
+const isDeepWork = (t) => /^(dw|deep ?work)$/i.test(String(t || '').trim())
+function agendaKleur(e) {
+  const t = String(e.titel || '')
+  if (e.soort === 'klantcall' || e.soort === 'opstartcall') return GOOGLE.oranje
+  if (e.soort === 'salescall') return GOOGLE.lavendel
+  if (e.soort === 'paviljoen' || /paviljoen/i.test(t)) return GOOGLE.donkergroen
+  if (/yorui|youri|meeting/i.test(t)) return GOOGLE.lichtgroen
+  if (PERSOONLIJK.test(t.trim())) return GOOGLE.blauw
+  return GOOGLE.grafiet
+}
+// Calls: alleen de voornaam ('G.' of 'DJ' alleen is te weinig, dan de hele naam).
+const voornaam = (naam) => {
+  const n = String(naam || '').trim().replace(/\s+/g, ' ')
+  const eerste = n.split(' ')[0]
+  return eerste.length <= 2 || eerste.endsWith('.') ? n : eerste
+}
+const zonderKersten = (t) => String(t || '').replace(/\s+(en|and)\s+Kersten Scheffer\s*$/i, '').trim()
 
 async function laadPeriode(van, tot, beperkt = false) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -77,7 +102,7 @@ async function laadPeriode(van, tot, beperkt = false) {
     supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord, metricool_link')
       .in('coach_id', coachIds).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
-    beperkt ? leeg() : supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
+    beperkt ? leeg() : supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline, scheduled_start_time, scheduled_end_time, estimated_minutes, color')
       .eq('coach_id', user.id).eq('status', 'active')
       .or(`and(scheduled_date.gte.${a},scheduled_date.lt.${b}),and(deadline.gte.${a},deadline.lt.${b})`)
       .limit(300).then(r => r, leeg),
@@ -85,17 +110,19 @@ async function laadPeriode(van, tot, beperkt = false) {
       .gte('moment', van.toISOString()).lt('moment', tot.toISOString()).limit(200).then(r => r, leeg),
   ])
   const items = []
-  ;(ag.data || []).forEach(e => items.push({
+  ;(ag.data || []).filter(e => !isDeepWork(e.titel)).forEach(e => items.push({
     id: `a${e.id}`, soort: ['salescall', 'opstartcall', 'klantcall'].includes(e.soort) ? 'call' : 'agenda',
     dag: nlDag(e.start_at), tijd: e.hele_dag ? null : nlTijd(e.start_at),
     startMin: e.hele_dag ? null : nlMin(e.start_at),
     eindMin: e.hele_dag ? null : (e.end_at && nlDag(e.end_at) === nlDag(e.start_at) ? nlMin(e.end_at) : (e.end_at ? 24 * 60 : nlMin(e.start_at) + 30)),
-    titel: e.contact_naam ? `Call · ${e.contact_naam}` : (e.titel || 'Afspraak'),
+    titel: e.contact_naam ? voornaam(e.contact_naam) : (zonderKersten(e.titel) || 'Afspraak'),
+    kleur: agendaKleur(e),
   }))
   ;(ca.data || []).forEach(c => items.push({
     id: `c${c.id}`, soort: 'call', dag: nlDag(c.scheduled_date), tijd: nlTijd(c.scheduled_date),
     startMin: nlMin(c.scheduled_date), eindMin: nlMin(c.scheduled_date) + 30,
-    titel: `${c.call_title || 'Call'} · ${c.clients?.first_name || ''}`.trim(),
+    titel: c.clients?.first_name ? voornaam(c.clients.first_name) : (c.call_title || 'Call'),
+    kleur: GOOGLE.oranje,
   }))
   // Stand (draft/ingepland/gepost/mislukt) uit content_items_status.
   // Testrijen ('__test…') tellen nergens mee.
@@ -132,7 +159,7 @@ async function laadPeriode(van, tot, beperkt = false) {
 }
 
 // Gino zegt iets over wat hij aanwijst: mini-bol + getypte tekst.
-function GinoZegt({ tekst, onWeg }) {
+function GinoZegt({ tekst, onWeg, accent = G }) {
   const [n, setN] = useState(0)
   useEffect(() => {
     setN(0)
@@ -145,15 +172,15 @@ function GinoZegt({ tekst, onWeg }) {
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 12, flexShrink: 0, animation: 'gk-blad .35s ease-out both' }}>
       <span style={{ position: 'relative', width: 20, height: 20, flexShrink: 0, marginTop: 1 }}>
         <span style={{
-          position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid ${G}`,
-          background: `radial-gradient(circle, ${G}66 0%, ${G}14 55%, rgba(0,0,0,.6) 72%)`, boxShadow: `0 0 10px ${G}88`,
+          position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid ${accent}`,
+          background: `radial-gradient(circle, ${accent}66 0%, ${accent}14 55%, rgba(0,0,0,.6) 72%)`, boxShadow: `0 0 10px ${accent}88`,
           animation: klaar ? 'none' : 'gk-puls .5s ease-in-out infinite',
         }} />
-        <span style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: `1px dashed ${G}66`, animation: 'gk-draai 6s linear infinite' }} />
+        <span style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: `1px dashed ${accent}66`, animation: 'gk-draai 6s linear infinite' }} />
       </span>
       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.4 }}>
         {tekst.slice(0, n)}
-        {!klaar && <span style={{ display: 'inline-block', width: 2, height: '1em', marginLeft: 2, verticalAlign: '-2px', background: G, animation: 'gk-puls .8s steps(1) infinite' }} />}
+        {!klaar && <span style={{ display: 'inline-block', width: 2, height: '1em', marginLeft: 2, verticalAlign: '-2px', background: accent, animation: 'gk-puls .8s steps(1) infinite' }} />}
       </div>
       <button type="button" onClick={onWeg} aria-label="Aanwijzing weg" style={{ ...rond, width: 24, height: 24, border: 'none', color: 'rgba(255,255,255,0.5)' }}><X size={14} strokeWidth={2.6} /></button>
     </div>
@@ -205,6 +232,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   // Week (agenda, standaard), content (contentkalender) of omzet.
   const [weergave, zetWeergave] = useState(beperkt ? 'content' : ['omzet', 'projecten', 'klanten', 'tijd', 'keten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
   const setWeergave = (w) => { if (!beperkt || BEPERKT_WEERGAVEN.includes(w)) zetWeergave(w) }
+  // Weekweergave: dik wit, geen groen als accent (10 nov 2026). Groen alleen nog als Google-kleur.
+  const A = weergave === 'week' ? '#fff' : G
   useTijdPlek(!beperkt && weergave === 'content' ? 'contentkalender' : null)
   const [projectId, setProjectId] = useState(verzoek?.project || null)
   // Telefoon + open project: balk over twee regels (terug, naam, kruisje / test, KPI, ring, dropdown).
@@ -408,13 +437,13 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           <div style={{
             // Boven de vaste dagkoppen en urenliniaal van de week (die liggen op 5-6).
             position: 'absolute', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.96)', backdropFilter: 'blur(6px)',
-            border: `1px solid ${G}33`, borderRadius: 16, boxShadow: `0 0 40px ${G}14`,
+            border: `1px solid ${A}33`, borderRadius: 16, boxShadow: `0 0 40px ${A}14`,
             display: 'flex', flexDirection: 'column', padding: isMobile ? 14 : 20, animation: 'gk-blad .25s ease-out both',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <button type="button" onClick={() => setGekozen(null)} aria-label="Terug" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 12px 0 8px', borderRadius: 999,
-                border: `1px solid ${G}66`, background: `${G}14`, color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+                border: `1px solid ${A}66`, background: `${A}14`, color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
                 fontSize: 12.5, fontWeight: 800, flexShrink: 0,
               }}><ChevronLeft size={16} strokeWidth={2.6} /> Terug</button>
               <div>
@@ -435,7 +464,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
                     animation: `gk-blad .3s ease-out ${i * 40}ms both`,
                   }}>
-                    <Icoon size={16} strokeWidth={2.4} style={{ color: groen ? G : 'rgba(255,255,255,0.7)', flexShrink: 0, filter: groen ? `drop-shadow(0 0 5px ${G})` : 'none' }} />
+                    <Icoon size={16} strokeWidth={2.4} style={{ color: groen ? A : 'rgba(255,255,255,0.7)', flexShrink: 0, filter: groen && A === G ? `drop-shadow(0 0 5px ${G})` : 'none' }} />
                     <div style={{ width: 44, flexShrink: 0, fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{it.tijd || ''}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textDecoration: it.klaar ? 'line-through' : 'none', opacity: it.klaar ? 0.6 : 1 }}>{it.titel}</div>
@@ -446,12 +475,12 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                     {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
                     {it.soort === 'content' && it.contentId && (
                       it.permalink
-                        ? <a href={it.permalink} target="_blank" rel="noreferrer" title="Open op Instagram" style={{ ...bekijk, textDecoration: 'none' }}>Bekijk</a>
-                        : <button type="button" onClick={() => openContent(it.contentId)} style={bekijk}>Bekijk</button>
+                        ? <a href={it.permalink} target="_blank" rel="noreferrer" title="Open op Instagram" style={{ ...bekijk, background: A, textDecoration: 'none' }}>Bekijk</a>
+                        : <button type="button" onClick={() => openContent(it.contentId)} style={{ ...bekijk, background: A }}>Bekijk</button>
                     )}
                     {it.soort === 'concept' && (
                       <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen([it.concept])}
-                        style={{ ...link, color: G, opacity: 1 }}>
+                        style={{ ...link, color: A, opacity: 1 }}>
                         <Plus size={13} strokeWidth={2.8} /> Inplannen
                       </button>
                     )}
@@ -463,7 +492,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               )}
             </div>
             <div style={{ display: 'flex', gap: 18, paddingTop: 12, flexWrap: 'wrap' }}>
-              <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
+              <button type="button" className="gk-link" style={{ ...link, color: A, opacity: 1 }}
                 onClick={() => onVraag?.(`Laten we ${gekozenDatum.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })} (${gekozen}) plannen. Kijk wat er al staat en stel content voor als concept in de kalender.`)}>
                 <Sparkles size={13} /> Plan deze dag met Gino
               </button>
@@ -490,7 +519,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         .gk-vak:hover { transform: scale(1.12); box-shadow: 0 0 0 1px ${G}, 0 0 16px ${G}66; z-index: 2 }
         .gk-kol:hover .gk-dagnr { color: ${G} }
         .gk-link { opacity: .7; transition: opacity .15s, color .15s }
-        .gk-link:hover { opacity: 1; color: ${G} !important }
+        .gk-link:hover { opacity: 1; color: ${A} !important }
         .gk-scroll { scrollbar-width: none } .gk-scroll::-webkit-scrollbar { display: none }
       `}</style>
 
@@ -539,7 +568,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={projectBalkMobiel ? { ...rond, order: 3 } : rond}><X size={16} strokeWidth={2.6} /></button>
       </div>
 
-      {notitie && <GinoZegt tekst={notitie} onWeg={() => { setNotitie(''); setFocus(null) }} />}
+      {notitie && <GinoZegt accent={A} tekst={notitie} onWeg={() => { setNotitie(''); setFocus(null) }} />}
 
       {/* Week: de agenda als HUD */}
       {weergave === 'week' && (
@@ -547,7 +576,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           <GinoWeek isMobile={isMobile} dagen={weekDagen} items={Object.values(perDag).flat()} onKies={setGekozen} uitlicht={focus ? [...focus].find(f => /^\d{4}-\d{2}-\d{2}$/.test(f)) || null : null} hoogte={Math.max(220, weekH - 24)} />
           {items === null && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gk-draai 1.2s linear infinite' }} />
+              <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${A}`, animation: 'gk-draai 1.2s linear infinite' }} />
             </div>
           )}
           {dagBlad}
@@ -616,26 +645,26 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         // Naast de bol: altijd één regel; past het niet, dan schuift hij zijwaarts.
         ...(inspring ? { flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' } : { flexWrap: 'wrap' }) }}>
         {weergave === 'tijd' ? (
-          <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
+          <button type="button" className="gk-link" style={{ ...link, color: A, opacity: 1 }}
             onClick={() => onVraag?.(`Kijk naar mijn tijd van de week van ${weekTitel}: waar valt winst te halen?`)}>
             <Sparkles size={13} /> Waar zit de winst?
           </button>
         ) : weergave === 'omzet' || weergave === 'projecten' || weergave === 'keten' ? null : concept.length > 0 ? (
           <>
-            <span style={{ fontSize: 12, fontWeight: 800, color: G }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
-            <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen(concept)} style={{ ...link, color: G, opacity: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: A }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
+            <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen(concept)} style={{ ...link, color: A, opacity: 1 }}>
               <Check size={13} strokeWidth={2.8} /> {bezig ? 'Bezig…' : 'Alles inplannen'}
             </button>
             <button type="button" className="gk-link" onClick={() => setConcept([])} style={link}>Weg</button>
           </>
         ) : (
-          <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
+          <button type="button" className="gk-link" style={{ ...link, color: A, opacity: 1 }}
             onClick={() => onVraag?.(`Laten we samen de content voor ${weergave === 'week' ? `de week van ${weekTitel}` : `${maandNaam} ${maand.getFullYear()}`} plannen. Kijk wat er al gepland staat en wat er in mijn agenda staat, en zet per lege dag een voorstel als concept in de kalender.`)}>
             <Sparkles size={13} /> Content plannen met Gino
           </button>
         )}
         {weergave === 'content' && (
-          <button type="button" className="gk-link" onClick={() => setAutopilot(a => !a)} style={{ ...link, color: autopilot ? G : '#fff' }}>
+          <button type="button" className="gk-link" onClick={() => setAutopilot(a => !a)} style={{ ...link, color: autopilot ? A : '#fff' }}>
             <Zap size={13} /> Autopilot
           </button>
         )}

@@ -9,10 +9,9 @@
 // soort: call | agenda | content | concept | taak | herinnering
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
-import { colors } from '../../ui/tokens'
-
-const G = colors.success
+import { Bell, ChevronDown } from 'lucide-react'
+// Dik wit, geen groen als accent (10 nov 2026); kleur zit alleen nog in de blokken (Google-tinten).
+const G = '#ffffff'
 const DAGLETTER = ['ZO', 'MA', 'DI', 'WO', 'DO', 'VR', 'ZA']
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const uur = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
@@ -56,7 +55,7 @@ function Wijzer({ deel, dag, nr, vandaag, vertraging }) {
           strokeDasharray={omtrek} style={{ '--gw-tot': omtrek * (1 - vol), strokeDashoffset: omtrek * (1 - vol), animation: `gw-ring 1s ease-out ${vertraging}ms both`, filter: `drop-shadow(0 0 3px ${G})` }} />
       )}
       {vandaag && <circle cx="23" cy="23" r="22.5" fill="none" stroke={`${G}77`} strokeWidth="1" strokeDasharray="2 4" style={{ transformOrigin: '23px 23px', animation: 'gw-draai 8s linear infinite' }} />}
-      <text x="23" y="20" textAnchor="middle" fill={vandaag ? G : 'rgba(255,255,255,0.5)'} fontSize="7.5" fontWeight="800" letterSpacing="1">{dag}</text>
+      <text x="23" y="20" textAnchor="middle" fill={vandaag ? G : 'rgba(255,255,255,0.7)'} fontSize="7.5" fontWeight="900" letterSpacing="1">{dag}</text>
       <text x="23" y="31.5" textAnchor="middle" fill="#fff" fontSize="12.5" fontWeight="900" style={vandaag ? { filter: `drop-shadow(0 0 4px ${G})` } : null}>{nr}</text>
     </svg>
   )
@@ -88,14 +87,16 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
   const perDag = useMemo(() => Object.fromEntries(dagen.map(d => {
     const k = iso(d)
     const lijst = items.filter(it => it.dag === k)
-    const getimed = lijst.filter(it => it.startMin != null && (it.soort === 'call' || it.soort === 'agenda' || it.soort === 'herinnering'))
-    const los = lijst.filter(it => !getimed.some(g => g.id === it.id))
-    return [k, { getimed, los, totaal: lijst.length }]
+    const getimed = lijst.filter(it => it.startMin != null && (it.soort === 'call' || it.soort === 'agenda' || it.soort === 'taak'))
+    // Herinneringen zijn een moment: dunne lijn, geen blok (10 nov 2026).
+    const momenten = lijst.filter(it => it.startMin != null && it.soort === 'herinnering')
+    const los = lijst.filter(it => !getimed.some(g => g.id === it.id) && !momenten.some(g => g.id === it.id))
+    return [k, { getimed, momenten, los, totaal: lijst.length }]
   })), [dagen, items])
 
   // Venster: van het eerste tot het laatste blok van de week, minstens 08–21.
   const { van, tot } = useMemo(() => {
-    const alle = Object.values(perDag).flatMap(d => d.getimed)
+    const alle = Object.values(perDag).flatMap(d => [...d.getimed, ...d.momenten])
     const a = Math.min(8 * 60, ...alle.map(b => b.startMin))
     const b = Math.max(21 * 60, ...alle.map(b => b.eindMin))
     return { van: Math.floor(a / 60) * 60, tot: Math.min(24 * 60, Math.ceil(b / 60) * 60) }
@@ -177,7 +178,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
           const heel = m % 60 === 0, label = m % 120 === 0
           return (
             <div key={m} style={{ position: 'absolute', right: 0, top: y(m), display: 'flex', alignItems: 'center', gap: 5, transform: 'translateY(-50%)', animation: `gw-in .3s ease-out ${((m - van) / 60) * 40}ms both` }}>
-              {label && <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', letterSpacing: '.05em' }}>{uur(m)}</span>}
+              {label && <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums', letterSpacing: '.05em' }}>{uur(m)}</span>}
               <span style={{ width: heel ? 8 : 4, height: 1, background: heel ? `${G}aa` : `${G}55` }} />
             </div>
           )
@@ -196,7 +197,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
 
         {dagen.map((d, di) => {
           const k = iso(d)
-          const { los, totaal } = perDag[k]
+          const { los, momenten, totaal } = perDag[k]
           const getimed = lanen(perDag[k].getimed)
           const isVandaag = k === vandaag
           const verleden = k < vandaag
@@ -254,46 +255,54 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
                   </div>
                 )}
                 {getimed.map((b, bi) => {
-                  const call = b.soort === 'call'
-                  const herinnering = b.soort === 'herinnering'
+                  // Effen blok in de Google-kleur (afspraak, call of Gino-taak); taak zonder kleur = zacht wit.
+                  const kleur = b.kleur || 'rgba(255,255,255,0.14)'
                   const top = y(Math.max(van, b.startMin))
                   const h = Math.max(18, y(Math.min(tot, b.eindMin)) - top - 2)
                   const breed = 100 / b.banen
                   const voorbij = isVandaag && b.echtEind <= nuMin
-                  const naam = b.titel.replace(/^Call\s*\S\s*/, '')
+                  const hoog = h > 34
                   return (
                     <div key={b.id} className="gw-cap"
                       onMouseEnter={() => setLens(b.id)} onMouseLeave={() => setLens(l => (l === b.id ? null : l))}
                       style={{
                         position: 'absolute', top, height: h, left: `calc(${b.baan * breed}% + 1px)`, width: `calc(${breed}% - 2px)`,
-                        borderRadius: 7, overflow: 'hidden', padding: h > 34 ? '4px 7px' : '0 7px', display: 'flex', flexDirection: h > 34 ? 'column' : 'row',
-                        alignItems: h > 34 ? 'stretch' : 'center', gap: h > 34 ? 1 : 5,
-                        background: call ? `linear-gradient(135deg, ${G}40, ${G}1a)` : herinnering ? 'transparent' : 'rgba(255,255,255,0.05)',
-                        border: call ? `1px solid ${G}aa` : herinnering ? `1px dashed ${G}88` : '1px solid rgba(255,255,255,0.14)',
-                        borderLeft: `2px solid ${call ? G : herinnering ? `${G}88` : 'rgba(255,255,255,0.4)'}`,
-                        boxShadow: call ? `0 0 14px ${G}40, inset 0 0 12px ${G}22` : 'none',
+                        borderRadius: 6, overflow: 'hidden', padding: hoog ? '4px 7px' : '0 7px', display: 'flex', flexDirection: 'column',
+                        justifyContent: hoog ? 'flex-start' : 'center', gap: 1, background: kleur, border: 'none',
                         opacity: voorbij ? 0.45 : 1,
                         transformOrigin: 'top', animation: `gw-capsule .45s cubic-bezier(.2,.8,.2,1) ${300 + di * 60 + bi * 50}ms both`,
                       }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 800, color: call ? G : 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, flexShrink: 0 }}>{uur(b.startMin)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{naam}</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{b.titel}</span>
+                      {hoog && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', opacity: 0.85, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>{uur(b.startMin)}</span>}
                     </div>
                   )
                 })}
+                {/* Herinneringen: dunne lijn op het moment, belletje + korte tekst; dekt niets af en vangt geen klik */}
+                {momenten.map(m => (
+                  <div key={m.id} aria-label={`Herinnering ${uur(m.startMin)} ${m.titel}`} style={{
+                    position: 'absolute', left: 0, right: 0, top: y(Math.max(van, m.startMin)), height: 0, zIndex: 3, pointerEvents: 'none',
+                    opacity: isVandaag && m.startMin <= nuMin ? 0.45 : verleden ? 0.6 : 1,
+                  }}>
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.6)' }} />
+                    <div style={{ position: 'absolute', left: 2, right: 2, bottom: 1, display: 'flex', alignItems: 'center', gap: 3, minWidth: 0 }}>
+                      <Bell size={9} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, textShadow: '0 0 3px #000, 0 0 3px #000' }}>{m.titel}</span>
+                    </div>
+                  </div>
+                ))}
                 {/* Lens: de afspraak waar je muis op staat, groot en volledig */}
                 {getimed.filter(b => b.id === lens).map(b => {
-                  const call = b.soort === 'call'
                   const rand = di === 0 ? { left: 0 } : di === dagen.length - 1 ? { right: 0 } : { left: '50%', transform: 'translateX(-50%)' }
                   return (
                     <div key={`lens-${b.id}`} style={{
                       position: 'absolute', top: Math.max(0, y(Math.max(van, b.startMin)) - 6), zIndex: 12, pointerEvents: 'none',
                       width: 'max-content', minWidth: '100%', maxWidth: 260, ...rand,
-                      padding: '8px 11px', borderRadius: 10, background: 'rgba(4,12,7,0.97)',
-                      border: `1px solid ${call ? G : 'rgba(255,255,255,0.35)'}`, borderLeft: `3px solid ${call ? G : 'rgba(255,255,255,0.6)'}`,
-                      boxShadow: `0 0 0 1px ${G}33, 0 0 26px ${G}55, 0 10px 30px rgba(0,0,0,0.7)`,
+                      padding: '8px 11px', borderRadius: 10, background: '#0a0a0a',
+                      border: 'none', borderLeft: `4px solid ${b.kleur || '#fff'}`,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
                       animation: 'gw-lens .16s ease-out both',
                     }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: call ? G : 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>
                         {uur(b.startMin)}{b.echtEind > b.startMin + 15 ? ` – ${uur(Math.min(b.echtEind, 24 * 60 - 1))}` : ''}
                       </div>
                       <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginTop: 2, whiteSpace: 'normal' }}>{b.titel}</div>

@@ -35,6 +35,10 @@ import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import { weekplanVoorWeek, lokaleDatum } from '../../meal-plan/DayTemplateService'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
+import WeekKolommen, { BulkBalk } from './plan-analyzer/WeekKolommen'
+import WeekStats from './plan-analyzer/WeekStats'
+import { dagCijfers } from './plan-analyzer/weekCijfers'
+import { laadIngredienten, schaalMaaltijd } from './plan-analyzer/schaalPortie'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
 import { openMealPlanForPrint } from '../mealplanhtmlgenerator'
 
@@ -324,7 +328,19 @@ export default function PlanAnalyzer({
   const [clientIntake, setClientIntake] = useState(null)
   const [clientRecord, setClientRecord] = useState(null)
   const [validSchemaDagKeys, setValidSchemaDagKeys] = useState(null)
-  const [viewMode, setViewMode] = useState('day')
+  // 'day' = één dag, 'kolommen' = de week naast elkaar, 'week' = weekagenda.
+  // Dag of kolommen wordt onthouden (10 nov 2026).
+  const [viewMode, setViewModeRuw] = useState(() => { try { return localStorage.getItem('pa_weergave') === 'kolommen' ? 'kolommen' : 'day' } catch { return 'day' } })
+  const setViewMode = (v) => setViewModeRuw(prev => {
+    const nieuw = typeof v === 'function' ? v(prev) : v
+    if (nieuw === 'day' || nieuw === 'kolommen') { try { localStorage.setItem('pa_weergave', nieuw) } catch { /* geen opslag */ } }
+    return nieuw
+  })
+  // Weekkolommen: stats-tabel open/dicht, selectie ('dag|slot') en bulk-bezig.
+  const [statsOpen, setStatsOpenRuw] = useState(() => { try { return localStorage.getItem('pa_stats_open') === '1' } catch { return false } })
+  const setStatsOpen = (v) => { setStatsOpenRuw(v); try { localStorage.setItem('pa_stats_open', v ? '1' : '0') } catch { /* geen opslag */ } }
+  const [selectie, setSelectie] = useState(() => new Set())
+  const [bulkBezig, setBulkBezig] = useState(null)
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
   // Keuzemenuutje van de zwevende 'maaltijd toevoegen'-knop.
   const [toevoegKeuze, setToevoegKeuze] = useState(false)
@@ -730,6 +746,8 @@ export default function PlanAnalyzer({
   const paneelHoogte = `calc(var(--paneel-hoogte, 100dvh) - var(--paneel-afstand, ${topOffset}px))`
 
   const actievePlanId = planMeta?.id || selectedConceptId || null
+  // Ander plan of andere week: de selectie in de weekkolommen hoort daar niet meer bij.
+  useEffect(() => { setSelectie(new Set()) }, [actievePlanId, weekModus])
 
   // Verschuift de agenda in de andere helft van het scherm een maaltijd, dan
   // volgt de kaart hier meteen. Zonder dit staat in split screen links 12:00
@@ -1104,6 +1122,23 @@ export default function PlanAnalyzer({
     // Pre-workout heeft geen dag (dayIndex null): DAYS[null].full gooide
     // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
     const dagNaam = DAYS[swapState.dayIndex]?.full || 'pre-workout'
+    // Wissel vanuit de weekkolommen: alle geselecteerde maaltijden in één keer.
+    if (Array.isArray(swapState.bulk) && weekData) {
+      const updated = weekData.map(dag => ({ ...dag, meals: { ...(dag?.meals || {}) } }))
+      let n = 0
+      swapState.bulk.forEach(({ dag, slot: s }) => {
+        const d = updated[dag]
+        if (!d?.meals?.[s]) return
+        d.meals[s] = withSlotTiming(newMeal, s, d.meals[s])
+        d.totals = calculateTotals(d.meals)
+        n++
+      })
+      if (n) await applyWeekUpdate(updated, `Wissel ${n}× → ${newMeal.name || '?'}`)
+      setSwapState(null)
+      setSelectie(new Set())
+      setAgendaRefreshKey(k => k + 1)
+      return
+    }
     const { slot, meal: oud } = swapState
     // Toegevoegd vanuit de agenda: de getikte tijd gaat mee op de maaltijd.
     if (swapState.timing) newMeal = { ...newMeal, timing: swapState.timing }
@@ -1927,6 +1962,77 @@ export default function PlanAnalyzer({
     return null
   }).filter(Boolean)
 
+  // ════════════ WEEKKOLOMMEN + BULK (10 nov 2026) ════════════
+  const weekDagen = dagCijfers(weekData, {
+    preWorkoutMeal, standaardTijden: SLOT_DEFAULT_TIMES,
+    isTraining: (i) => dagStripDagen[i]?.training,
+  })
+  // Selectie als lijst, alleen wat er nog echt staat.
+  const selectieItems = [...selectie].map(k => {
+    const [d, slot] = k.split('|')
+    return { dag: Number(d), slot }
+  }).filter(it => weekData?.[it.dag]?.meals?.[it.slot])
+  const kloonWeek = () => weekData.map(dag => ({ ...dag, meals: { ...(dag?.meals || {}) } }))
+  const bulk = async (soort, fn) => {
+    if (!weekData || !selectieItems.length || bulkBezig) return
+    setBulkBezig(soort)
+    try { await fn() } catch (e) {
+      console.error('Bulk-aanpassing mislukt:', e)
+      alert('Aanpassen mislukt: ' + (e?.message || 'onbekende fout'))
+    } finally { setBulkBezig(null) }
+  }
+  const bulkPortie = (factor) => bulk('portie', async () => {
+    const ingredienten = await laadIngredienten(db, selectieItems.map(it => weekData[it.dag].meals[it.slot]))
+    const updated = kloonWeek()
+    selectieItems.forEach(({ dag, slot }) => {
+      updated[dag].meals[slot] = schaalMaaltijd(updated[dag].meals[slot], factor, ingredienten)
+      updated[dag].totals = calculateTotals(updated[dag].meals)
+    })
+    await applyWeekUpdate(updated, `Portie ${factor > 1 ? '+' : '−'}${Math.round(Math.abs(factor - 1) * 100)}% · ${selectieItems.length} maaltijden`)
+  })
+  const bulkTijd = (tijd) => bulk('tijd', async () => {
+    if (!/^\d{2}:\d{2}$/.test(tijd)) return
+    const updated = kloonWeek()
+    selectieItems.forEach(({ dag, slot }) => { updated[dag].meals[slot] = { ...updated[dag].meals[slot], timing: tijd } })
+    await applyWeekUpdate(updated, `Tijd ${tijd} · ${selectieItems.length} maaltijden`)
+  })
+  const bulkVerwijder = () => bulk('weg', async () => {
+    if (!window.confirm(`${selectieItems.length} maaltijd${selectieItems.length === 1 ? '' : 'en'} verwijderen?`)) return
+    const updated = kloonWeek()
+    selectieItems.forEach(({ dag, slot }) => {
+      delete updated[dag].meals[slot]
+      updated[dag].totals = calculateTotals(updated[dag].meals)
+    })
+    await applyWeekUpdate(updated, `${selectieItems.length} maaltijden verwijderd`)
+    setSelectie(new Set())
+  })
+  const bulkWissel = () => {
+    if (!selectieItems.length) return
+    const eerste = selectieItems[0]
+    setSwapState({ dayIndex: eerste.dag, slot: eerste.slot, meal: weekData[eerste.dag].meals[eerste.slot], bulk: selectieItems })
+  }
+  // Maaltijd naar een andere dag slepen: zelfde slot als dat vrij is, anders
+  // het eerste vrije slot; de tijd gaat mee.
+  const verplaatsNaarDag = async (vanDag, slot, naarDag) => {
+    if (!weekData?.[vanDag]?.meals?.[slot] || vanDag === naarDag) return
+    const updated = kloonWeek()
+    const doel = !updated[naarDag].meals[slot] ? slot : SLOTS.find(sl => sl !== PRE_WORKOUT_SLOT && !updated[naarDag].meals[sl])
+    if (!doel) { alert(`${DAYS[naarDag]?.full || 'Die dag'} heeft geen vrij maaltijdmoment meer.`); return }
+    const meal = updated[vanDag].meals[slot]
+    delete updated[vanDag].meals[slot]
+    updated[naarDag].meals[doel] = meal
+    updated[vanDag].totals = calculateTotals(updated[vanDag].meals)
+    updated[naarDag].totals = calculateTotals(updated[naarDag].meals)
+    setSelectie(new Set())
+    await applyWeekUpdate(updated, `Verplaatst: ${meal.name || 'maaltijd'} → ${DAYS[naarDag]?.full || ''}`)
+  }
+  const voegToeOpDag = (i) => {
+    const vrij = SLOTS.find(sl => sl !== PRE_WORKOUT_SLOT && !weekData?.[i]?.meals?.[sl])
+    if (!vrij) { alert('Alle maaltijdmomenten van deze dag zijn gevuld.'); return }
+    setActiveDay(i)
+    handleAdd(i, vrij)
+  }
+
   return (
     // Eén blok dat onder de kop van CoachHub kleeft: de plantitel over de
     // volle breedte, daaronder zijbalk, zijvak en bouwer naast elkaar. Eerst
@@ -1956,6 +2062,8 @@ export default function PlanAnalyzer({
             onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo}
             onPdf={handlePDF} pdfBezig={loadingPdf}
             onActivate={planMeta ? handleActivate : null} activating={activating}
+            weergave={weekData ? viewMode : null}
+            onWeergave={(v) => { setSelectie(new Set()); setViewMode(v) }}
           />
           </div>
         )}
@@ -2028,7 +2136,7 @@ export default function PlanAnalyzer({
               dagIndex={swapState.dayIndex ?? null}
               weekStart={weekModus}
               tijd={swapState.timing || null}
-              plekken={swapState.slot === PRE_WORKOUT_SLOT ? undefined : plekkenVanMaaltijd(swapState.meal)}
+              plekken={swapState.slot === PRE_WORKOUT_SLOT || swapState.bulk ? undefined : plekkenVanMaaltijd(swapState.meal)}
               targetCalories={targets?.calories || clientRecord?.target_calories || null}
               onSelect={handleSwapSelect}
               onClose={() => setSwapState(null)} isMobile={m} />
@@ -2191,7 +2299,7 @@ export default function PlanAnalyzer({
         <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
             <DagStrip dagen={dagStripDagen} actief={activeDay}
-              onKies={(i) => { setActiveDay(i); if (viewMode === 'week') setViewMode('day') }}
+              onKies={(i) => { setActiveDay(i); if (viewMode !== 'day') setViewMode('day') }}
               doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0} isMobile={m}
               weekStart={weekModus}
               onWeek={(n) => kiesWeek(n === 0 ? dezeMaandag() : plusWekenIso(weekModus, n))}
@@ -2483,6 +2591,37 @@ export default function PlanAnalyzer({
                 </>
               )
             })()}
+          </div>
+        )}
+
+        {/* ── WEEK NAAST ELKAAR ──
+            Zeven kolommen zoals de workout builder, met de stats-tabel erboven
+            en de bulkbalk zodra er maaltijden geselecteerd zijn. */}
+        {viewMode === 'kolommen' && (
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: navRuimte }}>
+            <div style={{ maxWidth: 1500, margin: '0 auto', padding: m ? '0.6rem 0.5rem 1rem' : '0.9rem 1rem 1.5rem', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {weekData ? (<>
+                <WeekStats dagen={weekDagen} targets={targets || {}} open={statsOpen} onOpen={setStatsOpen}
+                  onKiesDag={(i) => { setActiveDay(i); setViewMode('day') }} isMobile={m} />
+                <WeekKolommen dagen={weekDagen} targets={targets || {}} weekStart={weekModus}
+                  aangepast={afwijkendeDagen.map(id => DAYS.findIndex(d => d.id === id)).filter(i => i >= 0)}
+                  actiefDag={activeDay} selectie={selectie} setSelectie={setSelectie}
+                  onOpenDag={(i) => { setActiveDay(i); setViewMode('day') }}
+                  onVoegToe={voegToeOpDag} onVerplaats={verplaatsNaarDag} isMobile={m} />
+                {!m && (
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    Sleep over kaarten om meerdere te selecteren (Shift = erbij) · sleep aan het gripje naar een andere dag · klik op een dag om hem te openen
+                  </div>
+                )}
+              </>) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: 700 }}>Nog geen plan geladen.</div>
+              )}
+            </div>
+            {selectieItems.length > 0 && (
+              <BulkBalk aantal={selectieItems.length} bezig={bulkBezig} isMobile={m}
+                onPortie={bulkPortie} onTijd={bulkTijd} onWissel={bulkWissel} onVerwijder={bulkVerwijder}
+                onWis={() => setSelectie(new Set())} />
+            )}
           </div>
         )}
       </div>

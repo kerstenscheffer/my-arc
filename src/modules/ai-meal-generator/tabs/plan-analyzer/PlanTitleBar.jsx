@@ -9,7 +9,7 @@
 // Was tot 24 okt 2026 vier gecentreerde regels (~190 px hoog).
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader, AlertTriangle, RefreshCw, Plus, Trash2, Users, ChevronDown, Search, X, Save, Eraser, MoreHorizontal, RotateCcw, RotateCw, Download } from 'lucide-react'
+import { Check, Loader, AlertTriangle, RefreshCw, Plus, Trash2, Users, ChevronDown, Search, X, Save, Eraser, MoreHorizontal, RotateCcw, RotateCw, Download, RectangleVertical, Columns3 } from 'lucide-react'
 
 const GREEN = '#22c55e'
 const RED = '#ef4444'
@@ -37,6 +37,9 @@ export default function PlanTitleBar({
   onUndo = null, onRedo = null, canUndo = false, canRedo = false,
   onPdf = null, pdfBezig = false,
   onActivate = null, activating = false,
+  // Weergave (10 nov 2026): 'day' of 'kolommen' (de week naast elkaar). Klik
+  // op de actieve knop = terug naar de andere, zoals in de workout builder.
+  weergave = null, onWeergave = null,
 }) {
   const m = isMobile
   const [editing, setEditing] = useState(false)
@@ -153,6 +156,17 @@ export default function PlanTitleBar({
 
       {/* Rechts: ongedaan maken, activeren, menu. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        {weergave && onWeergave && (<>
+          <button onClick={() => onWeergave('day')} title="Eén dag" aria-label="Eén dag" aria-pressed={weergave === 'day'}
+            style={{ ...ikoon(false), background: weergave === 'day' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>
+            <RectangleVertical size={16} strokeWidth={2.4} />
+          </button>
+          <button onClick={() => onWeergave(weergave === 'kolommen' ? 'day' : 'kolommen')} title="Week naast elkaar, met stats en bulk aanpassen" aria-label="Week naast elkaar" aria-pressed={weergave === 'kolommen'}
+            style={{ ...ikoon(false), background: weergave === 'kolommen' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>
+            <Columns3 size={16} strokeWidth={2.4} />
+          </button>
+          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
+        </>)}
         {onUndo && <button onClick={onUndo} disabled={!canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={ikoon(!canUndo)}><RotateCcw size={16} strokeWidth={2.4} /></button>}
         {onRedo && <button onClick={onRedo} disabled={!canRedo} title="Opnieuw" aria-label="Opnieuw" style={ikoon(!canRedo)}><RotateCw size={16} strokeWidth={2.4} /></button>}
         {onActivate && heeftPlan && !isActive && (
