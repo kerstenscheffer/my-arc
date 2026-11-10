@@ -3,6 +3,19 @@
 import React, { useState, useEffect } from 'react'
 import { Q, Hint, NextBtn, BackBtn, BigOption, OptionGrid, PhotoGrid } from '../../../public-intake/components/phase1/FlowStep'
 import { isMealSkipped } from './EatPatternFlow'
+import { Star, Coffee, Sandwich, UtensilsCrossed, Apple } from 'lucide-react'
+
+// Rijtje bolletjes = aantal verschillende gerechten per week.
+function Bolletjes({ aantal, kleur = '#fff', klein }) {
+  const d = klein ? 4 : 6
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: klein ? 2 : 3 }}>
+      {Array.from({ length: aantal }, (_, i) => (
+        <span key={i} style={{ width: d, height: d, borderRadius: '50%', background: kleur }} />
+      ))}
+    </div>
+  )
+}
 
 // Variatie per maaltijd (10 nov 2026). Elk antwoord is één vaste
 // planstructuur, zodat de coach niet hoeft te gokken:
@@ -14,11 +27,14 @@ const VARIATIE_OPTIES = [
   { value: 'afwisselen', label: 'Afwisselen', sub: '2 opties om en om',  aantal: 2 },
   { value: 'variatie',   label: 'Variatie',   sub: 'Elke dag iets anders', aantal: 7 },
 ]
+// Wat de coach aanraadt per maaltijd: ontbijt, lunch en snacks vast (makkelijk
+// vol te houden), avondeten afwisselen.
+const AANGERADEN = { ontbijt: 'vast', lunch: 'vast', snack: 'vast', diner: 'afwisselen' }
 const VARIATIE_MOMENTEN = [
-  { key: 'ontbijt', label: 'Ontbijt' },
-  { key: 'lunch',   label: 'Lunch' },
-  { key: 'diner',   label: 'Avondeten' },
-  { key: 'snack',   label: 'Snacks' },
+  { key: 'ontbijt', label: 'Ontbijt', icoon: Coffee },
+  { key: 'lunch',   label: 'Lunch', icoon: Sandwich },
+  { key: 'diner',   label: 'Avondeten', icoon: UtensilsCrossed },
+  { key: 'snack',   label: 'Snacks', icoon: Apple },
 ]
 
 // Guidance level — pre-selectie op basis van kennis niveau
@@ -76,33 +92,79 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
   const variatie = data.variatie_per_maaltijd || {}
   const zetVariatie = (k, v) => update('variatie_per_maaltijd', { ...variatie, [k]: v })
   const variatieKlaar = momenten.every(m => variatie[m.key])
+  // Snel: alles volgens coach-advies. Nog een keer tikken wist alles weer.
+  const allesAdvies = momenten.length > 0 && momenten.every(m => variatie[m.key] === AANGERADEN[m.key])
+  const wisselAdvies = () => update('variatie_per_maaltijd', allesAdvies ? {} : Object.fromEntries(momenten.map(m => [m.key, AANGERADEN[m.key]])))
   if (step === 3) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Hoeveel variatie wil je per maaltijd?</Q>
       <Hint isMobile={isMobile}>Zo weet ik precies hoeveel verschillende gerechten ik voor je klaarzet.</Hint>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', margin: '0.4rem 0 0.9rem' }}>
-        {momenten.map(m => (
-          <div key={m.key}>
-            <div style={{ fontSize: isMobile ? '0.92rem' : '0.95rem', fontWeight: 900, color: '#fff', marginBottom: '0.4rem' }}>{m.label}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-              {VARIATIE_OPTIES.map(o => {
-                const aan = variatie[m.key] === o.value
-                return (
-                  <button key={o.value} onClick={() => zetVariatie(m.key, o.value)} style={{
-                    minHeight: 58, padding: '0.5rem 0.4rem', borderRadius: 12, textAlign: 'center',
-                    background: aan ? 'rgba(16,185,129,0.14)' : '#0d0d0d',
-                    border: `1.5px solid ${aan ? 'rgba(16,185,129,0.75)' : 'rgba(255,255,255,0.12)'}`,
-                    color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
-                  }}>
-                    <div style={{ fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 900 }}>{o.label}</div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginTop: 2, lineHeight: 1.3 }}>{o.sub}</div>
-                  </button>
-                )
-              })}
-            </div>
+
+      {/* Uitleg één keer bovenaan in plaats van onder elke knop. De bolletjes
+          zijn het aantal gerechten per week dat je krijgt. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, margin: '0.3rem 0 0.9rem' }}>
+        {VARIATIE_OPTIES.map(o => (
+          <div key={o.value} style={{ textAlign: 'center' }}>
+            <Bolletjes aantal={o.aantal} />
+            <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: 5 }}>{o.label}</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{o.sub}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '0.9rem' }}>
+        {momenten.map((m, i) => {
+          const Icoon = m.icoon
+          return (
+            <div key={m.key} style={{ marginTop: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem', fontSize: isMobile ? '0.92rem' : '0.95rem', fontWeight: 900 }}>
+                <Icoon size={16} strokeWidth={2.4} color="#fff" />
+                <span style={{ color: '#fff' }}>{m.label}</span>
+                {/* Alleen achter de eerste maaltijd: coach-advies voor alles */}
+                {i === 0 && (
+                  <button onClick={wisselAdvies} style={{
+                    padding: 0, background: 'none', border: 'none',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    color: '#FFD700', fontSize: 'inherit', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <Star size={13} strokeWidth={2.6} fill={allesAdvies ? '#FFD700' : 'none'} />
+                    {allesAdvies ? 'Coach-advies gekozen' : 'Neem coach-advies over'}
+                  </button>
+                )}
+              </div>
+              {/* Segmenten: één blok met drie vakken, gekozen vak wit */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                {VARIATIE_OPTIES.map(o => {
+                  const aan = variatie[m.key] === o.value
+                  const advies = AANGERADEN[m.key] === o.value
+                  return (
+                    <button key={o.value} onClick={() => zetVariatie(m.key, o.value)} style={{
+                      position: 'relative', minHeight: 48, borderRadius: 9, border: 'none',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                      background: aan ? '#fff' : 'transparent', color: aan ? '#000' : '#fff',
+                      fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s ease',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      {/* "Advies" als labeltje rechtsboven op de hoek van het
+                          vak: zweeft erboven, dus geen verschuiving in de vakken. */}
+                      {advies && (
+                        <span style={{
+                          position: 'absolute', top: -11, right: -4, zIndex: 1,
+                          display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+                          padding: '0.1rem 0.45rem', borderRadius: 999, background: '#FFD700', color: '#000',
+                          fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase',
+                        }}><Star size={9} strokeWidth={2.8} fill="#000" /> Advies</span>
+                      )}
+                      <span style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 900 }}>{o.label}</span>
+                      <Bolletjes aantal={o.aantal} kleur={aan ? '#000' : 'rgba(255,255,255,0.55)'} klein />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
       <NextBtn onClick={() => setStep(4)} disabled={!variatieKlaar} isMobile={isMobile} onBack={goBack} />
     </div>
