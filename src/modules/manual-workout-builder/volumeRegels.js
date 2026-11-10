@@ -65,3 +65,20 @@ export const MIN_FRACTIE = 1 / 3      // te veel: die spier een week 1/3 minder
 
 export const LABEL_STATUS = { beginner: 'beginner', intermediate: 'intermediair', advanced: 'gevorderd' }
 export const LABEL_FASE = { bulk: 'build', onderhoud: 'onderhoud', cut: 'cut' }
+
+// Per spier uit het onderzoek (RP 2017 landmarks + wat studies zeggen), voor het
+// i-tje in het spieroverzicht. MV = onderhoud, MEV = minimaal effectief,
+// MAV = meeste groei, MRV = maximaal herstelbaar (sets/week).
+export const SPIER_INFO = {
+  chest: { mv: 8, mev: 10, mav: '12-20', mrv: '22+', freq: '1,5-3x', studie: 'Plafond schaalt met frequentie: ~20 sets bij 2x tot ~35 bij 5-6x per week (RP).' },
+  back: { mv: 8, mev: 10, mav: '14-22', mrv: '25+', freq: '2-4x', studie: 'Geen specifiek dosisonderzoek; rows tellen ook half voor biceps en rear delts.' },
+  quads: { mv: 6, mev: 8, mav: '12-18', mrv: '20+', freq: '1,5-3x', studie: 'Baz-Valle: >20 sets niet beter (p = 0,19). Aube: 12 sets = 24 sets.' },
+  hamstrings: { mv: 4, mev: 6, mav: '10-16', mrv: '20+', freq: '2-3x', studie: 'Geen specifiek onderzoek. Combineer knie-buigen (curl) en heup-strekken (RDL).' },
+  glutes: { mv: 0, mev: 0, mav: '4-12', mrv: '16+', freq: '2-3x', studie: 'Squats, lunges en deadlifts dekken onderhoud en minimum al.' },
+  side_delts: { mv: 0, mev: 8, mav: '16-22', mrv: '26+', freq: '2-6x', studie: 'Geen specifiek onderzoek; herstellen snel, dus vaak trainen kan.' },
+  rear_delts: { mv: 0, mev: 8, mav: '16-22', mrv: '26+', freq: '2-6x', studie: 'Geen specifiek onderzoek; rows en pulldowns tellen half mee.' },
+  front_delts: { mv: 0, mev: 0, mav: '—', mrv: '—', freq: '—', studie: 'Geen aparte doelen: presses trainen ze al genoeg (RP: MEV 0).' },
+  biceps: { mv: 5, mev: 8, mav: '14-20', mrv: '26+', freq: '2-6x', studie: 'Baz-Valle: >20 sets niet beter (p = 0,59).' },
+  triceps: { mv: 4, mev: 6, mav: '10-14', mrv: '18+', freq: '2-4x', studie: 'Baz-Valle: >20 sets wel beter (p = 0,01); Radaelli: groeide door tot 45 sets.' },
+  calves: { mv: 6, mev: 8, mav: '12-16', mrv: '20+', freq: '2-4x', studie: 'RP 2024 geeft een generieke 6-16.' },
+}

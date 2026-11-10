@@ -37,6 +37,7 @@ import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
 import { useVolumeContext } from './components/useVolumeContext'
 import { volumeAdvies, fractioneleSets } from './volumeSuggesties'
+import { RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS } from './volumeRegels'
 
 // Weektotalen per lichaamsdeel (10 nov 2026).
 const SPIER_BLOKKEN = [
@@ -399,6 +400,22 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Oefeningen van een dag groeperen per spiergroep (10 nov 2026). Groepen in de
   // volgorde waarin ze voor het eerst voorkomen, binnen een groep de oude volgorde:
   // de eerste (zware) oefening blijft dus vooraan. Ongedaan maken kan met Cmd+Z.
+  // Nieuwe of gewisselde oefening direct achter de laatste van dezelfde spiergroep
+  // (rug bij rug); is die groep er nog niet, dan achteraan (10 nov 2026).
+  const groepVan = (ex) => (ex?.type === 'cardio' ? '~cardio' : spierVan(ex || {}))
+  const bijZijnGroep = (lijst = [], ex) => {
+    const rest = lijst.filter(x => x.id !== ex.id)
+    const g = groepVan(ex)
+    let na = -1
+    rest.forEach((x, i) => { if (groepVan(x) === g) na = i })
+    if (na === -1) {
+      // Cardio altijd achteraan; anders vóór de cardio.
+      const eersteCardio = g === '~cardio' ? -1 : rest.findIndex(x => x.type === 'cardio')
+      return eersteCardio === -1 ? [...rest, ex] : [...rest.slice(0, eersteCardio), ex, ...rest.slice(eersteCardio)]
+    }
+    return [...rest.slice(0, na + 1), ex, ...rest.slice(na + 1)]
+  }
+
   const sorteerOpSpier = (dayId) => {
     setWorkoutPlan(prev => ({
       ...prev,
@@ -469,7 +486,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       ...prev,
       days: prev.days.map(d => {
         if (d.id !== activeDay) return d
-        const exercises = [...d.exercises, newExercise]
+        const exercises = bijZijnGroep(d.exercises, newExercise)
         return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
       })
     }))
@@ -573,6 +590,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     const ex = workoutPlan.days.find(d => d.id === w.dayId)?.exercises?.find(e => e.id === w.exId)
     if (ex) setWissel({ dayId: w.dayId, ex })
   }
+  // Kader voor de uitleg onder het spieroverzicht: de range voor deze klant.
+  const volumeKader = useMemo(() => {
+    if (!volumeCtx) return null
+    const status = RANGE[volumeCtx.status] ? volumeCtx.status : 'intermediate'
+    const fase = ['bulk', 'onderhoud', 'cut'].includes(volumeCtx.fase) ? volumeCtx.fase : 'onderhoud'
+    const [lo, hi, start] = RANGE[status][fase]
+    const plus40 = Number(volumeCtx.leeftijd) >= LEEFTIJD_40PLUS
+    return {
+      range: [lo, hi], start, fase, plus40,
+      maxSessie: plus40 ? Math.min(MAX_PER_SESSIE[status], MAX_PER_SESSIE_40PLUS) : MAX_PER_SESSIE[status],
+      statusLabel: ({ beginner: 'Beginner', intermediate: 'Intermediair', advanced: 'Gevorderd' })[status] + (volumeCtx.statusBekend ? '' : ' (aangenomen)'),
+      faseLabel: ({ bulk: 'Build', onderhoud: 'Onderhoud', cut: 'Cut' })[fase] + (volumeCtx.faseBekend ? '' : ' (geen lopende fase)'),
+    }
+  }, [volumeCtx])
   const voerAdviesUit = (a) => {
     const wijz = a?.wijzigingen || []
     if (!wijz.length) return
@@ -592,10 +623,22 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   const wisselOefening = (nieuw) => {
     if (!wissel) return
-    updateExercise(wissel.dayId, wissel.ex.id, {
+    const upd = {
       name: nieuw.name, equipment: nieuw.equipment || '', primairSpieren: nieuw.primairSpieren || '',
       type: nieuw.type || 'compound', _isCustom: nieuw._isCustom || false, video_url: null, thumbnail_url: null,
-    })
+    }
+    // Andere spiergroep na het wisselen: naar zijn groep schuiven. Zelfde groep: plek houden.
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== wissel.dayId) return d
+        const oud = d.exercises.find(x => x.id === wissel.ex.id)
+        if (!oud) return d
+        const nw = { ...oud, ...upd }
+        const exercises = groepVan(nw) === groepVan(oud) ? d.exercises.map(x => (x.id === nw.id ? nw : x)) : bijZijnGroep(d.exercises, nw)
+        return { ...d, exercises }
+      }),
+    }))
     if (nieuw.equipment && !workoutPlan.equipment.includes(nieuw.equipment)) {
       setWorkoutPlan(prev => ({ ...prev, equipment: [...prev.equipment, nieuw.equipment] }))
     }
@@ -1172,6 +1215,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: overzichtOpen ? '48vh' : 'none', overflowY: overzichtOpen ? 'auto' : 'visible' }}>
                 <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel}
                   open={overzichtOpen} onOpen={setOverzichtOpen}
+                  kader={volumeKader}
                   onSets={(dayId, exId, n) => updateExercise(dayId, exId, { sets: n })}
                   onActie={voerAdviesUit} onWissel={wisselVanuitAdvies}
                 />

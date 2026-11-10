@@ -79,7 +79,19 @@ export default function DayBuilder({
   const sleep = useSleepVolgorde(day.exercises.length, herschik)
 
   const handleExerciseField = (exerciseId, field, value) => {
-    const updated = day.exercises.map(ex => ex.id === exerciseId ? { ...ex, [field]: value } : ex)
+    let updated = day.exercises.map(ex => ex.id === exerciseId ? { ...ex, [field]: value } : ex)
+    // Andere spiergroep gekozen: de oefening schuift naar zijn groep (10 nov 2026).
+    if (field === 'primairSpieren') {
+      const ex = updated.find(x => x.id === exerciseId)
+      const oud = day.exercises.find(x => x.id === exerciseId)
+      if (ex && oud && spierVan(ex) !== spierVan(oud)) {
+        const rest = updated.filter(x => x.id !== exerciseId)
+        let na = -1
+        rest.forEach((x, i) => { if (x.type !== 'cardio' && spierVan(x) === spierVan(ex)) na = i })
+        const plek = na === -1 ? (rest.findIndex(x => x.type === 'cardio') === -1 ? rest.length : rest.findIndex(x => x.type === 'cardio')) : na + 1
+        updated = [...rest.slice(0, plek), ex, ...rest.slice(plek)]
+      }
+    }
     onUpdate({ ...day, exercises: updated })
   }
 
