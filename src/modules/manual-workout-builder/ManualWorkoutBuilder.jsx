@@ -26,13 +26,13 @@ import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag, spierLabel } from './spierGroepen'
+import { setsPerSpierDag, spierVan } from './spierGroepen'
 import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
 import { useVolumeContext } from './components/useVolumeContext'
@@ -394,6 +394,23 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
     setActiveDay(newDay.id)
     setShowDayPicker(false)
+  }
+
+  // Oefeningen van een dag groeperen per spiergroep (10 nov 2026). Groepen in de
+  // volgorde waarin ze voor het eerst voorkomen, binnen een groep de oude volgorde:
+  // de eerste (zware) oefening blijft dus vooraan. Ongedaan maken kan met Cmd+Z.
+  const sorteerOpSpier = (dayId) => {
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== dayId) return d
+        const volgorde = []
+        for (const ex of d.exercises || []) { const k = ex.type === 'cardio' ? '~cardio' : spierVan(ex); if (!volgorde.includes(k)) volgorde.push(k) }
+        const exercises = [...(d.exercises || [])].map((ex, i) => ({ ex, i, g: volgorde.indexOf(ex.type === 'cardio' ? '~cardio' : spierVan(ex)) }))
+          .sort((a, b) => a.g - b.g || a.i - b.i).map(x => x.ex)
+        return { ...d, exercises }
+      }),
+    }))
   }
 
   const updateDay = (dayId, updates) => {
@@ -916,14 +933,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const m = isMobile
   const LIJN = '1px solid rgba(255,255,255,0.12)'
   const DUN = '1px solid rgba(255,255,255,0.06)'
-  const iconKnop = (gevaar) => ({
-    width: 34, height: 34, flexShrink: 0, borderRadius: 9,
-    background: gevaar ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)',
-    border: `1px solid ${gevaar ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.12)'}`,
-    color: gevaar ? '#ef4444' : '#fff', cursor: 'pointer',
+  // Kale icoonknop zoals de kopregel van Coach Inzicht (10 nov 2026): geen vlak of
+  // rand, grijs, wit als hij aan staat; uitleg in de tooltip. Raakvlak 32 px.
+  const iconKnop = (gevaar, aan = false) => ({
+    width: 32, height: 32, padding: 0, flexShrink: 0, borderRadius: 8,
+    background: 'none', border: 'none',
+    color: gevaar ? 'rgba(239,68,68,0.85)' : aan ? '#fff' : 'rgba(255,255,255,0.55)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
+  const kopScheiding = <span aria-hidden style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
   const geenDoel = !bewerk && !selectedSchemaId && !effectiveClient?.id
   // De naam telt niet mee bij klantplannen: die bewaart de kopbalk zelf al
   // (bewaarTitel). Bij een sjabloon in bewerking gaat de naam mee met Opslaan.
@@ -1029,28 +1048,38 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )}
           {effectiveClient && (<>
             <KlantAanpassingen db={db} client={effectiveClient} knopStijl={iconKnop()} refreshKey={agendaKey} />
-            <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={iconKnop()}><RefreshCw size={15} strokeWidth={2.6} /></button>
-            <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={iconKnop()}><Plus size={16} strokeWidth={2.8} /></button>
-            <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...iconKnop(true), opacity: huidigPlan ? 1 : 0.4, cursor: huidigPlan ? 'pointer' : 'not-allowed' }}><Trash2 size={15} strokeWidth={2.6} /></button>
+            <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={iconKnop()}><RefreshCw size={17} /></button>
+            <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={iconKnop()}><Plus size={18} /></button>
+            <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...iconKnop(true), opacity: huidigPlan ? 1 : 0.35, cursor: huidigPlan ? 'pointer' : 'not-allowed' }}><Trash2 size={17} /></button>
           </>)}
         </div>
 
-        {!m && workoutPlan.days.length > 1 && (
-          <div role="group" aria-label="Weergave" style={{ display: 'flex', flexShrink: 0, padding: 3, gap: 2, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)' }}>
-            {[[false, '1 dag'], [true, 'Alle dagen']].map(([v, label]) => (
-              <button key={label} onClick={() => setAlleDagen(v)} aria-pressed={alleDagen === v} style={{
-                height: 28, padding: '0 0.7rem', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                background: alleDagen === v ? '#fff' : 'transparent', color: alleDagen === v ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
-                fontSize: '0.78rem', fontWeight: 900, whiteSpace: 'nowrap',
-              }}>{label}</button>
-            ))}
-          </div>
-        )}
-        <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={16} /></button>
-        <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw" aria-label="Opnieuw" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canRedo ? 1 : 0.3 }}><Redo2 size={16} /></button>
-        {!bewerk && <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} style={{ ...opslaanKnop(false), opacity: leegPlan ? 0.45 : 1 }}>
-          <Save size={14} strokeWidth={2.6} /> Als template
-        </button>}
+        {/* Weergave en extra's: kale iconen zoals Coach Inzicht. */}
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
+          {effectiveClient && (
+            <button onClick={() => setRoosterDicht(!roosterDicht)} aria-pressed={!roosterDicht} title={roosterDicht ? 'Weekrooster tonen' : 'Weekrooster verbergen'} aria-label="Weekrooster" style={iconKnop(false, !roosterDicht)}>
+              <CalendarRange size={17} />
+            </button>
+          )}
+          {!m && alleDagen && workoutPlan.days.length > 1 && effectiveClient?.id && (
+            <button onClick={() => setKrachtOpen(true)} title="Krachtverloop per spiergroep" aria-label="Kracht" style={iconKnop()}>
+              <TrendingUp size={17} />
+            </button>
+          )}
+          {!m && workoutPlan.days.length > 1 && (<>
+            {kopScheiding}
+            <button onClick={() => setAlleDagen(false)} aria-pressed={!alleDagen} title="Eén dag tegelijk" aria-label="1 dag" style={iconKnop(false, !alleDagen)}><RectangleVertical size={17} /></button>
+            <button onClick={() => setAlleDagen(true)} aria-pressed={alleDagen} title="Alle dagen naast elkaar" aria-label="Alle dagen" style={iconKnop(false, alleDagen)}><Columns3 size={17} /></button>
+          </>)}
+          {kopScheiding}
+          <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken (Cmd+Z)" aria-label="Ongedaan maken" style={{ ...iconKnop(), opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={17} /></button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw (Cmd+Shift+Z)" aria-label="Opnieuw" style={{ ...iconKnop(), opacity: history.canRedo ? 1 : 0.3 }}><Redo2 size={17} /></button>
+          {!bewerk && (
+            <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} title="Opslaan als template" aria-label="Als template" style={{ ...iconKnop(), opacity: leegPlan ? 0.3 : 1 }}>
+              <BookmarkPlus size={17} />
+            </button>
+          )}
+        </div>
         <button onClick={bewerk ? bewaarBewerk : saveToClientSchema} disabled={saving || geenDoel || leegPlan}
           title={bewerk ? 'Wijzigingen opslaan in het sjabloon. Plannen die klanten al hebben veranderen niet mee.' : geenDoel ? 'Kies eerst een klant' : !selectedSchemaId && effectiveClient?.id
             ? (clientSchemas.length > 0
@@ -1106,19 +1135,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           als die langer is dan het scherm). Mobiel scrollt de pagina als geheel. */}
       {/* De week van de klant bovenaan, zoals hij hem zelf ziet: alleen de
           dagen en de stappen. Plan wisselen en opslaan zitten in de kopbalk. */}
-      {effectiveClient && (
+      {effectiveClient && !roosterDicht && (
         <div style={{ flexShrink: 0, borderBottom: DUN }}>
-          {/* In- en uitklappen (10 nov 2026): dicht = meer ruimte voor de dagkolommen. */}
-          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.35rem 0.5rem 0' : '0.4rem 0 0' }}>
-            <button onClick={() => setRoosterDicht(!roosterDicht)} aria-expanded={!roosterDicht} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.2rem 0', background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.55)', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', fontFamily: 'inherit', cursor: 'pointer',
-            }}>
-              <ChevronDown size={14} strokeWidth={2.8} style={{ transform: roosterDicht ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }} />
-              Weekrooster
-            </button>
-          </div>
-          {!roosterDicht && <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.25rem' : '0.35rem' }}>
+          {/* In- en uitklappen via het kalender-icoon in de kopregel (10 nov 2026). */}
+          {!roosterDicht && <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem' }}>
             <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop
               verwijderGeblokkeerd={nietOpgeslagen ? 'Sla eerst je wijzigingen op.' : null}
               onPlandagWeg={herlaadKlant}
@@ -1149,34 +1169,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           const gevuld = blokken.filter(([, ks]) => ks.length)
           return (
             <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
-              <div style={{ maxWidth: 1460, margin: '0 auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 22px', padding: '0.2rem 0' }}>
-                {/* Per lichaamsdeel gegroepeerd (borst, rug, schouders, armen, benen). */}
-                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 26px' }}>
-                  {(() => {
-                    return gevuld.map(([titel, ks]) => (
-                      <span key={titel} style={{ display: 'inline-flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{titel}</span>
-                        {ks.map(k => (
-                          <SpierChip key={k} spier={k} toonNaam={!(ks.length === 1 && spierLabel(k) === titel)} sets={String(Math.round(sets[k].frac * 10) / 10).replace('.', ',')} info={herstel[k]} advies={advies[k]} onActie={voerAdviesUit} onWissel={wisselVanuitAdvies} />
-                        ))}
-                      </span>
-                    ))
-                  })()}
-                </span>
-                <button onClick={() => setOverzichtOpen(!overzichtOpen)} aria-expanded={overzichtOpen} title="Per spiergroep met koppen" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.75rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', background: overzichtOpen ? '#fff' : 'transparent', color: overzichtOpen ? '#000' : '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
-                  Overzicht <ChevronDown size={14} strokeWidth={2.6} style={{ transform: overzichtOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                </button>
-                {effectiveClient?.id && (
-                  <button onClick={() => setKrachtOpen(true)} title="Krachtverloop per spiergroep" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.75rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
-                    <BarChart3 size={14} strokeWidth={2.6} /> Kracht
-                  </button>
-                )}
+              <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: overzichtOpen ? '48vh' : 'none', overflowY: overzichtOpen ? 'auto' : 'visible' }}>
+                <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel}
+                  open={overzichtOpen} onOpen={setOverzichtOpen}
+                  onSets={(dayId, exId, n) => updateExercise(dayId, exId, { sets: n })}
+                  onActie={voerAdviesUit} onWissel={wisselVanuitAdvies}
+                />
               </div>
-              {overzichtOpen && (
-                <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: '42vh', overflowY: 'auto' }}>
-                  <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel} onSets={(dayId, exId, n) => updateExercise(dayId, exId, { sets: n })} />
-                </div>
-              )}
             </div>
           )
         })()}
@@ -1186,11 +1185,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
                   </button>
+                  {(dag.exercises || []).length > 1 && (
+                    <button onClick={() => sorteerOpSpier(dag.id)} title="Sorteer op spiergroep (zelfde spieren bij elkaar)" aria-label="Sorteer op spiergroep" style={{ ...iconKnop(), width: 24, height: 24, marginRight: -4 }}>
+                      <ArrowDownWideNarrow size={14} />
+                    </button>
+                  )}
+                  </div>
                   {/* Sets per spiergroep in de dagkop, niet in de lijst eronder. */}
                   {(dag.exercises || []).length > 0 && (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>

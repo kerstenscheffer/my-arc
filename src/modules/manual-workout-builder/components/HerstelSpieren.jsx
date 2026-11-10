@@ -35,7 +35,7 @@ const OORDEEL = {
 const TREND = { stijgt: 'Kracht stijgt', stagneert: 'Kracht staat stil', daalt: 'Kracht daalt' }
 const getal = (v) => String(v).replace('.', ',')
 
-export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein = false, toonNaam = true }) {
+export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein = false, toonNaam = true, inhoud = null }) {
   const [open, setOpen] = useState(false)
   const [plek, setPlek] = useState(null)
   // Eerst laten zien wat er verandert, pas na Akkoord uitvoeren (10 nov 2026).
@@ -73,9 +73,11 @@ export function SpierChip({ spier, sets, info, advies, onActie, onWissel, klein 
         fontFamily: 'inherit', cursor: klikbaar ? 'pointer' : 'default', whiteSpace: 'nowrap',
         fontSize: klein ? '0.7rem' : '0.8rem', fontWeight: 800, color: onbekend ? '#f59e0b' : 'rgba(255,255,255,0.65)',
       }}>
-        {toonNaam && spierLabel(spier)} <b style={{ fontWeight: 900, color: onbekend ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{sets}</b>
-        <HerstelStip stand={stand} maat={klein ? 6 : 7} />
-        {o && <span style={{ fontSize: klein ? '0.68rem' : '0.76rem', fontWeight: 900, color: o.kleur, marginLeft: 1 }}>{o.teken}</span>}
+        {inhoud || (<>
+          {toonNaam && spierLabel(spier)} <b style={{ fontWeight: 900, color: onbekend ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{sets}</b>
+          <HerstelStip stand={stand} maat={klein ? 6 : 7} />
+          {o && <span style={{ fontSize: klein ? '0.68rem' : '0.76rem', fontWeight: 900, color: o.kleur, marginLeft: 1 }}>{o.teken}</span>}
+        </>)}
       </button>
       {open && plek && createPortal(
         <div ref={paneel} style={{

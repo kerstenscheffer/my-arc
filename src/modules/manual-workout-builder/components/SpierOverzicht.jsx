@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { ChevronDown, Minus, Plus } from 'lucide-react'
-import { HerstelStip } from './HerstelSpieren'
+import { HerstelStip, SpierChip } from './HerstelSpieren'
 import { spierLabel } from '../spierGroepen'
 import { HERSTEL, GEVOEL } from '../../workout/bouwfase/bouwfaseData'
 
@@ -19,7 +19,7 @@ const RUIMTE = {
 }
 
 // Eén regel onder de spiergroep: herstel, kracht, cijfer van de klant en het oordeel.
-function Signalen({ info, advies }) {
+function Signalen({ spier, info, advies, onActie, onWissel }) {
   const h = info?.herstel?.[0]
   const hv = h && HERSTEL.find(x => x.id === h.gevoel)
   const scores = (info?.oefeningen || []).map(r => Number(r.score)).filter(Boolean)
@@ -37,7 +37,13 @@ function Signalen({ info, advies }) {
       )}
       {cijfer != null && <span style={{ ...item, color: '#fff' }} title="Gemiddeld cijfer van de klant, 7 dagen">{String(Math.round(cijfer * 10) / 10).replace('.', ',')}/10</span>}
       {pijn > 0 && <span style={{ ...item, color: '#f59e0b' }}>{pijn}x pijn</span>}
-      {r && <span title={advies.tekst} style={{ ...item, marginLeft: 'auto', color: r[1] }}>{r[0]}</span>}
+      {r && (
+        <span style={{ marginLeft: 'auto' }}>
+          {/* Klik = het adviesmenu met de knop (sets toevoegen/weghalen, wisselen). */}
+          <SpierChip spier={spier} info={info} advies={advies} onActie={onActie} onWissel={onWissel}
+            inhoud={<span title={advies.tekst} style={{ ...item, color: r[1], textDecoration: 'underline', textUnderlineOffset: 2 }}>{r[0]}</span>} />
+        </span>
+      )}
     </div>
   )
 }
@@ -50,17 +56,33 @@ const ORANJE = '#f59e0b'
 
 // blokken: [[titel, [spier...]]], sets: { spier: { frac } }, advies/herstel per spier.
 // onSets(dayId, exId, sets): sets van één oefening in het plan aanpassen.
-export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {}, onSets }) {
+// open/onOpen: lichaam uitgeklapt; klik op de titelregel klapt in en uit.
+export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {}, onSets, onActie, onWissel, open: lichaamOpen, onOpen }) {
   const getallen = { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }
   // Spiergroepen die uitgeklapt zijn: daar staan de oefeningen met -/+ per set.
   const [open, setOpen] = useState(() => new Set())
   const wissel = (k) => setOpen(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
   const stap = { width: 22, height: 22, padding: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${blokken.length}, minmax(0, 1fr))`, border: LIJN, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
-      {blokken.map(([titel, spieren], i) => (
+    <div style={{ display: 'flex', border: LIJN, borderRadius: 10, overflow: 'hidden' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${blokken.length}, minmax(0, 1fr))` }}>
+      {blokken.map(([titel, spieren], i) => {
+        // Kopregel per blok: totaal sets, doel (som van de spieren met een doel) en het zwaarste advies.
+        const totaal = spieren.reduce((n, k) => n + (sets[k]?.frac || 0), 0)
+        const metDoel = spieren.map(k => advies[k]?.range).filter(Boolean)
+        const doel = metDoel.length ? [metDoel.reduce((n, r) => n + r[0], 0), metDoel.reduce((n, r) => n + r[1], 0)] : null
+        const zwaarste = ['omlaag', 'let op', 'omhoog'].find(o => spieren.some(k => advies[k]?.oordeel === o))
+        const zp = zwaarste && PIJL[zwaarste]
+        return (
         <div key={titel} style={{ borderLeft: i ? LIJN : 'none', minWidth: 0 }}>
-          <div style={{ padding: '0.55rem 0.75rem', borderBottom: LIJN, fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#fff' }}>{titel}</div>
+          <button onClick={() => onOpen?.(!lichaamOpen)} aria-expanded={!!lichaamOpen} title={lichaamOpen ? 'Inklappen' : 'Spiergroepen en koppen tonen'} style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: 6, padding: '0.6rem 0.75rem', background: '#e6e6e6', border: 'none', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', color: '#000' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{titel}</span>
+            {/* Wit vlak: donkerder groen/rood/oranje voor contrast. */}
+            {zp && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: { '↑': '#047857', '↓': '#b91c1c', '!': '#b45309' }[zp[0]] }}>{zp[0]}</span>}
+            <span style={{ marginLeft: 'auto', ...getallen, fontSize: '0.92rem', fontWeight: 900 }}>{getal(totaal)}</span>
+            {doel && <span style={{ ...getallen, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(0,0,0,0.5)' }}>/ {getal(doel[0])}–{getal(doel[1])}</span>}
+          </button>
+          {lichaamOpen && <div style={{ borderTop: LIJN }}>
           {spieren.map((k, j) => {
             const a = advies[k]
             const p = a && PIJL[a.oordeel]
@@ -75,7 +97,7 @@ export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {
                   <span style={{ ...getallen, fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{getal(sets[k]?.frac || 0)}</span>
                   {a?.range && <span style={{ ...getallen, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>/ {getal(a.range[0])}–{getal(a.range[1])}</span>}
                 </div>
-                <Signalen info={herstel[k]} advies={a} />
+                <Signalen spier={k} info={herstel[k]} advies={a} onActie={onActie} onWissel={onWissel} />
                 {open.has(k) && (a?.bronnen || []).flatMap(b => b.items.map(it => (
                   <div key={`${it.dayId}|${it.exId}`} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
@@ -109,8 +131,11 @@ export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {
               </div>
             )
           })}
+          </div>}
         </div>
-      ))}
+        )
+      })}
+    </div>
     </div>
   )
 }

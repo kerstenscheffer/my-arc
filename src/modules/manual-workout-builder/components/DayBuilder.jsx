@@ -6,7 +6,7 @@ import BuilderExerciseCard from './BuilderExerciseCard'
 import useSleepVolgorde from './useSleepVolgorde'
 import { voorstelDag } from '../dagTitel'
 import { minutenVoorOefeningen } from '../trainingsTijd'
-import { setsPerSpierDag, spierLabel } from '../spierGroepen'
+import { setsPerSpierDag, spierLabel, spierVan } from '../spierGroepen'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
@@ -137,8 +137,17 @@ export default function DayBuilder({
       )}
 
       <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 10, overflow: sleep.bezig ? 'hidden' : 'visible' }}>
-        {day.exercises.map((exercise, index) => (
+        {day.exercises.map((exercise, index) => {
+          // Alle dagen: kopje met de spiergroep boven elke nieuwe groep (10 nov 2026).
+          const groep = (ex) => (ex?.type === 'cardio' ? 'cardio' : spierVan(ex || {}))
+          const kopje = compact && (index === 0 || groep(day.exercises[index - 1]) !== groep(exercise))
+          return (
           <div key={exercise.id} data-sleep-index={index} data-oef={`${day.id}|${exercise.id}`} style={sleep.kaartStijl(index)}>
+            {kopje && (
+              <div style={{ margin: index === 0 ? '0 0.7rem 5px' : '7px 0.7rem 5px', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: groep(exercise) === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
+                {groep(exercise) === 'cardio' ? 'Cardio' : spierLabel(groep(exercise))}
+              </div>
+            )}
             <BuilderExerciseCard
               exercise={exercise} index={index} isMobile={isMobile} db={db} client={client}
               geselecteerd={!!selectie?.has(`${day.id}|${exercise.id}`)}
@@ -150,7 +159,8 @@ export default function DayBuilder({
               kaartStijl compact={compact}
             />
           </div>
-        ))}
+          )
+        })}
         {day.exercises.length === 0 && (
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.88rem', fontWeight: 700 }}>
             Nog geen oefeningen op deze dag
