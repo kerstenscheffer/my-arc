@@ -23,7 +23,7 @@ const ALTIJD_LEZEN = new Set([
   'echo', 'printf', 'true', 'false', 'test', '[', ':', 'file', 'basename', 'dirname', 'ffprobe', 'sw_vers', 'uname',
   'ps', 'pgrep', 'mdfind', 'jq', 'pdftotext', 'pdfinfo', 'nl', 'seq', 'sleep', 'cd', 'date', 'sort', 'find', 'sed', 'awk',
 ])
-const GIT_LEZEN = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'check-ignore', 'ls-files', 'blame'])
+const GIT_LEZEN = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'check-ignore', 'ls-files', 'blame', 'rev-list', 'grep', 'cat-file', 'shortlog', 'describe', 'merge-base'])
 // onthoud: Gino's eigen geheugen, raakt niets van klanten.
 const PA_DB_LEZEN = new Set(['lees', 'schema', 'projecten', 'project', 'experimenten', 'herinneringen', 'geheugen', 'tijd', 'onthoud'])
 const LUS_WOORDEN = new Set(['do', 'done', 'then', 'else', 'elif', 'fi', 'if', 'while', 'until'])
@@ -81,14 +81,17 @@ const onderdelen = (tekst) => tekst.split(/\n|;;|;|&&|\|\||\||&/).map(x => x.tri
 const woorden = (seg) => seg.split(/\s+/).filter(Boolean)
 
 // Omleidingen eruit; schrijven mag alleen naar /tmp, ~/Gino of /dev/null.
-function zonderOmleiding(seg, hulp) {
+// inVrijeMap: de opdracht staat op dit moment (na een cd) in ~/Gino of /tmp; dan mag een
+// relatief pad zonder .. ook (10 nov 2026).
+function zonderOmleiding(seg, hulp, inVrijeMap = false) {
   let goed = true
   const schoon = seg.replace(/(\d?&?>>?|&>)\s*(&\d|\S+)|<HEREDOC|<\s*\S+/g, (m, pijl, doel) => {
     if (!pijl) return ' '
     if (doel.startsWith('&')) return ' '
     const q = doel.match(/^Q(\d+)Q$/)
     const pad = q ? hulp[Number(q[1])] : doel
-    if (!VRIJE_MAP.test(pad) || pad.includes('..')) goed = false
+    const relatiefVrij = inVrijeMap && /^[\w][\w.@%+=,-]*(\/[\w.@%+=,-]+)*$/.test(pad)
+    if ((!VRIJE_MAP.test(pad) && !relatiefVrij) || pad.includes('..')) goed = false
     return ' '
   }).replace(/<<HEREDOC/g, ' ')
   return goed ? schoon.trim() : null
@@ -101,6 +104,9 @@ function segmentLeest(seg, ctx) {
   const [c, ...rest] = w
   const tekst = (x) => { const q = x.match(/^Q(\d+)Q$/); return q ? ctx.hulp[Number(q[1])] : x }
   if (c === 'for') return rest[1] === 'in'
+  // 10 nov 2026: versie opvragen en Deno typecheck lezen alleen.
+  if (rest.length === 1 && (rest[0] === '--version' || rest[0] === '-v' || rest[0] === 'version') && /^[\w.-]+$/.test(c)) return true
+  if (c === 'deno') return rest[0] === 'check' && !rest.some(a => /^--(allow|reload|lock-write|frozen=false)/.test(a))
   if (c === 'mkdir' || c === 'touch') return rest.filter(a => !a.startsWith('-')).every(a => VRIJE_MAP.test(tekst(a)) && !tekst(a).includes('..'))
   // Nakijken en bouwen: schrijft alleen naar dist. eslint --fix wijzigt code, dus dan een kaart.
   if (c === 'npx') return rest[0] === 'eslint' && !rest.some(a => a.startsWith('--fix') || a.startsWith('--output-file') || a === '-o')
@@ -119,7 +125,8 @@ function segmentLeest(seg, ctx) {
   if (c === 'sort') return !rest.some(a => a === '-o' || a.startsWith('--output'))
   if (c === 'date') return !rest.some(a => a === '-s' || a === '--set')
   if (c === 'sed') return rest.every(a => a === '-n' || /^\d+(,\d+|,\$)?p$/.test(tekst(a)) || (!a.startsWith('-') && !/^Q\d+Q$/.test(a)))
-  if (c === 'awk') return rest.every(a => { const t = tekst(a); return a === t || !/system|getline|\||>|print\s*>|close\(/.test(t) })
+  // Een > of | ná print is in awk een omleiding; elders is > een vergelijking (10 nov 2026).
+  if (c === 'awk') return rest.every(a => { const t = tekst(a); return a === t || !/system|getline|close\(|\bprintf?\b[^;{}\n]*[>|]/.test(t) })
   return true
 }
 
@@ -225,7 +232,8 @@ function scriptSchoon(pad, opdracht, lees, diepte = 0) {
 }
 
 // Eigen werk van Gino zonder kaart (5 nov): nakijken en bouwen, zijn eigen projectborden.
-const PA_DB_VRIJ = new Set(['project-bij', 'project-nieuw', 'herinner']) // herinner: alleen Kerstens eigen herinneringen (6 nov 2026)
+// bijlage (10 nov): haalt Kerstens eigen chatbijlage naar ~/Downloads/Business OS bijlagen, overschrijft niets.
+const PA_DB_VRIJ = new Set(['project-bij', 'project-nieuw', 'herinner', 'bijlage', 'kaart', 'stap']) // herinner: alleen Kerstens eigen herinneringen (6 nov 2026)
 const UITVOER_VRIJ = /^(?:\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|(?:\.\/)?node_modules\/\.cache\/)/
 const uitvoerVrij = (rest, tekst) => rest.map(tekst).every(a => {
   const m = a.match(/^--(?:outfile|outdir|out-file|out-dir)=(.+)$/)
@@ -247,7 +255,16 @@ function vrijSegment(schoon, o, opdracht, lees) {
   if (c === 'rm') return !hardeBlokkade('Bash', { command: opdracht })
   if (c === 'npx' && rest[0] === 'vite') return rest[1] === 'build' && uitvoerVrij(rest, tekst)
   if (c === 'npx' && rest[0] === 'esbuild') return uitvoerVrij(rest, tekst)
-  if (c === 'sed') return !rest.some(a => /^(-i|--in-place)/.test(a)) && !rest.some(a => /^Q\d+Q$/.test(a) && SED_SCHRIJFT.test(tekst(a)))
+  // Vercel alleen bekijken (10 nov 2026); deployen blijft een kaart.
+  if (c === 'npx' && rest[0] === 'vercel') return ['ls', 'list', 'inspect'].includes(rest.filter(a => !a.startsWith('-'))[1])
+  if (c === 'sed') {
+    if (rest.some(a => /^Q\d+Q$/.test(a) && SED_SCHRIJFT.test(tekst(a)))) return false
+    if (!rest.some(a => /^(-i|--in-place)/.test(a))) return true
+    // sed -i: alleen in een code-opdracht (die mag met Edit al in de repo) en alleen op
+    // bestanden in de repo of een tijdelijke map (10 nov 2026).
+    return !!huidigeOpties.repoSchrijven && !BUITEN_WERK.test(voluit) && rest.every(a =>
+      /^Q\d+Q$/.test(a) || a.startsWith('-') || (!a.startsWith('/') && !a.startsWith('~') && !a.includes('$')) || VRIJE_MAP.test(a) || /^\/Users\/[\w.-]+\/workapp\//.test(a))
+  }
   if (c === 'python' || c === 'python3') {
     const a = rest.filter(x => x !== '-I')
     if (a[0] === '-c' || a[0] === '-' || a[0]?.startsWith('<')) return true
@@ -282,14 +299,29 @@ function vulVarsIn(cmd) {
 // opties.repoSchrijven: alleen voor code-opdrachten, zie metVrijSchrijven.
 export function vrijeBash(cmd, lees = null, opties = {}) {
   huidigeOpties = opties
-  const s = vulVarsIn(cmd)
+  let s = vulVarsIn(cmd)
+  // Kleine shell-functie (q(){ node scripts/pa-db.mjs lees "$1"; }): de inhoud apart
+  // nakijken, aanroepen tellen daarna als die inhoud (10 nov 2026).
+  const functies = []
+  s = s.replace(/(^|\n|;)\s*(\w+)\s*\(\)\s*\{([^{}]*)\}/g, (_, voor, naam, body) => { functies.push([naam, body]); return voor })
+  for (const [naam, body] of functies) {
+    if (!/^\w+$/.test(naam) || !vrijeBash(body, lees, opties)) return null
+    huidigeOpties = opties
+    s = s.replace(new RegExp(`(^|\\n|;|&&|\\|\\|)(\\s*)${naam}(?=\\s|$)`, 'g'), '$1$2true')
+  }
   const zonderMktemp = s.replace(/\bmktemp\s+-d\b/g, 'mktemp')
-  if (GEVAARLIJK.test(zonderMktemp) || VERSTUURT_OF_SCHRIJFT.test(metVrijSchrijven(s, opties))) return null
+  // 'supabase' als map (supabase/functions/…) of als adres (….supabase.co) is geen
+  // supabase-client; die herkent VERSTUURT_OF_SCHRIJFT aan createClient (10 nov 2026).
+  const zonderPaden = s.replace(/(^|[\s'"=(])supabase\/(?!supabase-js)/g, '$1sb-map/').replace(/\.supabase\.co\b/g, '.sb-adres')
+  if (GEVAARLIJK.test(zonderMktemp) || VERSTUURT_OF_SCHRIJFT.test(metVrijSchrijven(zonderPaden, opties))) return null
   const o = ontleed(s)
   if (!o || !o.tekst.trim()) return null
   for (const b of o.subst) if (!vrijeBash(b, lees, opties)) return null
+  let inVrijeMap = false
   for (const seg of onderdelen(o.tekst)) {
-    const schoon = zonderOmleiding(seg, o.hulp)
+    const cd = seg.match(/^cd\s+(\S+)\s*$/)
+    if (cd) { const q = cd[1].match(/^Q(\d+)Q$/); const pad = q ? o.hulp[Number(q[1])] : cd[1]; inVrijeMap = VRIJE_MAP.test(pad) && !pad.includes('..') && !/[$`]/.test(pad.replace(/^\$HOME|^\$\{HOME\}/, '')) }
+    const schoon = zonderOmleiding(seg, o.hulp, inVrijeMap)
     if (schoon === null || !vrijSegment(schoon, o, s, lees)) return null
   }
   return 'vrij'
@@ -319,7 +351,9 @@ const SQL_FUNCTIES = new Set(`count sum avg min max coalesce nullif greatest lea
   lead first_value last_value ntile percentile_cont percentile_disc stddev variance mode timezone cast date numeric
   decimal varchar char interval timestamp timestamptz
   select from where and or not in any all exists filter over as on join using lateral when then else values
-  group by order having limit distinct materialized like ilike between is case end`.split(/\s+/))
+  group by order having limit distinct materialized like ilike between is case end
+  jsonb_object_agg json_object_agg pg_get_triggerdef pg_get_functiondef pg_get_function_arguments pg_get_function_result
+  pg_get_indexdef pg_get_constraintdef pg_get_viewdef format_type`.split(/\s+/)) // catalogus-lezers: 10 nov 2026
 const SQL_SCHRIJFT = /\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke|copy|call|do|execute|perform|set|reset|lock|vacuum|analyze|refresh|comment|reindex|cluster|listen|notify|into|prepare|deallocate|import|security|owner)\b|\bfor\s+(update|share|no\s+key|key)\b/i
 const SQL_GEHEIM = /vault|secret|token|password|wachtwoord|encrypted|pg_authid|pg_shadow|\bauth\s*\./i
 export function leesSql(query) {
@@ -376,6 +410,7 @@ const GEEN_FAMILIE = [
 const MOET_VRIJ = [
   'npx eslint scripts/a.mjs && echo eslint-ok; node --check scripts/a.mjs && echo syntax-ok; TZ=Europe/Amsterdam date',
   'npm run build', 'npm run lint',
+  'deno check supabase/functions/a/index.ts 2>&1 | tail -8', "date '+%H:%M'; supabase --version 2>&1 | head -1",
   `node /Users/k/workapp/scripts/pa-db.mjs onthoud '{"soort":"correctie","tekst":"klein beginnen"}'`,
 ]
 const STUB = {
@@ -412,6 +447,7 @@ const EIGEN_WERK_VRIJ = [
   "{ cat a.js; cat <<'EOF'\nconsole.log(1)\nEOF\n} | node --input-type=module",
   'npx vite build 2>&1 | tail -2',
 ]
+const SED_REPO = ["sed -i '' 's/a/b/' src/a.jsx && grep -n b src/a.jsx", "sed -i '' 's/a/b/' /Users/k/workapp/src/a.jsx"]
 const EIGEN_WERK_REPO = ["python3 - <<'E'\nopen('src/a.js','w').write('x')\nE", "node - a <<'EOF'\nconst fs=require('fs');fs.writeFileSync(process.argv[2],'x')\nEOF"]
 const EIGEN_WERK_KAART = [
   "cat > /tmp/a.mjs <<'E'\nimport { writeFileSync } from 'fs'\nimport os from 'os'\nwriteFileSync(os.homedir()+'/.zshrc','x')\nE\nnode /tmp/a.mjs",
@@ -420,6 +456,27 @@ const EIGEN_WERK_KAART = [
   'npx vite', 'npx esbuild a.js --outfile=src/b.js', 'npx esbuild a.js --outfile=/tmp/../b.js', 'ffmpeg -y -i a src/b.mp4', 'ffmpeg -y -i a /tmp/../b.mp4', 'node scripts/pa-db.mjs app-lijst x',
   'npm run release', 'T=$(mktemp -d); node $T/onbekend.mjs', 'T=$(mktemp -d); curl https://x -o $T/a', "node -e \"fetch('https://x',{method:'POST'})\"", 'git push', 'set -e; git commit -m x',
 ]
+// 10 nov 2026: vormen uit de kaarten van 7-9 nov die Kersten allemaal goedkeurde.
+EIGEN_WERK_VRIJ.push(
+  `cd "/Users/k/Downloads/Business OS bijlagen" && grep -v -- '-->' "a.txt" | grep -v '^$' | sed -E 's/^K:/K:/' | awk 'length($0) > 3 { print }'`,
+  `git diff --stat $(git rev-list -1 --before="2026-11-06 18:57:00 +0100" HEAD) HEAD -- src | tail -30`,
+  "git grep -l -E 'function +x' ; echo ---",
+  `q(){ node scripts/pa-db.mjs lees "$1" | head -c 5000; echo; echo ---; }\nq "select 1"\nq "select 2"`,
+  `node scripts/pa-db.mjs bijlage "business-os-bijlagen/u/a.txt"; grep -v x "/Users/k/Downloads/Business OS bijlagen/a.txt" | head`,
+  'npx vercel ls --prod 2>&1 | sed -n 7,8p',
+  "cd ~/Gino/plan; cat > toon.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode toon.mjs a.json",
+  "cd ~/Gino/plan; node -e 'console.log(1)' > ids.txt; wc -c ids.txt",
+  "git diff --stat HEAD -- supabase/functions/a/; npx eslint supabase/functions/a/index.ts",
+  "curl -s --max-time 20 'https://abc.supabase.co/functions/v1/x?diag=1' -w 'HTTP %{http_code}' | cut -c1-600",
+  `node scripts/pa-db.mjs kaart '{"project_id":"p","stap_id":"s","notitie":"x"}'`,
+)
+EIGEN_WERK_KAART.push(
+  "sed -i '' 's/a/b/' ~/.zshrc", "sed -i '' 's/a/b/' /etc/hosts", "sed -i '' 's/a/b/' ../x", 'npx vercel --prod', 'npx vercel deploy',
+  "awk '{ print $0 > \"x\" }' y", "awk '{ print | \"sh\" }' y", 'q(){ rm -rf x; }; q', 'q(){ curl -X POST https://x; }\nq',
+  'deno run a.ts', 'deno check --reload a.ts', 'git branch -D x', 'git reflog expire',
+  'cd ~/Gino; cd /Users/k/workapp; echo x > a.js', 'cd ~/Gino; echo x > ../a.js', 'cd src; echo x > a.js', 'cd $X; echo x > a.js',
+  "node -e \"require('@supabase/supabase-js')\"", "node -e \"fetch('https://a.supabase.co/rest/v1/x')\"",
+)
 const BLIJFT_KAART = [
   'npx eslint --fix a.js', 'npx eslint a.js -o b', 'npx vite build', 'npm run release', 'npm install x', 'node --check a.js; rm a.js',
   'node scripts/pa-sql.mjs a.sql', 'node scripts/pa-db.mjs app-lijst x', 'node /tmp/scripts/pa-db.mjs lees x',
@@ -452,6 +509,8 @@ const SQL_JA = [
   "with a as (select client_id, count(*) n from client_coaching_logs group by 1) select * from a where n > 3",
   "select column_name from information_schema.columns where table_name = 'clients'",
   "select coalesce(jsonb_agg(x), '[]'::jsonb) from (select 'delete; drop (x)' as t) x",
+  "select c.relname, pg_get_triggerdef(t.oid) as def, p.prosrc from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where not t.tgisinternal",
+  "select jsonb_object_agg(d.key, d.value->'totals') from client_meal_plans p, jsonb_each(p.week_structure) d",
 ]
 const SQL_NEE = [
   "insert into notifications (client_id) values ('x')", 'select 1; delete from clients', 'select stuur_push(id) from clients',
@@ -470,6 +529,7 @@ export function veiligZelftest() {
   for (const c of EIGEN_WERK_VRIJ) if (hardeBlokkade('Bash', { command: c }) || !vrijeBash(c, stubLees)) fouten.push(`eigen werk moet vrij: ${c}`)
   for (const c of EIGEN_WERK_REPO) { if (!vrijeBash(c, stubLees, { repoSchrijven: true })) fouten.push(`code-opdracht mag dit: ${c}`); if (vrijeBash(c, stubLees)) fouten.push(`chat mag dit niet: ${c}`) }
   for (const c of EIGEN_WERK_KAART) if (vrijeBash(c, stubLees, { repoSchrijven: true })) fouten.push(`moet een kaart blijven: ${c}`)
+  for (const c of SED_REPO) { if (!vrijeBash(c, stubLees, { repoSchrijven: true })) fouten.push(`code-opdracht mag sed -i: ${c}`); if (vrijeBash(c, stubLees)) fouten.push(`chat mag geen sed -i: ${c}`) }
   for (const [c, wel] of [['D=$(mktemp -d); rm -rf $D', false], ['rm -rf $HOME', true], ["cat <<'E'\nX=$(mktemp -d)\nE\nrm -rf $X", true], ['D=$(mktemp -d); rm -rf $D/..', true], ['D=$(mktemp -d); D=~; rm -rf $D', true], ["echo 'a; X=/tmp/b; c'; rm -rf $X", true]]) if (!!hardeBlokkade('Bash', { command: c }) !== wel) fouten.push(`rm met variabele: ${c}`)
   for (const t of LEES_JA) if (!leesTool(t)) fouten.push(`lees-tool: ${t}`)
   for (const t of LEES_NEE) if (leesTool(t)) fouten.push(`geen lees-tool: ${t}`)
