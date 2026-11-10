@@ -175,6 +175,18 @@ function flattenNp(np) {
     put(`intake_nu_${k}_werkt`, pm[k]?.werkt_goed)
   })
   put('intake_nu_extras', (ch.extras || []).filter(Boolean).join('\n') || null)
+  // Eigen macro targets van de klant (sinds 10 nov 2026).
+  const mt = ch.macro_targets
+  if (mt?.heeft === 'nee') put('intake_macro_targets', 'Nee, heeft geen eigen targets')
+  else if (mt?.heeft === 'ja') {
+    const delen = [
+      mt.kcal && `${mt.kcal} kcal`,
+      mt.eiwit && `${mt.eiwit} g eiwit`,
+      mt.koolhydraten && `${mt.koolhydraten} g koolhydraten`,
+      mt.vet && `${mt.vet} g vet`,
+    ].filter(Boolean)
+    put('intake_macro_targets', delen.length ? delen.join(' · ') : 'Ja, maar geen getallen ingevuld')
+  }
   put('intake_cheat', cm.frequency)
   put('intake_sociaal', cm.social_frequency)
   put('intake_ontbijt', mealSummary(w, 'ontbijt'))
@@ -375,6 +387,7 @@ const PART2_SECTIONS = [
   {
     title: 'Wat eet je nu',
     fields: [
+      { key: 'intake_macro_targets', label: 'Eigen macro targets' },
       { key: 'intake_nu_ontbijt', label: 'Ontbijt' },
       { key: 'intake_nu_ontbijt_werkt', label: 'Ontbijt: werkt goed', alleenIngevuld: true },
       { key: 'intake_nu_lunch', label: 'Lunch' },
@@ -685,6 +698,7 @@ const OPTIONEEL_SINDS = {
   agenda_toelichting: '2026-09-03',    // tekstvak onder de weekplanner
   eigen_blokken: '2026-09-03',         // eigen blokken in de weekplanner
   supplementen_nu: '2026-09-03',       // tekstvak in de voedingsintake
+  intake_macro_targets: '2026-11-10',  // macro-vraag bovenaan "Wat eet je nu"
 }
 const CARDIO_VERVOLG = ['cardio_types', 'cardio_frequency', 'cardio_duration']
 // Alleen ervaren sporters krijgen deze (ExperienceFlow/CurrentTrainingFlow);

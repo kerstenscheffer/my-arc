@@ -88,6 +88,15 @@ function mapToNutritionPreferences(flowData) {
         flowData[`current_meals_extra_${i}`] || null
       ).filter(Boolean),
       eerder_geprobeerd: flowData.eerder_geprobeerd || null,
+      // Eigen macro targets van de klant, als hij die heeft. In current_habits
+      // (jsonb) zodat er geen kolom bij hoeft en oude app-versies niets merken.
+      macro_targets: flowData.macro_targets_heeft ? {
+        heeft:        flowData.macro_targets_heeft,
+        kcal:         parseInt(flowData.macro_kcal, 10)  || null,
+        eiwit:        parseInt(flowData.macro_eiwit, 10) || null,
+        koolhydraten: parseInt(flowData.macro_kh, 10)    || null,
+        vet:          parseInt(flowData.macro_vet, 10)   || null,
+      } : null,
       // Per maaltijdmoment: wat er goed aan werkt, en de screenshots die
       // erbij horen. Zo weet de coach van welke maaltijd hij naar de
       // getallen kijkt in plaats van naar een losse stapel plaatjes.
