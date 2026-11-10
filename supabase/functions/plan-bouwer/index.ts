@@ -248,18 +248,36 @@ function pastBijKlant(naam: string, k: Klant) {
   return true
 }
 
+// Relevantie: het hoofdwoord van de zoekterm (in het Nederlands het laatste
+// woord: "magere KWARK", "volkoren BROOD", "plantaardig EIWITPOEDER") moet in
+// de productnaam staan. Anders pakt de zoekfunctie soms een zwakke treffer
+// ("Plantaardige topping" voor plantaardig eiwitpoeder).
+const hoofdwoord = (term: string) => {
+  const w = term.toLowerCase().replace(/[^a-zà-ÿ\s]/g, ' ').trim().split(/\s+/).filter(Boolean)
+  return w[w.length - 1] || term.toLowerCase()
+}
+// Begin van het woord vergelijken: vangt meervouden ("tomaten" → Tomaat).
+const stam = (w: string) => w.slice(0, Math.max(4, w.length - 3))
+const relevant = (naam: string, term: string) => naam.toLowerCase().includes(stam(hoofdwoord(term)))
+
 async function zoekIngredient(sb: SupabaseClient, term: string, rol: Rol, clientId: string, cache: Map<string, any>, klant: Klant) {
   const sleutel = `${term.toLowerCase()}|${rol}`
   if (cache.has(sleutel)) return cache.get(sleutel)
-  const { data } = await sb.rpc('zoek_ingredienten', { p_q: term, p_client: clientId, p_limit: 12 })
-  let rijen: any[] = (data || []).filter((r: any) => Number(r.calories_per_100g) > 0 || /water|thee|koffie/i.test(r.name))
-  // Altijd rauw/ongekookt wegen (Kersten): bereide varianten alleen als er niets anders is.
-  const rauw = rijen.filter(r => !NIET_RAUW.includes(String(r.bereiding || '').toLowerCase()))
-  if (rauw.length) rijen = rauw
-  rijen = rijen.filter(r => pastBijKlant(r.name, klant))
-  // Eigen coach-producten eerst, dan de zoekscore.
-  rijen.sort((a, b) => (b.source === 'coach' ? 1 : 0) - (a.source === 'coach' ? 1 : 0) || Number(b.score) - Number(a.score))
-  const r = rijen[0] || null
+  const kies = async (q: string) => {
+    const { data } = await sb.rpc('zoek_ingredienten', { p_q: q, p_client: clientId, p_limit: 25 })
+    let rijen: any[] = (data || []).filter((r: any) => Number(r.calories_per_100g) > 0 || /water|thee|koffie/i.test(r.name))
+    rijen = rijen.filter(r => pastBijKlant(r.name, klant) && relevant(r.name, term))
+    // Altijd rauw/ongekookt wegen (Kersten): bereide varianten alleen als er niets anders is.
+    const rauw = rijen.filter(r => !NIET_RAUW.includes(String(r.bereiding || '').toLowerCase()))
+    if (rauw.length) rijen = rauw
+    // Eigen coach-producten eerst, dan de zoekscore.
+    rijen.sort((a, b) => (b.source === 'coach' ? 1 : 0) - (a.source === 'coach' ? 1 : 0) || Number(b.score) - Number(a.score))
+    return rijen[0] || null
+  }
+  const hw = hoofdwoord(term)
+  let r = await kies(term)
+  if (!r && hw !== term.toLowerCase()) r = await kies(hw)
+  if (!r && klant.dieet === 'veganistisch') r = await kies(`vegan ${hw}`)
   cache.set(sleutel, r)
   return r
 }

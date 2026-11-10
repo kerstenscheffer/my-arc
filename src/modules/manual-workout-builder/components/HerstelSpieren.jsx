@@ -25,7 +25,7 @@ export const HerstelStip = ({ stand, maat = 7 }) => (stand
 
 // Spiergroep in de weektotalen: naam, sets, stip en eventueel +1. Klik = details.
 // doel = { dagNaam, oefening } waar de extra set zou landen, of null (geen tijd/oefening).
-export function SpierChip({ spier, sets, info, doel, onPlusSet }) {
+export function SpierChip({ spier, sets, info, doel, onPlusSet, klein = false }) {
   const [open, setOpen] = useState(false)
   const [plek, setPlek] = useState(null)
   const knop = useRef(null)
@@ -54,11 +54,11 @@ export function SpierChip({ spier, sets, info, doel, onPlusSet }) {
       <button ref={knop} onClick={klik} disabled={!info} style={{
         display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0, background: 'none', border: 'none',
         fontFamily: 'inherit', cursor: info ? 'pointer' : 'default', whiteSpace: 'nowrap',
-        fontSize: '0.8rem', fontWeight: 800, color: onbekend ? '#f59e0b' : 'rgba(255,255,255,0.65)',
+        fontSize: klein ? '0.7rem' : '0.8rem', fontWeight: 800, color: onbekend ? '#f59e0b' : 'rgba(255,255,255,0.65)',
       }}>
         {spierLabel(spier)} <b style={{ fontWeight: 900, color: onbekend ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{sets}</b>
-        <HerstelStip stand={stand} />
-        {stand === 'groen' && doel && <span style={{ fontSize: '0.66rem', fontWeight: 900, color: KLEUR.groen }}>+1</span>}
+        <HerstelStip stand={stand} maat={klein ? 6 : 7} />
+        {!klein && stand === 'groen' && doel && <span style={{ fontSize: '0.66rem', fontWeight: 900, color: KLEUR.groen }}>+1</span>}
       </button>
       {open && plek && createPortal(
         <div ref={paneel} style={{

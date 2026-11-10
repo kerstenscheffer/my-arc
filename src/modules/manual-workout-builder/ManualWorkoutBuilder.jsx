@@ -32,8 +32,8 @@ import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
-import { setsPerSpierDag, spierLabel, spierVan } from './spierGroepen'
-import { SpierChip, HerstelStip } from './components/HerstelSpieren'
+import { setsPerSpierDag, spierVan } from './spierGroepen'
+import { SpierChip } from './components/HerstelSpieren'
 import { useHerstel } from './components/useHerstel'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -244,7 +244,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           'experience', 'training_experience',
           'injuries', 'gym_name', 'workout_type',
           'days_per_week', 'workout_days_per_week', 'training_days',
-          'minutes_per_session', 'training_time', 'workout_schedule',
+          'minutes_per_session', 'training_time', 'workout_schedule', 'auth_user_id',
         ].join(', '))
         .eq('id', clientId).single()
       let intakeDays = []
@@ -253,7 +253,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           .select('training').eq('client_id', clientId).order('updated_at', { ascending: false }).limit(1)
         intakeDays = np?.[0]?.training?.training_days || []
       } catch {}
-      setTrainingInfo({ ...cd, intakeDays })
+      // Sessieduur uit de intake ("Hoe lang zou je kunnen trainen per sessie?").
+      // Staat op user_id = auth-account (of het klant-id bij oude intakes).
+      let sessieMin = null
+      try {
+        const ids = [cd?.auth_user_id, clientId].filter(Boolean)
+        const { data: wp } = await db.supabase.from('user_workout_preferences')
+          .select('default_time_per_session').in('user_id', ids)
+          .order('workout_completed_at', { ascending: false, nullsFirst: false }).limit(1)
+        sessieMin = wp?.[0]?.default_time_per_session ?? null
+      } catch { sessieMin = null }
+      setTrainingInfo({ ...cd, intakeDays, sessieMin })
     } catch (e) {
       console.error('loadTrainingInfo:', e)
     }
@@ -513,7 +523,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // op een dag waar nog 3 minuten bij kunnen binnen de trainingsduur van de klant
   // (intake, anders 60 min). Gelijk aantal sets: de eerste dag.
   const plusSetDoel = (k) => {
-    const budget = parseInt(trainingInfo?.minutes_per_session, 10) || 60
+    // Intake-keuzes zijn bandbreedtes (30 = "30 tot 45 min"): we nemen de bovenkant.
+    // Niets ingevuld = coach bepaalt = 60-90 min, dus 90.
+    const BOVEN = { 30: 45, 45: 60, 60: 75, 75: 90, 90: 90 }
+    const keuze = Number(trainingInfo?.sessieMin) || Number(trainingInfo?.minutes_per_session) || 0
+    const budget = BOVEN[keuze] || keuze || 90
     let beste = null
     workoutPlan.days.forEach((d, i) => {
       if (minutenVoorOefeningen(d.exercises || []) + 3 > budget) return
@@ -1122,27 +1136,23 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {workoutPlan.days.map((dag, i) => (
               <div key={dag.id} style={{ width: 280, flexShrink: 0, height: 'calc(100% - 1rem)', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
-                <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{
-                  flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', background: 'none', border: 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
+                {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
+                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef · {setsVan(dag)} sets</span>
-                  </span>
+                  </button>
                   {/* Sets per spiergroep in de dagkop, niet in de lijst eronder. */}
                   {(dag.exercises || []).length > 0 && (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
-                      {setsPerSpierDag(dag.exercises).map(([k, n]) => (
-                        <span key={k} style={{ fontSize: '0.7rem', fontWeight: 800, color: k === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' }}>
-                          {spierLabel(k)} <b style={{ fontWeight: 900, color: k === 'onbekend' ? '#f59e0b' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</b>
-                          <HerstelStip stand={herstel[k]?.stand} maat={6} />
-                        </span>
-                      ))}
+                      {setsPerSpierDag(dag.exercises).map(([k, n]) => {
+                        const doel = herstel[k]?.stand === 'groen' ? plusSetDoel(k) : null
+                        return <SpierChip key={k} klein spier={k} sets={n} info={herstel[k]} doel={doel} onPlusSet={() => voegSetToe(doel)} />
+                      })}
                     </span>
                   )}
-                </button>
+                </div>
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0', scrollbarWidth: 'thin' }}>
                   <DayBuilder
                     key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop compact
