@@ -67,6 +67,10 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   // Slepen om to-do's te herordenen (persisteert `position`).
   const [dragId, setDragId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
+  // Secties in de strook verslepen (links/rechts), en een to-do op een sectie
+  // laten vallen om hem daarheen te verplaatsen.
+  const [secDrag, setSecDrag] = useState(null)
+  const [secOver, setSecOver] = useState(null)
   // Inline bewerken van een bestaande to-do.
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
@@ -253,17 +257,56 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   // een derde van de breedte op, en dat is precies de ruimte waarin de titel
   // van een to-do moet passen: op een telefoon zag je "Dagdoel: 2 onboarding
   // v…" en had je niets aan de lijst.
+  // Sectie `vanId` vóór `naarId` zetten; volgorde geldt ook in Productiviteit.
+  const verschuifSectie = (vanId, naarId) => {
+    if (!vanId || vanId === naarId) return
+    const ids = sections.map(s => s.id)
+    const van = ids.indexOf(vanId)
+    if (van < 0 || !ids.includes(naarId)) return
+    ids.splice(van, 1)
+    const doel = ids.indexOf(naarId)
+    // Naar links: vóór het doel. Naar rechts: erna, zodat de laatste plek bereikbaar is.
+    ids.splice(van <= doel ? doel + 1 : doel, 0, vanId)
+    const opVolgorde = ids.map(id => sections.find(s => s.id === id))
+    setSections(opVolgorde)
+    svc.reorderSections(ids)
+  }
+
   const railBtn = (item) => {
     const active = filter === item.id
     const n = countFor(item.id)
+    const isSectie = item.id !== 'all'
+    const sleepbaar = item.id !== 'all' && item.id !== 'inbox'
+    const doelLijn = secOver === item.id && (dragId || (secDrag && secDrag !== item.id))
     return (
-      <button key={item.id} onClick={() => setFilter(item.id)} title={item.title}
+      <button key={item.id} onClick={() => setFilter(item.id)}
+        title={sleepbaar ? `${item.title} · sleep om te verplaatsen` : item.title}
+        draggable={sleepbaar}
+        onDragStart={sleepbaar ? (e) => { setSecDrag(item.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', item.id) } catch { /* noop */ } } : undefined}
+        onDragOver={(e) => {
+          if ((secDrag && sleepbaar) || (dragId && isSectie)) { e.preventDefault(); if (secOver !== item.id) setSecOver(item.id) }
+        }}
+        onDragLeave={() => { if (secOver === item.id) setSecOver(null) }}
+        onDrop={(e) => {
+          e.preventDefault()
+          if (secDrag && sleepbaar) verschuifSectie(secDrag, item.id)
+          else if (dragId) {
+            const t = tasks.find(x => x.id === dragId)
+            if (t) zetSectie(t, item.id === 'inbox' ? '' : item.id)
+            setDragId(null); setDragOverId(null)
+          }
+          setSecDrag(null); setSecOver(null)
+        }}
+        onDragEnd={() => { setSecDrag(null); setSecOver(null) }}
         style={{
+          opacity: secDrag === item.id ? 0.4 : 1,
+          outline: doelLijn ? `2px solid ${dragId ? '#10b981' : '#fff'}` : 'none', outlineOffset: -2, borderRadius: 6,
+          cursor: sleepbaar ? 'grab' : 'pointer',
           display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
           padding: '0.3rem 0.45rem', minHeight: 28,
           background: 'transparent', border: 'none',
           borderBottom: `2px solid ${active ? '#fff' : 'transparent'}`,
-          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
         {item.Icon
           ? <item.Icon size={13} strokeWidth={2.6} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />

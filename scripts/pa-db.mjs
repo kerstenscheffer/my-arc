@@ -52,6 +52,11 @@
 //     Takenronde (business-os-pa.mjs, planTaken): elke 30 min een rij soort groei met invoer.ronde = taken en invoer.kaarten,
 //     alleen als er geen loopt en er kaarten zijn. Regels: scripts/takenronde.mjs. Open kaart van wie gino, dag vandaag of eerder,
 //     zonder vast, geen open kaart van wie kersten met een eerdere dag in dezelfde fase; max 3 per ronde.
+//   node scripts/pa-db.mjs todo-notitie '{"id","tekst"}'   regel "Gino (dd-mm-jjjj): tekst" onderaan description van een open taak
+//     van Kersten (productivity_tasks); bestaande tekst blijft, hoogstens één per taak per dag, vinkt niets af
+//   node scripts/pa-db.mjs content-idee '{"titel","hook","script","taak_id"?}'   concept in content_items (reel, status idea);
+//     weigert "afvallen" en gedachtestreepjes
+//   node scripts/pa-db.mjs todocheck-droog [YYYY-MM-DD]  welke taken de dagelijkse To-do-check (todocheck.mjs, 13:00) zou pakken; voert niets uit
 //   node scripts/pa-db.mjs statscheck-droog [YYYY-MM-DD]  uitkomst van de vaste query's van de wekelijkse statscheck (statscheck.mjs); leest alleen
 //   node scripts/pa-db.mjs tijd [van] [tot]          Kerstens gemeten tijd per dag/categorie/uur + grootste bronnen (standaard laatste 7 dagen)
 //   node scripts/pa-db.mjs tijd-regel '{"patroon","categorie"}'   indeling bijsturen (app, domein, #tab of titel bevat patroon); werkt terug in de tijd
@@ -71,6 +76,7 @@ import zlib from 'node:zlib'
 import { createClient } from '@supabase/supabase-js'
 import { kiesTaken, leesLopendeProjecten, vandaagNL, wijzigKaart } from './takenronde.mjs'
 import { statscheckQueries, statscheckWeek } from './statscheck.mjs'
+import { KERSTEN_ID, ginoPrefix, kiesTodos, leesEerderGecheckt, leesOpenTodos, taalFout, todocheckDag } from './todocheck.mjs'
 import { maandagVan } from '../src/modules/business-os/nieuweMannenData.js'
 import { schrijfPlan } from '../src/modules/business-os/projectStappen.js'
 
@@ -348,6 +354,52 @@ if (cmd === 'lees') {
     res[naam] = error ? { fout: error.message } : data
   }
   uit(res)
+} else if (cmd === 'todo-notitie') {
+  // To-do-check (todocheck.mjs): regel "Gino (dd-mm-jjjj): …" onderaan description van een open taak van Kersten.
+  // Bestaande tekst blijft staan; per taak hoogstens één regel per dag. Vinkt niets af.
+  let n
+  try { n = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const tekst = String(n.tekst || '').trim().slice(0, 3000)
+  if (!n.id || !tekst) { uit({ fout: 'id en tekst zijn verplicht' }); process.exit(1) }
+  const { data: taak, error } = await sb.from('productivity_tasks').select('id, description, status')
+    .eq('id', n.id).eq('coach_id', KERSTEN_ID).maybeSingle()
+  if (error || !taak) { uit({ fout: error?.message || 'Taak niet gevonden' }); process.exit(1) }
+  if (taak.status !== 'active') { uit({ fout: `Taak staat op ${taak.status}, niet op active` }); process.exit(1) }
+  const prefix = ginoPrefix(vandaagNL())
+  if ((taak.description || '').includes(prefix)) { uit({ fout: 'Taak heeft vandaag al een Gino-regel' }); process.exit(1) }
+  const description = [(taak.description || '').trimEnd(), `${prefix} ${tekst}`].filter(Boolean).join('\n\n')
+  // Alleen schrijven als description intussen niet veranderde (Kersten kan tegelijk typen).
+  let q = sb.from('productivity_tasks').update({ description }).eq('id', taak.id).eq('coach_id', KERSTEN_ID).eq('status', 'active')
+  q = taak.description == null ? q.is('description', null) : q.eq('description', taak.description)
+  const { data: gezet, error: fout } = await q.select('id')
+  uit(fout ? { fout: fout.message } : gezet?.length ? { ok: true } : { fout: 'Taak veranderde net, lees hem opnieuw' })
+} else if (cmd === 'content-idee') {
+  // To-do-check: concept in content_items (status idea, type reel). Nooit gepland of gepost.
+  let c
+  try { c = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const titel = String(c.titel || '').trim().slice(0, 200)
+  const hook = String(c.hook || '').trim().slice(0, 500)
+  const script = String(c.script || '').trim().slice(0, 6000)
+  if (!titel || !hook || !script) { uit({ fout: 'titel, hook en script zijn verplicht' }); process.exit(1) }
+  const taal = taalFout(`${titel}\n${hook}\n${script}`)
+  if (taal) { uit({ fout: taal }); process.exit(1) }
+  let notes = null
+  if (c.taak_id) {
+    const { data: taak } = await sb.from('productivity_tasks').select('title').eq('id', c.taak_id).eq('coach_id', KERSTEN_ID).maybeSingle()
+    if (taak) notes = `Uit to-do (Gino To-do-check): ${String(taak.title || '').trim().slice(0, 200)}`
+  }
+  const { data: { user } } = await sb.auth.getUser(token)
+  const { data, error } = await sb.from('content_items')
+    .insert({ coach_id: user.id, title: titel, type: 'reel', status: 'idea', hook, script, notes }).select('id').single()
+  uit(error ? { fout: error.message } : { ok: true, id: data.id })
+} else if (cmd === 'todocheck-droog') {
+  // Welke taken de To-do-check vandaag zou pakken en waarom andere niet; voert niets uit.
+  const dag = /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : vandaagNL()
+  const [{ data, error }, eerder] = await Promise.all([leesOpenTodos(sb), leesEerderGecheckt(sb)])
+  if (error) { uit({ fout: error.message }); process.exit(1) }
+  // Wanneer de ronde start: 13:00 NL of later, winter- en zomertijd.
+  const planning = Object.fromEntries(['2026-11-10T11:59:00Z', '2026-11-10T12:00:00Z', '2026-11-10T22:59:00Z', '2026-11-10T23:00:00Z', '2026-06-01T10:59:00Z', '2026-06-01T11:00:00Z'].map(t => [t, todocheckDag(Date.parse(t))]))
+  uit({ dag, ronde_nu: todocheckDag(), planning, ...kiesTodos(data, eerder, dag) })
 } else if (cmd === 'experiment') {
   // Strategie zet zelf proeven op: wat doen we, wat verwachten we, hoe meten we.
   let e
