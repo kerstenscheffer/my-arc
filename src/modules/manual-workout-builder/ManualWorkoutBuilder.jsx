@@ -26,7 +26,7 @@ import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
@@ -50,6 +50,7 @@ const SPIER_BLOKKEN = [
   ['Buik', ['abs', 'core']],
 ]
 import KrachtGrafiek from './components/KrachtGrafiek'
+import WorkoutLogsModal from './components/WorkoutLogsModal'
 import SpierOverzicht from './components/SpierOverzicht'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -76,6 +77,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // sets/reps/rust blijven staan.
   const [wissel, setWissel] = useState(null)
   const [krachtOpen, setKrachtOpen] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(false)
   // Dag-editor helemaal dicht (10 nov 2026): nog een klik op het actieve
   // weergave-icoon sluit hem, een klik op een icoon opent die weergave weer.
   const [dagenDicht, setDagenDicht] = useState(false)
@@ -1152,6 +1154,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <TrendingUp size={17} />
             </button>
           )}
+          {effectiveClient?.id && (
+            <button onClick={() => setLogsOpen(true)} title="Workout logs van de klant" aria-label="Workout logs" style={iconKnop(false, logsOpen)}>
+              <History size={17} />
+            </button>
+          )}
           {!m && workoutPlan.days.length > 1 && (<>
             {kopScheiding}
             <button onClick={() => kiesWeergave(false)} aria-pressed={!alleDagen && !dagenDicht} title={!alleDagen && !dagenDicht ? 'Dag-editor sluiten' : 'Eén dag tegelijk'} aria-label="1 dag" style={iconKnop(false, !alleDagen && !dagenDicht)}><RectangleVertical size={17} /></button>
@@ -1615,6 +1622,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </div>,
         document.body,
       )}
+      {logsOpen && effectiveClient?.id && <WorkoutLogsModal db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setLogsOpen(false)} />}
       {krachtOpen && effectiveClient?.id && <KrachtGrafiek db={db} client={effectiveClient} plan={workoutPlan} onClose={() => setKrachtOpen(false)} />}
       {wissel && <ExerciseSelector titel={`${wissel.ex.name || 'Oefening'} wisselen`} onSelect={wisselOefening} onClose={() => setWissel(null)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}

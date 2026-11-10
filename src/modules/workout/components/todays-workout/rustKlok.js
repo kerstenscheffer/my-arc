@@ -41,21 +41,57 @@ const zet = (nieuw) => {
   luisteraars.forEach(l => l())
 }
 
+// Geluid als de rust om is (10 nov 2026, vraag van een klant). Web Audio, geen
+// bestand: niets te laden en het werkt ook via een live-update. Telefoons laten
+// alleen geluid toe na een tik, dus de klank wordt ontgrendeld bij het starten
+// van de klok (dat is altijd een tik: set loggen, herstarten, tijd verzetten).
+// Beperking: alleen met de app open. Scherm uit of app op de achtergrond = stil.
+let audio = null
+const ontgrendelGeluid = () => {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    if (!audio) audio = new AC()
+    if (audio.state === 'suspended') audio.resume()
+  } catch { /* geen geluid mogelijk */ }
+}
+const piep = () => {
+  try {
+    if (!audio) return
+    if (audio.state === 'suspended') audio.resume()
+    const t0 = audio.currentTime
+    // Drie korte tonen, de laatste hoger: duidelijk, niet schel.
+    ;[[0, 880], [0.22, 880], [0.44, 1320]].forEach(([na, hz]) => {
+      const osc = audio.createOscillator()
+      const vol = audio.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = hz
+      vol.gain.setValueAtTime(0.0001, t0 + na)
+      vol.gain.exponentialRampToValueAtTime(0.5, t0 + na + 0.02)
+      vol.gain.exponentialRampToValueAtTime(0.0001, t0 + na + 0.18)
+      osc.connect(vol).connect(audio.destination)
+      osc.start(t0 + na)
+      osc.stop(t0 + na + 0.2)
+    })
+  } catch { /* stil falen: trillen gebeurt toch */ }
+}
+
 const abonneer = (l) => {
   luisteraars.add(l)
   return () => luisteraars.delete(l)
 }
 
-export const startRustKlok = ({ oefening, sec, bron = 'standaard' }) => zet({
+export const startRustKlok = ({ oefening, sec, bron = 'standaard' }) => { ontgrendelGeluid(); zet({
   oefening, bron, totaal: sec, eind: Date.now() + sec * 1000,
   pauzeOver: null, aangepast: false, klaar: false, gestart: Date.now(),
-})
+}) }
 
 export const stopRustKlok = () => zet(null)
 
 // Nieuwe rusttijd en nieuwe resterende tijd. Werkt ook tijdens een pauze.
 export const verzetRustKlok = (totaal, over) => {
   if (!stand) return
+  ontgrendelGeluid()
   zet({
     ...stand, totaal, aangepast: true, klaar: over <= 0 && stand.klaar,
     ...(stand.pauzeOver != null ? { pauzeOver: over } : { eind: Date.now() + over * 1000 }),
@@ -64,6 +100,7 @@ export const verzetRustKlok = (totaal, over) => {
 
 export const herstartRustKlok = () => {
   if (!stand) return
+  ontgrendelGeluid()
   zet({ ...stand, eind: Date.now() + stand.totaal * 1000, pauzeOver: null, klaar: false })
 }
 
@@ -84,6 +121,8 @@ const controleer = () => {
   // en het log-scherm allebei meekijken.
   if (over <= 0 && !stand.klaar) {
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
+    // Alleen piepen als het nu gebeurt, niet bij terugkomen in de app ruim na nul.
+    if (over > -3) piep()
     zet({ ...stand, klaar: true })
   }
 }
