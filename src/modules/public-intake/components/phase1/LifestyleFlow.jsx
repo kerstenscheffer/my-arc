@@ -37,13 +37,18 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
   const renderStep = () => {
     switch (step) {
 
+      // Activiteit en stappen op één scherm (10 nov 2026): de stappen staan
+      // direct onder "Hoe actief ben je". Los van elkaar gevraagd omdat
+      // "matig actief" niets zegt over hoeveel iemand echt loopt; dat
+      // verschil is bruikbaar voor de dagelijkse verbranding. Banden i.p.v.
+      // een precies getal: bijna niemand weet zijn stappen exact.
       case 'activiteit':
         return <>
           <Q isMobile={isMobile}>Hoe actief ben je op dit moment?</Q>
           <Hint isMobile={isMobile}>Los van sport, denk aan je dagelijkse leven.</Hint>
           <PhotoGrid
             value={data.activity_level}
-            onChange={v => { update('activity_level', v); go('stappen') }}
+            onChange={v => update('activity_level', v)}
             isMobile={isMobile}
             options={[
               { value: 'sedentary',         label: 'Weinig beweging',  sub: 'Zit veel, kantoorwerk',       image: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?w=400&h=200&fit=crop&q=80' },
@@ -52,38 +57,35 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
               { value: 'very_active',       label: 'Heel actief',      sub: 'Dagelijks bewegen + fysiek werk', image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=200&fit=crop&q=80' },
             ]}
           />
-        </>
 
-      // Stappen per dag. Los van de vraag hierboven: "matig actief" zegt
-      // niets over hoeveel iemand daadwerkelijk loopt, en juist dat verschil
-      // is bruikbaar bij het bepalen van de dagelijkse verbranding en bij
-      // bijsturen als het gewicht stilstaat.
-      //
-      // Banden in plaats van een precies getal: bijna niemand weet zijn
-      // stappen op honderd nauwkeurig, en een verzonnen precies getal is
-      // erger dan een eerlijke band. De zin erachter is wat mensen herkennen.
-      case 'stappen':
-        return <>
-          <BackBtn onBack={goBack} />
-          <Q isMobile={isMobile}>Hoeveel stappen zet je gemiddeld op een dag?</Q>
-          <Hint isMobile={isMobile}>Een schatting is prima, kies wat het dichtst in de buurt komt.</Hint>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {[
-              { value: '4000_6000',  label: '4.000 tot 6.000',  sub: 'Ik zit veel' },
-              { value: '6000_8000',  label: '6.000 tot 8.000',  sub: 'Ik loop regelmatig, maar zit ook veel' },
-              { value: '8000_10000', label: '8.000 tot 10.000', sub: 'Ik loop meer dan ik zit' },
-              { value: '10000_plus', label: '10.000+',        sub: 'Ik loop de hele dag door' },
-            ].map(o => (
-              <BigOption
-                key={o.value}
-                label={o.label}
-                sub={o.sub}
-                selected={data.daily_steps === o.value}
-                onClick={() => { update('daily_steps', o.value); go('week_builder') }}
-                isMobile={isMobile}
-              />
-            ))}
+          <div style={{ marginTop: '1.2rem' }}>
+            <Q isMobile={isMobile}>Hoeveel stappen zet je gemiddeld op een dag?</Q>
+            <Hint isMobile={isMobile}>Een schatting is prima, kies wat het dichtst in de buurt komt.</Hint>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {[
+                { value: '4000_6000',  label: '4.000 tot 6.000',  sub: 'Ik zit veel' },
+                { value: '6000_8000',  label: '6.000 tot 8.000',  sub: 'Loop regelmatig, zit ook veel' },
+                { value: '8000_10000', label: '8.000 tot 10.000', sub: 'Ik loop meer dan ik zit' },
+                { value: '10000_plus', label: '10.000+',          sub: 'Ik loop de hele dag door' },
+              ].map(o => {
+                const aan = data.daily_steps === o.value
+                return (
+                  <button key={o.value} onClick={() => update('daily_steps', o.value)} style={{
+                    minHeight: 60, padding: '0.55rem 0.5rem', borderRadius: 12, textAlign: 'center',
+                    background: aan ? '#fff' : '#0d0d0d', color: aan ? '#000' : '#fff',
+                    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.15)'}`,
+                    fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s ease',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <div style={{ fontSize: isMobile ? '0.88rem' : '0.9rem', fontWeight: 900 }}>{o.label}</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 600, marginTop: 2, color: aan ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.65)' }}>{o.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
+          <div style={{ height: '0.6rem' }} />
+          <NextBtn onClick={() => go('week_builder')} disabled={!data.activity_level || !data.daily_steps} isMobile={isMobile} />
         </>
 
       case 'week_builder':
