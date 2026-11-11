@@ -46,6 +46,11 @@ const zet = (nieuw) => {
 // alleen geluid toe na een tik, dus de klank wordt ontgrendeld bij het starten
 // van de klok (dat is altijd een tik: set loggen, herstarten, tijd verzetten).
 // Beperking: alleen met de app open. Scherm uit of app op de achtergrond = stil.
+// Aan/uit-voorkeur in localStorage (10 nov 2026, belofte Wesley).
+const GELUID_SLEUTEL = 'myarc:rusttimer_geluid_aan'
+export const isTimerGeluidAan = () => { try { return localStorage.getItem(GELUID_SLEUTEL) !== '0' } catch { return true } }
+export const zetTimerGeluid = (aan) => { try { localStorage.setItem(GELUID_SLEUTEL, aan ? '1' : '0') } catch {} }
+
 let audio = null
 const ontgrendelGeluid = () => {
   try {
@@ -122,7 +127,7 @@ const controleer = () => {
   if (over <= 0 && !stand.klaar) {
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
     // Alleen piepen als het nu gebeurt, niet bij terugkomen in de app ruim na nul.
-    if (over > -3) piep()
+    if (over > -3 && isTimerGeluidAan()) piep()
     zet({ ...stand, klaar: true })
   }
 }

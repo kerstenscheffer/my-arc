@@ -11,10 +11,10 @@
 // minuten pakt en bij curls veertig seconden, wil dat niet elke set opnieuw
 // instellen.
 
-import { useCallback, useRef } from 'react'
-import { Pause, Play, RotateCcw, SkipForward, Minus, Plus } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { Pause, Play, RotateCcw, SkipForward, Minus, Plus, Bell, BellOff } from 'lucide-react'
 import { bewaarRusttijd } from '../rusttijd'
-import { useRustKlok, verzetRustKlok, herstartRustKlok, wisselPauzeRustKlok, klokTekst } from '../rustKlok'
+import { useRustKlok, verzetRustKlok, herstartRustKlok, wisselPauzeRustKlok, klokTekst, isTimerGeluidAan, zetTimerGeluid } from '../rustKlok'
 
 const GROEN = '#10b981'
 
@@ -25,6 +25,7 @@ const mmss = (sec) => klokTekst(Math.max(0, sec))
 // de rust begon, dan staat erbij waar de klok bij hoort.
 export default function RustTimer({ huidigeOefening, onStop, isMobile }) {
   const { klok, over } = useRustKlok()
+  const [geluidAan, setGeluidAan] = useState(isTimerGeluidAan)
   const totaal = klok?.totaal ?? 0
   const loopt = klok?.pauzeOver == null
   const oefeningNaam = klok?.oefening
@@ -142,6 +143,13 @@ export default function RustTimer({ huidigeOefening, onStop, isMobile }) {
             {loopt ? <Pause size={15} /> : <Play size={15} />}
           </RondeKnop>
           <RondeKnop titel="Opnieuw" onClick={herstartRustKlok} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
+          <RondeKnop
+            titel={geluidAan ? 'Geluid uitschakelen' : 'Geluid inschakelen'}
+            onClick={() => { const nieuw = !geluidAan; zetTimerGeluid(nieuw); setGeluidAan(nieuw) }}
+            isMobile={isMobile}
+          >
+            {geluidAan ? <Bell size={14} /> : <BellOff size={14} />}
+          </RondeKnop>
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }} />
