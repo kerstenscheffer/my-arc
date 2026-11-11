@@ -61,6 +61,8 @@ const PAGINAS = ['home', 'workout', 'meal', 'agenda', 'boodschappen', 'tracking'
 
 // Initialize database
 const db = DatabaseService
+// Klant ophalen lukte niet door het netwerk (niet: klant bestaat niet).
+const GEEN_VERBINDING = Symbol('geen-verbinding')
 
 // Theme Configuration
 const pageThemes = {
@@ -234,6 +236,29 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // verving een haperende database dan de hele werkende app door een
   // foutscherm of "account niet gevonden".
   const geladenRef = useRef(false)
+
+  // getClientByEmail geeft bij élke fout null, ook zonder internet. Na een
+  // herstart in de sportschool zag een klant dan "Client account niet gevonden"
+  // en dacht dat zijn account weg was (Joris, 11 nov 2026). Daarom: opnieuw
+  // proberen, en alleen "niet gevonden" als de database echt geen rij teruggeeft.
+  const zoekKlantOpnieuw = async (authUser) => {
+    for (const wacht of [0, 1500, 3000, 5000]) {
+      if (wacht) await new Promise(r => setTimeout(r, wacht))
+      if (wacht) {
+        const c = await db.getClientByEmail(authUser.email)
+        if (c) return c
+      }
+      const { data, error } = await supabase.from('clients').select('id')
+        .eq('auth_user_id', authUser.id).limit(1)
+        .then(r => r, e => ({ data: null, error: e }))
+      if (error) continue
+      // Gekoppelde rij bestaat (bv. ander e-mailadres): op id ophalen.
+      if (data?.[0]?.id) return (await db.getClient(data[0].id).catch(() => null)) || GEEN_VERBINDING
+      return null
+    }
+    return GEEN_VERBINDING
+  }
+
   const loadClientData = async () => {
     const opAchtergrond = geladenRef.current
     try {
@@ -258,8 +283,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         clientData = await db.getClient(uitSleutel)
       } else {
         clientData = await db.getClientByEmail(authUser.email)
+        if (!clientData && !opAchtergrond) clientData = await zoekKlantOpnieuw(authUser)
       }
 
+      if (clientData === GEEN_VERBINDING) {
+        setError('Geen verbinding. Check je internet; de app probeert het zelf opnieuw zodra je weer online bent.'); setLoading(false); return
+      }
       if (!clientData) {
         if (opAchtergrond) { console.warn('Klant verversen gaf niets terug; oude gegevens blijven staan'); return }
         setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return

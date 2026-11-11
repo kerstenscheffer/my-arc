@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import lazy from './lazyMetHerlaad'
 import LaadScherm from './components/LaadScherm'
-import { kiesPortaal } from './portaalKeuze'
+import { kiesPortaal, ROL_SLEUTEL, heeftOpgeslagenSessie } from './portaalKeuze'
 import Login from './components/Login'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -79,6 +79,13 @@ const db = DatabaseService
 
 // De server gaf geen antwoord op wie dit is: nooit gokken, wel opnieuw laten proberen.
 function PortaalOnbekend() {
+  // Zodra het internet terug is of de app weer in beeld komt: zelf opnieuw.
+  useEffect(() => {
+    const opnieuw = () => { if (document.visibilityState === 'visible' && navigator.onLine !== false) window.location.reload() }
+    window.addEventListener('online', opnieuw)
+    document.addEventListener('visibilitychange', opnieuw)
+    return () => { window.removeEventListener('online', opnieuw); document.removeEventListener('visibilitychange', opnieuw) }
+  }, [])
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', gap: 16 }}>
       <div style={{ fontSize: 18, fontWeight: 700 }}>Geen verbinding</div>
@@ -122,17 +129,38 @@ function App() {
     if (user?.id) pushNotificationService.init(user.id)
   }, [user])
 
+  // Na een (her)start blijft het laadscherm staan tot vaststaat wie dit is
+  // (11 nov 2026). Lukt dat niet: "Geen verbinding" met opnieuw proberen,
+  // nooit het coachportaal en niet het inlogscherm als er een sessie is.
+  const [geenVerbinding, setGeenVerbinding] = useState(false)
+  const pauze = (ms) => new Promise(r => setTimeout(r, ms))
+
   const checkUser = async () => {
     try {
-      const currentUser = await db.getCurrentUser()
+      // Geen gebruiker terwijl er wel een sessie op het toestel staat = het
+      // netwerk is er (nog) niet, bv. vlak na een herstart in de sportschool.
+      // Dan opnieuw proberen in plaats van het inlogscherm te tonen.
+      let currentUser = await db.getCurrentUser()
+      if (!currentUser?.id && heeftOpgeslagenSessie()) {
+        for (const wacht of [1000, 2000, 4000, 6000]) {
+          await pauze(wacht)
+          currentUser = await db.getCurrentUser()
+          if (currentUser?.id || !heeftOpgeslagenSessie()) break
+        }
+        if (!currentUser?.id && heeftOpgeslagenSessie()) {
+          setGeenVerbinding(true)
+          setLoading(false)
+          return
+        }
+      }
       setUser(currentUser)
 
       // Rol-check op de server. Direct na het opstarten of een live-update kan het
-      // netwerk nog niet klaar zijn, dus een paar keer proberen.
+      // netwerk nog niet klaar zijn, dus een tijd blijven proberen (laadscherm).
       if (currentUser?.id) {
         let rol = null
-        for (const wacht of [0, 500, 1500, 3000]) {
-          if (wacht) await new Promise(r => setTimeout(r, wacht))
+        for (const wacht of [0, 500, 1500, 3000, 5000, 8000]) {
+          if (wacht) await pauze(wacht)
           try {
             const { data, error } = await db.supabase.rpc('get_my_portal_role')
             if (!error && ['coach', 'client', 'both', 'none'].includes(data)) { rol = data; break }
@@ -141,11 +169,15 @@ function App() {
           }
         }
         let keuze = null
-        try { keuze = localStorage.getItem('portalChoice') } catch { /* private mode */ }
-        const portaal = kiesPortaal({ rol, klantLaatst: storedMode, keuze })
+        let bekend = null
+        try { keuze = localStorage.getItem('portalChoice'); bekend = localStorage.getItem(ROL_SLEUTEL) } catch { /* private mode */ }
+        const portaal = kiesPortaal({ rol, klantLaatst: storedMode, keuze, bekend })
         setMagCoach(portaal === 'coach')
         setIsClientMode(portaal === 'klant')
-        if (rol) localStorage.setItem('isClientMode', portaal === 'klant' ? 'true' : 'false')
+        if (rol) {
+          localStorage.setItem('isClientMode', portaal === 'klant' ? 'true' : 'false')
+          try { localStorage.setItem(ROL_SLEUTEL, portaal) } catch { /* private mode */ }
+        }
       }
     } catch {
       console.log('Not authenticated')
@@ -156,6 +188,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('isClientMode')
     localStorage.removeItem('portalChoice')
+    localStorage.removeItem(ROL_SLEUTEL)
     setIsClientMode(false)
   }
 
@@ -485,6 +518,7 @@ function App() {
   // ==============================================
 
   if (loading) return <LaadScherm />
+  if (geenVerbinding) return <PortaalOnbekend />
 
   // ==============================================
   // MAIN ROUTE - CLIENT LOGIN AS DEFAULT (/)
