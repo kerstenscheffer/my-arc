@@ -820,11 +820,11 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
             onClick={loadData}
             style={{
               padding: '0.75rem 1.5rem',
-              background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+              background: '#fff',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '9px',
               color: '#000',
-              fontWeight: '700',
+              fontWeight: '900',
               cursor: 'pointer'
             }}
           >
@@ -852,8 +852,8 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: isMobile ? '0.75rem' : '1rem',
-        background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.3) 100%)`,
-        borderBottom: `1px solid ${GOLD.border}`,
+        background: 'transparent',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
         borderRadius: isMobile ? '0' : '12px 12px 0 0'
       }}>
         {/* Week Navigation */}
@@ -866,10 +866,10 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
               justifyContent: 'center',
               width: '36px',
               height: '36px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${GOLD.border}`,
+              background: 'transparent',
+              border: 'none',
               borderRadius: '8px',
-              color: GOLD.primary,
+              color: '#fff',
               cursor: 'pointer',
               touchAction: 'manipulation'
             }}
@@ -883,11 +883,10 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.375rem',
-              color: GOLD.primary,
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: '700'
+              color: '#fff',
+              fontSize: isMobile ? '0.95rem' : '1rem',
+              fontWeight: '900', letterSpacing: '-0.015em'
             }}>
-              <Calendar size={16} />
               {formatWeekRange()}
             </div>
           </div>
@@ -900,10 +899,10 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
               justifyContent: 'center',
               width: '36px',
               height: '36px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${GOLD.border}`,
+              background: 'transparent',
+              border: 'none',
               borderRadius: '8px',
-              color: GOLD.primary,
+              color: '#fff',
               cursor: 'pointer',
               touchAction: 'manipulation'
             }}
@@ -922,10 +921,10 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
               justifyContent: 'center',
               width: '36px',
               height: '36px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${GOLD.border}`,
+              background: 'transparent',
+              border: 'none',
               borderRadius: '8px',
-              color: 'rgba(255, 255, 255, 0.6)',
+              color: '#fff',
               cursor: 'pointer',
               touchAction: 'manipulation'
             }}
@@ -945,11 +944,11 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
               alignItems: 'center',
               gap: '0.375rem',
               padding: isMobile ? '0.5rem' : '0.5rem 0.875rem',
-              background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+              background: '#fff',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '9px',
               color: '#000',
-              fontWeight: '700',
+              fontWeight: '900',
               fontSize: '0.85rem',
               cursor: 'pointer',
               touchAction: 'manipulation'

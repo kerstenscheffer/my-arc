@@ -27,7 +27,6 @@ import BatchesListView from './content-library/BatchesListView'
 import QuickIdeaModal from './QuickIdeaModal'
 import TeleprompterModal from './TeleprompterModal'
 
-const GOLD = '#FFD700'
 
 // Engelse dag-namen zoals output_day_items ze opslaat (agenda-grid).
 const DOW_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -265,7 +264,7 @@ export default function OutputHub({ db, onPlanned }) {
     Object.assign(ghost.style, {
       position: 'fixed', zIndex: '2147483600', pointerEvents: 'none',
       left: `${e.clientX}px`, top: `${e.clientY}px`, transform: 'translate(-50%, -140%)',
-      background: GOLD, color: '#0a0a0a', fontWeight: '800', fontSize: '0.78rem',
+      background: '#fff', color: '#0a0a0a', fontWeight: '900', fontSize: '0.78rem',
       padding: '0.4rem 0.7rem', borderRadius: '8px', maxWidth: '220px',
       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
@@ -945,14 +944,14 @@ function PlanIdeaModal({ idea, onClose, onConfirm, isMobile }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 420, background: '#0a0a0a',
-        border: '1px solid rgba(255,215,0,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16,
+        border: '1px solid rgba(255,255,255,0.14)', borderRadius: isMobile ? '16px 16px 0 0' : 16,
         padding: isMobile ? '1.1rem 1rem 1.5rem' : '1.3rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CalendarPlus size={18} color={GOLD} /> Inplannen
+            <CalendarPlus size={18} color="#fff" strokeWidth={2.6} /> Inplannen
           </h3>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
         </div>
         <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginBottom: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {idea.title || 'Idee'}
@@ -968,7 +967,7 @@ function PlanIdeaModal({ idea, onClose, onConfirm, isMobile }) {
 
         <button onClick={submit} disabled={saving} style={{
           width: '100%', padding: '0.85rem', borderRadius: 10, border: 'none',
-          background: saving ? 'rgba(255,215,0,0.35)' : 'linear-gradient(135deg,#FFD700,#D4AF37)',
+          background: saving ? 'rgba(255,255,255,0.4)' : '#fff',
           color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900, cursor: saving ? 'default' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>

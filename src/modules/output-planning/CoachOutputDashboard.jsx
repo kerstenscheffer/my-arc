@@ -213,9 +213,7 @@ export default function CoachOutputDashboard({ db }) {
           {/* Inline week navigator (compact pill) */}
           <div style={{
             display: 'inline-flex', alignItems: 'center',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 999, padding: 2,
+            background: 'transparent', border: 'none', padding: 0,
           }}>
             <button
               onClick={goToPreviousWeek}
@@ -223,7 +221,7 @@ export default function CoachOutputDashboard({ db }) {
                 width: 32, height: 32, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: 'none',
-                color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                color: '#fff', cursor: 'pointer',
                 touchAction: 'manipulation',
               }}
               title="Vorige week"
@@ -236,14 +234,14 @@ export default function CoachOutputDashboard({ db }) {
                 padding: '0 0.65rem', minHeight: 32,
                 display: 'flex', alignItems: 'center', gap: '0.35rem',
                 background: 'transparent', border: 'none',
-                color: isCurrentWeek ? GOLD.primary : '#fff',
-                fontSize: '0.78rem', fontWeight: 700,
+                color: '#fff',
+                fontSize: isMobile ? '0.9rem' : '0.85rem', fontWeight: 900, letterSpacing: '-0.015em',
                 cursor: 'pointer', touchAction: 'manipulation',
                 whiteSpace: 'nowrap',
               }}
               title={isCurrentWeek ? 'Huidige week' : 'Spring naar huidige week'}
             >
-              <Calendar size={13} />
+              {isCurrentWeek && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />}
               {formatWeekRange(currentWeekMonday)}
             </button>
             <button
@@ -252,7 +250,7 @@ export default function CoachOutputDashboard({ db }) {
                 width: 32, height: 32, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: 'none',
-                color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                color: '#fff', cursor: 'pointer',
                 touchAction: 'manipulation',
               }}
               title="Volgende week"
@@ -270,13 +268,12 @@ export default function CoachOutputDashboard({ db }) {
             style={{
               width: 36, height: 36, display: 'flex',
               alignItems: 'center', justifyContent: 'center',
-              background: GOLD.background,
-              border: `1px solid ${GOLD.border}`,
-              borderRadius: 8, color: GOLD.primary,
+              background: 'transparent', border: 'none',
+              borderRadius: 8, color: '#fff',
               cursor: 'pointer', touchAction: 'manipulation',
             }}
           >
-            <Download size={15} />
+            <Download size={18} strokeWidth={2.4} />
           </button>
           <button
             onClick={() => setIsFullscreen(!inFullscreen)}
@@ -284,14 +281,13 @@ export default function CoachOutputDashboard({ db }) {
             style={{
               width: 36, height: 36, display: 'flex',
               alignItems: 'center', justifyContent: 'center',
-              background: inFullscreen ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
-              border: inFullscreen ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              background: 'transparent', border: 'none',
               borderRadius: 8,
-              color: inFullscreen ? '#ef4444' : 'rgba(255,255,255,0.7)',
+              color: '#fff',
               cursor: 'pointer', touchAction: 'manipulation',
             }}
           >
-            {inFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            {inFullscreen ? <Minimize2 size={17} strokeWidth={2.4} /> : <Maximize2 size={17} strokeWidth={2.4} />}
           </button>
         </div>
         
@@ -303,9 +299,8 @@ export default function CoachOutputDashboard({ db }) {
           primaire taak per scherm). Desktop toont beide kolommen naast elkaar. */}
       {isMobile && (
         <div style={{
-          display: 'flex', gap: 4, marginBottom: '0.6rem', padding: 3,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 12,
+          display: 'flex', marginBottom: '0.6rem', height: 40,
+          border: '1px solid rgba(255,255,255,0.18)', borderRadius: 10, overflow: 'hidden',
         }}>
           {[
             { id: 'hub', label: 'Ideeën & Batches' },
@@ -317,11 +312,10 @@ export default function CoachOutputDashboard({ db }) {
                 key={t.id}
                 onClick={() => setMobileTab(t.id)}
                 style={{
-                  flex: 1, minHeight: 44, borderRadius: 9, cursor: 'pointer',
-                  border: active ? `1px solid ${GOLD.border}` : '1px solid transparent',
-                  background: active ? GOLD.background : 'transparent',
-                  color: active ? GOLD.primary : 'rgba(255,255,255,0.6)',
-                  fontSize: '0.82rem', fontWeight: 800, touchAction: 'manipulation',
+                  flex: 1, cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                  background: active ? '#fff' : 'transparent',
+                  color: active ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+                  fontSize: '0.85rem', fontWeight: 900, touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
@@ -334,9 +328,9 @@ export default function CoachOutputDashboard({ db }) {
 
       {/* Content Area */}
       <div style={{
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: isMobile ? '12px' : '16px',
-        border: `1px solid ${GOLD.border}`,
+        background: 'transparent',
+        borderRadius: isMobile ? 0 : '16px',
+        border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
         overflow: 'hidden',
         position: 'relative',
         flex: inFullscreen ? 1 : 'none',
@@ -350,6 +344,7 @@ export default function CoachOutputDashboard({ db }) {
           left: 0,
           right: 0,
           height: '2px',
+          display: 'none',
           background: `linear-gradient(90deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`
         }} />
         
@@ -384,7 +379,7 @@ export default function CoachOutputDashboard({ db }) {
             // Desktop: two columns side-by-side — content left, planning right.
             gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 5fr) minmax(0, 7fr)',
             gap: isMobile ? '0.75rem' : '1rem',
-            padding: isMobile ? '0.5rem' : '0.75rem',
+            padding: isMobile ? 0 : '0.75rem',
             alignItems: isMobile ? 'stretch' : 'start',
           }}>
             {(!isMobile || mobileTab === 'hub') && (

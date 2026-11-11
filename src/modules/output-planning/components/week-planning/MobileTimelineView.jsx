@@ -279,12 +279,8 @@ export default function MobileTimelineView({
                   padding: '0.4rem 0.25rem',
                   minWidth: 42,
                   minHeight: 48,
-                  background: isSelected
-                    ? `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.3) 100%)`
-                    : 'transparent',
-                  border: isSelected
-                    ? `1px solid ${GOLD.border}`
-                    : '1px solid transparent',
+                  background: isSelected ? '#fff' : 'transparent',
+                  border: '1px solid transparent',
                   borderRadius: '10px',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
@@ -294,24 +290,16 @@ export default function MobileTimelineView({
               >
                 <span style={{
                   fontSize: '0.6rem',
-                  fontWeight: '600',
-                  color: dayIsToday 
-                    ? GOLD.primary 
-                    : isSelected 
-                      ? 'rgba(255, 255, 255, 0.8)' 
-                      : 'rgba(255, 255, 255, 0.4)',
+                  fontWeight: '900',
+                  color: isSelected ? 'rgba(10,10,10,0.6)' : dayIsToday ? '#22c55e' : 'rgba(255, 255, 255, 0.5)',
                   textTransform: 'uppercase'
                 }}>
                   {DAYS[idx]}
                 </span>
                 <span style={{
-                  fontSize: '0.9rem',
-                  fontWeight: '700',
-                  color: dayIsToday 
-                    ? GOLD.primary 
-                    : isSelected 
-                      ? '#fff' 
-                      : 'rgba(255, 255, 255, 0.6)'
+                  fontSize: '0.95rem',
+                  fontWeight: '900',
+                  color: isSelected ? '#0a0a0a' : dayIsToday ? '#22c55e' : '#fff'
                 }}>
                   {new Date(day.date).getDate()}
                 </span>
@@ -320,7 +308,7 @@ export default function MobileTimelineView({
                     width: '4px',
                     height: '4px',
                     borderRadius: '50%',
-                    background: isSelected ? GOLD.primary : 'rgba(255, 255, 255, 0.3)',
+                    background: isSelected ? '#0a0a0a' : 'rgba(255, 255, 255, 0.5)',
                     marginTop: '2px'
                   }} />
                 )}
@@ -356,7 +344,7 @@ export default function MobileTimelineView({
       {selectedDay && (
         <div style={{
           padding: '0.75rem 1rem',
-          background: isToday ? GOLD.background : 'rgba(0, 0, 0, 0.2)',
+          background: 'transparent',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           display: 'flex',
           alignItems: 'center',
@@ -365,8 +353,8 @@ export default function MobileTimelineView({
           <div>
             <div style={{
               fontSize: '1rem',
-              fontWeight: '700',
-              color: isToday ? GOLD.primary : '#fff'
+              fontWeight: '900',
+              color: '#fff'
             }}>
               {DAYS_FULL[selectedDayIndex]}
             </div>
@@ -610,9 +598,9 @@ export default function MobileTimelineView({
           width: '56px',
           height: '56px',
           borderRadius: '50%',
-          background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+          background: '#fff',
           border: 'none',
-          boxShadow: `0 4px 20px ${GOLD.glow}`,
+          boxShadow: '0 10px 28px rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
