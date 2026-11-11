@@ -396,12 +396,11 @@ export default function OutputHub({ db, onPlanned }) {
           textAlign: 'left', padding: 0,
         }}
       >
-        {open ? <ChevronDown size={18} color="rgba(255,255,255,0.5)" /> : <ChevronRight size={18} color="rgba(255,255,255,0.5)" />}
+        {open ? <ChevronDown size={18} strokeWidth={2.8} color="#fff" /> : <ChevronRight size={18} strokeWidth={2.8} color="#fff" />}
         {icon}
-        <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800 }}>{label}</span>
+        <span style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em' }}>{label}</span>
         <span style={{
-          background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)',
-          padding: '2px 8px', borderRadius: 12, fontSize: '0.7rem', fontWeight: 700,
+          color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
         }}>
           {count}
         </span>
@@ -424,7 +423,7 @@ export default function OutputHub({ db, onPlanned }) {
         padding: isMobile ? '0.42rem 0.3rem' : '0.48rem 0.4rem',
         background: bg || 'transparent', border: 'none',
         color: disabled ? 'rgba(255,255,255,0.2)' : color,
-        fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+        fontSize: isMobile ? '0.64rem' : '0.66rem', fontWeight: 900,
         cursor: disabled ? 'not-allowed' : 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: 34,
       }}
@@ -504,12 +503,12 @@ export default function OutputHub({ db, onPlanned }) {
         <div style={{ display: 'flex', borderTop: `1px solid ${DIVIDER}` }}>
           {ideaAction({
             icon: <Video size={13} />, label: 'Tele',
-            color: hasScript ? GOLD : 'rgba(255,255,255,0.2)', disabled: !hasScript,
+            color: hasScript ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !hasScript,
             onClick: () => setTeleScript({ script: idea.script || '', title: idea.title || 'Idee' }),
           })}
           <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
           {ideaAction({
-            icon: <CalendarPlus size={12} />, label: 'Plan', color: GOLD,
+            icon: <CalendarPlus size={12} />, label: 'Plan', color: '#fff',
             onClick: () => setIdeaToPlan(idea),
           })}
           <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
@@ -551,10 +550,10 @@ export default function OutputHub({ db, onPlanned }) {
         <button
           onClick={openNewIdea}
           style={{
-            flex: '1 1 0', minHeight: 52,
+            flex: '1 1 0', minHeight: isMobile ? 46 : 50,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-            background: GOLD, color: '#000', border: 'none', borderRadius: 10,
-            fontWeight: 800, fontSize: isMobile ? '0.9rem' : '0.95rem',
+            background: '#fff', color: '#000', border: 'none', borderRadius: 12,
+            fontWeight: 900, fontSize: isMobile ? '0.92rem' : '0.95rem', fontFamily: 'inherit',
             cursor: 'pointer', touchAction: 'manipulation',
           }}
         >
@@ -563,15 +562,15 @@ export default function OutputHub({ db, onPlanned }) {
         <button
           onClick={() => setShowBatchModal(true)}
           style={{
-            flex: '1 1 0', minHeight: 52,
+            flex: '1 1 0', minHeight: isMobile ? 46 : 50,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-            background: 'rgba(255,255,255,0.06)', color: '#fff',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-            fontWeight: 700, fontSize: isMobile ? '0.9rem' : '0.95rem',
+            background: 'transparent', color: '#fff',
+            border: '1px solid rgba(255,255,255,0.22)', borderRadius: 12,
+            fontWeight: 900, fontSize: isMobile ? '0.92rem' : '0.95rem', fontFamily: 'inherit',
             cursor: 'pointer', touchAction: 'manipulation',
           }}
         >
-          <Package size={18} /> Nieuwe batch
+          <Package size={18} strokeWidth={2.6} /> Nieuwe batch
         </button>
       </div>
 
@@ -586,7 +585,7 @@ export default function OutputHub({ db, onPlanned }) {
           {/* ── INBOX ─────────────────────────────────────────────────────── */}
           <section>
             {sectionHeader(
-              <Inbox size={isMobile ? 16 : 18} color={GOLD} />,
+              <Inbox size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.4} />,
               'Inbox',
               ideas.length,
               openInbox, setOpenInbox,
@@ -594,16 +593,15 @@ export default function OutputHub({ db, onPlanned }) {
                 onClick={(e) => { e.stopPropagation(); createSection() }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                  padding: '0.35rem 0.65rem', minHeight: 34,
-                  background: 'rgba(255,215,0,0.12)',
-                  border: '1px solid rgba(255,215,0,0.3)',
-                  borderRadius: 6, color: GOLD,
-                  fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                  padding: '0.35rem 0.4rem', minHeight: 34,
+                  background: 'transparent', border: 'none',
+                  borderRadius: 6, color: '#fff',
+                  fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
                   touchAction: 'manipulation',
                 }}
                 title="Nieuwe sectie"
               >
-                <Plus size={13} /> Sectie
+                <Plus size={15} strokeWidth={3} /> Sectie
               </button>,
             )}
             {openInbox && (() => {
@@ -739,7 +737,7 @@ export default function OutputHub({ db, onPlanned }) {
           {/* ── BATCHES ───────────────────────────────────────────────────── */}
           <section>
             {sectionHeader(
-              <Package size={isMobile ? 16 : 18} color={GOLD} />,
+              <Package size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.4} />,
               'Batches',
               actieveBatches.length,
               openBatches, setOpenBatches,
@@ -747,6 +745,7 @@ export default function OutputHub({ db, onPlanned }) {
             {openBatches && (
               <BatchesListView
                 batches={actieveBatches}
+                title={null}
                 loading={false}
                 onCreateBatch={null}   /* button lives in the top bar */
                 onEditItem={handleEditBatchItem}

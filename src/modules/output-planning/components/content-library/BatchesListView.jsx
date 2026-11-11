@@ -20,8 +20,6 @@ function fieldPreview(item, format) {
   return item.hook || ''
 }
 
-const GOLD = '#FFD700'
-
 const STATUS_STYLES = {
   draft:     { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8', label: 'DRAFT' },
   ready:     { bg: 'rgba(16,185,129,0.15)',  color: '#10b981', label: 'READY' },
@@ -35,9 +33,8 @@ const StatusPill = ({ status }) => {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
-      padding: '2px 8px', borderRadius: '3px',
-      background: s.bg, color: s.color,
-      fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.04em',
+      padding: 0, background: 'transparent', color: s.color,
+      fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.06em',
       textTransform: 'uppercase',
     }}>{s.label}</span>
   )
@@ -81,7 +78,7 @@ export default function BatchesListView({
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: isMobile ? '0.25rem' : '0.5rem',
       }}>
-        <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 700, color: '#fff' }}>
+        <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 900, color: '#fff' }}>
           {title}
         </div>
         {onCreateBatch && (
@@ -91,7 +88,7 @@ export default function BatchesListView({
               display: 'flex', alignItems: 'center', gap: '0.4rem',
               padding: isMobile ? '0.55rem 0.8rem' : '0.55rem 0.95rem',
               minHeight: 44,
-              background: GOLD, color: '#000', border: 'none',
+              background: '#fff', color: '#000', border: 'none',
               borderRadius: '8px', fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.85rem',
               cursor: 'pointer', touchAction: 'manipulation',
             }}
@@ -128,9 +125,9 @@ export default function BatchesListView({
           <div
             key={batch.id}
             style={{
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: '10px',
-              background: 'rgba(255,255,255,0.02)',
+              background: 'transparent',
               overflow: 'hidden',
             }}
           >
@@ -138,8 +135,8 @@ export default function BatchesListView({
               onClick={() => toggle(batch.id)}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem',
-                display: 'flex', alignItems: 'center', gap: '0.65rem',
+                padding: isMobile ? '0.6rem 0.4rem 0.6rem 0.6rem' : '0.75rem 0.85rem',
+                display: 'flex', alignItems: 'center', gap: isMobile ? '0.45rem' : '0.65rem',
                 background: 'transparent', border: 'none', color: '#fff',
                 cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation',
               }}
@@ -147,17 +144,17 @@ export default function BatchesListView({
               {isOpen
                 ? <ChevronDown size={18} color="rgba(255,255,255,0.5)" />
                 : <ChevronRight size={18} color="rgba(255,255,255,0.5)" />}
-              <Package size={isMobile ? 16 : 18} color={GOLD} />
+              {!isMobile && <Package size={17} color="#fff" strokeWidth={2.4} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 700, color: '#fff',
+                  fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {batch.batch_name || 'Naamloze batch'}
                 </div>
                 <div style={{
                   display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: 2,
-                  fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)',
+                  fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden',
                 }}>
                   <StatusPill status={batch.status || 'draft'} />
                   <span style={{ fontWeight: 600 }}>
@@ -167,7 +164,7 @@ export default function BatchesListView({
                     )}
                   </span>
                   {batch.shoot_date
-                    ? <span style={{ color: GOLD, fontWeight: 700 }}>🎬 {formatDate(batch.shoot_date)}</span>
+                    ? <span style={{ color: '#fff', fontWeight: 900 }}>🎬 {formatDate(batch.shoot_date)}</span>
                     : (batch.created_at && <span>{formatDate(batch.created_at)}</span>)}
                 </div>
               </div>
@@ -175,7 +172,7 @@ export default function BatchesListView({
                 <span
                   onClick={(e) => { e.stopPropagation(); onCompleteBatch(batch) }}
                   style={{
-                    padding: '8px', borderRadius: 6, cursor: 'pointer',
+                    padding: isMobile ? '6px' : '8px', borderRadius: 6, cursor: 'pointer', display: 'flex',
                     color: '#10b981',
                   }}
                   title="Batch afronden — gaat naar het archief"
@@ -187,7 +184,7 @@ export default function BatchesListView({
                 <span
                   onClick={(e) => { e.stopPropagation(); onReopenBatch(batch) }}
                   style={{
-                    padding: '8px', borderRadius: 6, cursor: 'pointer',
+                    padding: isMobile ? '6px' : '8px', borderRadius: 6, cursor: 'pointer', display: 'flex',
                     color: 'rgba(255,255,255,0.55)',
                   }}
                   title="Terug naar de werklijst"
@@ -199,20 +196,20 @@ export default function BatchesListView({
                 <span
                   onClick={(e) => { e.stopPropagation(); onPlanBatch(batch) }}
                   style={{
-                    padding: '8px', borderRadius: 6, cursor: 'pointer',
-                    color: batch.shoot_date ? GOLD : 'rgba(255,255,255,0.55)',
+                    padding: isMobile ? '6px' : '8px', borderRadius: 6, cursor: 'pointer', display: 'flex',
+                    color: '#fff',
                   }}
                   title={batch.shoot_date ? 'Opnamemoment aanpassen' : 'Hele batch inplannen'}
                 >
-                  <CalendarPlus size={16} />
+                  <CalendarPlus size={16} strokeWidth={2.4} />
                 </span>
               )}
               {onDeleteBatch && (
                 <span
                   onClick={(e) => { e.stopPropagation(); onDeleteBatch(batch) }}
                   style={{
-                    padding: '8px', borderRadius: 6, cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.4)',
+                    padding: isMobile ? '6px' : '8px', borderRadius: 6, cursor: 'pointer', display: 'flex',
+                    color: '#ef4444',
                   }}
                   title="Batch verwijderen"
                 >
@@ -241,22 +238,22 @@ export default function BatchesListView({
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: '0.55rem',
                       padding: isMobile ? '0.55rem 0.6rem' : '0.6rem 0.75rem',
-                      background: 'rgba(255,255,255,0.025)',
-                      border: '1px solid rgba(255,255,255,0.05)',
+                      background: 'transparent',
+                      border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: '8px',
                     }}
                   >
                     <div style={{
-                      flexShrink: 0, width: 24, height: 24, borderRadius: 4,
-                      background: 'rgba(255,215,0,0.12)', color: GOLD,
+                      flexShrink: 0, width: 22, height: 22,
+                      color: '#fff',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.7rem', fontWeight: 800,
+                      fontSize: '0.85rem', fontWeight: 900,
                     }}>
                       {item.item_number || '—'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 600,
+                        fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 800,
                         color: '#fff', marginBottom: 2,
                         overflow: 'hidden', textOverflow: 'ellipsis',
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -280,50 +277,50 @@ export default function BatchesListView({
                         )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: 0, flexShrink: 0 }}>
                       {onViewItem && (
                         <button
                           onClick={() => onViewItem(item, batch)}
                           style={{
-                            padding: 8, minHeight: 44, minWidth: 44,
+                            padding: 0, minHeight: 40, minWidth: isMobile ? 34 : 40,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                            background: 'transparent', border: 'none',
+                            borderRadius: 6, color: '#fff', cursor: 'pointer',
                             touchAction: 'manipulation',
                           }}
                           title="Inzien"
                         >
-                          <Eye size={14} />
+                          <Eye size={16} strokeWidth={2.4} />
                         </button>
                       )}
                       {onEditItem && (
                         <button
                           onClick={() => onEditItem(item, batch)}
                           style={{
-                            padding: 8, minHeight: 44, minWidth: 44,
+                            padding: 0, minHeight: 40, minWidth: isMobile ? 34 : 40,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                            background: 'transparent', border: 'none',
+                            borderRadius: 6, color: '#fff', cursor: 'pointer',
                             touchAction: 'manipulation',
                           }}
                           title="Bewerken"
                         >
-                          <Edit3 size={14} />
+                          <Edit3 size={16} strokeWidth={2.4} />
                         </button>
                       )}
                       {onPlanItem && (
                         <button
                           onClick={() => onPlanItem(item, batch)}
                           style={{
-                            padding: 8, minHeight: 44, minWidth: 44,
+                            padding: 0, minHeight: 40, minWidth: isMobile ? 34 : 40,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: 6, color: GOLD, cursor: 'pointer',
+                            background: 'transparent', border: 'none',
+                            borderRadius: 6, color: '#fff', cursor: 'pointer',
                             touchAction: 'manipulation',
                           }}
                           title="Plannen in week"
                         >
-                          <CalendarPlus size={14} />
+                          <CalendarPlus size={16} strokeWidth={2.4} />
                         </button>
                       )}
                     </div>
