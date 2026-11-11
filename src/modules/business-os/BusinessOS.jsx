@@ -51,6 +51,7 @@ import { TimerKiezer, TimerBlok } from './GinoTimer.jsx'
 import { useGinoTimer, speelGeluid, gewerktMinuten } from './ginoTimer.js'
 import { schrijfPlan, wijzigStap } from './projectStappen'
 import ProductivityService from '../productivity/ProductivityService'
+import PrioriteitenMatrix from './PrioriteitenMatrix'
 
 const contentService = new ContentPlanningService(supabase)
 const productivityService = new ProductivityService(supabase)
@@ -75,6 +76,7 @@ const PRIJS_KEY = 'business_os_prijs'
 const ONDERDELEN = [
   ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
   ['timer', 'Timer'],
+  ['prioriteiten', 'Prioriteiten'],
   ['geldplan', 'Geldplan · 6 maanden cashflow en break-even'],
   ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
   ['notities', 'Notities · vastgezette antwoorden van Gino'],
@@ -91,7 +93,7 @@ const ONDERDELEN = [
 ]
 
 // Niet voor teamleden: bevat agenda, privé geldplan of de Mac-agents.
-const BEPERKT_VERBORGEN = ['vandaag', 'timer', 'geldplan', 'calls', 'agents']
+const BEPERKT_VERBORGEN = ['vandaag', 'timer', 'prioriteiten', 'geldplan', 'calls', 'agents']
 
 // Leesbare namen voor de cron-jobs. Onbekende jobs tonen hun eigen naam.
 const AGENTS = {
@@ -883,6 +885,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   const [prijs, setPrijs] = useState(() => lees(PRIJS_KEY, 0))
   const [menu, setMenu] = useState(false)
   const [blad, setBlad] = useState(null)
+  // Prioriteiten = zwevend venster (Eisenhower-matrix), geen blad.
+  const [matrix, setMatrix] = useState(false)
   const [denkt, setDenkt] = useState(false)
   const [herinnertPraat, setHerinnertPraat] = useState(false)
   // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
@@ -1408,7 +1412,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               border: `1px solid ${C.rand}`, borderRadius: 14, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
             }}>
               {ONDERDELEN.filter(([k]) => !beperkt || !BEPERKT_VERBORGEN.includes(k)).map(([k, titel]) => (
-                <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); setBlad(k) }}
+                <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); if (k === 'prioriteiten') setMatrix(true); else setBlad(k) }}
                   onMouseEnter={e => { e.currentTarget.style.background = colors.surface }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                   style={{
@@ -1525,6 +1529,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />}
+
+      {matrix && !zwevend && !beperkt && <PrioriteitenMatrix isMobile={isMobile} onClose={() => setMatrix(false)} />}
 
       {previewId && !zwevend && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 

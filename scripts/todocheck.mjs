@@ -11,7 +11,8 @@
 // description (pa-db todo-notitie). Hij vinkt niets af en archiveert niets.
 //
 // Keuze (kiesTodos): geen herhalende blokken (recurrence_active), geen taak die vandaag al een
-// Gino-regel kreeg. Eerst taken die nog nooit in een To-do-check zaten, oudste eerst; daarna wat het
+// Gino-regel kreeg. Voorrang: taken die Kersten in de Prioriteiten-matrix naar "Gino laten doen"
+// sleepte (kwadrant = 'gino', 11 nov 2026). Daarna eerst taken die nog nooit in een To-do-check zaten, oudste eerst; daarna wat het
 // langst geleden langskwam. Zo schuift de ronde elke dag door de lijst in plaats van steeds dezelfde
 // 10 te pakken. Droge run: pa-db todocheck-droog.
 //
@@ -42,7 +43,7 @@ export function todocheckDag(nu = Date.now()) {
 export const ginoPrefix = (dag) => `Gino (${dag.split('-').reverse().join('-')}):`
 
 export const leesOpenTodos = (sb) => sb.from('productivity_tasks')
-  .select('id, title, description, created_at, recurrence_active')
+  .select('id, title, description, created_at, recurrence_active, kwadrant')
   .eq('coach_id', KERSTEN_ID).eq('status', 'active').order('created_at')
 
 // Per taak-id de laatste dag dat hij in een To-do-check zat.
@@ -67,9 +68,11 @@ export function kiesTodos(taken, eerder, dag) {
     else if (String(t.description || '').includes(prefix)) overgeslagen.push({ ...kort, reden: 'vandaag al een Gino-regel' })
     else mogen.push({ ...kort, laatst: eerder[t.id] || '', created_at: t.created_at })
   }
-  mogen.sort((a, b) => a.laatst.localeCompare(b.laatst) || a.created_at.localeCompare(b.created_at))
+  // Voorrang: in de Prioriteiten-matrix naar "Gino laten doen" gesleept (kwadrant = 'gino').
+  const gino = new Set((taken || []).filter(t => t.kwadrant === 'gino').map(t => t.id))
+  mogen.sort((a, b) => (gino.has(b.id) ? 1 : 0) - (gino.has(a.id) ? 1 : 0) || a.laatst.localeCompare(b.laatst) || a.created_at.localeCompare(b.created_at))
   return {
-    taken: mogen.slice(0, TODOCHECK_MAX).map(({ id, titel }) => ({ id, titel })),
+    taken: mogen.slice(0, TODOCHECK_MAX).map(({ id, titel }) => (gino.has(id) ? { id, titel, gedelegeerd: true } : { id, titel })),
     overgeslagen: [...mogen.slice(TODOCHECK_MAX).map(k => ({ id: k.id, titel: k.titel, reden: `meer dan ${TODOCHECK_MAX} per ronde` })), ...overgeslagen],
   }
 }
@@ -85,7 +88,9 @@ export function taalFout(tekst) {
 export function todocheckVraag(dag, taken) {
   const prefix = ginoPrefix(dag)
   return `To-do-check (automatisch, dagelijks, niemand kijkt mee). Vandaag = ${dag}. Loop deze open to-do's van Kersten na, en alleen deze:
-${taken.map(t => `- ${t.id}: ${JSON.stringify(t.titel)}`).join('\n')}
+${taken.map(t => `- ${t.id}: ${JSON.stringify(t.titel)}${t.gedelegeerd ? ' [gedelegeerd door Kersten]' : ''}`).join('\n')}
+
+Taken met [gedelegeerd door Kersten] heeft hij in zijn Prioriteiten-matrix aan jou gegeven: pak die eerst en zo volledig als binnen de grenzen hieronder kan.
 
 Per taak:
 1. Lees hem: node scripts/pa-db.mjs lees "select id, title, description, category, priority, deadline, scheduled_date, status, steps from productivity_tasks where id = '<id>'". Staat hij niet meer op active, of staat er al een regel "${prefix}" in description: sla hem over.

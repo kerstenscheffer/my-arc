@@ -17,7 +17,8 @@ import SupplementInfoModal from './SupplementInfoModal'
 import GelogdOverlay from './GelogdOverlay'
 import { MaaltijdKaartenSkelet } from '../../../client/PaginaSkeletten'
 import { SkeletStijl } from '../../../ui/Skelet'
-import { PillBottle } from 'lucide-react'
+import { PillBottle, Undo2 } from 'lucide-react'
+import { createPortal } from '../../../client/paginaPortal'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -361,30 +362,61 @@ export default function AIDaySchedule({
   }
 
   // ✅ FOOD LOG: Delete consumed meal
-  const handleDeleteConsumedMeal = async (mealId) => {
-    if (!loggingService) return
-    try {
-      await loggingService.deleteConsumedMeal(mealId)
-      const deleted = consumedMeals.find(m => m.id === mealId)
-      setConsumedMeals(prev => prev.filter(m => m.id !== mealId))
+  // 11 nov 2026: eerst vragen (een klant tikte per ongeluk op het prullenbakje
+  // naast de waterfles), en daarna nog 7 s "Ongedaan maken". We bewaren de
+  // hele rij vóór het wissen; terugzetten = dezelfde rij opnieuw invoegen.
+  const [ongedaan, setOngedaan] = useState(null)   // { rij, timer }
+  const macroDelta = (rij, teken) => {
+    if (!rij) return
+    if (onMealLogged && isVandaag()) {
+      onMealLogged({
+        calories: teken * (rij.calories || 0),
+        protein: teken * (rij.protein || 0),
+        carbs: teken * (rij.carbs || 0),
+        fat: teken * (rij.fat || 0)
+      })
+    }
+    // Notify parent to refresh MacroHero cache for past days.
+    if (onPastDayUpdate && !isVandaag()) onPastDayUpdate()
+  }
 
-      // Alleen vandaag's totals updaten als we ECHT vandaag aan het editen
-      // zijn — anders trekken we de macros van een past-day delete af van
-      // vandaag (zelfde bug als bij logging).
-      if (deleted && onMealLogged && isVandaag()) {
-        onMealLogged({
-          calories: -(deleted.calories || 0),
-          protein: -(deleted.protein || 0),
-          carbs: -(deleted.carbs || 0),
-          fat: -(deleted.fat || 0)
+  const handleDeleteConsumedMeal = async (mealId) => {
+    if (!db?.supabase) return
+    const lokaal = consumedMeals.find(m => m.id === mealId)
+    const naam = lokaal?.meal_name || lokaal?.name || 'dit'
+    if (!window.confirm(`Weet je zeker dat je ${naam} wilt verwijderen?`)) return
+    try {
+      const { data: rij } = await db.supabase.from('consumed_meals').select('*').eq('id', mealId).maybeSingle()
+      const { error } = await db.supabase.from('consumed_meals').delete().eq('id', mealId)
+      if (error) throw error
+      const weg = rij || lokaal
+      setConsumedMeals(prev => prev.filter(m => m.id !== mealId))
+      macroDelta(weg, -1)
+      if (rij) {
+        setOngedaan(prev => {
+          if (prev?.timer) clearTimeout(prev.timer)
+          return { rij, timer: setTimeout(() => setOngedaan(null), 7000) }
         })
-      }
-      // Notify parent to refresh MacroHero cache for past days.
-      if (deleted && onPastDayUpdate && !isVandaag()) {
-        onPastDayUpdate()
       }
     } catch (err) {
       console.error('Failed to delete consumed meal:', err)
+      window.alert('Verwijderen lukte niet. Probeer het opnieuw.')
+    }
+  }
+
+  const zetTerug = async () => {
+    const huidig = ongedaan
+    if (!huidig?.rij || !db?.supabase) return
+    if (huidig.timer) clearTimeout(huidig.timer)
+    setOngedaan(null)
+    try {
+      const { data, error } = await db.supabase.from('consumed_meals').insert(huidig.rij).select().single()
+      if (error) throw error
+      setConsumedMeals(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]))
+      macroDelta(data, 1)
+    } catch (err) {
+      console.error('Terugzetten mislukt:', err)
+      window.alert('Terugzetten lukte niet. Log het opnieuw.')
     }
   }
 
@@ -741,6 +773,26 @@ export default function AIDaySchedule({
       // wrapper hoeft geen frame meer te zijn.
       paddingTop: 4,
     }}>
+      {ongedaan && createPortal(
+        <div style={{
+          position: 'fixed', left: 16, right: 16, bottom: 'calc(88px + env(safe-area-inset-bottom))', zIndex: 3000,
+          maxWidth: 440, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12,
+          padding: '0.7rem 0.75rem 0.7rem 1rem', borderRadius: 14, background: '#111',
+          border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0, color: '#fff', fontWeight: 800, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {ongedaan.rij.meal_name || 'Maaltijd'} verwijderd
+          </div>
+          <button onClick={zetTerug} style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 0.85rem',
+            border: 'none', borderRadius: 10, background: '#fff', color: '#0a0a0a',
+            fontWeight: 900, fontSize: '0.85rem', fontFamily: 'inherit', cursor: 'pointer',
+          }}>
+            <Undo2 size={16} strokeWidth={2.8} /> Ongedaan maken
+          </button>
+        </div>,
+        document.body
+      )}
       {afgerond && (
         <GelogdOverlay
           naam={afgerond.naam} kcal={afgerond.kcal} sub={afgerond.sub}

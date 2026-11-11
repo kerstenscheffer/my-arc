@@ -14,9 +14,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../client/paginaPortal'
 import { useModalHost } from '../coach/ModalHost'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Minus, Maximize2 } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Minus, Maximize2, Grid2x2 } from 'lucide-react'
 import useZwevendVenster from './useZwevendVenster'
 import ProductivityService from '../modules/productivity/ProductivityService'
+import PrioriteitenMatrix from '../modules/business-os/PrioriteitenMatrix'
 
 const GOLD = '#FFD700'
 
@@ -78,6 +79,8 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   const [editMinutes, setEditMinutes] = useState('')
   const [editSection, setEditSection] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  // Eisenhower-matrix (Prioriteiten) als eigen zwevend venster.
+  const [matrixOpen, setMatrixOpen] = useState(false)
 
   const load = async () => {
     try {
@@ -378,6 +381,9 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
           {!isMobile && <GripVertical size={13} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
           <ListTodo size={17} color={GOLD} style={{ flexShrink: 0 }} />
           <span style={{ fontSize: isMobile ? '1rem' : '1rem', fontWeight: 900, color: '#fff', flex: 1, letterSpacing: '-0.02em' }}>To-do's</span>
+          <button onClick={() => setMatrixOpen(true)} title="Prioriteiten-matrix" style={{ ...kopKnop, width: 'auto', padding: '0 8px', gap: 5, fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit' }}>
+            <Grid2x2 size={14} strokeWidth={2.8} /> Matrix
+          </button>
           {!isMobile && (
             <button onClick={() => setIngeklapt(v => !v)} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={kopKnop}>
               <Minus size={16} strokeWidth={2.8} />
@@ -726,5 +732,10 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     </div>
   )
 
-  return createPortal(<>{modal}{addModal}</>, modalHost)
+  // Matrix sluiten = lijst opnieuw laden: daar kan afgevinkt of weggezet zijn.
+  const matrixVenster = matrixOpen && (
+    <PrioriteitenMatrix coachId={coachId} isMobile={isMobile} onClose={() => { setMatrixOpen(false); load() }} />
+  )
+
+  return <>{createPortal(<>{modal}{addModal}</>, modalHost)}{matrixVenster}</>
 }
