@@ -36,10 +36,10 @@ const GROEN = colors.success
 // in de kopregel: erop slepen haalt een taak uit de vakken, aantikken opent
 // de lijst.
 const VAKKEN = [
-  { id: 'doen', titel: 'Nu doen', kleur: '#4c1d95', rand: '#a78bfa' },
-  { id: 'plannen', titel: 'Inplannen', kleur: '#1e3a8a', rand: '#93c5fd' },
-  { id: 'gino', titel: 'Gino laten doen', kleur: '#14532d', rand: '#86efac' },
-  { id: 'weg', titel: 'Weg', kleur: '#374151', rand: '#d1d5db' },
+  { id: 'doen', titel: 'Nu doen', kleur: '#170a2e', rand: '#a78bfa' },
+  { id: 'plannen', titel: 'Inplannen', kleur: '#0a1430', rand: '#93c5fd' },
+  { id: 'gino', titel: 'Gino laten doen', kleur: '#06200f', rand: '#86efac' },
+  { id: 'weg', titel: 'Weg', kleur: '#151619', rand: '#d1d5db' },
 ]
 
 const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, created_at'
@@ -72,7 +72,7 @@ const KNOP = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
 }
-const KOPKNOP = { ...KNOP, width: 28, height: 28, borderRadius: 8 }
+const KOPKNOP = { ...KNOP, width: 24, height: 24, borderRadius: 6 }
 
 export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const modalHost = useModalHost()
@@ -234,7 +234,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         }}
         style={{
           display: 'flex', gap: 4, alignItems: 'flex-start',
-          padding: '8px 10px 8px 2px',
+          padding: '4px 8px 4px 0',
           borderBottom: '1px solid rgba(255,255,255,0.12)',
           opacity: sleep?.taak.id === t.id ? 0.3 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
@@ -263,11 +263,11 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           </div>
         ) : (
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div title={t.kwadrant ? undefined : 'Voorlopige plek: sleep om vast te zetten'} style={{ fontSize: '0.84rem', fontWeight: 800, color: t.kwadrant ? WIT : 'rgba(255,255,255,0.72)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <div title={t.kwadrant ? undefined : 'Voorlopige plek: sleep om vast te zetten'} style={{ fontSize: '0.8rem', fontWeight: 800, color: t.kwadrant ? WIT : 'rgba(255,255,255,0.72)', lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {t.title}
             </div>
             {(label || d) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1 }}>
                 {label && <span style={{ flex: 1, minWidth: 0, fontSize: '0.66rem', fontWeight: 800, color: ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>}
                 {d && <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: '0.66rem', fontWeight: 900, color: dKleur, fontVariantNumeric: 'tabular-nums' }}>{kortDatum(d)}</span>}
               </div>
@@ -296,15 +296,15 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     }}>
       <div {...sleepHandvat} style={{
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-        padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 12px) 14px 10px' : '10px 12px',
+        padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 8px) 12px 6px' : '5px 10px',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         ...(sleepHandvat.style || {}),
       }}>
-        <Grid2x2 size={17} color={WIT} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
+        <Grid2x2 size={15} color={WIT} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
         <button type="button" data-kwadrant="uit" onClick={() => setUitOpen(v => !v)} title="Uitgeplande taken"
           style={{
-            ...KNOP, gap: 6, height: 28, padding: '0 10px', borderRadius: 999, fontSize: '0.8rem', fontWeight: 900,
+            ...KNOP, gap: 6, height: 24, padding: '0 9px', borderRadius: 999, fontSize: '0.74rem', fontWeight: 900,
             border: `1.5px solid ${sleep?.over === 'uit' ? WIT : 'rgba(255,255,255,0.3)'}`,
             background: sleep?.over === 'uit' || uitOpen ? WIT : 'transparent',
             color: sleep?.over === 'uit' || uitOpen ? '#000' : WIT,
@@ -328,18 +328,18 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       </div>
 
       {!ingeklapt && (
-        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 8, padding: isMobile ? 8 : 10 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 0, padding: 0, overflow: 'hidden', borderRadius: isMobile ? 0 : '0 0 16px 16px' }}>
           {VAKKEN.map(v => {
             const lijst = perVak(v.id)
             const doel = sleep && sleep.over === v.id
             return (
               <div key={v.id} data-kwadrant={v.id} style={{
                 minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-                background: v.kleur, borderRadius: 14,
+                background: v.kleur,
                 outline: doel ? `2px solid ${v.rand}` : '2px solid transparent', outlineOffset: -2,
                 transition: 'outline-color 0.1s',
               }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '10px 12px 6px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 12px 3px', flexShrink: 0 }}>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{v.titel}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
                 </div>
@@ -353,7 +353,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       )}
 
       {uitOpen && !ingeklapt && (
-        <div onClick={() => setUitOpen(false)} style={{ pointerEvents: sleep ? 'none' : 'auto', opacity: sleep ? 0.35 : 1, position: 'absolute', inset: 0, top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 52px)' : 49 }}>
+        <div onClick={() => setUitOpen(false)} style={{ pointerEvents: sleep ? 'none' : 'auto', opacity: sleep ? 0.35 : 1, position: 'absolute', inset: 0, top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 40px)' : 35 }}>
           <div onClick={e => e.stopPropagation()} style={{
             position: 'absolute', top: 6, right: 10, width: isMobile ? 'calc(100% - 20px)' : 340, maxHeight: '70%',
             display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(255,255,255,0.14)',
