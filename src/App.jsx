@@ -159,7 +159,12 @@ function App() {
       // netwerk nog niet klaar zijn, dus een tijd blijven proberen (laadscherm).
       if (currentUser?.id) {
         let rol = null
-        for (const wacht of [0, 500, 1500, 3000, 5000, 8000]) {
+        let keuze = null
+        let bekend = null
+        try { keuze = localStorage.getItem('portalChoice'); bekend = localStorage.getItem(ROL_SLEUTEL) } catch { /* private mode */ }
+        // Bekende klant: na ~5 s door naar het klantportaal; anders langer wachten.
+        const pogingen = bekend === 'klant' ? [0, 500, 1500, 3000] : [0, 500, 1500, 3000, 5000, 8000]
+        for (const wacht of pogingen) {
           if (wacht) await pauze(wacht)
           try {
             const { data, error } = await db.supabase.rpc('get_my_portal_role')
@@ -168,9 +173,6 @@ function App() {
             console.warn('Portal-rol ophalen mislukt:', e?.message)
           }
         }
-        let keuze = null
-        let bekend = null
-        try { keuze = localStorage.getItem('portalChoice'); bekend = localStorage.getItem(ROL_SLEUTEL) } catch { /* private mode */ }
         const portaal = kiesPortaal({ rol, klantLaatst: storedMode, keuze, bekend })
         setMagCoach(portaal === 'coach')
         setIsClientMode(portaal === 'klant')

@@ -32,15 +32,15 @@ const WIT = colors.textPrimary
 const ZACHT = colors.textSecondary
 const GROEN = colors.success
 
-// Kopbalk per vak in een diepe kleur met witte tekst (11 nov 2026).
+// Vakken gevuld met een diepe kleur (11 nov 2026). Uitgepland zit als knop
+// in de kopregel: erop slepen haalt een taak uit de vakken, aantikken opent
+// de lijst.
 const VAKKEN = [
-  { id: 'doen', titel: 'Nu doen', kleur: '#5b21b6' },
-  { id: 'plannen', titel: 'Inplannen', kleur: '#1e40af' },
-  { id: 'gino', titel: 'Gino laten doen', kleur: '#15803d' },
-  { id: 'weg', titel: 'Weg', kleur: '#4b5563' },
+  { id: 'doen', titel: 'Nu doen', kleur: '#4c1d95', rand: '#a78bfa' },
+  { id: 'plannen', titel: 'Inplannen', kleur: '#1e3a8a', rand: '#93c5fd' },
+  { id: 'gino', titel: 'Gino laten doen', kleur: '#14532d', rand: '#86efac' },
+  { id: 'weg', titel: 'Weg', kleur: '#374151', rand: '#d1d5db' },
 ]
-const UIT = { id: 'uit', titel: 'Uitgepland', kleur: '#000' }
-const LIJN = '2px solid rgba(255,255,255,0.9)'
 
 const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, created_at'
 
@@ -86,6 +86,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const [datumVoor, setDatumVoor] = useState(null)
   const [ongedaan, setOngedaan] = useState(null)
   const [sleep, setSleep] = useState(null)
+  const [uitOpen, setUitOpen] = useState(false)
   const sleepteNet = useRef(false)
   const ongedaanTimer = useRef(null)
 
@@ -234,11 +235,11 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         style={{
           display: 'flex', gap: 4, alignItems: 'flex-start',
           padding: '8px 10px 8px 2px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid rgba(255,255,255,0.12)',
           opacity: sleep?.taak.id === t.id ? 0.3 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
         }}>
-        <span data-greep="" aria-hidden style={{ flexShrink: 0, display: 'flex', alignItems: 'center', alignSelf: 'stretch', padding: '0 2px', color: 'rgba(255,255,255,0.2)', touchAction: 'none', cursor: 'grab' }}>
+        <span data-greep="" aria-hidden style={{ flexShrink: 0, display: 'flex', alignItems: 'center', alignSelf: 'stretch', padding: '0 2px', color: 'rgba(255,255,255,0.35)', touchAction: 'none', cursor: 'grab' }}>
           <GripVertical size={14} />
         </span>
         {isOpen ? (
@@ -288,19 +289,29 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const venster = (
     <div style={{
       ...vensterStijl,
-      background: '#000',
-      border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.25)',
+      background: '#0a0a0a',
+      border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
       borderRadius: isMobile ? 0 : 16,
       boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
     }}>
       <div {...sleepHandvat} style={{
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 12px) 14px 10px' : '10px 12px',
-        borderBottom: LIJN,
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         ...(sleepHandvat.style || {}),
       }}>
         <Grid2x2 size={17} color={WIT} strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <span style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
+        <button type="button" data-kwadrant="uit" onClick={() => setUitOpen(v => !v)} title="Uitgeplande taken"
+          style={{
+            ...KNOP, gap: 6, height: 28, padding: '0 10px', borderRadius: 999, fontSize: '0.8rem', fontWeight: 900,
+            border: `1.5px solid ${sleep?.over === 'uit' ? WIT : 'rgba(255,255,255,0.3)'}`,
+            background: sleep?.over === 'uit' || uitOpen ? WIT : 'transparent',
+            color: sleep?.over === 'uit' || uitOpen ? '#000' : WIT,
+            transform: sleep?.over === 'uit' ? 'scale(1.08)' : 'none', transition: 'transform 0.1s',
+          }}>
+          Uitgepland{taken ? ` ${perVak('uit').length}` : ''}
+        </button>
         {!isMobile && (
           <button type="button" onClick={() => setIngeklapt(v => !v)} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={KOPKNOP}>
             <Minus size={16} strokeWidth={2.8} />
@@ -317,44 +328,48 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       </div>
 
       {!ingeklapt && (
-        <div style={{
-          flex: 1, minHeight: 0, display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr 1fr' : 'minmax(170px, 0.7fr) 1fr 1fr',
-          gridTemplateRows: isMobile ? 'minmax(90px, 0.45fr) 1fr 1fr' : '1fr 1fr',
-          gridTemplateAreas: isMobile ? '"uit uit" "doen plannen" "gino weg"' : '"uit doen plannen" "uit gino weg"',
-        }}>
-          {[UIT, ...VAKKEN].map(v => {
+        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 8, padding: isMobile ? 8 : 10 }}>
+          {VAKKEN.map(v => {
             const lijst = perVak(v.id)
             const doel = sleep && sleep.over === v.id
-            const isUit = v.id === 'uit'
-            const rechts = !isMobile ? v.id !== 'plannen' && v.id !== 'weg' : v.id === 'doen' || v.id === 'gino'
-            const onder = isMobile ? v.id !== 'gino' && v.id !== 'weg' : v.id === 'doen' || v.id === 'plannen'
             return (
               <div key={v.id} data-kwadrant={v.id} style={{
-                gridArea: v.id, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-                borderRight: rechts ? LIJN : 'none', borderBottom: onder ? LIJN : 'none',
-                background: doel ? (isUit ? 'rgba(255,255,255,0.08)' : `${v.kleur}40`) : 'transparent',
-                transition: 'background 0.1s',
+                minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
+                background: v.kleur, borderRadius: 14,
+                outline: doel ? `2px solid ${v.rand}` : '2px solid transparent', outlineOffset: -2,
+                transition: 'outline-color 0.1s',
               }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
-                  background: isUit ? 'transparent' : v.kleur,
-                  borderBottom: isUit ? '1px solid rgba(255,255,255,0.15)' : 'none',
-                }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.86rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{v.titel}</span>
-                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.55, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '10px 12px 6px', flexShrink: 0 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{v.titel}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
                 </div>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', padding: '0 4px 10px' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', padding: '0 6px 10px' }}>
                   {lijst.map(kaart)}
-                  {isUit && taken && !lijst.length && (
-                    <div style={{ padding: '12px 10px', fontSize: '0.74rem', fontWeight: 700, color: ZACHT, lineHeight: 1.4 }}>
-                      Sleep een taak hierheen om hem uit de vakken te halen.
-                    </div>
-                  )}
                 </div>
               </div>
             )
           })}
+        </div>
+      )}
+
+      {uitOpen && !ingeklapt && (
+        <div onClick={() => setUitOpen(false)} style={{ pointerEvents: sleep ? 'none' : 'auto', opacity: sleep ? 0.35 : 1, position: 'absolute', inset: 0, top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 52px)' : 49 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: 'absolute', top: 6, right: 10, width: isMobile ? 'calc(100% - 20px)' : 340, maxHeight: '70%',
+            display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.7)', overflow: 'hidden',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 12px 6px' }}>
+              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: WIT }}>Uitgepland</span>
+              <button type="button" onClick={() => setUitOpen(false)} aria-label="Sluiten" style={KOPKNOP}><X size={16} strokeWidth={2.8} /></button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 10px' }}>
+              {perVak('uit').map(kaart)}
+              {!perVak('uit').length && (
+                <div style={{ padding: '6px 8px 4px', fontSize: '0.78rem', fontWeight: 700, color: ZACHT }}>Nog niets. Sleep een taak op de knop Uitgepland.</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -412,7 +427,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const spook = sleep && (
     <div style={{
       position: 'fixed', left: sleep.x, top: sleep.y, width: sleep.w, zIndex: 2147483300, pointerEvents: 'none',
-      background: '#111', border: `2px solid ${sleep.over && sleep.over !== 'uit' ? VAKKEN.find(v => v.id === sleep.over)?.kleur : 'rgba(255,255,255,0.6)'}`,
+      background: '#111', border: `2px solid ${VAKKEN.find(v => v.id === sleep.over)?.rand || 'rgba(255,255,255,0.6)'}`,
       borderRadius: 10, padding: '8px 12px', boxShadow: '0 16px 40px rgba(0,0,0,0.7)', transform: 'rotate(-1.5deg)',
       fontSize: '0.84rem', fontWeight: 800, color: WIT, lineHeight: 1.3, boxSizing: 'border-box',
     }}>
