@@ -14,7 +14,7 @@ export default function ClientWorkoutPlan({ client, schema, db, onFocusChange, o
   return (
     <>
       <WorkoutPlan client={client} schema={schema} db={db} onFocusChange={onFocusChange} onClientUpdate={onClientUpdate} />
-      <RustKlokBalk />
+      <RustKlokBalk db={db} client={client} />
     </>
   )
 }

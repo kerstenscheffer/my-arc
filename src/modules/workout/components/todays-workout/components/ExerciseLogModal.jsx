@@ -769,7 +769,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     // Rusttimer starten vóór het opslaan: dat is een netwerkrondje, en die
     // seconden horen bij je rust en niet bij het wachten op de server.
     // Niet na een correctie van een bestaande set — dan rust je niet.
-    if (rustTimerAan && editingIndex === null) startRustKlok({ oefening: exercise.name, sec: rusttijd.sec, bron: rusttijd.bron })
+    if (rustTimerAan && editingIndex === null) startRustKlok({ oefening: exercise.name, sec: rusttijd.sec, bron: rusttijd.bron, exercise })
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
     // Bouwfase: laatste geplande set gelogd → hoe zwaar voelde deze oefening?
@@ -1311,6 +1311,22 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 ) : null}
               />
 
+            {/* Eén regel tussen de kop en set 1 (12 nov 2026, Kersten: het gele
+                vak onder de tabel was lelijk). Sticky links, zodat hij blijft
+                staan als de tabel zijwaarts schuift; begint onder Vandaag. */}
+            {tipZwaarder && (
+              <div style={{
+                position: 'sticky', left: 0, width: 'max-content', maxWidth: '100%',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: `0.3rem 0.5rem 0 ${zij + TABEL.set}px`, marginBottom: -3,
+                fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
+                color: '#FFD700', letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+              }}>
+                <TrendingUp size={13} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                Je kan omhoog in gewicht
+              </div>
+            )}
+
             {Array.from({ length: Math.max(loggedSets.length, geplandeSets) }, (_, i) => {
               const set = loggedSets[i]
               const eerder = kolommen.map(k => k.sets?.[i] || null)
@@ -1332,26 +1348,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             </div>
               )
             })()}
-
-            {tipZwaarder && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                margin: isMobile ? '0.9rem 1rem 0' : '1rem 1.25rem 0',
-                padding: isMobile ? '0.6rem 0.7rem' : '0.7rem 0.85rem',
-                borderRadius: 12,
-                background: 'rgba(255,215,0,0.07)',
-                border: '1px solid rgba(255,215,0,0.25)',
-              }}>
-                <TrendingUp size={15} strokeWidth={2.6} color="#FFD700" style={{ flexShrink: 0 }} />
-                <span style={{
-                  fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                }}>
-                  2 sets van 12+ met perfecte uitvoering gedaan?{' '}
-                  <span style={{ color: '#FFD700', fontWeight: 900 }}>Ga omhoog in gewicht.</span>
-                </span>
-              </div>
-            )}
 
             {/* Tijdens de rust staat de timer op de plek van de knoppen, dus
                 direct onder de vorige sessie en direct bóven je gelogde sets.
@@ -1447,7 +1443,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               display: 'flex', gap: '0.5rem',
               padding: isMobile ? '0.1rem 1rem 0' : '0.15rem 1.25rem 0',
             }}>
-              <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: bfAan ? 6 : 8, flexWrap: bfAan ? 'nowrap' : 'wrap', justifyContent: 'center' }}>
                 <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
                 <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
                 {bfAan && (
@@ -1455,7 +1451,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                     label={oefFeedback?.score ? `Gevoel ${oefFeedback.score}` : 'Gevoel'} stip={!!oefFeedback} />
                 )}
               </div>
-              <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />
+              {/* Met Gevoel erbij zijn het drie pillen: dan vervalt de lege plek,
+                  anders valt Gevoel op een telefoon naar een tweede regel. */}
+              {!bfAan && <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />}
             </div>
 
             {/* Krachtverloop van deze oefening: de beste set per training.
@@ -1723,7 +1721,7 @@ function Pil({ actief, onClick, icoon, label, stip = false }) {
         border: `1px solid ${actief ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}`,
         borderRadius: 999, color: '#fff',
         fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.02em',
-        cursor: 'pointer', fontFamily: 'inherit',
+        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >

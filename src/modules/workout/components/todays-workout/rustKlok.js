@@ -150,8 +150,29 @@ const abonneer = (l) => {
   return () => luisteraars.delete(l)
 }
 
-export const startRustKlok = ({ oefening, sec, bron = 'standaard' }) => { ontgrendelGeluid(); if (isTimerGeluidAan()) vraagRustMeldingToestemming(); zet({
-  oefening, bron, totaal: sec, eind: Date.now() + sec * 1000,
+// Tik op de zwevende balk = terug naar de oefening waar de klok bij hoort
+// (12 nov 2026, Kersten). De kaart van die oefening opent zijn eigen
+// log-scherm; staat die kaart niet op het scherm (weekoverzicht), dan meldt
+// niemand zich en opent de balk het log-scherm zelf met `oef` uit de klok.
+export const OPEN_OEFENING = 'myarc:open-oefening'
+export const vraagOefeningOpen = (naam) => {
+  const detail = { naam: String(naam || '').toLowerCase(), opgepakt: false }
+  window.dispatchEvent(new CustomEvent(OPEN_OEFENING, { detail }))
+  return detail.opgepakt
+}
+// Wat de balk nodig heeft om het log-scherm los te openen. Klein houden: het
+// gaat localStorage in.
+const kleineOefening = (ex) => {
+  if (!ex?.name) return null
+  try {
+    const tekst = JSON.stringify(ex)
+    if (tekst.length < 6000) return JSON.parse(tekst)
+  } catch { /* niet te bewaren: dan alleen de kern */ }
+  return { name: ex.name, sets: ex.sets, reps: ex.reps }
+}
+
+export const startRustKlok = ({ oefening, sec, bron = 'standaard', exercise = null }) => { ontgrendelGeluid(); if (isTimerGeluidAan()) vraagRustMeldingToestemming(); zet({
+  oefening, bron, oef: kleineOefening(exercise), totaal: sec, eind: Date.now() + sec * 1000,
   pauzeOver: null, aangepast: false, klaar: false, gestart: Date.now(),
 }) }
 

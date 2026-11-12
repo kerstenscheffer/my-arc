@@ -4,6 +4,7 @@ import { oefeningInfo, laatsteFeedback } from '../../../utils/oefeningBatch'
 import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Trash2 } from 'lucide-react'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
+import { OPEN_OEFENING } from '../rustKlok'
 import ClientFeedbackModal from './ClientFeedbackModal'
 import BladModal from './BladModal'
 import ExerciseService from '../../../../../services/ExerciseService'
@@ -26,6 +27,17 @@ export default function ExerciseCard({
     setShowLogModal(true)
     onGeopend?.()
   }, [openNu]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Tik op de zwevende rustklok: de kaart van die oefening opent zijn log.
+  const eigenNaam = String(localExercise?.name || '').toLowerCase()
+  useEffect(() => {
+    const open = (e) => {
+      if (!e.detail || e.detail.opgepakt || e.detail.naam !== eigenNaam) return
+      e.detail.opgepakt = true
+      setShowLogModal(true)
+    }
+    window.addEventListener(OPEN_OEFENING, open)
+    return () => window.removeEventListener(OPEN_OEFENING, open)
+  }, [eigenNaam])
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [imageUrls, setImageUrls] = useState(() => [...fotoKandidaten(exercise), getFallbackImage(exercise)])
   const [loadingImage, setLoadingImage] = useState(true)

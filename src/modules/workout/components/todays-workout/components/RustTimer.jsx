@@ -136,30 +136,31 @@ export default function RustTimer({ huidigeOefening, onStop, isMobile }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: isMobile ? 5 : 8, flexShrink: 0 }}>
-          <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)} isMobile={isMobile}><Minus size={15} /></RondeKnop>
-          <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)} isMobile={isMobile}><Plus size={15} /></RondeKnop>
+        {/* Zonder vakjes (12 nov 2026, Kersten: strakker). De groep vult wat er
+            tussen de klok en Volgende over is en de knoppen delen dat gelijk:
+            met de bel erbij liep de rij op een iPhone rechts het scherm uit. */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', maxWidth: isMobile ? 220 : 260 }}>
+          <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)} isMobile={isMobile}><Minus size={18} /></RondeKnop>
+          <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)} isMobile={isMobile}><Plus size={18} /></RondeKnop>
           <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={wisselPauzeRustKlok} isMobile={isMobile}>
-            {loopt ? <Pause size={15} /> : <Play size={15} />}
+            {loopt ? <Pause size={18} /> : <Play size={18} />}
           </RondeKnop>
-          <RondeKnop titel="Opnieuw" onClick={herstartRustKlok} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
+          <RondeKnop titel="Opnieuw" onClick={herstartRustKlok} isMobile={isMobile}><RotateCcw size={17} /></RondeKnop>
           <RondeKnop
             titel={geluidAan ? 'Geluid uitschakelen' : 'Geluid inschakelen'}
             onClick={() => { const nieuw = !geluidAan; zetTimerGeluid(nieuw); setGeluidAan(nieuw) }}
             isMobile={isMobile}
           >
-            {geluidAan ? <Bell size={14} /> : <BellOff size={14} />}
+            {geluidAan ? <Bell size={17} /> : <BellOff size={17} />}
           </RondeKnop>
         </div>
-
-        <div style={{ flex: 1, minWidth: 0 }} />
 
         {/* Doorgaan kan altijd — een timer die je vasthoudt is een timer die
             je de volgende keer niet meer aanzet. */}
         <button
           onClick={onStop}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6,
+            display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
             height: isMobile ? 40 : 44, padding: isMobile ? '0 0.7rem' : '0 1.1rem',
             background: '#fff', border: '1px solid #fff', borderRadius: 12,
             color: '#0a0a0a',
@@ -181,10 +182,10 @@ function RondeKnop({ children, onClick, titel, isMobile }) {
     <button
       onClick={onClick} title={titel} aria-label={titel}
       style={{
-        width: isMobile ? 34 : 40, height: isMobile ? 34 : 40, flexShrink: 0,
+        flex: '1 1 0', minWidth: 24, maxWidth: 44, height: isMobile ? 40 : 44, padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 11, color: 'rgba(255,255,255,0.75)', cursor: 'pointer',
+        background: 'transparent', border: 'none',
+        color: 'rgba(255,255,255,0.85)', cursor: 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
