@@ -70,9 +70,14 @@ function CallRegel({ dc, onOutcome }) {
   // Een lead die "denkt erover na" heeft de call al gevoerd; die stap slaan we
   // over. Een call die nog moet komen begint dicht: je wilt hem zien staan,
   // niet per ongeluk afhandelen.
-  const [open, setOpen] = useState(!dc.toekomstig)
-  const [stap, setStap] = useState(dc.denktNa ? 'gevoerd' : 1)
-  const [verzetten, setVerzetten] = useState(false)
+  // Overig (nog geen datum, of al gevoerd/niet gevoerd zonder vervolg) begint
+  // ook dicht, en opent op de stap waar hij is blijven steken.
+  const [open, setOpen] = useState(!dc.toekomstig && !dc.overig)
+  const [stap, setStap] = useState(
+    dc.denktNa || dc.status === 'gevoerd' ? 'gevoerd'
+      : dc.status === 'nietGevoerd' || dc.status === 'geenDatum' ? 'niet' : 1)
+  // Zonder datum is inplannen de eerste vraag; de andere keuzes staan onder Terug.
+  const [verzetten, setVerzetten] = useState(dc.status === 'geenDatum')
   const [afgezegd, setAfgezegd] = useState(false)
   const [denkt, setDenkt] = useState(false)
   // Sale: het bedrag hoort bij dezelfde handeling, dus vragen we het hier en
@@ -105,7 +110,10 @@ function CallRegel({ dc, onOutcome }) {
             {dc.leadName || 'Lead'}
           </div>
           <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-            {dc.toekomstig ? 'Staat op' : 'Call was'} {datumTekst(dc)}
+            {dc.status === 'geenDatum' ? 'Nog geen datum gepland'
+              : dc.status === 'gevoerd' ? `Gevoerd op ${datumTekst(dc)} · nog geen uitkomst`
+              : dc.status === 'nietGevoerd' ? `Niet gevoerd op ${datumTekst(dc)} · nog geen vervolg`
+              : `${dc.toekomstig ? 'Staat op' : 'Call was'} ${datumTekst(dc)}`}
             {dc.denktNa && (
               <span style={{ color: '#eab308' }}>
                 {' · denkt na'}{dc.followupDate ? ` tot ${new Date(dc.followupDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
@@ -194,7 +202,25 @@ function CallRegel({ dc, onOutcome }) {
           <button style={knop('#06b6d4')} onClick={() => onOutcome(dc, 'reschedule', { callDate: datum || null, callTime: tijd || null })}>
             <CalendarClock size={13} strokeWidth={3} /> Inplannen
           </button>
+          {dc.overig && (
+            <button style={{ ...knop('rgba(255,255,255,0.45)'), flex: 0, minWidth: 64 }} onClick={() => setVerzetten(false)}>Terug</button>
+          )}
         </div>
+      )}
+
+      {/* Overig begint op de stap waar hij bleef steken; hiermee kun je alsnog
+          naar de andere kant (wel / niet gevoerd) als dat niet klopt. */}
+      {open && dc.overig && !sale && !verloren && !denkt && !afgezegd && (
+        <button
+          onClick={() => { setVerzetten(false); setStap(stap === 'gevoerd' ? 'niet' : 'gevoerd') }}
+          style={{
+            marginTop: 8, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.45)', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'inherit',
+            textDecoration: 'underline', textUnderlineOffset: 3,
+          }}
+        >
+          {stap === 'gevoerd' ? 'Call is niet gevoerd' : 'Call is wel gevoerd'}
+        </button>
       )}
     </div>
   )
@@ -326,8 +352,11 @@ export default function DueCallsModal({ dueCalls, wachtBetaling, mijnId, onOutco
   const modalHost = useModalHost()
   const lijst = dueCalls || []
   const betalingen = wachtBetaling || []
-  const teDoen = lijst.filter(c => !c.toekomstig)
+  const teDoen = lijst.filter(c => !c.toekomstig && !c.overig)
   const komtNog = lijst.filter(c => c.toekomstig)
+  // Iedereen die verder nog in Sales Call staat: zonder datum, of al gevoerd /
+  // niet gevoerd maar nooit afgerond.
+  const overig = lijst.filter(c => c.overig)
   // Begin op het tabblad waar werk ligt: staan er geen calls open maar wel
   // betalingen, dan is dat het scherm dat je wilde zien.
   const [tab, setTab] = useState(teDoen.length === 0 && betalingen.length > 0 ? 'betaling' : 'calls')
@@ -358,7 +387,7 @@ export default function DueCallsModal({ dueCalls, wachtBetaling, mijnId, onOutco
             </div>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
               {tab === 'calls'
-                ? `${teDoen.length} af te handelen · ${komtNog.length} komt nog`
+                ? `${teDoen.length} af te handelen · ${komtNog.length} komt nog${overig.length ? ` · ${overig.length} nog open` : ''}`
                 : `${betalingen.length} ${betalingen.length === 1 ? 'close wacht' : 'closes wachten'} op geld`}
             </div>
           </div>
@@ -435,13 +464,19 @@ export default function DueCallsModal({ dueCalls, wachtBetaling, mijnId, onOutco
               {teDoen.length > 0 && (
                 <>
                   <Kop tekst="Af te handelen" aantal={teDoen.length} />
-                  {teDoen.map(dc => <CallRegel key={dc.movementId} dc={dc} onOutcome={onOutcome} />)}
+                  {teDoen.map(dc => <CallRegel key={dc.leadId} dc={dc} onOutcome={onOutcome} />)}
                 </>
               )}
               {komtNog.length > 0 && (
                 <>
                   <Kop tekst="Komt nog" aantal={komtNog.length} />
-                  {komtNog.map(dc => <CallRegel key={dc.movementId} dc={dc} onOutcome={onOutcome} />)}
+                  {komtNog.map(dc => <CallRegel key={dc.leadId} dc={dc} onOutcome={onOutcome} />)}
+                </>
+              )}
+              {overig.length > 0 && (
+                <>
+                  <Kop tekst="Ook in Sales Call" aantal={overig.length} />
+                  {overig.map(dc => <CallRegel key={dc.leadId} dc={dc} onOutcome={onOutcome} />)}
                 </>
               )}
             </>

@@ -1539,7 +1539,13 @@ export default function KanbanBoard({
       // true = ook de leads die nog nadenken en wiens datum nog niet bereikt
       // is. Bij het handmatig openen wil je élke openstaande call kunnen
       // afronden; bij het automatisch openen alleen wat vandaag speelt.
-      setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds, true) : [])
+      const calls = schedIds.length ? await leadService.getDueScheduledCalls(schedIds, true) : []
+      // De overige leads uit Sales Call: alleen wie ook op het bord staat (het
+      // bord kan vrouwen verbergen), met de naam zoals de kaart hem toont.
+      const opBord = new Map(sections.filter(s => schedIds.includes(s.id)).flatMap(s => (s.leads || []).map(l => [l.id, l])))
+      setDueCalls(calls
+        .filter(c => !c.overig || opBord.has(c.leadId))
+        .map(c => (c.overig && !c.leadName ? { ...c, leadName: leadFullName(opBord.get(c.leadId)) } : c)))
       setWachtBetaling(await leadService.getAwaitingPayment(coachId))
     } catch (e) { console.warn('due calls open failed:', e?.message) }
     setShowDueCalls(true)
@@ -1558,13 +1564,14 @@ export default function KanbanBoard({
   // Geeft true als het goed ging.
   const meldMislukt = (res, dc) => {
     if (res?.success) return true
-    setDueCalls(prev => (prev.some(d => d.movementId === dc.movementId) ? prev : [...prev, dc]))
+    setDueCalls(prev => (prev.some(d => d.leadId === dc.leadId) ? prev : [...prev, dc]))
     alert(res?.error || 'Opslaan mislukt')
     return false
   }
 
   const handleDueCallOutcome = async (dc, kind, extra = {}) => {
-    setDueCalls(prev => prev.filter(d => d.movementId !== dc.movementId))
+    // Op lead, niet op movement: een lead zonder call-rij heeft geen movementId.
+    setDueCalls(prev => prev.filter(d => d.leadId !== dc.leadId))
     const lead = (sections.find(s => s.id === dc.sectionId)?.leads || []).find(l => l.id === dc.leadId)
       || { id: dc.leadId, first_name: dc.leadName || '' }
     try {
@@ -1579,7 +1586,7 @@ export default function KanbanBoard({
       if (kind === 'afgezegd') {
         // Lead heeft de call afgezegd → call annuleren (telt niet als no-show)
         // en terug naar "Call voorgesteld" zodat je 'm opnieuw kunt inplannen.
-        const resAfg = await leadService.cancelScheduledCall(dc.movementId, extra.reason || null)
+        const resAfg = dc.movementId ? await leadService.cancelScheduledCall(dc.movementId, extra.reason || null) : { success: true }
         if (!meldMislukt(resAfg, dc)) return
         const proposed = sections.find(s => s.id !== 'unassigned' && /voorgesteld|voorstel/i.test(s.title || ''))
         if (proposed) await handleMoveLeadToSection(lead, dc.sectionId, proposed.id)
@@ -1595,7 +1602,8 @@ export default function KanbanBoard({
         return
       }
       const happened = (kind === 'sale' || kind === 'saleLost')
-      const resUitkomst = await leadService.resolveScheduledCall(dc.movementId, happened)
+      // Geen call-rij (lead zonder datum in Sales Call gezet): niets te markeren, alleen verplaatsen.
+      const resUitkomst = dc.movementId ? await leadService.resolveScheduledCall(dc.movementId, happened) : { success: true }
       if (!meldMislukt(resUitkomst, dc)) return
       let target = null
       if (kind === 'sale') target = sections.find(s => s.id !== 'unassigned' && isSaleSectionTitle(s.title))
@@ -2096,14 +2104,14 @@ export default function KanbanBoard({
                 position: 'relative',
                 width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: 'none',
-                color: dueCalls.some(c => !c.toekomstig) ? '#FFD700' : 'rgba(255,255,255,0.65)',
+                color: dueCalls.some(c => !c.toekomstig && !c.overig) ? '#FFD700' : 'rgba(255,255,255,0.65)',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Phone size={16} />
               {/* De badge telt alleen wat om actie vraagt; de calls die nog
                   moeten komen staan wel in de lijst maar zijn geen alarm. */}
-              {dueCalls.filter(c => !c.toekomstig).length > 0 && (
+              {dueCalls.filter(c => !c.toekomstig && !c.overig).length > 0 && (
                 <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, background: '#ef4444', color: '#fff', borderRadius: 7, padding: '0 3px', fontSize: '0.52rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.filter(c => !c.toekomstig).length}</span>
               )}
             </button>

@@ -1192,6 +1192,41 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         if (a.toekomstig !== b.toekomstig) return a.toekomstig ? 1 : -1
         return `${a.callDate}${a.callTime || ''}`.localeCompare(`${b.callDate}${b.callTime || ''}`)
       })
+
+      // Handmatig geopend: óók elke andere lead die nu in Sales Call staat
+      // (12 nov 2026, Kersten). Zonder dit waren twee soorten onvindbaar:
+      // een lead zonder datum, en een call die al op gevoerd/niet gevoerd
+      // staat maar nooit een vervolg kreeg (nog steeds in de sectie). Ze komen
+      // als `overig` achteraan en tellen niet mee in het rode bolletje.
+      if (toonToekomstig) {
+        const { data: inSectie } = await this.db.supabase
+          .from('lead_section_items').select('lead_id, section_id').in('section_id', scheduledSectionIds)
+        const al = new Set(due.map(d => d.leadId))
+        const rest = (inSectie || []).filter(it => it.lead_id && !al.has(it.lead_id))
+        if (rest.length) {
+          const { data: restMovs } = await this.db.supabase
+            .from('lead_movements')
+            .select('id, lead_id, lead_name, to_section_id, to_section_title, call_date, call_time, moved_at, call_happened, outcome_type')
+            .in('lead_id', rest.map(r => r.lead_id))
+            .in('to_section_id', scheduledSectionIds)
+            .is('reverted_at', null)
+            .order('moved_at', { ascending: false })
+          const laatste = new Map()
+          for (const mv of restMovs || []) { if (!laatste.has(mv.lead_id)) laatste.set(mv.lead_id, mv) }
+          for (const it of rest) {
+            const mv = laatste.get(it.lead_id) || null
+            due.push({
+              movementId: mv?.id || null, leadId: it.lead_id, leadName: mv?.lead_name || null,
+              sectionId: it.section_id, sectionTitle: mv?.to_section_title || null,
+              callDate: mv?.call_date || null, callTime: mv?.call_time || null,
+              denktNa: false, followupDate: null, toekomstig: false,
+              overig: true,
+              // geenDatum | gevoerd | nietGevoerd | open
+              status: !mv?.call_date ? 'geenDatum' : mv.call_happened === true ? 'gevoerd' : mv.call_happened === false ? 'nietGevoerd' : 'open',
+            })
+          }
+        }
+      }
       return due
     } catch (e) {
       console.error('getDueScheduledCalls failed:', e)
