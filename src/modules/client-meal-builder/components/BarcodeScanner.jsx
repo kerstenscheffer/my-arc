@@ -10,6 +10,20 @@ import {
 import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine, Image as ImageIcon } from 'lucide-react'
 import { leesBarcodeUitFoto } from './leesBarcodeUitFoto'
 import { colors, radius, space, type, border } from '../../../ui/tokens'
+import { Capacitor, registerPlugin } from '@capacitor/core'
+
+// De scanner van de telefoon zelf, alleen in de iPhone-app (12 nov 2026).
+// Via de webweergave vroeg iOS bij elke scan opnieuw om de camera; de native
+// scanner vraagt het één keer per installatie. Rechtstreeks geregistreerd en
+// niet via het pakket @capacitor/barcode-scanner geïmporteerd: dat sleept een
+// web-scanner mee de bundel in die we niet gebruiken. Oudere app-versies
+// hebben de plugin niet en houden de camera-in-de-pagina hieronder.
+const AppScanner = registerPlugin('CapacitorBarcodeScanner')
+const heeftAppScanner = () => {
+  try {
+    return Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('CapacitorBarcodeScanner')
+  } catch { return false }
+}
 
 const G = {
   primary: '#FFD700',
@@ -35,6 +49,7 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const nativeRef = useRef(null)
   const readerRef = useRef(null)
   const timeoutRef = useRef(null)
+  const appBezigRef = useRef(false)
 
   const [scanning, setScanning] = useState(false)
   const [manualMode, setManualMode] = useState(false)
@@ -118,8 +133,34 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
     }
   }
 
+  // true = de app-scanner heeft het afgehandeld (ook bij annuleren).
+  const startAppScanner = async () => {
+    if (!heeftAppScanner()) return false
+    if (appBezigRef.current) return true
+    appBezigRef.current = true
+    try {
+      const uit = await AppScanner.scanBarcode({
+        hint: 17, // alle soorten; Apple leest EAN en UPC hoe dan ook samen
+        scanInstructions: 'Richt op de barcode', scanButton: false, scanText: ' ',
+        cameraDirection: 1, scanOrientation: 1,
+        cancelButtonAccessibilityLabel: 'Sluiten',
+      })
+      const code = String(uit?.ScanResult || '').trim()
+      if (code) { handleScanSuccess(code); return true }
+    } catch (e) {
+      console.warn('app-scanner gestopt:', e?.message)
+    } finally {
+      appBezigRef.current = false
+    }
+    // Geannuleerd of geen camera: handmatig invoeren, met de weg terug naar
+    // scannen en zoeken die daar al staat.
+    setManualMode(true)
+    return true
+  }
+
   const startScanning = async () => {
     try {
+      if (await startAppScanner()) return
       setStatus('scanning')
 
       // Eerst de ingebouwde lezer proberen; die is niet kieskeurig over de
