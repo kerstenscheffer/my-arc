@@ -34,7 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus } from 'lucide-react'
+import { X, Minus, Maximize2, Minimize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -94,7 +94,7 @@ const KOPKNOP = { ...KNOP, width: 24, height: 24, borderRadius: 6 }
 
 export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const modalHost = useModalHost()
-  const { ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat } =
+  const { ingeklapt, setIngeklapt, volledig, wisselVolledig, vensterStijl, sleepHandvat, formaatHandvat } =
     useZwevendVenster({ isMobile, standaard: { w: 900, h: 660 } })
   const [taken, setTaken] = useState(null)
   const [secties, setSecties] = useState({})
@@ -515,9 +515,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     <div style={{
       ...vensterStijl,
       background: '#0a0a0a',
-      border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
-      borderRadius: isMobile ? 0 : 16,
-      boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
+      // Volledig scherm = echt het hele scherm: geen rand, geen ronde hoeken.
+      border: isMobile || volledig ? 'none' : '1px solid rgba(255,255,255,0.1)',
+      borderRadius: isMobile || volledig ? 0 : 16,
+      boxShadow: isMobile || volledig ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
     }}>
       <style>{'@keyframes prio-puls { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }'}</style>
       <div {...sleepHandvat} style={{
@@ -548,8 +549,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           </button>
         )}
         {!isMobile && (
-          <button type="button" onClick={herstel} aria-label="Terug naar het midden" title="Terug naar het midden" style={KOPKNOP}>
-            <Maximize2 size={15} strokeWidth={2.8} />
+          // Deze knop zette het venster alleen terug naar het midden; het
+          // pijltjes-icoon belooft volledig scherm, dus dat doet hij nu.
+          <button type="button" onClick={wisselVolledig} aria-label={volledig ? 'Terug naar venster' : 'Volledig scherm'} title={volledig ? 'Terug naar venster' : 'Volledig scherm'} style={KOPKNOP}>
+            {volledig ? <Minimize2 size={15} strokeWidth={2.8} /> : <Maximize2 size={15} strokeWidth={2.8} />}
           </button>
         )}
         <button type="button" onClick={onClose} aria-label="Sluiten" title="Sluiten" style={KOPKNOP}>
