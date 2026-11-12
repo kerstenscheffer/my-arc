@@ -1414,7 +1414,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, onPrioriteiten, beperkt = false, macPlek = null, zwevend = false }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onPrioriteiten, beperkt = false, macPlek = null, zwevend = false }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2749,11 +2749,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         position: 'absolute', right: 0, bottom: 'calc(100% + 8px)', zIndex: 41, minWidth: 230, padding: 6,
                         background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,.6)',
                       }}>
-                        <button onClick={() => { setMenu(false); kiezer.current?.click() }} style={menuRegel}>
-                          <ImagePlus size={15} /> <span style={{ flex: 1 }}>Foto of screenshot</span>
-                        </button>
-                        <button onClick={() => { setMenu(false); bestandKiezer.current?.click() }} title="pdf, csv, Excel, txt, foto; max 20 MB" style={menuRegel}>
-                          <Paperclip size={15} /> <span style={{ flex: 1 }}>Bestand bijvoegen</span>
+                        {/* Menu opgeschoond (12 nov 2026, Kersten): foto en bestand zijn één
+                            regel; Inklappen naar zijkant, Eerdere gesprekken, Notities en
+                            Altijd toegestaan staan er niet meer in. */}
+                        <button onClick={() => { setMenu(false); bestandKiezer.current?.click() }} title="Foto, screenshot, pdf, csv, Excel of txt; max 20 MB" style={menuRegel}>
+                          <Paperclip size={15} /> <span style={{ flex: 1 }}>Foto of bestand</span>
                         </button>
                         {/* Kijk mee stond als losse knop in de balk (12 nov 2026 weggehaald,
                             Kersten); de functie blijft hier bereikbaar. */}
@@ -2773,28 +2773,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                             {klein.aan ? <Maximize2 size={15} /> : <Minimize2 size={15} />} <span style={{ flex: 1 }}>{klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}</span>
                           </button>
                         )}
-                        {/* In het kleine blokje zit hiervoor een pijltje op de linkerrand. */}
-                        {klein && !klein.aan && (
-                          <button onClick={() => { setMenu(false); klein.inklappen() }} style={menuRegel}>
-                            <PanelRightClose size={15} /> <span style={{ flex: 1 }}>Inklappen naar zijkant</span>
-                          </button>
-                        )}
-                        <button onClick={() => { setMenu(false); setToonEerder(true) }} style={menuRegel}>
-                          <History size={15} /> <span style={{ flex: 1 }}>Eerdere gesprekken</span>
-                        </button>
                         {gesprek.length > 0 && (
                           <button onClick={() => { setMenu(false); leegGesprek() }} style={menuRegel}>
                             <SquarePen size={15} /> <span style={{ flex: 1 }}>Nieuw gesprek</span>
                           </button>
                         )}
-                        {onNotities && (
-                          <button onClick={() => { setMenu(false); onNotities() }} style={menuRegel}>
-                            <StickyNote size={15} /> <span style={{ flex: 1 }}>Notities</span>
-                          </button>
-                        )}
-                        <button onClick={() => { setMenu(false); setToonRegels(true) }} style={menuRegel}>
-                          <ShieldCheck size={15} /> <span style={{ flex: 1 }}>Altijd toegestaan</span>
-                        </button>
                         {stem.beschikbaar() && (
                           <>
                             <button role="switch" aria-checked={allesVoorlezen} onClick={() => stem.zetAlles(!allesVoorlezen)} style={menuRegel}>
