@@ -19,11 +19,20 @@
 //   → Uitgepland (kwadrant 'uit', 11 nov): uit de vakken gehaald, blijft
 //     actief maar staat in een eigen kolom. Ook via "Uitplannen" op de kaart.
 // Kaart aantikken: titel bewerken en afvinken.
+//
+// 12 nov 2026:
+//   - Rondje vooraan = direct afvinken.
+//   - Gino en Weg krimpen tot hun kop zolang ze leeg zijn (groeien bij slepen).
+//   - Nu doen: meer dan NU_MAX taken = kop rood "te vol".
+//   - Inplannen gegroepeerd: Deze week (incl. te laat) / Later / Zonder datum.
+//   - Weg toont wat de laatste 7 dagen gearchiveerd is, met Terug.
+//   - Gino-taken tonen de laatste regel "Gino (dd-mm-jjjj): …" uit
+//     description (todocheck), anders "Wacht op Gino".
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, GripVertical, Grid2x2, Check } from 'lucide-react'
+import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -42,7 +51,15 @@ const VAKKEN = [
   { id: 'weg', titel: 'Weg', kleur: '#151619', rand: '#d1d5db' },
 ]
 
-const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, created_at'
+const NU_MAX = 5
+// Nu doen verdeeld over de dag (12 nov 2026), kolom productivity_tasks.dagdeel.
+const DAGDELEN = [
+  { id: 'ochtend', titel: 'Ochtend', tijd: '06–12', van: 6, tot: 12 },
+  { id: 'middag', titel: 'Middag', tijd: '12–18', van: 12, tot: 18 },
+  { id: 'avond', titel: 'Avond', tijd: '18–24', van: 18, tot: 24 },
+]
+const dagdeelNu = () => { const u = new Date().getHours(); return DAGDELEN.find(d => u >= d.van && u < d.tot)?.id || null }
+const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, created_at'
 
 const dagIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dagIso(d) }
@@ -87,6 +104,8 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const [ongedaan, setOngedaan] = useState(null)
   const [sleep, setSleep] = useState(null)
   const [uitOpen, setUitOpen] = useState(false)
+  const [wegLijst, setWegLijst] = useState([])
+  const [afgevinkt, setAfgevinkt] = useState(null)
   const sleepteNet = useRef(false)
   const ongedaanTimer = useRef(null)
 
@@ -97,17 +116,23 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       uid = data?.user?.id
     }
     if (!uid) { setFout('Niet ingelogd'); return }
-    const [t, s] = await Promise.all([
+    const week = new Date(Date.now() - 7 * 86400000).toISOString()
+    const [t, s, w] = await Promise.all([
       supabase.from('productivity_tasks').select(VELDEN).eq('coach_id', uid).eq('status', 'active')
         .order('created_at', { ascending: true })
         .then(r => r, e => ({ data: null, error: e })),
       supabase.from('productivity_sections').select('id, title').eq('coach_id', uid)
+        .then(r => r, e => ({ data: null, error: e })),
+      supabase.from('productivity_tasks').select('id, title, updated_at').eq('coach_id', uid)
+        .eq('status', 'archived').eq('kwadrant', 'weg').gte('updated_at', week)
+        .order('updated_at', { ascending: false }).limit(50)
         .then(r => r, e => ({ data: null, error: e })),
     ])
     if (t.error) { setFout('Laden mislukt'); console.error('Matrix laden:', t.error); return }
     setFout(null)
     setTaken((t.data || []).filter(x => !x.recurrence_active && (!x.scheduled_start_time || isBelofte(x))))
     setSecties(Object.fromEntries((s.data || []).map(x => [x.id, x.title])))
+    setWegLijst(w.data || [])
   }, [coachId])
 
   useEffect(() => { laad() }, [laad])
@@ -123,7 +148,14 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     return !error
   }
 
-  const verplaats = async (t, naar) => {
+  // naar = 'doen' | 'doen:ochtend' | 'plannen' | …
+  const verplaats = async (t, doelId) => {
+    const [naar, deel] = String(doelId).split(':')
+    if (naar === 'doen') {
+      if (t.kwadrant === 'doen' && (!deel || deel === t.dagdeel)) return
+      await schrijf(t.id, { kwadrant: 'doen', dagdeel: deel || (t.kwadrant === 'doen' ? t.dagdeel : null) || null })
+      return
+    }
     if (t.kwadrant && t.kwadrant === naar) return
     if (naar === 'weg') {
       const vorig = { kwadrant: t.kwadrant || null }
@@ -133,6 +165,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         .update({ kwadrant: 'weg', status: 'archived', updated_at: new Date().toISOString() }).eq('id', t.id)
         .then(r => r, e => ({ error: e }))
       if (error) { console.error('Matrix archiveren:', error); setFout('Opslaan mislukt'); laad(); return }
+      setWegLijst(l => [{ id: t.id, title: t.title, updated_at: new Date().toISOString() }, ...l.filter(x => x.id !== t.id)])
       clearTimeout(ongedaanTimer.current)
       setOngedaan({ taak: t, vorig })
       ongedaanTimer.current = setTimeout(() => setOngedaan(null), 5000)
@@ -143,10 +176,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       const regel = `Gino: gedelegeerd (${d})`
       const oud = (t.description || '').trimEnd()
       const description = oud.includes(regel) ? oud : [oud, regel].filter(Boolean).join('\n')
-      await schrijf(t.id, { kwadrant: 'gino', description })
+      await schrijf(t.id, { kwadrant: 'gino', dagdeel: null, description })
       return
     }
-    const ok = await schrijf(t.id, { kwadrant: naar })
+    const ok = await schrijf(t.id, { kwadrant: naar, dagdeel: null })
     if (ok && naar === 'plannen') setDatumVoor(t.id)
   }
 
@@ -159,10 +192,25 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       .update({ ...vorig, status: 'active', updated_at: new Date().toISOString() }).eq('id', taak.id)
       .then(r => r, e => ({ error: e }))
     if (error) { console.error('Matrix ongedaan:', error); setFout('Ongedaan maken mislukt') }
+    setWegLijst(l => l.filter(x => x.id !== taak.id))
+    laad()
+  }
+
+  // Uit Weg terughalen: weer actief, zonder vak (krijgt zijn voorlopige plek).
+  const haalTerug = async (w) => {
+    setWegLijst(l => l.filter(x => x.id !== w.id))
+    const { error } = await supabase.from('productivity_tasks')
+      .update({ kwadrant: null, status: 'active', updated_at: new Date().toISOString() }).eq('id', w.id)
+      .then(r => r, e => ({ error: e }))
+    if (error) { console.error('Matrix terughalen:', error); setFout('Terughalen mislukt') }
     laad()
   }
 
   const vinkAf = async (t) => {
+    // Even het vinkje laten zien, dan pas weg uit de lijst.
+    setAfgevinkt(t.id)
+    await new Promise(r => setTimeout(r, 350))
+    setAfgevinkt(null)
     setTaken(l => (l || []).filter(x => x.id !== t.id))
     setOpen(null)
     const { error } = await supabase.from('productivity_tasks')
@@ -179,24 +227,36 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
 
   // Slepen: pas na 6 px beweging, zodat een tik een tik blijft.
   const vakOnder = (x, y) => document.elementFromPoint(x, y)?.closest?.('[data-kwadrant]')?.getAttribute('data-kwadrant') || null
+  // Hele kaart sleepbaar (12 nov 2026). Muis: na 6 px beweging. Touch: kaart
+  // 300 ms vasthouden, dan slepen; eerder bewegen = gewoon scrollen.
   const startSleep = (e, t) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
-    if (e.target.closest('button, input')) return
-    if (e.pointerType !== 'mouse' && !e.target.closest('[data-greep]')) return
+    if (e.target.closest('button, input, label')) return
+    const touch = e.pointerType !== 'mouse'
     const r = e.currentTarget.getBoundingClientRect()
     const sx = e.clientX, sy = e.clientY
     let actief = false
+    let vast = !touch
+    const houdTimer = touch ? setTimeout(() => { vast = true; navigator.vibrate?.(10) }, 300) : null
+    const blokScroll = (ev) => { if (vast) ev.preventDefault() }
     const beweeg = (ev) => {
-      if (!actief && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return
+      const afstand = Math.hypot(ev.clientX - sx, ev.clientY - sy)
+      if (!vast) { if (afstand > 8) opruimen(); return }
+      if (!actief && afstand < 6) return
       actief = true
       sleepteNet.current = true
       ev.preventDefault()
       setSleep({ taak: t, x: ev.clientX - (sx - r.left), y: ev.clientY - (sy - r.top), w: r.width, over: vakOnder(ev.clientX, ev.clientY) })
     }
-    const klaar = (ev) => {
+    const opruimen = () => {
+      clearTimeout(houdTimer)
       window.removeEventListener('pointermove', beweeg)
       window.removeEventListener('pointerup', klaar)
       window.removeEventListener('pointercancel', klaar)
+      window.removeEventListener('touchmove', blokScroll)
+    }
+    const klaar = (ev) => {
+      opruimen()
       if (!actief) return
       const vak = ev.type === 'pointerup' ? vakOnder(ev.clientX, ev.clientY) : null
       setSleep(null)
@@ -206,6 +266,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     window.addEventListener('pointermove', beweeg, { passive: false })
     window.addEventListener('pointerup', klaar)
     window.addEventListener('pointercancel', klaar)
+    if (touch) window.addEventListener('touchmove', blokScroll, { passive: false })
   }
 
   const labelVan = (t) => {
@@ -220,6 +281,16 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
 
   const vandaag = plusDagen(0)
 
+  // Laatste "Gino (dd-mm-jjjj): …"-regel uit description.
+  const ginoStand = (t) => {
+    const regels = String(t.description || '').split('\n').map(r => r.trim())
+      .filter(r => /^Gino \(\d{2}-\d{2}-\d{4}\):/.test(r))
+    if (!regels.length) return null
+    const r = regels[regels.length - 1]
+    const m = /^Gino \((\d{2})-(\d{2})-\d{4}\):\s*(.*)$/.exec(r)
+    return m ? { dag: `${Number(m[1])}/${Number(m[2])}`, tekst: m[3] } : null
+  }
+
   const kaart = (t) => {
     const isOpen = open === t.id
     const label = labelVan(t)
@@ -232,16 +303,24 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           if (sleepteNet.current || isOpen) return
           setOpen(t.id); setTitelEdit(t.title || '')
         }}
+        onContextMenu={e => e.preventDefault()}
         style={{
-          display: 'flex', gap: 4, alignItems: 'flex-start',
-          padding: '4px 8px 4px 0',
-          borderBottom: '1px solid rgba(255,255,255,0.12)',
-          opacity: sleep?.taak.id === t.id ? 0.3 : 1,
+          display: 'flex', gap: 8, alignItems: 'flex-start',
+          padding: '8px 8px 8px 10px', marginBottom: 6,
+          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12,
+          WebkitTouchCallout: 'none',
+          opacity: sleep?.taak.id === t.id ? 0.3 : afgevinkt === t.id ? 0.5 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
         }}>
-        <span data-greep="" aria-hidden style={{ flexShrink: 0, display: 'flex', alignItems: 'center', alignSelf: 'stretch', padding: '0 2px', color: 'rgba(255,255,255,0.35)', touchAction: 'none', cursor: 'grab' }}>
-          <GripVertical size={14} />
-        </span>
+        {!isOpen && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); vinkAf(t) }} aria-label="Afvinken" title="Afvinken" style={{
+            ...KNOP, width: 18, height: 18, marginTop: 1, borderRadius: '50%',
+            border: `1.8px solid ${afgevinkt === t.id ? GROEN : 'rgba(255,255,255,0.55)'}`,
+            background: afgevinkt === t.id ? GROEN : 'transparent', color: '#000',
+          }}>
+            {afgevinkt === t.id && <Check size={11} strokeWidth={3.5} />}
+          </button>
+        )}
         {isOpen ? (
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }} onClick={e => e.stopPropagation()}>
             <input autoFocus value={titelEdit} onChange={e => setTitelEdit(e.target.value)}
@@ -266,13 +345,28 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             <div title={t.kwadrant ? undefined : 'Voorlopige plek: sleep om vast te zetten'} style={{ fontSize: '0.8rem', fontWeight: 800, color: t.kwadrant ? WIT : 'rgba(255,255,255,0.72)', lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {t.title}
             </div>
-            {(label || d) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1 }}>
-                {label && <span style={{ flex: 1, minWidth: 0, fontSize: '0.66rem', fontWeight: 800, color: ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>}
-                {d && <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: '0.66rem', fontWeight: 900, color: dKleur, fontVariantNumeric: 'tabular-nums' }}>{kortDatum(d)}</span>}
-              </div>
+            {kwadrantVan(t) === 'gino' && (() => {
+              const g = ginoStand(t)
+              return (
+                <div title={g?.tekst} style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 800, color: g ? '#86efac' : ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {g ? `Gino ${g.dag}: ${g.tekst}` : 'Wacht op Gino (dagelijks na 13:00)'}
+                </div>
+              )
+            })()}
+            {label && (
+              <div style={{ marginTop: 2, fontSize: '0.66rem', fontWeight: 800, color: ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
             )}
           </div>
+        )}
+        {!isOpen && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); setDatumVoor(t.id) }} title="Datum kiezen" aria-label="Datum kiezen" style={{
+            ...KNOP, gap: 4, height: 22, padding: d ? '0 7px' : 0, width: d ? 'auto' : 22, borderRadius: 999,
+            background: d ? 'rgba(255,255,255,0.08)' : 'transparent', color: d ? dKleur : 'rgba(255,255,255,0.55)',
+            fontSize: '0.68rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+          }}>
+            <CalendarDays size={13} strokeWidth={2.6} />
+            {d && kortDatum(d)}
+          </button>
         )}
       </div>
     )
@@ -327,30 +421,91 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         </button>
       </div>
 
-      {!ingeklapt && (
-        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 0, padding: 0, overflow: 'hidden', borderRadius: isMobile ? 0 : '0 0 16px 16px' }}>
-          {VAKKEN.map(v => {
-            const lijst = perVak(v.id)
-            const doel = sleep && sleep.over === v.id
-            return (
-              <div key={v.id} data-kwadrant={v.id} style={{
-                minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-                background: v.kleur,
-                outline: doel ? `2px solid ${v.rand}` : '2px solid transparent', outlineOffset: -2,
-                transition: 'outline-color 0.1s',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 12px 3px', flexShrink: 0 }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{v.titel}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
+      {!ingeklapt && (() => {
+        const onderLeeg = !sleep && perVak('gino').length === 0 && perVak('weg').length === 0 && wegLijst.length === 0
+        const groepKop = (tekst, n, kleur) => (
+          <div key={`kop-${tekst}`} style={{ display: 'flex', gap: 6, padding: '8px 4px 5px', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: kleur || ZACHT }}>
+            <span>{tekst}</span><span style={{ opacity: 0.7 }}>{n}</span>
+          </div>
+        )
+        const plannenInhoud = (lijst) => {
+          const grens = plusDagen(7)
+          const groepen = [
+            ['Deze week', lijst.filter(t => datumVan(t) && datumVan(t) <= grens)],
+            ['Later', lijst.filter(t => datumVan(t) && datumVan(t) > grens)],
+            ['Zonder datum', lijst.filter(t => !datumVan(t))],
+          ].filter(([, l]) => l.length)
+          return groepen.flatMap(([naam, l]) => [groepKop(naam, l.length), ...l.map(kaart)])
+        }
+        // Nu doen per dagdeel; elk dagdeel is zelf een plek om op te droppen.
+        const doenInhoud = (lijst) => {
+          const nu = dagdeelNu()
+          const rest = lijst.filter(t => !DAGDELEN.some(d => d.id === t.dagdeel))
+          return [
+            ...DAGDELEN.map(d => {
+              const l = lijst.filter(t => t.dagdeel === d.id)
+              const hier = sleep?.over === `doen:${d.id}`
+              return (
+                <div key={d.id} data-kwadrant={`doen:${d.id}`} style={{
+                  minHeight: 30, marginBottom: 4, borderRadius: 10,
+                  background: hier ? 'rgba(167,139,250,0.16)' : 'transparent',
+                  outline: hier ? '1.5px dashed #a78bfa' : 'none', outlineOffset: -1,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '6px 4px 5px', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: d.id === nu ? WIT : ZACHT }}>
+                    <span>{d.titel}</span>
+                    <span style={{ opacity: 0.7, letterSpacing: 0 }}>{d.tijd}</span>
+                    {d.id === nu && <span style={{ color: '#a78bfa' }}>· nu</span>}
+                    <span style={{ marginLeft: 'auto', opacity: 0.7 }}>{l.length || ''}</span>
+                  </div>
+                  {l.map(kaart)}
                 </div>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', padding: '0 6px 10px' }}>
-                  {lijst.map(kaart)}
+              )
+            }),
+            ...(rest.length ? [groepKop('Nog geen dagdeel', rest.length), ...rest.map(kaart)] : []),
+          ]
+        }
+        // Voorlopig in Weg (nog actief) bovenaan, daarna wat al gearchiveerd is.
+        const wegInhoud = () => [...perVak('weg').map(kaart), ...(wegLijst.length ? [groepKop('Gearchiveerd, 7 dagen', wegLijst.length)] : []), ...wegLijst.map(w => (
+          <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 4px 6px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.title}</span>
+            <button type="button" onClick={() => haalTerug(w)} style={{ ...KNOP, height: 22, padding: '0 6px', fontSize: '0.7rem', fontWeight: 900 }}>Terug</button>
+          </div>
+        ))]
+        return (
+          <div style={{
+            flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: onderLeeg ? '1fr auto' : sleep ? '1fr 1fr' : '1fr minmax(0, 0.65fr)',
+            gap: 0, padding: 0, overflow: 'hidden', borderRadius: isMobile ? 0 : '0 0 16px 16px',
+          }}>
+            {VAKKEN.map(v => {
+              const lijst = v.id === 'weg' ? [...perVak('weg'), ...wegLijst] : perVak(v.id)
+              const doel = sleep && String(sleep.over || '').split(':')[0] === v.id
+              const teVol = v.id === 'doen' && lijst.length > NU_MAX
+              return (
+                <div key={v.id} data-kwadrant={v.id} style={{
+                  minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
+                  background: v.kleur,
+                  outline: doel ? `2px solid ${v.rand}` : '2px solid transparent', outlineOffset: -2,
+                  transition: 'outline-color 0.1s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: onderLeeg && (v.id === 'gino' || v.id === 'weg') ? '7px 12px' : '7px 12px 3px', flexShrink: 0 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                      {v.titel}
+                      {teVol && <span style={{ marginLeft: 8, fontSize: '0.72rem', color: colors.danger }}>te vol, max {NU_MAX}</span>}
+                    </span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: teVol ? colors.danger : WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
+                  </div>
+                  {!(onderLeeg && (v.id === 'gino' || v.id === 'weg')) && (
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', padding: '2px 8px 10px' }}>
+                      {v.id === 'plannen' ? plannenInhoud(lijst) : v.id === 'weg' ? wegInhoud() : v.id === 'doen' ? doenInhoud(lijst) : lijst.map(kaart)}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {uitOpen && !ingeklapt && (
         <div onClick={() => setUitOpen(false)} style={{ pointerEvents: sleep ? 'none' : 'auto', opacity: sleep ? 0.35 : 1, position: 'absolute', inset: 0, top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 40px)' : 35 }}>
@@ -427,7 +582,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const spook = sleep && (
     <div style={{
       position: 'fixed', left: sleep.x, top: sleep.y, width: sleep.w, zIndex: 2147483300, pointerEvents: 'none',
-      background: '#111', border: `2px solid ${VAKKEN.find(v => v.id === sleep.over)?.rand || 'rgba(255,255,255,0.6)'}`,
+      background: '#111', border: `2px solid ${VAKKEN.find(v => v.id === String(sleep.over || '').split(':')[0])?.rand || 'rgba(255,255,255,0.6)'}`,
       borderRadius: 10, padding: '8px 12px', boxShadow: '0 16px 40px rgba(0,0,0,0.7)', transform: 'rotate(-1.5deg)',
       fontSize: '0.84rem', fontWeight: 800, color: WIT, lineHeight: 1.3, boxSizing: 'border-box',
     }}>

@@ -22,3 +22,14 @@ end $$;
 -- where table_schema = 'public' and table_name = 'productivity_tasks' and column_name = 'kwadrant';
 
 -- 11 nov 2026: 'uit' toegevoegd (live gezet met drop + add constraint).
+
+-- 12 nov 2026: dagdeel binnen "Nu doen" (live gezet).
+alter table public.productivity_tasks add column if not exists dagdeel text;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'productivity_tasks_dagdeel_check') then
+    alter table public.productivity_tasks
+      add constraint productivity_tasks_dagdeel_check
+      check (dagdeel is null or dagdeel in ('ochtend', 'middag', 'avond'));
+  end if;
+end $$;
