@@ -33,3 +33,9 @@ begin
       check (dagdeel is null or dagdeel in ('ochtend', 'middag', 'avond'));
   end if;
 end $$;
+
+-- 12 nov 2026: Gino-opdracht per taak (live gezet). Zie scripts/ginotaak.mjs.
+alter table public.productivity_tasks add column if not exists gino_opdracht text;
+alter table public.productivity_tasks add column if not exists gino_status text;   -- wacht | bezig | klaar | mislukt
+alter table public.productivity_tasks add column if not exists gino_resultaat text;
+alter table public.productivity_tasks add column if not exists gino_klaar_at timestamptz;

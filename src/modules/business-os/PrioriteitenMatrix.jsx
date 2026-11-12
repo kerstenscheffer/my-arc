@@ -23,16 +23,18 @@
 // 12 nov 2026:
 //   - Rondje vooraan = direct afvinken.
 //   - Gino en Weg krimpen tot hun kop zolang ze leeg zijn (groeien bij slepen).
-//   - Nu doen: meer dan NU_MAX taken = kop rood "te vol".
 //   - Inplannen gegroepeerd: Deze week (incl. te laat) / Later / Zonder datum.
 //   - Weg toont wat de laatste 7 dagen gearchiveerd is, met Terug.
+//   - Naar Gino slepen vraagt om een opdracht (gino_opdracht, status 'wacht').
+//     De PA (scripts/ginotaak.mjs) pakt hem binnen een minuut op en zet het
+//     resultaat in gino_resultaat. Zonder opdracht: oude gedrag hieronder.
 //   - Gino-taken tonen de laatste regel "Gino (dd-mm-jjjj): …" uit
 //     description (todocheck), anders "Wacht op Gino".
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays } from 'lucide-react'
+import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -45,13 +47,12 @@ const GROEN = colors.success
 // in de kopregel: erop slepen haalt een taak uit de vakken, aantikken opent
 // de lijst.
 const VAKKEN = [
-  { id: 'doen', titel: 'Nu doen', kleur: '#170a2e', rand: '#a78bfa' },
-  { id: 'plannen', titel: 'Inplannen', kleur: '#0a1430', rand: '#93c5fd' },
-  { id: 'gino', titel: 'Gino laten doen', kleur: '#06200f', rand: '#86efac' },
-  { id: 'weg', titel: 'Weg', kleur: '#151619', rand: '#d1d5db' },
+  { id: 'doen', titel: 'Nu doen', kleur: '#000', rand: '#a855f7' },
+  { id: 'plannen', titel: 'Inplannen', kleur: '#000', rand: '#3b82f6' },
+  { id: 'gino', titel: 'Gino laten doen', kleur: '#000', rand: '#22c55e' },
+  { id: 'weg', titel: 'Weg', kleur: '#000', rand: '#9ca3af' },
 ]
 
-const NU_MAX = 5
 // Nu doen verdeeld over de dag (12 nov 2026), kolom productivity_tasks.dagdeel.
 const DAGDELEN = [
   { id: 'ochtend', titel: 'Ochtend', tijd: '06–12', van: 6, tot: 12 },
@@ -59,7 +60,7 @@ const DAGDELEN = [
   { id: 'avond', titel: 'Avond', tijd: '18–24', van: 18, tot: 24 },
 ]
 const dagdeelNu = () => { const u = new Date().getHours(); return DAGDELEN.find(d => u >= d.van && u < d.tot)?.id || null }
-const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, created_at'
+const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, gino_opdracht, gino_status, gino_resultaat, gino_klaar_at, created_at'
 
 const dagIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dagIso(d) }
@@ -106,6 +107,18 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const [uitOpen, setUitOpen] = useState(false)
   const [wegLijst, setWegLijst] = useState([])
   const [afgevinkt, setAfgevinkt] = useState(null)
+  const [ginoVoor, setGinoVoor] = useState(null)      // taak-id waarvoor het opdracht-venster open staat
+  const [ginoTekst, setGinoTekst] = useState('')
+  // Dichtgeklapte dagdelen in Nu doen, onthouden per browser.
+  const [dichtDelen, setDichtDelen] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('prio_dicht_delen') || '[]')) } catch { return new Set() }
+  })
+  const wisselDeel = (id) => setDichtDelen(oud => {
+    const n = new Set(oud)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    try { localStorage.setItem('prio_dicht_delen', JSON.stringify([...n])) } catch { /* privé-venster */ }
+    return n
+  })
   const sleepteNet = useRef(false)
   const ongedaanTimer = useRef(null)
 
@@ -136,6 +149,13 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   }, [coachId])
 
   useEffect(() => { laad() }, [laad])
+  // Loopt er een Gino-taak, dan elke 15 s verversen tot hij klaar is.
+  const ginoLoopt = (taken || []).some(t => t.gino_status === 'wacht' || t.gino_status === 'bezig')
+  useEffect(() => {
+    if (!ginoLoopt) return undefined
+    const id = setInterval(laad, 15000)
+    return () => clearInterval(id)
+  }, [ginoLoopt, laad])
   useEffect(() => () => clearTimeout(ongedaanTimer.current), [])
 
   // Optimistisch bijwerken; bij een fout opnieuw laden.
@@ -177,10 +197,20 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       const oud = (t.description || '').trimEnd()
       const description = oud.includes(regel) ? oud : [oud, regel].filter(Boolean).join('\n')
       await schrijf(t.id, { kwadrant: 'gino', dagdeel: null, description })
+      openGino(t)
       return
     }
     const ok = await schrijf(t.id, { kwadrant: naar, dagdeel: null })
     if (ok && naar === 'plannen') setDatumVoor(t.id)
+  }
+
+  const openGino = (t) => { setGinoVoor(t.id); setGinoTekst(t.gino_opdracht || '') }
+  const geefAanGino = async () => {
+    const id = ginoVoor
+    const tekst = ginoTekst.trim()
+    setGinoVoor(null)
+    if (!id || !tekst) return
+    await schrijf(id, { kwadrant: 'gino', dagdeel: null, gino_opdracht: tekst, gino_status: 'wacht', gino_resultaat: null, gino_klaar_at: null })
   }
 
   const maakOngedaan = async () => {
@@ -293,6 +323,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
 
   const kaart = (t) => {
     const isOpen = open === t.id
+    const gloed = VAKKEN.find(v => v.id === kwadrantVan(t))?.rand || '#ffffff'
     const label = labelVan(t)
     const d = datumVan(t)
     const dKleur = d && d < vandaag ? colors.danger : d === vandaag ? GROEN : ZACHT
@@ -307,7 +338,8 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         style={{
           display: 'flex', gap: 8, alignItems: 'flex-start',
           padding: '8px 8px 8px 10px', marginBottom: 6,
-          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12,
+          background: '#050505', border: `1px solid ${gloed}80`, borderRadius: 12,
+          boxShadow: `0 0 10px ${gloed}33, inset 0 0 12px ${gloed}14`,
           WebkitTouchCallout: 'none',
           opacity: sleep?.taak.id === t.id ? 0.3 : afgevinkt === t.id ? 0.5 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
@@ -326,7 +358,22 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             <input autoFocus value={titelEdit} onChange={e => setTitelEdit(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') bewaarTitel(t); if (e.key === 'Escape') setOpen(null) }}
               style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', borderBottom: '1.5px solid rgba(255,255,255,0.35)', outline: 'none', color: WIT, fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit', padding: '2px 0', userSelect: 'text', WebkitUserSelect: 'text' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {kwadrantVan(t) === 'gino' && (t.gino_opdracht || t.gino_resultaat) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text', WebkitUserSelect: 'text' }}>
+                {t.gino_opdracht && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: ZACHT, whiteSpace: 'pre-wrap' }}><b style={{ color: WIT }}>Opdracht:</b> {t.gino_opdracht}</div>}
+                {t.gino_resultaat && (
+                  <div style={{ maxHeight: 260, overflowY: 'auto', fontSize: '0.78rem', fontWeight: 700, color: WIT, lineHeight: 1.45, whiteSpace: 'pre-wrap', padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    {t.gino_resultaat}
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {kwadrantVan(t) === 'gino' && (
+                <button type="button" onClick={() => { setOpen(null); openGino(t) }} style={{ ...KNOP, height: 30, padding: '0 12px', borderRadius: 999, border: '1.5px solid #22c55e', color: '#86efac', fontSize: '0.76rem', fontWeight: 900 }}>
+                  {t.gino_opdracht ? 'Opdracht aanpassen' : 'Opdracht'}
+                </button>
+              )}
               <button type="button" onClick={() => vinkAf(t)} style={{ ...KNOP, gap: 5, height: 30, padding: '0 12px', borderRadius: 999, background: GROEN, color: '#000', fontSize: '0.76rem', fontWeight: 900 }}>
                 <Check size={14} strokeWidth={3} /> Afvinken
               </button>
@@ -346,10 +393,23 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
               {t.title}
             </div>
             {kwadrantVan(t) === 'gino' && (() => {
+              const st = t.gino_opdracht ? t.gino_status : null
+              if (st) {
+                const eerste = String(t.gino_resultaat || '').split('\n').find(r => r.trim()) || ''
+                const [kleur, tekst] = st === 'wacht' ? [ZACHT, 'In de rij, Gino begint binnen een minuut']
+                  : st === 'bezig' ? ['#86efac', 'Gino is bezig…']
+                  : st === 'klaar' ? ['#86efac', `Klaar: ${eerste}`]
+                  : [colors.danger, `Mislukt: ${eerste}`]
+                return (
+                  <div title={st === 'klaar' || st === 'mislukt' ? t.gino_resultaat : undefined} style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 800, color: kleur, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', animation: st === 'bezig' ? 'prio-puls 1.4s ease-in-out infinite' : 'none' }}>
+                    {tekst}
+                  </div>
+                )
+              }
               const g = ginoStand(t)
               return (
                 <div title={g?.tekst} style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 800, color: g ? '#86efac' : ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {g ? `Gino ${g.dag}: ${g.tekst}` : 'Wacht op Gino (dagelijks na 13:00)'}
+                  {g ? `Gino ${g.dag}: ${g.tekst}` : 'Nog geen opdracht, tik op Opdracht'}
                 </div>
               )
             })()}
@@ -357,6 +417,11 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
               <div style={{ marginTop: 2, fontSize: '0.66rem', fontWeight: 800, color: ZACHT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
             )}
           </div>
+        )}
+        {!isOpen && kwadrantVan(t) === 'gino' && !t.gino_opdracht && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); openGino(t) }} style={{ ...KNOP, height: 22, padding: '0 8px', borderRadius: 999, background: '#22c55e', color: '#000', fontSize: '0.68rem', fontWeight: 900 }}>
+            Opdracht
+          </button>
         )}
         {!isOpen && (
           <button type="button" onClick={(e) => { e.stopPropagation(); setDatumVoor(t.id) }} title="Datum kiezen" aria-label="Datum kiezen" style={{
@@ -388,6 +453,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       borderRadius: isMobile ? 0 : 16,
       boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
     }}>
+      <style>{'@keyframes prio-puls { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }'}</style>
       <div {...sleepHandvat} style={{
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 8px) 12px 6px' : '5px 10px',
@@ -451,13 +517,14 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
                   background: hier ? 'rgba(167,139,250,0.16)' : 'transparent',
                   outline: hier ? '1.5px dashed #a78bfa' : 'none', outlineOffset: -1,
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '6px 4px 5px', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: d.id === nu ? WIT : ZACHT }}>
+                  <button type="button" onClick={() => wisselDeel(d.id)} aria-expanded={!dichtDelen.has(d.id)} style={{ ...KNOP, width: '100%', justifyContent: 'flex-start', alignItems: 'center', gap: 6, padding: '6px 4px 5px', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: d.id === nu ? WIT : ZACHT }}>
+                    <ChevronDown size={13} strokeWidth={3} style={{ transform: dichtDelen.has(d.id) ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }} />
                     <span>{d.titel}</span>
                     <span style={{ opacity: 0.7, letterSpacing: 0 }}>{d.tijd}</span>
                     {d.id === nu && <span style={{ color: '#a78bfa' }}>· nu</span>}
                     <span style={{ marginLeft: 'auto', opacity: 0.7 }}>{l.length || ''}</span>
-                  </div>
-                  {l.map(kaart)}
+                  </button>
+                  {!dichtDelen.has(d.id) && l.map(kaart)}
                 </div>
               )
             }),
@@ -480,23 +547,21 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             {VAKKEN.map(v => {
               const lijst = v.id === 'weg' ? [...perVak('weg'), ...wegLijst] : perVak(v.id)
               const doel = sleep && String(sleep.over || '').split(':')[0] === v.id
-              const teVol = v.id === 'doen' && lijst.length > NU_MAX
               return (
                 <div key={v.id} data-kwadrant={v.id} style={{
                   minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
                   background: v.kleur,
-                  outline: doel ? `2px solid ${v.rand}` : '2px solid transparent', outlineOffset: -2,
-                  transition: 'outline-color 0.1s',
+                  boxShadow: `inset 0 0 0 ${doel ? 2 : 1}px ${v.rand}${doel ? '' : 'aa'}, inset 0 0 ${doel ? 36 : 22}px ${v.rand}${doel ? '55' : '2e'}`,
+                  transition: 'box-shadow 0.12s',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: onderLeeg && (v.id === 'gino' || v.id === 'weg') ? '7px 12px' : '7px 12px 3px', flexShrink: 0 }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
                       {v.titel}
-                      {teVol && <span style={{ marginLeft: 8, fontSize: '0.72rem', color: colors.danger }}>te vol, max {NU_MAX}</span>}
                     </span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: teVol ? colors.danger : WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
                   </div>
                   {!(onderLeeg && (v.id === 'gino' || v.id === 'weg')) && (
-                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', padding: '2px 8px 10px' }}>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block', padding: '2px 10px 12px' }}>
                       {v.id === 'plannen' ? plannenInhoud(lijst) : v.id === 'weg' ? wegInhoud() : v.id === 'doen' ? doenInhoud(lijst) : lijst.map(kaart)}
                     </div>
                   )}
@@ -544,6 +609,33 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           </div>
         </div>
       )}
+
+      {ginoVoor && !ingeklapt && (() => {
+        const gt = (taken || []).find(t => t.id === ginoVoor)
+        return (
+          <div onClick={() => setGinoVoor(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 5 }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#050505', border: '1px solid #22c55e88', boxShadow: '0 0 24px #22c55e33', borderRadius: 16, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: WIT }}>Wat moet Gino doen?</div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZACHT, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gt?.title}</div>
+                </div>
+                <button type="button" onClick={() => setGinoVoor(null)} aria-label="Later" title="Later" style={KOPKNOP}><X size={17} strokeWidth={2.8} /></button>
+              </div>
+              <textarea autoFocus value={ginoTekst} onChange={e => setGinoTekst(e.target.value)} rows={6}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) geefAanGino() }}
+                placeholder="Bijv. Zoek uit welke 3 Strava-stats klanten het meest motiveren en schrijf een korte opzet voor het scherm."
+                style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, outline: 'none', color: WIT, fontSize: '0.86rem', fontWeight: 700, fontFamily: 'inherit', lineHeight: 1.45, padding: '10px 12px' }} />
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: ZACHT, margin: '8px 0 12px', lineHeight: 1.4 }}>
+                Gino pakt hem binnen een minuut op (als de PA op je Mac draait). Hij kan uitzoeken, content-concepten maken, teksten schrijven en dingen op de ontwikkellijst zetten. Niets naar klanten, geen plannen wijzigen.
+              </div>
+              <button type="button" onClick={geefAanGino} disabled={!ginoTekst.trim()} style={{ ...KNOP, width: '100%', height: 42, borderRadius: 12, background: ginoTekst.trim() ? '#22c55e' : 'rgba(255,255,255,0.1)', color: ginoTekst.trim() ? '#000' : ZACHT, fontSize: '0.88rem', fontWeight: 900, cursor: ginoTekst.trim() ? 'pointer' : 'default' }}>
+                {gt?.gino_opdracht ? 'Opnieuw laten doen' : 'Gino laten doen'}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {datumTaak && !ingeklapt && (
         <div onClick={() => setDatumVoor(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>

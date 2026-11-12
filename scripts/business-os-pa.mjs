@@ -66,6 +66,7 @@ import { kaartenVastNaRonde, kiesTaken, leesLopendeProjecten, vandaagNL } from '
 import { KLANTEN_TITEL, klantenVraag, vulRonde } from './klantenronde.mjs'
 import { STATSCHECK_HERINNERING, STATSCHECK_TITEL, STATSCHECK_TOEGESTAAN, statscheckVraag, statscheckWeek } from './statscheck.mjs'
 import { TODOCHECK_TITEL, TODOCHECK_TOEGESTAAN, kiesTodos, leesEerderGecheckt, leesOpenTodos, todocheckDag, todocheckVraag } from './todocheck.mjs'
+import { GINOTAAK_TITEL, ginoTaakVraag, leesGinoWachtrij } from './ginotaak.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 process.chdir(MAP)
@@ -1070,11 +1071,12 @@ async function rondeGroei() {
     const klanten = rij.invoer?.ronde === 'klanten'
     const statscheck = rij.invoer?.ronde === 'statscheck' && rij.invoer.week ? rij.invoer.week : null
     const todocheck = rij.invoer?.ronde === 'todocheck' && rij.invoer.dag && Array.isArray(rij.invoer.taken) && rij.invoer.taken.length ? rij.invoer : null
-    console.log(`${tijd()} 🌱 ${project ? rij.opdracht : taken ? RONDE_TITEL.taken : klanten ? KLANTEN_TITEL : statscheck ? STATSCHECK_TITEL : todocheck ? TODOCHECK_TITEL : ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
+    const ginotaak = rij.invoer?.ronde === 'ginotaak' && rij.invoer.taak_id ? rij.invoer : null
+    console.log(`${tijd()} 🌱 ${project ? rij.opdracht : taken ? RONDE_TITEL.taken : klanten ? KLANTEN_TITEL : statscheck ? STATSCHECK_TITEL : todocheck ? TODOCHECK_TITEL : ginotaak ? `${GINOTAAK_TITEL}: ${ginotaak.titel}` : ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
     const t0 = Date.now()
     const dagNL = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' })).getDay()
-    const vraag = taken ? TAKEN_VRAAG(taken) : project ? PROJECT_VRAAG(project) : klanten ? klantenVraag(dagNL) : statscheck ? statscheckVraag(statscheck) : todocheck ? todocheckVraag(todocheck.dag, todocheck.taken) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
-    const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f), { rijId: rij.id, zonderVragen: true, toegestaan: statscheck ? STATSCHECK_TOEGESTAAN : todocheck ? TODOCHECK_TOEGESTAAN : null }))
+    const vraag = taken ? TAKEN_VRAAG(taken) : project ? PROJECT_VRAAG(project) : klanten ? klantenVraag(dagNL) : statscheck ? statscheckVraag(statscheck) : todocheck ? todocheckVraag(todocheck.dag, todocheck.taken) : ginotaak ? ginoTaakVraag(ginotaak) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
+    const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f), { rijId: rij.id, zonderVragen: true, toegestaan: statscheck ? STATSCHECK_TOEGESTAAN : (todocheck || ginotaak) ? TODOCHECK_TOEGESTAAN : null }))
     lopend.delete(rij.id)
     // Mislukt, meestal doordat de Mac sliep: nog twee keer proberen als hij weer wakker is.
     const poging = Number(rij.invoer?.poging) || 0
@@ -1084,6 +1086,7 @@ async function rondeGroei() {
         .eq('id', rij.id).eq('status', 'bezig').select('id')
       // Geen rij terug = Kersten stopte hem: dan ook niet over een half uur opnieuw.
       if (taken && !terug?.length) await kaartenVastNaRonde(sb, taken, TAKEN_GEEN_UITKOMST)
+      if (ginotaak && !terug?.length) await ginoTaakKlaar(ginotaak.taak_id, false, 'Gestopt.')
       return
     }
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
@@ -1095,11 +1098,12 @@ async function rondeGroei() {
     }
     // Statscheck levert alleen een overzicht: geen knoppen die iets kunnen wijzigen.
     // Statscheck en To-do-check leveren alleen een overzicht: geen knoppen die iets kunnen wijzigen of sturen.
-    if (statscheck || todocheck) r.antwoord.acties = []
+    if ((statscheck || todocheck || ginotaak) && r.antwoord) r.antwoord.acties = []
     const { data: gezet } = await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
       .eq('id', rij.id).eq('status', 'bezig').select('id')
     if (taken) await kaartenVastNaRonde(sb, taken, TAKEN_GEEN_UITKOMST)
+    if (ginotaak) await ginoTaakKlaar(ginotaak.taak_id, r.ok, r.antwoord?.tekst || r.tekst).catch(e => console.error(tijd(), 'Gino-taak terugschrijven mislukt:', e.message))
     if (statscheck && r.ok && gezet?.length) await statscheckHerinnering().catch(e => console.error(tijd(), 'Statscheck-herinnering mislukt:', e.message))
   } finally { bezig.groei = false }
 }
@@ -1132,6 +1136,36 @@ async function planStatscheck() {
     if (rijFout) throw rijFout
   }
   statscheckGepland = week
+}
+
+// Gino-taken (ginotaak.mjs): taken die Kersten met een opdracht naar "Gino laten doen" sleepte.
+// Elke minuut: per wachtende taak één groei-rij, taak op 'bezig'. Alleen als de taak nog op 'wacht'
+// stond, zodat twee PA-processen hem niet dubbel inplannen.
+async function planGinoTaken() {
+  if (!gebruiker) return
+  const { data, error } = await leesGinoWachtrij(sb, gebruiker.id)
+  if (error) throw error
+  for (const t of data || []) {
+    if (!String(t.gino_opdracht || '').trim()) continue
+    const { data: gepakt } = await sb.from('productivity_tasks').update({ gino_status: 'bezig' })
+      .eq('id', t.id).eq('gino_status', 'wacht').select('id')
+    if (!gepakt?.length) continue
+    const { error: rijFout } = await sb.from('business_os_opdrachten').insert({
+      coach_id: gebruiker.id, soort: 'groei', opdracht: `${GINOTAAK_TITEL}: ${String(t.title || '').slice(0, 120)}`,
+      invoer: { ronde: 'ginotaak', taak_id: t.id, titel: t.title, opdracht: t.gino_opdracht },
+    })
+    if (rijFout) { await sb.from('productivity_tasks').update({ gino_status: 'wacht' }).eq('id', t.id); throw rijFout }
+  }
+}
+
+// Resultaat van een Gino-taak op de taak zetten. Alleen als hij nog op 'bezig' staat: heeft Kersten
+// intussen een nieuwe opdracht gegeven (weer 'wacht'), dan laten we die staan.
+async function ginoTaakKlaar(id, ok, tekst) {
+  await sb.from('productivity_tasks').update({
+    gino_status: ok ? 'klaar' : 'mislukt',
+    gino_resultaat: String(tekst || (ok ? 'Klaar.' : 'Mislukt.')).slice(0, 8000),
+    gino_klaar_at: new Date().toISOString(),
+  }).eq('id', id).eq('gino_status', 'bezig')
 }
 
 // To-do-check: elke dag vanaf 13:00 NL één rij (todocheck.mjs), met de gekozen taken (max 10) in invoer.
@@ -1407,6 +1441,7 @@ setInterval(() => planGroei().catch(fout), 10 * 60 * 1000)
 setInterval(() => planTaken().catch(fout), 60 * 1000)
 setInterval(() => planStatscheck().catch(fout), 60 * 1000)
 setInterval(() => planTodocheck().catch(fout), 60 * 1000)
+setInterval(() => planGinoTaken().catch(fout), 60 * 1000)
 setInterval(() => planZoomSync().catch(fout), 5 * 60 * 1000)
 setInterval(() => planMetricool().catch(fout), 15 * 60 * 1000)
 // Gino's tijdmeter: elke minuut welke app/site voorop staat (scripts/gino-tijd.mjs).
