@@ -775,10 +775,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     // Bouwfase: laatste geplande set gelogd → hoe zwaar voelde deze oefening?
     const vraagFeedback = bfAan && editingIndex === null && !oefFeedback && newSets.length >= plannedSetCount(exercise)
     if (vraagFeedback) setFbOpen('oefening')
-    // Timer aan en de laatste geplande set net gelogd: door naar de volgende
-    // oefening (9 nov 2026). Precies gelijk, zodat een extra set je niet
-    // wegstuurt. Met een feedbackvraag open wachten we tot die dicht is.
-    if (onVolgendeOefening && rustTimerAan && editingIndex === null && newSets.length === plannedSetCount(exercise)) {
+    // Laatste geplande set gelogd: door naar de volgende oefening (9 nov 2026).
+    // Werkt ook zonder rusttimer (12 nov 2026). Precies gelijk, zodat een extra
+    // set je niet wegstuurt. Met een feedbackvraag open wachten we tot die dicht is.
+    if (onVolgendeOefening && editingIndex === null && newSets.length === plannedSetCount(exercise)) {
       if (vraagFeedback) naFeedbackVerder.current = true
       else onVolgendeOefening()
     }
