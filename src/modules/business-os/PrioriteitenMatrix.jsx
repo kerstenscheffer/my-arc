@@ -60,7 +60,7 @@ const DAGDELEN = [
   { id: 'avond', titel: 'Avond', tijd: '18–24', van: 18, tot: 24 },
 ]
 const dagdeelNu = () => { const u = new Date().getHours(); return DAGDELEN.find(d => u >= d.van && u < d.tot)?.id || null }
-const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, gino_opdracht, gino_status, gino_resultaat, gino_klaar_at, created_at'
+const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, gino_opdracht, gino_status, gino_resultaat, gino_klaar_at, gino_gesprek, created_at'
 
 const dagIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dagIso(d) }
@@ -109,6 +109,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const [afgevinkt, setAfgevinkt] = useState(null)
   const [ginoVoor, setGinoVoor] = useState(null)      // taak-id waarvoor het opdracht-venster open staat
   const [ginoTekst, setGinoTekst] = useState('')
+  const [reactie, setReactie] = useState('')
   // Dichtgeklapte dagdelen in Nu doen, onthouden per browser.
   const [dichtDelen, setDichtDelen] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('prio_dicht_delen') || '[]')) } catch { return new Set() }
@@ -210,7 +211,21 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     const tekst = ginoTekst.trim()
     setGinoVoor(null)
     if (!id || !tekst) return
-    await schrijf(id, { kwadrant: 'gino', dagdeel: null, gino_opdracht: tekst, gino_status: 'wacht', gino_resultaat: null, gino_klaar_at: null })
+    await schrijf(id, {
+      kwadrant: 'gino', dagdeel: null, gino_opdracht: tekst, gino_status: 'wacht', gino_resultaat: null, gino_klaar_at: null,
+      gino_gesprek: [{ van: 'kersten', tekst, at: new Date().toISOString() }],
+    })
+  }
+
+  // Gesprek met Gino op de kaart. Oude taken zonder gesprek: opdracht + resultaat als begin.
+  const gesprekVan = (t) => (Array.isArray(t.gino_gesprek) && t.gino_gesprek.length
+    ? t.gino_gesprek
+    : [t.gino_opdracht && { van: 'kersten', tekst: t.gino_opdracht }, t.gino_resultaat && { van: 'gino', tekst: t.gino_resultaat }].filter(Boolean))
+  const stuurReactie = async (t) => {
+    const tekst = reactie.trim()
+    if (!tekst) return
+    setReactie('')
+    await schrijf(t.id, { gino_gesprek: [...gesprekVan(t), { van: 'kersten', tekst, at: new Date().toISOString() }].slice(-40), gino_status: 'wacht' })
   }
 
   const maakOngedaan = async () => {
@@ -323,7 +338,8 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
 
   const kaart = (t) => {
     const isOpen = open === t.id
-    const gloed = VAKKEN.find(v => v.id === kwadrantVan(t))?.rand || '#ffffff'
+    // Gino wacht op antwoord: kaart gloeit amber, zodat je hem ziet staan.
+    const gloed = kwadrantVan(t) === 'gino' && t.gino_status === 'vraag' ? '#f59e0b' : VAKKEN.find(v => v.id === kwadrantVan(t))?.rand || '#ffffff'
     const label = labelVan(t)
     const d = datumVan(t)
     const dKleur = d && d < vandaag ? colors.danger : d === vandaag ? GROEN : ZACHT
@@ -332,7 +348,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         onPointerDown={isOpen ? undefined : (e) => startSleep(e, t)}
         onClick={() => {
           if (sleepteNet.current || isOpen) return
-          setOpen(t.id); setTitelEdit(t.title || '')
+          setOpen(t.id); setTitelEdit(t.title || ''); setReactie('')
         }}
         onContextMenu={e => e.preventDefault()}
         style={{
@@ -358,12 +374,38 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             <input autoFocus value={titelEdit} onChange={e => setTitelEdit(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') bewaarTitel(t); if (e.key === 'Escape') setOpen(null) }}
               style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', borderBottom: '1.5px solid rgba(255,255,255,0.35)', outline: 'none', color: WIT, fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit', padding: '2px 0', userSelect: 'text', WebkitUserSelect: 'text' }} />
-            {kwadrantVan(t) === 'gino' && (t.gino_opdracht || t.gino_resultaat) && (
+            {kwadrantVan(t) === 'gino' && t.gino_opdracht && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text', WebkitUserSelect: 'text' }}>
-                {t.gino_opdracht && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: ZACHT, whiteSpace: 'pre-wrap' }}><b style={{ color: WIT }}>Opdracht:</b> {t.gino_opdracht}</div>}
-                {t.gino_resultaat && (
-                  <div style={{ maxHeight: 260, overflowY: 'auto', fontSize: '0.78rem', fontWeight: 700, color: WIT, lineHeight: 1.45, whiteSpace: 'pre-wrap', padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                    {t.gino_resultaat}
+                <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gesprekVan(t).map((b, i) => {
+                    const gino = b.van === 'gino'
+                    return (
+                      <div key={i} style={{
+                        alignSelf: gino ? 'flex-start' : 'flex-end', maxWidth: '92%',
+                        fontSize: '0.78rem', fontWeight: 700, color: WIT, lineHeight: 1.45, whiteSpace: 'pre-wrap', padding: '7px 10px', borderRadius: 10,
+                        background: gino ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.08)',
+                        border: `1px solid ${gino ? (b.fout ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.3)') : 'rgba(255,255,255,0.12)'}`,
+                      }}>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: gino ? '#86efac' : ZACHT, marginBottom: 2 }}>{gino ? 'Gino' : 'Jij'}</div>
+                        {b.tekst}
+                      </div>
+                    )
+                  })}
+                  {(t.gino_status === 'wacht' || t.gino_status === 'bezig') && (
+                    <div style={{ alignSelf: 'flex-start', fontSize: '0.74rem', fontWeight: 800, color: '#86efac', animation: 'prio-puls 1.4s ease-in-out infinite' }}>
+                      {t.gino_status === 'bezig' ? 'Gino is bezig…' : 'In de rij…'}
+                    </div>
+                  )}
+                </div>
+                {t.gino_status !== 'wacht' && t.gino_status !== 'bezig' && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    <textarea value={reactie} onChange={e => setReactie(e.target.value)} rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) stuurReactie(t) }}
+                      placeholder={t.gino_status === 'vraag' ? 'Antwoord Gino…' : 'Nog iets? Stuur Gino verder…'}
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', resize: 'vertical', background: '#0d0d0d', border: `1px solid ${t.gino_status === 'vraag' ? '#fbbf2488' : 'rgba(255,255,255,0.14)'}`, borderRadius: 10, outline: 'none', color: WIT, fontSize: '0.8rem', fontWeight: 700, fontFamily: 'inherit', lineHeight: 1.4, padding: '7px 10px', userSelect: 'text', WebkitUserSelect: 'text' }} />
+                    <button type="button" onClick={() => stuurReactie(t)} disabled={!reactie.trim()} style={{ ...KNOP, height: 34, padding: '0 12px', borderRadius: 10, background: reactie.trim() ? '#22c55e' : 'rgba(255,255,255,0.1)', color: reactie.trim() ? '#000' : ZACHT, fontSize: '0.76rem', fontWeight: 900 }}>
+                      Stuur
+                    </button>
                   </div>
                 )}
               </div>
@@ -371,7 +413,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {kwadrantVan(t) === 'gino' && (
                 <button type="button" onClick={() => { setOpen(null); openGino(t) }} style={{ ...KNOP, height: 30, padding: '0 12px', borderRadius: 999, border: '1.5px solid #22c55e', color: '#86efac', fontSize: '0.76rem', fontWeight: 900 }}>
-                  {t.gino_opdracht ? 'Opdracht aanpassen' : 'Opdracht'}
+                  {t.gino_opdracht ? 'Nieuwe opdracht' : 'Opdracht'}
                 </button>
               )}
               <button type="button" onClick={() => vinkAf(t)} style={{ ...KNOP, gap: 5, height: 30, padding: '0 12px', borderRadius: 999, background: GROEN, color: '#000', fontSize: '0.76rem', fontWeight: 900 }}>
@@ -396,12 +438,14 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
               const st = t.gino_opdracht ? t.gino_status : null
               if (st) {
                 const eerste = String(t.gino_resultaat || '').split('\n').find(r => r.trim()) || ''
-                const [kleur, tekst] = st === 'wacht' ? [ZACHT, 'In de rij, Gino begint binnen een minuut']
+                const vraag = (String(t.gino_resultaat || '').match(/^\s*VRAAG:\s*(.*)$/m) || [])[1]
+                const [kleur, tekst] = st === 'vraag' ? ['#fbbf24', `Gino vraagt: ${vraag || 'tik om te antwoorden'}`]
+                  : st === 'wacht' ? [ZACHT, 'In de rij, Gino begint binnen een minuut']
                   : st === 'bezig' ? ['#86efac', 'Gino is bezig…']
                   : st === 'klaar' ? ['#86efac', `Klaar: ${eerste}`]
                   : [colors.danger, `Mislukt: ${eerste}`]
                 return (
-                  <div title={st === 'klaar' || st === 'mislukt' ? t.gino_resultaat : undefined} style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 800, color: kleur, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', animation: st === 'bezig' ? 'prio-puls 1.4s ease-in-out infinite' : 'none' }}>
+                  <div title={st === 'klaar' || st === 'mislukt' || st === 'vraag' ? t.gino_resultaat : undefined} style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 800, color: kleur, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', animation: st === 'bezig' ? 'prio-puls 1.4s ease-in-out infinite' : 'none' }}>
                     {tekst}
                   </div>
                 )

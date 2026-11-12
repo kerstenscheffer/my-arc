@@ -66,7 +66,7 @@ import { kaartenVastNaRonde, kiesTaken, leesLopendeProjecten, vandaagNL } from '
 import { KLANTEN_TITEL, klantenVraag, vulRonde } from './klantenronde.mjs'
 import { STATSCHECK_HERINNERING, STATSCHECK_TITEL, STATSCHECK_TOEGESTAAN, statscheckVraag, statscheckWeek } from './statscheck.mjs'
 import { TODOCHECK_TITEL, TODOCHECK_TOEGESTAAN, kiesTodos, leesEerderGecheckt, leesOpenTodos, todocheckDag, todocheckVraag } from './todocheck.mjs'
-import { GINOTAAK_TITEL, ginoTaakVraag, leesGinoWachtrij } from './ginotaak.mjs'
+import { GINOTAAK_TITEL, ginoTaakVraag, heeftVraag, leesGinoWachtrij } from './ginotaak.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 process.chdir(MAP)
@@ -1152,18 +1152,24 @@ async function planGinoTaken() {
     if (!gepakt?.length) continue
     const { error: rijFout } = await sb.from('business_os_opdrachten').insert({
       coach_id: gebruiker.id, soort: 'groei', opdracht: `${GINOTAAK_TITEL}: ${String(t.title || '').slice(0, 120)}`,
-      invoer: { ronde: 'ginotaak', taak_id: t.id, titel: t.title, opdracht: t.gino_opdracht },
+      invoer: { ronde: 'ginotaak', taak_id: t.id, titel: t.title, opdracht: t.gino_opdracht, gesprek: Array.isArray(t.gino_gesprek) ? t.gino_gesprek : [] },
     })
     if (rijFout) { await sb.from('productivity_tasks').update({ gino_status: 'wacht' }).eq('id', t.id); throw rijFout }
   }
 }
 
-// Resultaat van een Gino-taak op de taak zetten. Alleen als hij nog op 'bezig' staat: heeft Kersten
-// intussen een nieuwe opdracht gegeven (weer 'wacht'), dan laten we die staan.
+// Resultaat van een Gino-taak op de taak zetten en aan het gesprek toevoegen. Met een regel
+// "VRAAG: …" wacht hij op Kersten (status 'vraag'). Alleen als de taak nog op 'bezig' staat: heeft
+// Kersten intussen iets nieuws gestuurd (weer 'wacht'), dan laten we die staan.
 async function ginoTaakKlaar(id, ok, tekst) {
+  const antwoord = String(tekst || (ok ? 'Klaar.' : 'Mislukt.')).slice(0, 8000)
+  const { data: taak } = await sb.from('productivity_tasks').select('gino_gesprek, gino_status').eq('id', id).maybeSingle()
+  if (taak?.gino_status !== 'bezig') return
+  const gesprek = [...(Array.isArray(taak.gino_gesprek) ? taak.gino_gesprek : []), { van: 'gino', tekst: antwoord, at: new Date().toISOString(), ...(ok ? {} : { fout: true }) }].slice(-40)
   await sb.from('productivity_tasks').update({
-    gino_status: ok ? 'klaar' : 'mislukt',
-    gino_resultaat: String(tekst || (ok ? 'Klaar.' : 'Mislukt.')).slice(0, 8000),
+    gino_status: !ok ? 'mislukt' : heeftVraag(antwoord) ? 'vraag' : 'klaar',
+    gino_resultaat: antwoord,
+    gino_gesprek: gesprek,
     gino_klaar_at: new Date().toISOString(),
   }).eq('id', id).eq('gino_status', 'bezig')
 }

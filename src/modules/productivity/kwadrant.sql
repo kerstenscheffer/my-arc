@@ -39,3 +39,9 @@ alter table public.productivity_tasks add column if not exists gino_opdracht tex
 alter table public.productivity_tasks add column if not exists gino_status text;   -- wacht | bezig | klaar | mislukt
 alter table public.productivity_tasks add column if not exists gino_resultaat text;
 alter table public.productivity_tasks add column if not exists gino_klaar_at timestamptz;
+
+-- 12 nov 2026: sparren met Gino per taak (live gezet).
+alter table public.productivity_tasks add column if not exists gino_gesprek jsonb;   -- [{ van: 'kersten'|'gino', tekst, at }]
+alter table public.productivity_tasks drop constraint if exists productivity_tasks_gino_status_check;
+alter table public.productivity_tasks add constraint productivity_tasks_gino_status_check
+  check (gino_status is null or gino_status in ('wacht', 'bezig', 'klaar', 'mislukt', 'vraag'));
