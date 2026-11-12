@@ -613,7 +613,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     const d = workoutPlan.days.find(x => x.id === id)
     return [...new Set((d?.exercises || []).filter(ex => ex.type !== 'cardio' && Number(ex.sets) > 0).map(ex => spierVan(ex)).filter(k => k !== 'onbekend'))]
   }
-  const rust = useMemo(() => rustPerSpier(cyc.slots, spierenVanDag), [cyc, workoutPlan.days]) // eslint-disable-line react-hooks/exhaustive-deps
+  // De week zelf: bij een weekrooster alleen de 7 dagen, zonder de kolommen
+  // "niet ingepland" erachter. Die trainingen doet de klant niet, dus ze
+  // tellen ook niet mee in rust, weekvolume en advies.
+  const weekSlots = cyc.ingepland ? cyc.slots.slice(0, cyc.ingepland) : cyc.slots
+  const losIds = cyc.los || []
+  const weekDagen = useMemo(
+    () => (losIds.length ? workoutPlan.days.filter(d => !losIds.includes(d.id)) : workoutPlan.days),
+    [workoutPlan.days, cyc], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const rust = useMemo(() => rustPerSpier(weekSlots, spierenVanDag), [cyc, workoutPlan.days]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Volume-suggesties per spiergroep (volumeSuggesties.js + volumeRegels.js,
   // op basis van Kerstens volume-onderzoek, 10 nov 2026).
@@ -624,8 +633,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const sessieKeuze = Number(trainingInfo?.sessieMin) || Number(trainingInfo?.minutes_per_session) || 0
   const sessieBudget = BOVEN[sessieKeuze] || sessieKeuze || 90
   const advies = useMemo(
-    () => (effectiveClient?.id && volumeCtx ? volumeAdvies({ days: workoutPlan.days, ctx: volumeCtx, herstel, budget: sessieBudget, factor: cyclusFactor, rust }) : {}),
-    [effectiveClient?.id, volumeCtx, workoutPlan.days, herstel, sessieBudget, cyclusFactor, rust],
+    () => (effectiveClient?.id && volumeCtx ? volumeAdvies({ days: weekDagen, ctx: volumeCtx, herstel, budget: sessieBudget, factor: cyclusFactor, rust }) : {}),
+    [effectiveClient?.id, volumeCtx, weekDagen, herstel, sessieBudget, cyclusFactor, rust],
   )
   // Pijntje: het wisselvenster openen voor die oefening.
   const wisselVanuitAdvies = (w) => {
@@ -1249,7 +1258,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       {!m && alleDagen && workoutPlan.days.length > 1 ? (<>
         {/* Totaal van de hele week boven de kolommen (10 nov 2026). */}
         {(() => {
-          const alle = workoutPlan.days.flatMap(d => d.exercises || [])
+          const alle = weekDagen.flatMap(d => d.exercises || [])
           // Per week: bij een langere cyclus omgerekend (sets × 7 / lengte).
           const sets = Object.fromEntries(Object.entries(fractioneleSets(alle, volumeCtx?.secMap || {}))
             .map(([k, v]) => [k, { ...v, frac: v.frac * cyclusFactor }]))
@@ -1284,7 +1293,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <span style={{ minWidth: 58, textAlign: 'center', color: '#fff', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{cyc.lengte} dagen</span>
               <button onClick={() => cyclusLengte(cyc.lengte + 1)} disabled={cyc.lengte >= MAX_LENGTE} aria-label="Langer" style={{ ...iconKnop(), width: 26, height: 26, opacity: cyc.lengte >= MAX_LENGTE ? 0.3 : 1 }}><Plus size={13} /></button>
             </span>
-            <span>{workoutPlan.days.length} trainingen · {cyc.lengte - workoutPlan.days.length} rust</span>
+            <span>{weekDagen.length} trainingen · {cyc.lengte - weekDagen.length} rust</span>
+            {losIds.length > 0 && <span title="Staat in het plan, maar de klant heeft hem niet in zijn week gezet. Telt niet mee in het weekvolume." style={{ color: '#f59e0b' }}>· {losIds.length} niet ingepland</span>}
             {cyc.lengte !== STANDAARD_LENGTE && <span title="Volume en frequentie worden omgerekend naar een week">= {String(Math.round(workoutPlan.days.length * cyclusFactor * 10) / 10).replace('.', ',')} trainingen per week</span>}
             {cyc.bron === 'rooster' && <span title="Bij een week van 7 dagen volgt de volgorde het weekrooster van de klant; pas het daar aan">· volgorde uit weekrooster</span>}
           </div>
@@ -1294,7 +1304,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             {/* Eén blok: kolommen tegen elkaar met lijnen ertussen, in de volgorde van de cyclus. */}
             <div style={{ display: 'flex', height: 'calc(100% - 1rem)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden' }}>
             {cyc.slots.map((slotId, plek) => {
-              const label = cyc.weekdagen ? WEEKDAG_KORT[plek] : `Dag ${plek + 1}`
+              const isLos = !!cyc.ingepland && plek >= cyc.ingepland
+              const label = isLos ? 'Niet ingepland' : cyc.weekdagen ? WEEKDAG_KORT[plek] : `Dag ${plek + 1}`
               const verplaats = cyc.bron !== 'rooster' && (
                 <span style={{ display: 'inline-flex', gap: 0, marginLeft: 'auto' }}>
                   <button onClick={() => verschuif(plek, -1)} disabled={plek === 0} title="Eerder in de cyclus" aria-label="Eerder" style={{ ...iconKnop(), width: 20, height: 18, opacity: plek === 0 ? 0.25 : 1 }}><ChevronLeft size={13} /></button>
@@ -1303,7 +1314,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               )
               const slotKop = (
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 0.55rem 0 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: isLos ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>{label}</span>
                   {verplaats}
                 </div>
               )
@@ -1317,7 +1328,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               const dag = workoutPlan.days[i]
               if (!dag) return null
               // Spieren die de vorige cyclusdag ook al direct trainde: geen rustdag ertussen.
-              const vorige = cyc.slots[(plek - 1 + cyc.slots.length) % cyc.slots.length]
+              const vorige = isLos ? null : weekSlots[(plek - 1 + weekSlots.length) % weekSlots.length]
               const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
               return (
               <div key={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
@@ -1325,10 +1336,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 7px', minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+                  {/* De naam zoals de klant hem op zijn weekrooster ziet staat voorop
+                      (12 nov 2026): hij werd door de cijfers ernaast weggedrukt, waardoor
+                      alleen "Dag 2" overbleef. De cijfers staan nu op een eigen regel. */}
+                  <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: '0.98rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</span>
+                  <span style={{ fontSize: '0.64rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Dag {i + 1}</span>
+                  <span style={{ flexBasis: '100%', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
                     {minutenVoorOefeningen(dag.exercises || [])} min · {(dag.exercises || []).length} oef ·{' '}
                     {(() => {
                       // Max harde sets per training (output zakt daarna); alleen met klant.

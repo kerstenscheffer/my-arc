@@ -65,8 +65,17 @@ export function cyclusVan(plan, { rooster = null, actief = false, schemaId = nul
     return { lengte: Math.max(c.lengte, ids.length), slots: normaliseer(c.volgorde || [], ids, c.lengte), bron: 'plan', weekdagen: false }
   }
   // 7 dagen: het weekrooster van de klant is de waarheid (dat ziet hij in de app).
+  // Een training die de klant niet heeft ingepland komt NIET op een rustdag te
+  // staan (12 nov 2026: de builder toonde er een op maandag terwijl de klant
+  // daar rust had). Die komen als losse kolommen ná de week: slots[0..6] is de
+  // week zoals de klant hem ziet, slots[7..] = `los` = niet ingepland.
   const r = uitRooster(rooster, schemaId, actief, keyNaarId)
-  if (r && ids.length <= STANDAARD_LENGTE) return { lengte: STANDAARD_LENGTE, slots: normaliseer(r, ids, STANDAARD_LENGTE), bron: 'rooster', weekdagen: true }
+  if (r && ids.length <= STANDAARD_LENGTE) {
+    const gezien = new Set()
+    const week = r.map(id => (id != null && ids.includes(id) && !gezien.has(id) ? (gezien.add(id), id) : null))
+    const los = ids.filter(id => !gezien.has(id))
+    return { lengte: STANDAARD_LENGTE, slots: [...week, ...los], bron: 'rooster', weekdagen: true, ingepland: STANDAARD_LENGTE, los }
+  }
   if (c?.volgorde?.length) return { lengte: Math.max(STANDAARD_LENGTE, ids.length), slots: normaliseer(c.volgorde, ids, STANDAARD_LENGTE), bron: 'plan', weekdagen: false }
   const L = Math.max(STANDAARD_LENGTE, ids.length)
   return { lengte: L, slots: verdeel(ids, L), bron: 'verdeeld', weekdagen: false }
