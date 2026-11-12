@@ -9,6 +9,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import belUrl from './boksbel.wav'
+import { koppelRustMelding, vraagRustMeldingToestemming } from './rustMelding'
 
 const SLEUTEL = 'myarc.rust.klok'
 // Hoe lang hij na nul doortelt: zo zie je de echte tijd tussen twee sets, maar
@@ -51,13 +52,16 @@ const zet = (nieuw) => {
 const GELUID_SLEUTEL = 'myarc:rusttimer_geluid_aan'
 export const isTimerGeluidAan = () => { try { return localStorage.getItem(GELUID_SLEUTEL) !== '0' } catch { return true } }
 export const zetTimerGeluid = (aan) => { try { localStorage.setItem(GELUID_SLEUTEL, aan ? '1' : '0') } catch { /* privémodus */ } }
+// App op de achtergrond of scherm op slot: dan een lokale melding met geluid
+// op de eindtijd (rustMelding.js). Alleen als het geluid aan staat.
+koppelRustMelding(() => (stand && isTimerGeluidAan() ? stand : null))
 
 let audio = null
 // De bel zelf: een echte opname (CC0, opengameart.org/content/boxing-ring-0,
 // boxing_matchbell.wav; mono en luider gemaakt). Kersten koos deze op 12 nov
 // 2026, een paar keer achter elkaar. Laadt bij de eerste tik; lukt dat niet,
 // dan klinkt de nagemaakte bel in piep().
-const BEL_KEER = 3
+const BEL_KEER = 6 // eerst 3; Kersten wilde hem twee keer zo lang (12 nov 2026)
 const BEL_TUSSEN = 0.4 // seconden tussen twee slagen; de opname duurt 0,55 s
 let belKlank = null
 let belLaadt = false
@@ -146,7 +150,7 @@ const abonneer = (l) => {
   return () => luisteraars.delete(l)
 }
 
-export const startRustKlok = ({ oefening, sec, bron = 'standaard' }) => { ontgrendelGeluid(); zet({
+export const startRustKlok = ({ oefening, sec, bron = 'standaard' }) => { ontgrendelGeluid(); if (isTimerGeluidAan()) vraagRustMeldingToestemming(); zet({
   oefening, bron, totaal: sec, eind: Date.now() + sec * 1000,
   pauzeOver: null, aangepast: false, klaar: false, gestart: Date.now(),
 }) }
