@@ -49,21 +49,41 @@ const zet = (nieuw) => {
 // Aan/uit-voorkeur in localStorage (10 nov 2026, belofte Wesley).
 const GELUID_SLEUTEL = 'myarc:rusttimer_geluid_aan'
 export const isTimerGeluidAan = () => { try { return localStorage.getItem(GELUID_SLEUTEL) !== '0' } catch { return true } }
-export const zetTimerGeluid = (aan) => { try { localStorage.setItem(GELUID_SLEUTEL, aan ? '1' : '0') } catch {} }
+export const zetTimerGeluid = (aan) => { try { localStorage.setItem(GELUID_SLEUTEL, aan ? '1' : '0') } catch { /* privémodus */ } }
 
 let audio = null
 const ontgrendelGeluid = () => {
   try {
     const AC = window.AudioContext || window.webkitAudioContext
     if (!AC) return
-    if (!audio) audio = new AC()
-    if (audio.state === 'suspended') audio.resume()
+    const nieuw = !audio || audio.state === 'closed'
+    if (nieuw) audio = new AC()
+    if (!nieuw && audio.state === 'running') return
+    // iOS kent naast 'suspended' ook 'interrupted' (na een telefoontje of even
+    // uit de app): alles wat niet loopt opnieuw aanzetten.
+    audio.resume()?.catch?.(() => {})
+    // Eén stil monster afspelen binnen de tik: oudere iPhones geven de klank
+    // pas vrij als er in de tik zelf echt iets is afgespeeld.
+    const stil = audio.createBufferSource()
+    stil.buffer = audio.createBuffer(1, 1, 22050)
+    stil.connect(audio.destination)
+    stil.start(0)
   } catch { /* geen geluid mogelijk */ }
+}
+// Elke tik terwijl er een klok loopt houdt de klank vrij (12 nov 2026). Zonder
+// dit bleef het stil als de klok uit localStorage kwam (app herstart: er is dan
+// nooit een start-tik geweest) of als iOS de klank tijdens het rusten had
+// stilgezet. Buiten een tik om mag een telefoon de klank niet zelf aanzetten.
+if (typeof window !== 'undefined') {
+  const houdVrij = () => { if (stand && isTimerGeluidAan()) ontgrendelGeluid() }
+  for (const soort of ['pointerup', 'touchend', 'click']) {
+    window.addEventListener(soort, houdVrij, { capture: true, passive: true })
+  }
 }
 const piep = () => {
   try {
     if (!audio) return
-    if (audio.state === 'suspended') audio.resume()
+    if (audio.state !== 'running') audio.resume()?.catch?.(() => {})
     const t0 = audio.currentTime
     // Drie korte tonen, de laatste hoger: duidelijk, niet schel.
     ;[[0, 880], [0.22, 880], [0.44, 1320]].forEach(([na, hz]) => {
