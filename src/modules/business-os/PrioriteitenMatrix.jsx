@@ -34,7 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays, ChevronDown } from 'lucide-react'
+import { X, Minus, Maximize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -120,8 +120,12 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     try { localStorage.setItem('prio_dicht_delen', JSON.stringify([...n])) } catch { /* privé-venster */ }
     return n
   })
+  const [nieuwOpen, setNieuwOpen] = useState(false)
+  const [nieuwTitel, setNieuwTitel] = useState('')
+  const [nieuwVak, setNieuwVak] = useState('doen')
   const sleepteNet = useRef(false)
   const ongedaanTimer = useRef(null)
+  const uidRef = useRef(coachId || null)
 
   const laad = useCallback(async () => {
     let uid = coachId
@@ -130,6 +134,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       uid = data?.user?.id
     }
     if (!uid) { setFout('Niet ingelogd'); return }
+    uidRef.current = uid
     const week = new Date(Date.now() - 7 * 86400000).toISOString()
     const [t, s, w] = await Promise.all([
       supabase.from('productivity_tasks').select(VELDEN).eq('coach_id', uid).eq('status', 'active')
@@ -150,6 +155,23 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   }, [coachId])
 
   useEffect(() => { laad() }, [laad])
+
+  // Nieuwe taak (12 nov): + in de kopbalk, titel + vak, Enter = erbij. Venster blijft open voor de volgende.
+  const maakTaak = async () => {
+    const titel = nieuwTitel.trim()
+    if (!titel || !uidRef.current) return
+    const rij = {
+      coach_id: uidRef.current, title: titel, status: 'active', kwadrant: nieuwVak,
+      dagdeel: nieuwVak === 'doen' ? dagdeelNu() : null,
+    }
+    setNieuwTitel('')
+    const { data, error } = await supabase.from('productivity_tasks').insert(rij).select(VELDEN).single()
+    if (error) { console.error('Taak maken:', error); setNieuwTitel(titel); setFout('Taak maken mislukt'); return }
+    setFout(null)
+    setTaken(oud => [...(oud || []), data])
+    if (nieuwVak === 'gino') openGino(data)
+    else if (nieuwVak === 'plannen') setDatumVoor(data.id)
+  }
   // Loopt er een Gino-taak, dan elke 15 s verversen tot hij klaar is.
   const ginoLoopt = (taken || []).some(t => t.gino_status === 'wacht' || t.gino_status === 'bezig')
   useEffect(() => {
@@ -506,15 +528,19 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       }}>
         <Grid2x2 size={15} color={WIT} strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
+        <button type="button" onClick={() => setNieuwOpen(v => !v)} aria-label="Nieuwe taak" title="Nieuwe taak"
+          style={{ ...KOPKNOP, background: 'transparent', color: nieuwOpen ? '#22c55e' : WIT }}>
+          <Plus size={18} strokeWidth={3} />
+        </button>
         <button type="button" data-kwadrant="uit" onClick={() => setUitOpen(v => !v)} title="Uitgeplande taken"
           style={{
-            ...KNOP, gap: 6, height: 24, padding: '0 9px', borderRadius: 999, fontSize: '0.74rem', fontWeight: 900,
-            border: `1.5px solid ${sleep?.over === 'uit' ? WIT : 'rgba(255,255,255,0.3)'}`,
-            background: sleep?.over === 'uit' || uitOpen ? WIT : 'transparent',
-            color: sleep?.over === 'uit' || uitOpen ? '#000' : WIT,
-            transform: sleep?.over === 'uit' ? 'scale(1.08)' : 'none', transition: 'transform 0.1s',
+            ...KNOP, gap: 5, height: 24, padding: '0 4px', border: 'none', background: 'transparent',
+            fontSize: '0.76rem', fontWeight: 900,
+            color: sleep?.over === 'uit' || uitOpen ? WIT : ZACHT,
+            textDecoration: sleep?.over === 'uit' ? 'underline' : 'none', textUnderlineOffset: 4,
+            transform: sleep?.over === 'uit' ? 'scale(1.12)' : 'none', transition: 'transform 0.1s, color 0.1s',
           }}>
-          Uitgepland{taken ? ` ${perVak('uit').length}` : ''}
+          Uitgepland{taken ? <span style={{ color: WIT }}>{perVak('uit').length}</span> : null}
         </button>
         {!isMobile && (
           <button type="button" onClick={() => setIngeklapt(v => !v)} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={KOPKNOP}>
@@ -530,6 +556,25 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           <X size={18} strokeWidth={2.8} />
         </button>
       </div>
+
+      {nieuwOpen && !ingeklapt && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <input autoFocus value={nieuwTitel} onChange={e => setNieuwTitel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') maakTaak(); if (e.key === 'Escape') setNieuwOpen(false) }}
+            placeholder="Nieuwe taak…"
+            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: WIT, fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit', padding: '4px 0' }} />
+          {VAKKEN.map(v => (
+            <button key={v.id} type="button" onClick={() => setNieuwVak(v.id)} title={v.titel}
+              style={{ ...KNOP, height: 22, padding: '0 6px', border: 'none', background: 'transparent', fontSize: '0.7rem', fontWeight: 900, color: nieuwVak === v.id ? v.rand : 'rgba(255,255,255,0.35)', textShadow: nieuwVak === v.id ? `0 0 8px ${v.rand}` : 'none' }}>
+              {({ doen: 'Nu', plannen: 'Plannen', gino: 'Gino', weg: 'Weg' })[v.id]}
+            </button>
+          ))}
+          <button type="button" onClick={maakTaak} disabled={!nieuwTitel.trim()} aria-label="Toevoegen" title="Toevoegen (Enter)"
+            style={{ ...KOPKNOP, background: 'transparent', color: nieuwTitel.trim() ? '#22c55e' : 'rgba(255,255,255,0.3)' }}>
+            <Check size={17} strokeWidth={3} />
+          </button>
+        </div>
+      )}
 
       {!ingeklapt && (() => {
         const onderLeeg = !sleep && perVak('gino').length === 0 && perVak('weg').length === 0 && wegLijst.length === 0
