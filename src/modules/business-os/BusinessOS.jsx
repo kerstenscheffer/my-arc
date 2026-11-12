@@ -1474,7 +1474,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onNotities={() => setBlad('notities')} onPrioriteiten={beperkt ? undefined : () => setMatrix(true)} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
@@ -1530,7 +1530,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />}
 
-      {matrix && !zwevend && !beperkt && <PrioriteitenMatrix isMobile={isMobile} onClose={() => setMatrix(false)} />}
+      {/* Ook bij de zwevende Gino op andere pagina's (via zijn puntjesmenu). */}
+      {matrix && !beperkt && <PrioriteitenMatrix isMobile={isMobile} onClose={() => setMatrix(false)} />}
 
       {previewId && !zwevend && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 

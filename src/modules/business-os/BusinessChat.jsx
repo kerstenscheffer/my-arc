@@ -47,7 +47,7 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { paginaVoorGino } from '../../lib/huidigePagina'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ScanEye, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ScanEye, Grid2x2, ThumbsUp, ThumbsDown, Paperclip, FileText, ChevronDown, ShieldCheck, Minimize2, Maximize2, PanelRightClose, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { waNummer } from './berichtTekst'
 import { colors } from '../../ui/tokens'
@@ -1414,7 +1414,7 @@ const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 const TIJD_VRAAG = /(mijn tijd|tijd (gaat|ging|besteed|kwijt)|waar (gaat|ging) mijn tijd|tijdvreter|productiviteit|productief|uren (achter|besteed|gewerkt)|hoeveel (uur|tijd) (heb|ben|zit))/i
 
 // klein: { aan, wissel, inklappen } voor het sleepbare blokje, of null waar dat niet kan (telefoon).
-export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, beperkt = false, macPlek = null, zwevend = false }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28, klein = null, vastgezet, onVastzetten, onNotities, onPrioriteiten, beperkt = false, macPlek = null, zwevend = false }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -2736,12 +2736,6 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                 }}>
                 {modus === 'slim' ? 'Slim' : 'Snel'}
               </button>}
-              {zwevend && !isEditor(actief) && (
-                <button onClick={kijkMee} disabled={kijkBezig} title="Kijk mee: stuur een screenshot van deze pagina mee" aria-label="Kijk mee met deze pagina"
-                  style={{ ...rondeKnop, width: 32, flexShrink: 0, background: 'transparent', color: kijkBezig ? colors.textMuted : '#fff', cursor: kijkBezig ? 'wait' : 'pointer' }}>
-                  <ScanEye size={17} strokeWidth={2.4} />
-                </button>
-              )}
               {!isEditor(actief) && (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => { if (!menu && stem.beschikbaar()) stem.tegoed(); setMenu(m => !m) }} title="Meer" aria-label="Meer opties"
@@ -2761,6 +2755,19 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                         <button onClick={() => { setMenu(false); bestandKiezer.current?.click() }} title="pdf, csv, Excel, txt, foto; max 20 MB" style={menuRegel}>
                           <Paperclip size={15} /> <span style={{ flex: 1 }}>Bestand bijvoegen</span>
                         </button>
+                        {/* Kijk mee stond als losse knop in de balk (12 nov 2026 weggehaald,
+                            Kersten); de functie blijft hier bereikbaar. */}
+                        {zwevend && (
+                          <button onClick={() => { setMenu(false); kijkMee() }} disabled={kijkBezig} title="Stuur een screenshot van deze pagina mee" style={menuRegel}>
+                            <ScanEye size={15} /> <span style={{ flex: 1 }}>Kijk mee met deze pagina</span>
+                          </button>
+                        )}
+                        {/* Prioriteiten openen vanaf elke pagina waar Gino staat. */}
+                        {onPrioriteiten && (
+                          <button onClick={() => { setMenu(false); onPrioriteiten() }} style={menuRegel}>
+                            <Grid2x2 size={15} /> <span style={{ flex: 1 }}>Prioriteiten</span>
+                          </button>
+                        )}
                         {klein && (
                           <button onClick={() => { setMenu(false); klein.wissel() }} style={menuRegel}>
                             {klein.aan ? <Maximize2 size={15} /> : <Minimize2 size={15} />} <span style={{ flex: 1 }}>{klein.aan ? 'Terug naar groot' : 'Klein maken en slepen'}</span>
