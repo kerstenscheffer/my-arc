@@ -187,6 +187,49 @@ function GinoZegt({ tekst, onWeg, accent = G }) {
   )
 }
 
+// Weergave kiezen (12 nov 2026): eigen dropdown in plaats van <select>, die
+// opende soms naar boven en zag eruit als het systeemmenu. Opent naar beneden.
+function WeergaveKiezer({ waarde, opties, onKies, rechts }) {
+  const [open, setOpen] = useState(false)
+  const huidig = opties.find(o => o.toLowerCase() === waarde) || opties[0]
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open} aria-label="Weergave kiezen" style={{
+        display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 4px', border: 'none', background: 'transparent',
+        color: '#fff', fontFamily: 'inherit', fontSize: 14, fontWeight: 900, cursor: 'pointer',
+      }}>
+        {huidig}
+        <ChevronDown size={15} strokeWidth={2.8} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+          <div role="listbox" style={{
+            position: 'absolute', top: '100%', marginTop: 6, [rechts ? 'right' : 'left']: 0, zIndex: 50, minWidth: 160,
+            background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: 4,
+            boxShadow: '0 14px 36px rgba(0,0,0,0.7)',
+          }}>
+            {opties.map(naam => {
+              const id = naam.toLowerCase()
+              const aan = id === waarde
+              return (
+                <button key={id} type="button" role="option" aria-selected={aan} onClick={() => { setOpen(false); if (!aan) onKies(id) }} style={{
+                  display: 'flex', alignItems: 'center', width: '100%', gap: 8, height: 34, padding: '0 10px', border: 'none', borderRadius: 8,
+                  background: aan ? 'rgba(255,255,255,0.08)' : 'transparent', color: aan ? '#fff' : 'rgba(255,255,255,0.7)',
+                  fontFamily: 'inherit', fontSize: 13, fontWeight: 900, cursor: 'pointer', textAlign: 'left',
+                }}>
+                  <span style={{ flex: 1 }}>{naam}</span>
+                  {aan && <Check size={14} strokeWidth={3} />}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
 const BEPERKT_WEERGAVEN = ['content', 'keten', 'omzet', 'klanten']
 
 // inspring: px vanaf links tot het invoerveld (kleine bol ernaast), zodat de rij onderaan op dezelfde linkerrand begint.
@@ -205,8 +248,8 @@ function KlantenKnoppen({ open, onKies }) {
         return (
           <button key={id} type="button" onClick={() => onKies(id)} title={label} aria-label={label} aria-pressed={aan} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 34, borderRadius: 999,
-            border: 'none', cursor: 'pointer', background: aan ? colors.surface : 'transparent',
-            color: aan ? colors.success : colors.textMuted, boxShadow: aan ? 'none' : `inset 0 0 0 1px ${colors.borderSubtle}`,
+            border: 'none', cursor: 'pointer', background: 'transparent',
+            color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
           }}>
             <deel.Icoon size={16} strokeWidth={2.5} />
           </button>
@@ -540,21 +583,12 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           position: 'relative', flexShrink: 0,
           ...(projectBalkMobiel ? { order: 8, marginLeft: 'auto' } : weergave === 'projecten' && !isMobile ? { marginLeft: 'auto' } : { marginRight: isMobile ? 'auto' : 0 }),
         }}>
-          <select
-            value={weergave}
-            onChange={(e) => kiesWeergave(e.target.value)}
-            aria-label="Weergave kiezen"
-            style={{
-              appearance: 'none', WebkitAppearance: 'none', height: 36, padding: '0 32px 0 14px', cursor: 'pointer',
-              background: 'transparent', border: '1.5px solid #fff', borderRadius: 18, outline: 'none',
-              color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
-            }}
-          >
-            {(beperkt ? ['Content', 'Keten', 'Omzet', 'Klanten'] : ['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten']).map(naam => (
-              <option key={naam} value={naam.toLowerCase()} style={{ background: '#0a0a0a', color: '#fff' }}>{naam}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} strokeWidth={2.6} color="#fff" aria-hidden style={{ position: 'absolute', right: 12, top: 11, pointerEvents: 'none' }} />
+          <WeergaveKiezer
+            waarde={weergave}
+            opties={beperkt ? ['Content', 'Keten', 'Omzet', 'Klanten'] : ['Week', 'Content', 'Keten', 'Omzet', 'Tijd', 'Projecten', 'Klanten']}
+            onKies={kiesWeergave}
+            rechts={!isMobile}
+          />
         </div>
         {weergave !== 'projecten' && weergave !== 'klanten' && weergave !== 'keten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
@@ -675,7 +709,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
 
 const rond = {
-  width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff', background: 'transparent', color: '#fff',
+  width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'transparent', color: '#fff',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
 }
 const bekijk = {

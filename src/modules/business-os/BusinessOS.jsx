@@ -1388,8 +1388,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           CoachHub's Terug-knop) ── */}
       {!zwevend && <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
         position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
-        width: 36, height: 36, borderRadius: '50%', border: `1.5px solid ${kalender ? colors.success : '#fff'}`,
-        background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
+        width: 36, height: 36, borderRadius: '50%', border: 'none',
+        background: 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <CalendarDays size={16} strokeWidth={2.6} />
@@ -1398,8 +1398,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
       {!zwevend && <div style={{ position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
-          width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #fff',
-          background: menu ? colors.surface : 'transparent', color: C.wit, cursor: 'pointer',
+          width: 36, height: 36, borderRadius: '50%', border: 'none',
+          background: 'transparent', color: C.wit, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <MoreHorizontal size={16} strokeWidth={2.6} />
