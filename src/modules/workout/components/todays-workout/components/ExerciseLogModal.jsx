@@ -941,6 +941,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // Twee sets van twaalf of meer: dan is het gewicht te licht geworden. De
   // vraag naar de uitvoering staat er bewust bij — twaalf slordige reps zijn
   // geen reden om te verzwaren.
+  const krap = isMobile && bfAan // drie pillen onder Set toevoegen op een telefoon
   const tipZwaarder = loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
 
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
@@ -1443,17 +1444,18 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               display: 'flex', gap: '0.5rem',
               padding: isMobile ? '0.1rem 1rem 0' : '0.15rem 1.25rem 0',
             }}>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: bfAan ? 6 : 8, flexWrap: bfAan ? 'nowrap' : 'wrap', justifyContent: 'center' }}>
-                <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
-                <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: krap ? 4 : 8, flexWrap: bfAan ? 'nowrap' : 'wrap', justifyContent: 'center' }}>
+                <Pil krap={krap} actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
+                <Pil krap={krap} actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
                 {bfAan && (
-                  <Pil actief={fbOpen === 'oefening'} onClick={() => setFbOpen('oefening')} icoon={<Gauge size={12} strokeWidth={2.4} />}
+                  <Pil krap={krap} actief={fbOpen === 'oefening'} onClick={() => setFbOpen('oefening')} icoon={<Gauge size={12} strokeWidth={2.4} />}
                     label={oefFeedback?.score ? `Gevoel ${oefFeedback.score}` : 'Gevoel'} stip={!!oefFeedback} />
                 )}
               </div>
-              {/* Met Gevoel erbij zijn het drie pillen: dan vervalt de lege plek,
-                  anders valt Gevoel op een telefoon naar een tweede regel. */}
-              {!bfAan && <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />}
+              {/* Met Gevoel erbij zijn het drie pillen op één regel, midden
+                  onder Set toevoegen. Op een telefoon is dat vak smal: daar
+                  zijn de pillen dan iets kleiner (krap). */}
+              <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />
             </div>
 
             {/* Krachtverloop van deze oefening: de beste set per training.
@@ -1709,18 +1711,18 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
 // Klein pilletje onder de cijfers. Vervangt de knoppenrij onderaan het
 // scherm: die nam een hele band in beslag voor twee dingen die je af en toe
 // opentikt.
-function Pil({ actief, onClick, icoon, label, stip = false }) {
+function Pil({ actief, onClick, icoon, label, stip = false, krap = false }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={actief}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '0.3rem 0.6rem 0.3rem 0.5rem',
+        display: 'inline-flex', alignItems: 'center', gap: krap ? 4 : 5,
+        padding: krap ? '0.3rem 0.45rem 0.3rem 0.4rem' : '0.3rem 0.6rem 0.3rem 0.5rem',
         background: actief ? 'rgba(255,255,255,0.1)' : 'transparent',
         border: `1px solid ${actief ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}`,
         borderRadius: 999, color: '#fff',
-        fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.02em',
+        fontSize: krap ? '0.66rem' : '0.7rem', fontWeight: 800, letterSpacing: krap ? 0 : '0.02em',
         cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}

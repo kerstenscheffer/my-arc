@@ -1,9 +1,10 @@
 // src/modules/workout/components/todays-workout/components/ExerciseList.jsx
 import { useState, useEffect, useRef } from 'react'
-import { Plus, RotateCcw } from 'lucide-react'
+import { Plus, RotateCcw, ChevronRight, Check } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
+import { fotoKandidaten, getFallbackImage, fotoAchtergrond } from '../../../utils/oefeningFoto'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 import { logPlanWijziging } from '../../../services/planWijzigingLog'
 
@@ -43,6 +44,8 @@ export default function ExerciseList({
   // openen terwijl je alleen wilde verslepen.
   const netGesleept = useRef(false)
   const [terugzetBezig, setTerugzetBezig] = useState(false)
+  // Het stapeltje "N gedaan" bovenaan: dicht = alleen de kaartjes, open = de namen.
+  const [deckOpen, setDeckOpen] = useState(false)
   // Timer aan: na de laatste set van een oefening opent de eerstvolgende
   // die nog niet af is. Eerst vooruit in de lijst, dan wat er eerder bleef liggen.
   const [openIndex, setOpenIndex] = useState(null)
@@ -54,6 +57,13 @@ export default function ExerciseList({
       .find(i => !isExerciseFullyLogged(localExercises[i], todaysLogs))
     if (volgende !== undefined) setOpenIndex(volgende)
   }
+
+  // Zolang de plusknop linksonder staat, schuift de zwevende rustklok ernaast
+  // (zie RustKlokBalk). Een klasse op <body>: de balk hangt in een andere boom.
+  useEffect(() => {
+    document.body.classList.add('oef-plusknop')
+    return () => document.body.classList.remove('oef-plusknop')
+  }, [])
 
   useEffect(() => {
     localExercises.forEach((_, index) => {
@@ -260,8 +270,9 @@ export default function ExerciseList({
     netGesleept.current = true
     setTimeout(() => { netGesleept.current = false }, 300)
     if (staat.naar !== staat.van) {
-      const vanIndex = groep.items[staat.van].index
-      const naarIndex = groep.items[staat.naar].index
+      // Posities tellen alleen de kaarten die je ziet (zie `zichtbaar`).
+      const vanIndex = groep.zichtbaar[staat.van].index
+      const naarIndex = groep.zichtbaar[staat.naar].index
       handleVerplaats(vanIndex, naarIndex)
     }
   }
@@ -278,6 +289,16 @@ export default function ExerciseList({
     if (!groep) { groep = { naam, items: [] }; groepen.push(groep) }
     groep.items.push({ ex, index })
   })
+
+  // Klaar = alle geplande sets gelogd. Die oefeningen gaan uit de lijst en
+  // vallen in het stapeltje bovenaan, net als op de dagagenda (12 nov 2026,
+  // Kersten). De kaart zelf blijft onzichtbaar bestaan: zijn log-scherm staat
+  // vaak nog open op het moment dat de laatste set erin gaat.
+  const isKlaar = (ex) => isExerciseFullyLogged(ex, todaysLogs)
+  groepen.forEach(g => { g.zichtbaar = g.items.filter(it => !isKlaar(it.ex)) })
+  const gedaanItems = groepen.flatMap(g => g.items.filter(it => isKlaar(it.ex)))
+  const totaalOef = groepen.reduce((n, g) => n + g.items.length, 0)
+  const allesKlaar = totaalOef > 0 && gedaanItems.length === totaalOef
 
   const emptyState = !localExercises || localExercises.length === 0
 
@@ -297,11 +318,51 @@ export default function ExerciseList({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {/* Het stapeltje met wat klaar is, in de maat van de workoutkaarten.
+              Geen eigen voortgangsbalk: die staat al bovenaan de pagina. Tik =
+              de kaarten zelf klappen hieronder open (zie `order` bij de kaart). */}
+          {gedaanItems.length > 0 && (
+            <button
+              onClick={() => setDeckOpen(o => !o)}
+              aria-expanded={deckOpen}
+              aria-label={`${gedaanItems.length} gedaan, ${deckOpen ? 'inklappen' : 'bekijken'}`}
+              style={{
+                order: -2,
+                margin: isMobile ? '0.7rem 0.9rem 0.3rem' : '0.85rem 1.25rem 0.4rem',
+                display: 'flex', alignItems: 'center', gap: 14, padding: '4px 0',
+                background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', paddingLeft: 3 }}>
+                {gedaanItems.map(({ ex, index }, i) => {
+                  const rot = ((i * 37) % 9) - 4
+                  return (
+                    <span key={`${ex.name}-${index}`} style={{
+                      width: isMobile ? 44 : 50, height: isMobile ? 56 : 64, marginLeft: i ? -18 : 0, borderRadius: 8, flexShrink: 0,
+                      border: '2px solid #0a0a0a', boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                      backgroundImage: fotoAchtergrond([...fotoKandidaten(ex), getFallbackImage(ex)]),
+                      backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#1c1c1c',
+                      transform: `rotate(${rot}deg)`, zIndex: i,
+                    }} />
+                  )
+                })}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#10b981', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                <Check size={17} strokeWidth={3.2} />
+                {allesKlaar ? 'Alles gedaan' : `${gedaanItems.length} gedaan`}
+              </span>
+              <ChevronRight size={18} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto', transform: deckOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+            </button>
+          )}
           {groepen.map(groep => (
-            <div key={groep.naam}>
+            // display: contents → kop en kaarten liggen rechtstreeks in de
+            // kolom, zodat `order` de klare kaarten onder het stapeltje zet
+            // zonder ze te verhuizen (een kaart die verhuist, sluit zijn log).
+            <div key={groep.naam} style={{ display: 'contents' }}>
               <div style={{
                 margin: isMobile ? '0.7rem 0.9rem 0.35rem' : '0.85rem 1.25rem 0.4rem',
-                display: 'flex', alignItems: 'baseline', gap: 7,
+                display: groep.zichtbaar.length ? 'flex' : 'none', alignItems: 'baseline', gap: 7,
               }}>
                 <span style={{
                   fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
@@ -310,9 +371,14 @@ export default function ExerciseList({
                 <span style={{
                   fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 800,
                   color: 'rgba(255,255,255,0.3)',
-                }}>{groep.items.length}</span>
+                }}>{groep.zichtbaar.length}</span>
               </div>
-              {groep.items.map(({ ex: exercise, index }, posInGroep) => {
+              {groep.items.map(({ ex: exercise, index }) => {
+                // Plek tussen de kaarten die nog moeten; -1 = klaar. Een klare
+                // kaart staat onder het stapeltje, en alleen als dat open is.
+                const posInGroep = groep.zichtbaar.findIndex(it => it.index === index)
+                const klaarKaart = posInGroep < 0
+                const weg = klaarKaart && !deckOpen
                 // Verschuiving tijdens het slepen: de opgepakte kaart volgt je
                 // vinger, de kaarten ertussen schuiven een plek op zodat je ziet
                 // waar hij terechtkomt.
@@ -326,12 +392,13 @@ export default function ExerciseList({
                 return (
             <div
               key={`${exercise.name}-${index}`}
-              onTouchStart={(e) => startDruk(e, groep.naam, posInGroep, groep.items.length, e.currentTarget)}
+              onTouchStart={(e) => { if (!klaarKaart) startDruk(e, groep.naam, posInGroep, groep.zichtbaar.length, e.currentTarget) }}
               onTouchMove={beweeg}
               onTouchEnd={() => laatLos(groep)}
               onTouchCancel={() => laatLos(groep)}
               onClickCapture={(e) => { if (netGesleept.current) { e.preventDefault(); e.stopPropagation() } }}
               style={{
+                display: weg ? 'none' : 'block', order: klaarKaart ? -1 : 0,
                 position: 'relative',
                 zIndex: isOpgepakt ? 5 : 1,
                 transform: isOpgepakt ? `translateY(${sleep.dy}px) scale(1.02)` : `translateY(${verschuif}px)`,

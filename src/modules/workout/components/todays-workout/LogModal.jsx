@@ -113,7 +113,9 @@ export default function LogModal({
   const progressPct = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', paddingTop: isMobile ? 10 : 14, paddingBottom: isMobile ? 130 : 140 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', paddingTop: isMobile ? 10 : 14, paddingBottom: 4 }}>
+      {/* De ruimte voor de zwevende knoppen staat ónder "Training afronden"
+          (TodaysWorkoutMain), zodat die knop direct op de laatste oefening volgt. */}
 
       {/* ── CONTENT — exercise list ── */}
       <div style={{ width: '100%' }}>

@@ -36,7 +36,6 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const [todaysWorkout, setTodaysWorkout] = useState(null)
   const ooitGeladen = useRef(false)
   // Twee trainingen op één dag: alle sleutels van de dag, en welke open staat.
-  const [dagSleutels, setDagSleutels] = useState([])
   const [gekozenKey, setGekozenKey] = useState(null)
   useEffect(() => { setGekozenKey(selectedWorkoutKey || null) }, [selectedWorkoutKey, selectedDay])
   const [todaysLogs, setTodaysLogs] = useState([])
@@ -246,7 +245,6 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       // we over; anders blokkeert hij de andere training van die dag.
       const sleutelsVanDag = trainingenVanDag(savedSchedule, todayName)
         .filter(k => !/^dag\d+$/.test(k) || schemaWithOverrides.week_structure?.[k])
-      setDagSleutels(sleutelsVanDag)
       let workoutKey = (gekozenKey && sleutelsVanDag.includes(gekozenKey)) ? gekozenKey : (sleutelsVanDag[0] || null)
 
       console.log('🏋️ dag:', todayName, '| workoutKey:', workoutKey)
@@ -441,34 +439,14 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
-  // Schakelaar tussen de trainingen van de dag (alleen bij twee of meer).
-  const naamVanSleutel = (k) => {
-    if (!k) return 'Training'
-    const ws = freshSchema?.week_structure || {}
-    if (ws[k]) return ws[k].name || ws[k].focus || k
-    if (todaysWorkout && (todaysWorkout.workoutKey === k || (k.startsWith('custom_') && todaysWorkout.customData?.id === k.replace('custom_', '')))) return todaysWorkout.name || 'Training'
-    if (k.startsWith('custom_')) return 'Eigen training'
-    const pk = ontleedPlanKey(k)
-    return pk ? 'Ander plan' : k
-  }
-  const actieveSleutel = todaysWorkout?.customData?.id ? `custom_${todaysWorkout.customData.id}` : todaysWorkout?.workoutKey
-  const schakelaar = dagSleutels.length > 1 ? (
-    <div style={{ display: 'flex', gap: 6, padding: isMobile ? '0.6rem 1rem 0' : '0.75rem 1.5rem 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
-      {dagSleutels.map((k, i) => {
-        const aan = gekozenKey ? gekozenKey === k : (actieveSleutel ? actieveSleutel === k || (ontleedPlanKey(k)?.dagKey === actieveSleutel) : i === 0)
-        return (
-          <button key={k} onClick={() => setGekozenKey(k)} style={{
-            flexShrink: 0, padding: '0.45rem 0.85rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
-            background: aan ? '#fff' : 'rgba(255,255,255,0.06)', color: aan ? '#0a0a0a' : '#fff',
-            border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>{i + 1}. {naamVanSleutel(k)}</button>
-        )
-      })}
-    </div>
-  ) : null
-
+  // De knoppenrij "1. Legs · 2. …" boven de kaart is weg (12 nov 2026,
+  // Kersten): hij nam ruimte en toonde ruwe sleutels. Een tweede training van
+  // de dag kies je via zijn tegel in het weekrooster (selectedWorkoutKey).
   // Bouwfase-regel boven de kaart, en het afrondblad met het overzicht van vandaag.
-  const faseRegel = bouwfase.aan && bouwfase.stand ? (
+  // Tijdens de bouwweken zelf staat er niets meer ("Bouwfase · week 1 van 7"
+  // mocht weg, 12 nov 2026, Kersten). In de deload en daarna blijft de regel:
+  // daar staat de uitleg en de enige knop naar "Bouwfase afronden".
+  const faseRegel = bouwfase.aan && bouwfase.stand && bouwfase.stand.soort !== 'bouw' && bouwfase.stand.soort !== 'nog_niet' ? (
     <div style={{ padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: bouwfase.stand.soort === 'deload' ? '#f59e0b' : '#10b981' }}>
       {faseTekst(bouwfase.stand)}
       {bouwfase.stand.soort === 'deload' && <div style={{ marginTop: 2, fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: 'rgba(255,255,255,0.6)' }}>Zelfde oefeningen, minder sets en lichter.</div>}
@@ -533,7 +511,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
           background: '#0a0a0a',
           display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ flexShrink: 0 }}>{schakelaar}{faseRegel}{kaart}</div>
+          <div style={{ flexShrink: 0 }}>{faseRegel}{kaart}</div>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <LogModal
               workout={todaysWorkout}
@@ -545,7 +523,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
               db={db}
             />
             {bouwfase.aan && todaysLogs.length > 0 && (
-              <div style={{ padding: isMobile ? '0.5rem 1rem 2rem' : '0.75rem 1.5rem 2rem' }}>
+              <div style={{ padding: isMobile ? '0.35rem 0.9rem 0' : '0.5rem 1.25rem 0' }}>
                 <button onClick={() => setWkOpen(true)} style={{
                   width: '100%', minHeight: 50, borderRadius: 14, fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer',
                   background: fbDag.workout ? 'transparent' : '#fff', color: fbDag.workout ? '#10b981' : '#0a0a0a',
@@ -555,6 +533,9 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
                 </button>
               </div>
             )}
+            {/* Vrije ruimte onderaan: daar zweven de plusknop en de rustklok.
+                Zo schuift het laatste stuk van de lijst er altijd bovenuit. */}
+            <div aria-hidden style={{ height: isMobile ? 130 : 140 }} />
           </div>
         </div>
         {afrondBlad}
@@ -567,7 +548,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   return dagFade(
     <>
       {kop}
-      <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{schakelaar}{kaart}</div>
+      <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{kaart}</div>
       {faseRegel}
       {afrondBlad}
       {reflectieBlad}

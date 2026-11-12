@@ -32,18 +32,26 @@ export default function RustKlokBalk({ db, client }) {
   }
 
   const voorbij = over <= 0
-  const kleur = voorbij ? GROEN : '#fff'
+  // Op wit: zwart, en een donkerder groen dan op de zwarte schermen (leesbaar).
+  const kleur = voorbij ? '#059669' : '#0a0a0a'
   const pct = Math.max(0, Math.min(100, (over / Math.max(1, klok.totaal)) * 100))
 
   return <>{losScherm}{createPortal(
     // Boven de zwevende navigatie (bottom 22, zIndex 101), onder het log-scherm (10000).
-    <div style={{
+    // Wit, net als de plusknop en "Training afronden" (12 nov 2026, Kersten:
+    // de drie liepen niet samen). Staat de plusknop er (oefeningenlijst open),
+    // dan staat de klok er rechts naast op dezelfde hoogte in plaats van eroverheen.
+    <div className="rust-klok-balk" style={{
       position: 'fixed', left: 10, right: 10, bottom: 92, zIndex: 102,
       maxWidth: 480, margin: '0 auto', overflow: 'hidden',
-      background: 'rgba(10,10,10,0.96)', border: '1px solid rgba(255,255,255,0.14)',
-      borderRadius: 14, boxShadow: '0 14px 40px rgba(0,0,0,0.6)',
+      background: '#fff', border: 'none',
+      borderRadius: 18, boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
     }}>
-      <div style={{ height: 3, background: 'rgba(255,255,255,0.1)' }}>
+      <style>{`
+        body.oef-plusknop .rust-klok-balk { left: 104px !important; right: 12px !important; margin: 0 !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 35px) !important; }
+        @media (min-width: 769px) { body.oef-plusknop .rust-klok-balk { left: 124px !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 43px) !important; } }
+      `}</style>
+      <div style={{ height: 3, background: 'rgba(10,10,10,0.08)' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: kleur, transition: 'width 0.25s linear' }} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.45rem 0.45rem 0.85rem' }}>
@@ -65,12 +73,12 @@ export default function RustKlokBalk({ db, client }) {
             {klokTekst(over)}
           </span>
           <span style={{
-            flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+            flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(10,10,10,0.6)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {voorbij ? 'Rust voorbij' : 'Rust'} · {klok.oefening}
           </span>
-          <ChevronRight size={16} color="rgba(255,255,255,0.55)" style={{ flexShrink: 0 }} />
+          <ChevronRight size={16} strokeWidth={2.8} color="rgba(10,10,10,0.5)" style={{ flexShrink: 0 }} />
         </button>
         <button
           onClick={stopRustKlok}
@@ -78,12 +86,12 @@ export default function RustKlokBalk({ db, client }) {
           title="Rustklok stoppen"
           style={{
             width: 36, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 11,
-            color: 'rgba(255,255,255,0.75)', cursor: 'pointer',
+            background: 'rgba(10,10,10,0.07)', border: 'none', borderRadius: 12,
+            color: '#0a0a0a', cursor: 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <X size={15} />
+          <X size={16} strokeWidth={2.8} />
         </button>
       </div>
     </div>,

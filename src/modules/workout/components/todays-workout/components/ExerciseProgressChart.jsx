@@ -22,7 +22,7 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, Info } from 'lucide-react'
-import { metBandFases, faseSamenvatting, KLEUR_VOOR, oordeelTekst, geschatRM, REFERENTIE_REPS } from '../krachtBand'
+import { metBandFases, KLEUR_VOOR, oordeelTekst, geschatRM, REFERENTIE_REPS } from '../krachtBand'
 
 const LIJN = 'rgba(255,255,255,0.1)'
 const GROEN = '#10b981'
@@ -352,9 +352,13 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
         </div>
       )}
 
-      <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
+      {/* Geen focusrand: de grafiek kreeg bij een tik een gele/witte lijn
+          eromheen (12 nov 2026). De toetsenbordlaag van recharts staat uit;
+          de waarden lees je via de tooltip. */}
+      <style>{'.kracht-grafiek *:focus, .kracht-grafiek *:focus-visible { outline: none; }'}</style>
+      <div className="kracht-grafiek" style={{ width: '100%', height: isMobile ? 190 : 230, WebkitTapHighlightColor: 'transparent' }}>
         <ResponsiveContainer>
-          <ComposedChart data={data} margin={{ top: 16, right: 10, bottom: 0, left: -4 }}>
+          <ComposedChart accessibilityLayer={false} data={data} margin={{ top: 16, right: 10, bottom: 0, left: -4 }}>
             <defs>
               {/* De lijn kleurt mee met hoe je ervoor staat: groen op tempo,
                   oranje als je vooruitgaat maar traag, rood als je stilstaat.
@@ -407,33 +411,6 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
             />
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
-
-      {/* Wat de band betekent. Zonder deze regel is een grijs vlak onder een
-          lijn decoratie, en dan gaat niemand ernaar handelen. */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '0.35rem 0.9rem',
-        marginTop: 2, fontSize: '0.62rem', fontWeight: 700,
-        color: 'rgba(255,255,255,0.4)',
-      }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 2, background: 'rgba(255,255,255,0.28)' }} />
-          {(() => {
-            const stukken = faseSamenvatting(punten, fases)
-            if (!stukken.length || !stukken[0].doel) return 'streeftempo'
-            // "cut tot 4 sep · build daarna" — zodat je ziet waarom de lijn
-            // halverwege van richting verandert.
-            return stukken
-              .map((f, i) => i === 0 && stukken.length > 1
-                ? `${f.doel} tot ${kortDatum(stukken[1].vanaf)}`
-                : i === 0 ? `${f.doel}-fase` : `${f.doel} daarna`)
-              .join(' · ')
-          })()}
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 8, background: 'rgba(255,255,255,0.12)', borderRadius: 2 }} />
-          minimaal tot streef
-        </span>
       </div>
     </div>
   )
