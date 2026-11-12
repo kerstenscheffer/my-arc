@@ -76,7 +76,9 @@ export default function TodaysWorkoutCard({
     return (
       <div style={{
         position: 'relative', width: '100%',
-        height: isMobile ? 190 : 230,
+        // Lager en donkerder (12 nov 2026, Kersten): de foto is sfeer, de
+        // oefeningen eronder zijn waar het om gaat.
+        height: isMobile ? 150 : 185,
       }}>
         <div style={{
           position: 'absolute', inset: 0,
@@ -89,7 +91,7 @@ export default function TodaysWorkoutCard({
             kosten geen extra hoogte meer. */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(180deg, rgba(10,10,10,0.45) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.75) 68%, #0a0a0a 100%)',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.7) 0%, rgba(10,10,10,0.45) 32%, rgba(10,10,10,0.82) 68%, #0a0a0a 100%)',
         }} />
 
         {inProgress && (
@@ -109,21 +111,22 @@ export default function TodaysWorkoutCard({
           title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
           style={{
             position: 'absolute',
-            top: `calc(env(safe-area-inset-top, 0px) + 10px)`, left: 10,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            width: 112, height: 40, borderRadius: 999,
-            background: timerFinished ? '#10b981' : '#fff',
+            // Zonder vakje: alleen icoon en tijd op de foto. Het tikvlak blijft 40 hoog.
+            top: `calc(env(safe-area-inset-top, 0px) + 6px)`, left: isMobile ? '1rem' : '1.5rem',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: 7,
+            minWidth: 88, height: 40,
+            background: 'transparent',
             border: 'none', cursor: 'pointer',
-            boxShadow: '0 8px 22px rgba(0,0,0,0.5)',
+            textShadow: '0 2px 10px rgba(0,0,0,0.8)',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
           {timerFinished
-            ? <Check size={15} color="#0a0a0a" strokeWidth={3} />
-            : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.45)'} />}
+            ? <Check size={17} color="#10b981" strokeWidth={3} />
+            : <Timer size={17} strokeWidth={2.6} color={timerRunning ? '#fff' : 'rgba(255,255,255,0.6)'} />}
           <span style={{
-            fontSize: '0.95rem', fontWeight: 900,
-            color: timerFinished ? '#0a0a0a' : timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.5)',
+            fontSize: '1.1rem', fontWeight: 900,
+            color: timerFinished ? '#10b981' : timerRunning ? '#fff' : 'rgba(255,255,255,0.65)',
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
           }}>
             {timerStarted ? <TimerGetal opgebouwd={timerAccumulatedSec} startedAt={timerStartedAt} format={formatElapsed} /> : '0:00'}
@@ -135,18 +138,17 @@ export default function TodaysWorkoutCard({
           aria-label="Sluit workout"
           style={{
             position: 'absolute',
-            top: `calc(env(safe-area-inset-top, 0px) + 10px)`, right: 10,
+            top: `calc(env(safe-area-inset-top, 0px) + 6px)`, right: isMobile ? '1rem' : '1.5rem',
             display: 'flex', alignItems: 'center', gap: 5,
-            height: 40, padding: '0 0.8rem', borderRadius: 12,
-            background: 'rgba(10,10,10,0.7)',
-            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
-            fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+            height: 40, padding: '0 0 0 0.8rem',
+            background: 'transparent', border: 'none', color: '#fff',
+            textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+            fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit',
             cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
           Sluit
-          <ChevronDown size={15} strokeWidth={2.8} style={{ transform: 'rotate(180deg)' }} />
+          <ChevronDown size={17} strokeWidth={2.8} style={{ transform: 'rotate(180deg)' }} />
         </button>
 
         <div style={{
