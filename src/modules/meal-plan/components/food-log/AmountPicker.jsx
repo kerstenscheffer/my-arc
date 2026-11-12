@@ -192,13 +192,18 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   // stond dit hele bestand in de linter als fout. De hooks gaan uit van een
   // ontbrekend item; de render stopt eronder alsnog.
   const isPer100g = item?.per100g === true
+  // Gebruikersvoorkeur: 'gram' = sla portie-standaard over voor ingrediënten
+  // (belofte Wesley, 9 nov 2026). Alleen bij nieuwe items — eerder gelogde
+  // items houden hun eenheid.
+  const voorkeurGramInit = (() => { try { return localStorage.getItem('myarc:log_eenheid_voorkeur') === 'gram' } catch { return false } })()
 
   const [gramOptions] = useState(() => buildGramOptions(item?.name, eigenPortie(item), item?.bereiding))
   const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
 
   // Nieuw product met een natuurlijke portie: begin op "1 ei" / "1 snee" in
   // plaats van 100 gram. Een eerder gelogd item houdt zijn grammen.
-  const startNatuurlijk = isPer100g && !(item?._savedAmount > 0)
+  // Voorkeur gram? Dan startNatuurlijk overslaan → picker opent op 1 gram.
+  const startNatuurlijk = isPer100g && !voorkeurGramInit && !(item?._savedAmount > 0)
     ? (servingOptions.find(o => o.id === 'eigen')
       || servingOptions.find(o => o.natuurlijk && String(item?.name || '').toLowerCase().includes(o.enkel.toLowerCase()))
       || servingOptions.find(o => o.natuurlijk) || null)
@@ -293,6 +298,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   const [mealMoment, setMealMoment] = useState(defaultMealMoment || getDefaultMoment())
   const [gewicht, setGewicht] = useState(() => leesGewicht(item?.name))
   const [totaalTekst, setTotaalTekst] = useState(null)
+  const [voorkeurGram, setVoorkeurGram] = useState(voorkeurGramInit)
 
   if (!item) return null
 
@@ -662,6 +668,27 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
           {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} ${u === 'ml' ? 'ml' : 'gram'}`}
         </div>
       ) : null}
+
+      {/* Standaard eenheid voor ingrediënten (alleen tonen als relevant) */}
+      {isPer100g && !item?._savedAmount && !item?._snel && (
+        <div style={{ textAlign: 'center', marginTop: 10 }}>
+          <button
+            onClick={() => {
+              const nieuw = !voorkeurGram
+              setVoorkeurGram(nieuw)
+              try { localStorage.setItem('myarc:log_eenheid_voorkeur', nieuw ? 'gram' : 'portie') } catch {}
+            }}
+            style={{
+              background: 'none', border: 'none', padding: '2px 8px', cursor: 'pointer',
+              fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)',
+              fontFamily: 'inherit', letterSpacing: '0.03em',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Standaard: {voorkeurGram ? 'gram ✓' : 'portie'}
+          </button>
+        </div>
+      )}
 
       {/* Totaal van het recept, zelf te overschrijven na bakken of koken. */}
       {inGram && (
