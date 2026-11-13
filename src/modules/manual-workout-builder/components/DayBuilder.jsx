@@ -153,11 +153,39 @@ export default function DayBuilder({
           // Alle dagen: kopje met de spiergroep boven elke nieuwe groep (10 nov 2026).
           const groep = (ex) => (ex?.type === 'cardio' ? 'cardio' : spierVan(ex || {}))
           const kopje = compact && (index === 0 || groep(day.exercises[index - 1]) !== groep(exercise))
+          // Een hele spiergroep omhoog of omlaag (13 nov 2026, Kersten). Een blok =
+          // de oefeningen die onder dit kopje bij elkaar staan; het wisselt van
+          // plek met het blok erboven of eronder.
+          const blokken = []
+          day.exercises.forEach((ex, i) => {
+            const vorig = blokken[blokken.length - 1]
+            if (vorig && groep(day.exercises[i - 1]) === groep(ex)) vorig.push(ex)
+            else blokken.push([ex])
+          })
+          const blokNr = blokken.findIndex(b => b[0] === exercise)
+          const schuifBlok = (stap) => {
+            const naar = blokNr + stap
+            if (blokNr < 0 || naar < 0 || naar >= blokken.length) return
+            const nieuw = [...blokken]
+            ;[nieuw[blokNr], nieuw[naar]] = [nieuw[naar], nieuw[blokNr]]
+            onUpdate({ exercises: nieuw.flat() })
+          }
+          const blokPijl = (aan) => ({
+            width: 24, height: 20, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', color: '#fff', opacity: aan ? 0.75 : 0.18,
+            cursor: aan ? 'pointer' : 'default', touchAction: 'manipulation',
+          })
           return (
           <div key={exercise.id} data-sleep-index={index} data-oef={`${day.id}|${exercise.id}`} style={sleep.kaartStijl(index)}>
             {kopje && (
-              <div style={{ margin: index === 0 ? '0 0.7rem 5px' : '7px 0.7rem 5px', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: groep(exercise) === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
-                {groep(exercise) === 'cardio' ? 'Cardio' : spierLabel(groep(exercise))}
+              <div style={{ display: 'flex', alignItems: 'center', margin: index === 0 ? '0 0.4rem 5px 0.7rem' : '7px 0.4rem 5px 0.7rem', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: groep(exercise) === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
+                <span style={{ flex: 1, minWidth: 0 }}>{groep(exercise) === 'cardio' ? 'Cardio' : spierLabel(groep(exercise))}</span>
+                {blokken.length > 1 && (
+                  <>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); schuifBlok(-1) }} disabled={blokNr <= 0} aria-label="Spiergroep omhoog" title="Spiergroep omhoog" style={blokPijl(blokNr > 0)}><ChevronUp size={15} strokeWidth={2.8} /></button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); schuifBlok(1) }} disabled={blokNr >= blokken.length - 1} aria-label="Spiergroep omlaag" title="Spiergroep omlaag" style={blokPijl(blokNr < blokken.length - 1)}><ChevronDown size={15} strokeWidth={2.8} /></button>
+                  </>
+                )}
               </div>
             )}
             <BuilderExerciseCard

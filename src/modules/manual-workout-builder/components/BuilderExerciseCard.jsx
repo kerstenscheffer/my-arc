@@ -99,8 +99,11 @@ export default function BuilderExerciseCard({
             <span style={{ position: 'absolute', left: 4, bottom: 2, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{index + 1}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span style={{ minWidth: 0, fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+              </span>
+              {exercise.power && <span style={{ flexShrink: 0, fontSize: '0.52rem', fontWeight: 900, color: '#000', background: '#fff', padding: '2px 6px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>Power</span>}
             </div>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
               {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}</>}
@@ -178,6 +181,7 @@ export default function BuilderExerciseCard({
               <span style={{ flexShrink: 1, minWidth: 0, fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
               </span>
+              {exercise.power && <span style={{ flexShrink: 0, alignSelf: 'center', fontSize: '0.52rem', fontWeight: 900, color: '#000', background: '#fff', padding: '2px 6px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>Power</span>}
               {(exercise.primairSpieren || exercise.muscle || (!isCardio && exercise.equipment)) && (
                 <span style={{ flexShrink: 100, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textTransform: 'capitalize' }}>
                   {[exercise.primairSpieren || exercise.muscle, !isCardio && exercise.equipment].filter(Boolean).join(' · ')}
@@ -419,7 +423,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
               </div>
 
               {/* Power (13 nov 2026): eigen blok en eigen log bij de klant. */}
-              <button type="button" onClick={() => onField('power', !exercise.power)} aria-pressed={!!exercise.power} style={{
+              <button type="button" onClick={() => { const aan = !exercise.power; onField('power', aan); if (aan) onField('reps', '2-4') }} aria-pressed={!!exercise.power} style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '0.6rem 0.75rem', textAlign: 'left',
                 background: exercise.power ? '#fff' : 'transparent', color: exercise.power ? '#000' : '#fff',
                 border: `1px solid ${exercise.power ? '#fff' : 'rgba(255,255,255,0.18)'}`, borderRadius: 10,
@@ -428,7 +432,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                 <Zap size={16} strokeWidth={2.6} style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900 }}>Power-oefening</span>
-                  <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, opacity: 0.65 }}>Komt bij de klant in het blok Power, met uitleg en een eigen log (snelheid per set)</span>
+                  <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, opacity: 0.65 }}>Komt bij de klant in het blok Power: 30 tot 50% van zijn max, 2 tot 4 snelle herhalingen, snelheid per set gelogd</span>
                 </span>
                 <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{exercise.power ? 'Aan' : 'Uit'}</span>
               </button>

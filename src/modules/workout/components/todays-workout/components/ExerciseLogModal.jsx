@@ -20,7 +20,7 @@ import OpwarmPoort from './OpwarmPoort'
 // Bouwfase-tracking (9 nov 2026): feedback per oefening en herstelvraag, alleen
 // als de coach het voor deze klant aanzette.
 import useBouwfase from '../../../bouwfase/useBouwfase'
-import { isPower, POWER_UITLEG, SNELHEDEN, snelheidVan } from '../../../utils/power'
+import { isPower, POWER_UITLEG, POWER_PCT, SNELHEDEN, snelheidVan, schat1RM, basisNaam } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
 import { leesFeedbackVanDag, spiergroepVan, vandaagIso } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
@@ -512,6 +512,24 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const spier = spiergroepVan(exercise)
   // Alleen voor vandaag; een oude dag naloggen vraagt niets.
   const power = isPower(exercise)
+  // Power: geschatte 1RM van deze klant op deze oefening, voor het adviesgewicht.
+  const [max1RM, setMax1RM] = useState(null)
+  useEffect(() => {
+    if (!power || !client?.id || !db) return undefined
+    let weg = false
+    ;(async () => {
+      try {
+        const { data: sessies } = await db.supabase.from('workout_sessions').select('id')
+          .eq('client_id', client.id).order('workout_date', { ascending: false }).limit(120)
+        if (!sessies?.length) return
+        const namen = [...new Set([exercise.name, basisNaam(exercise.name)].filter(Boolean))]
+        const { data: rijen } = await db.supabase.from('workout_progress').select('sets')
+          .in('session_id', sessies.map(s => s.id)).in('exercise_name', namen)
+        if (!weg) setMax1RM(schat1RM(rijen || []))
+      } catch (e) { console.warn('1RM voor power niet geladen:', e?.message) }
+    })()
+    return () => { weg = true }
+  }, [power, client?.id, db, exercise.name])
   const bfAan = bouwfase.aan && !power && (!datum || datum === vandaagIso())
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
   const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
@@ -1274,6 +1292,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 {String(exercise.notes || '').trim() && (
                   <div style={{ fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 800, color: '#fff', lineHeight: 1.45, marginBottom: 6, whiteSpace: 'pre-wrap' }}>{String(exercise.notes).trim()}</div>
                 )}
+                {/* Adviesgewicht: 30 tot 50% van de geschatte 1RM, afgerond op een schijf. */}
+                {(() => {
+                  const stap = eenheid === 'lb' ? 5 : 2.5
+                  const rond = (kg) => Math.max(stap, Math.round(vanKg(kg, eenheid) / stap) * stap)
+                  const EHP = eenheidLabel(eenheid)
+                  return (
+                    <div style={{ fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 800, color: '#fff', lineHeight: 1.45, marginBottom: 6 }}>
+                      {max1RM
+                        ? <>Pak {rond(max1RM * POWER_PCT[0])} tot {rond(max1RM * POWER_PCT[1])}{EHP}<span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}> · 30 tot 50% van je geschatte max van {Math.round(vanKg(max1RM, eenheid))}{EHP}</span></>
+                        : <>Pak 30 tot 50% van je max<span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}> · nog geen max bekend voor deze oefening: kies een gewicht dat je 2 tot 4 keer echt snel kan bewegen</span></>}
+                    </div>
+                  )
+                })()}
                 {POWER_UITLEG.map(regel => (
                   <div key={regel} style={{ display: 'flex', gap: 7, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45 }}>
                     <span aria-hidden style={{ color: '#10b981', fontWeight: 900, flexShrink: 0 }}>→</span><span>{regel}</span>
@@ -1544,8 +1575,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               <SetInputWizard
                 onComplete={handleSetComplete}
                 onCancel={() => { setShowWizard(false); setEditingIndex(null) }}
-                previousWeight={editingSet?.weight ?? lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? 20}
-                previousReps={editingSet?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || 10)}
+                previousWeight={editingSet?.weight ?? lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? (power && max1RM ? Math.round(max1RM * 0.4 / 2.5) * 2.5 : 20)}
+                previousReps={editingSet?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || (power ? 3 : 10))}
                 isMobile={isMobile}
                 editMode={editingIndex !== null}
                 snel={rustTimerAan && editingIndex === null}
