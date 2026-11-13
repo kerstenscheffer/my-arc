@@ -11,7 +11,7 @@
 //   · Rust-waarschuwing → rode/oranje rand als dezelfde training te dicht
 //     op deze dag staat
 
-import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2, Footprints, CalendarX } from 'lucide-react'
+import { CircleCheck, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2, Footprints, CalendarX } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
@@ -26,21 +26,32 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
         position: 'relative', flex: groei, minHeight: isMobile ? 58 : 66, width: '100%',
         overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
         // Aaneen: de dagen vormen samen één strook, dus geen eigen hoeken of
-        // rand. Gedaan blijft herkenbaar aan een groene lijn binnenin.
+        // rand. Gedaan = alleen een groene lijn onderlangs; rondom gaf het
+        // groene strepen tussen de dagen (13 nov 2026, Kersten).
         ...(aaneen
-          ? { borderRadius: 0, boxShadow: klaar ? 'inset 0 0 0 1px rgba(16,185,129,0.55)' : 'none' }
+          ? { borderRadius: 0, boxShadow: klaar ? 'inset 0 -2px 0 rgba(16,185,129,0.8)' : 'none' }
           : { borderRadius: 10, border: `1px solid ${klaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.08)'}` }),
       }}
     >
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.45 : 1 }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.88) 100%)' }} />
+      {/* Afgerond: een vinkje in een cirkel midden op de foto (13 nov 2026,
+          Kersten); stond als het woord "Gedaan" boven de titel. */}
+      {klaar && (
+        <div aria-label="Gedaan" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <CircleCheck size={isMobile ? 24 : 28} strokeWidth={2.4} color="#10b981" style={{ filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.8))' }} />
+        </div>
+      )}
       {/* Stappen van de dag: een strook over de bovenkant van de foto, binnen
           de rand van de tegel, zodat het één kaart is. */}
       {band}
       <div style={{ position: 'absolute', left: 4, right: 4, bottom: kanSchuiven ? (isMobile ? 20 : 22) : 4, textAlign: 'left' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.46rem' : '0.52rem', fontWeight: 900, color: klaar ? '#10b981' : 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-          {klaar ? <Check size={9} strokeWidth={3.2} /> : <Icoon size={9} strokeWidth={2.8} />}{klaar ? 'Gedaan' : eyebrow}
-        </div>
+        {/* Gedaan: geen woord, maar een vinkje midden op de tegel (zie hieronder). */}
+        {!klaar && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.46rem' : '0.52rem', fontWeight: 900, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+            <Icoon size={9} strokeWidth={2.8} />{eyebrow}
+          </div>
+        )}
         <div style={{ fontSize: isMobile ? '0.68rem' : '0.78rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {titel}
         </div>
