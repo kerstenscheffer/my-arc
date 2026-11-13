@@ -26,7 +26,7 @@ import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History, FileClock } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History, FileClock, ArrowLeftRight } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
@@ -762,15 +762,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       type: nieuw.type || 'compound', _isCustom: nieuw._isCustom || false, video_url: null, thumbnail_url: null,
     }
     // Andere spiergroep na het wisselen: naar zijn groep schuiven. Zelfde groep: plek houden.
+    // `wissel.meer`: de hele selectie in één keer naar dezelfde oefening (13 nov
+    // 2026, Kersten). Sets, reps, rust en power van elke oefening blijven staan.
+    const doelen = wissel.meer || [`${wissel.dayId}|${wissel.ex.id}`]
     setWorkoutPlan(prev => ({
       ...prev,
       days: prev.days.map(d => {
-        if (d.id !== wissel.dayId) return d
-        const oud = d.exercises.find(x => x.id === wissel.ex.id)
-        if (!oud) return d
-        const nw = { ...oud, ...upd }
-        const exercises = groepVan(nw) === groepVan(oud) ? d.exercises.map(x => (x.id === nw.id ? nw : x)) : bijZijnGroep(d.exercises, nw)
-        return { ...d, exercises }
+        let exercises = d.exercises
+        for (const oud of d.exercises) {
+          if (!doelen.includes(`${d.id}|${oud.id}`)) continue
+          const nw = { ...oud, ...upd }
+          exercises = groepVan(nw) === groepVan(oud) ? exercises.map(x => (x.id === nw.id ? nw : x)) : bijZijnGroep(exercises, nw)
+        }
+        return exercises === d.exercises ? d : { ...d, exercises }
       }),
     }))
     if (nieuw.equipment && !workoutPlan.equipment.includes(nieuw.equipment)) {
@@ -1719,6 +1723,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             height: 36, padding: '0 0.9rem', borderRadius: 9, border: 'none', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
             background: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.12)' : '#fff', color: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.4)' : '#000',
           }}>Toepassen</button>
+          <button onClick={() => setWissel({ meer: [...selectie], ex: { name: `${selectie.size} oefeningen` } })} title="Alle geselecteerde oefeningen vervangen door één andere" style={{ height: 36, padding: '0 0.8rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}><ArrowLeftRight size={15} /> Wisselen</button>
           <button onClick={kopieerSelectie} title="Kopiëren (Cmd+C)" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Copy size={15} /></button>
           <button onClick={wisSelectie} title="Geselecteerde oefeningen verwijderen" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash2 size={15} /></button>
           <button onClick={() => setSelectie(new Set())} title="Selectie opheffen (Esc)" style={{ width: 36, height: 36, borderRadius: 9, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} /></button>
