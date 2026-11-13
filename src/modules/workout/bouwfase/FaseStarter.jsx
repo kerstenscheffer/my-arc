@@ -40,6 +40,10 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
   const [tdee, setTdee] = useState(null)
   const [signalen, setSignalen] = useState([])
   const [nieuwOpen, setNieuwOpen] = useState(false)
+  // Wat de klant vond van de oefeningen die hij mocht proberen, en de laatst
+  // afgeronde mesocyclus (om de volgende te starten).
+  const [geprobeerd, setGeprobeerd] = useState([])
+  const [vorige, setVorige] = useState(null)
 
   const laad = useCallback(async () => {
     if (!client?.id) return
@@ -47,6 +51,22 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
     setFase(f)
     berekenGemetenTdee(db, client.id).then(setTdee, () => setTdee(null))
     checkDeloadSignalen(db, client.id, f).then(setSignalen, () => setSignalen([]))
+    const sinds = new Date(); sinds.setDate(sinds.getDate() - 60)
+    db.supabase.from('training_feedback').select('oefening, gevoel, datum')
+      .eq('client_id', client.id).eq('soort', 'oefening').in('gevoel', ['probeer_ja', 'probeer_nee'])
+      .gte('datum', sinds.toISOString().slice(0, 10)).order('datum', { ascending: false })
+      .then(({ data }) => {
+        // Per oefening het laatste antwoord.
+        const per = new Map()
+        for (const r of data || []) if (r.oefening && !per.has(r.oefening)) per.set(r.oefening, r.gevoel)
+        setGeprobeerd([...per.entries()].map(([naam, gevoel]) => ({ naam, wil: gevoel === 'probeer_ja' })))
+      }, () => setGeprobeerd([]))
+    if (!f) {
+      db.supabase.from('training_fases').select('nummer, afgerond_op, bouw_weken')
+        .eq('client_id', client.id).not('nummer', 'is', null).not('afgerond_op', 'is', null)
+        .order('afgerond_op', { ascending: false }).limit(1)
+        .then(({ data }) => setVorige(data?.[0] || null), () => setVorige(null))
+    } else setVorige(null)
   }, [client?.id, db])
   useEffect(() => { laad() }, [laad])
 
@@ -115,7 +135,9 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
               onder={`${fase.deload_dagen} dagen deload${nieuweStijl ? '' : ' · oude stijl'}`} />
           )}
         </>) : (
-          <Cijfer kop="Mesocyclus" waarde="Niet gestart" onder="4 weken bouwen, 7 dagen deload" />
+          <Cijfer kop="Mesocyclus"
+            waarde={vorige ? `Start mesocyclus ${Number(vorige.nummer) + 1}` : 'Niet gestart'}
+            onder={vorige ? `Mesocyclus ${vorige.nummer} is afgerond op ${kort(vorige.afgerond_op)}` : '4 weken bouwen, 7 dagen deload'} />
         )}
 
         {/* Gemeten TDEE naast de formule. Alleen een getal bij genoeg data. */}
@@ -159,6 +181,20 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
           {inDeload
             ? `Deload loopt sinds ${kort(fase.deload_gestart_op)}${fase.deload_reden ? ` (${fase.deload_reden})` : ''}. Actief plan: ${deloadNaam || 'het deload-schema'}. Eindigt vanzelf na ${fase.deload_dagen} dagen.`
             : `Het deload-schema staat klaar${deloadNaam ? `: ${deloadNaam}` : ''}. Open het via de planlijst om oefeningen "Proberen" toe te voegen. De deload start vanzelf op ${meso ? kort(meso.deloadStart) : 'de geplande dag'}.`}
+        </div>
+      )}
+
+      {/* Wat de klant koos bij de oefeningen die hij mocht proberen. */}
+      {geprobeerd.length > 0 && (
+        <div style={{ padding: '0.55rem 0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>Geprobeerd door de klant</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+            {geprobeerd.map(g => (
+              <span key={g.naam} style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>
+                {g.naam} <span style={{ fontWeight: 700, color: g.wil ? '#10b981' : 'rgba(255,255,255,0.5)' }}>{g.wil ? '· wil hij erin' : '· liever niet'}</span>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

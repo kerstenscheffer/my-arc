@@ -100,10 +100,13 @@ export function getMesoStatus(fase, vandaag = iso(new Date())) {
   }
 }
 
-const rpc = async (db, naam, args) => {
+// `tekstAntwoord`: start_deload en eind_deload geven 'ok' of de reden waarom
+// het niet kon. De andere functies geven een id terug; dat is geen fout
+// (13 nov 2026: het id van de nieuwe mesocyclus verscheen als foutmelding).
+const rpc = async (db, naam, args, tekstAntwoord = false) => {
   const { data, error } = await db.supabase.rpc(naam, args)
   if (error) return { error: error.message }
-  if (typeof data === 'string' && data !== 'ok') return { error: data }
+  if (tekstAntwoord && data !== 'ok') return { error: data || 'Mislukt' }
   return { data, error: null }
 }
 
@@ -124,11 +127,11 @@ export async function startDeload(db, fase, { reden = 'gepland' } = {}) {
     const t = await berekenGemetenTdee(db, fase.client_id).catch(() => null)
     kcal = t?.betrouwbaarheid === 'hoog' ? t.tdee_gemeten : (t?.tdee_formule || null)
   }
-  const res = await rpc(db, 'start_deload', { p_fase: fase.id, p_kcal: kcal ? Math.round(kcal) : null, p_reden: reden })
+  const res = await rpc(db, 'start_deload', { p_fase: fase.id, p_kcal: kcal ? Math.round(kcal) : null, p_reden: reden }, true)
   return { ...res, kcal }
 }
 
-export const eindDeload = (db, faseId) => rpc(db, 'eind_deload', { p_fase: faseId })
+export const eindDeload = (db, faseId) => rpc(db, 'eind_deload', { p_fase: faseId }, true)
 
 // Gemeten TDEE overnemen als de TDEE van de klant (zelfde velden als het fasepaneel).
 export async function neemTdeeOver(db, clientId, tdee) {

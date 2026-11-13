@@ -324,3 +324,79 @@ revoke all on function public.mesocyclus_nachtrun() from public, anon, authentic
 
 select cron.unschedule('mesocyclus-nachtrun') where exists (select 1 from cron.job where jobname = 'mesocyclus-nachtrun');
 select cron.schedule('mesocyclus-nachtrun', '10 2 * * *', $cron$select public.mesocyclus_nachtrun()$cron$);
+
+-- 11. Gemeten TDEE in de database, zelfde regels als berekenGemetenTdee in de
+--     app: 21 dagen, trendlijn door de wegingen, alleen volledig gelogde dagen
+--     (>= 60% van het kcal-doel), deload-dagen tellen niet mee, minimaal 8
+--     wegingen en 10 logdagen. Voor de nachtrun.
+create or replace function public._gemeten_tdee(p_client uuid, p_dagen int default 21)
+returns jsonb language plpgsql stable security definer set search_path to 'public' as $$
+declare
+  v_tot date := (now() at time zone 'Europe/Amsterdam')::date;
+  v_van date := v_tot - (p_dagen - 1);
+  v_doel numeric; v_formule numeric; v_drempel numeric;
+  v_weg int; v_helling numeric; v_log int; v_inname numeric; v_tdee numeric;
+begin
+  select target_calories, tdee into v_doel, v_formule from clients where id = p_client;
+  v_drempel := case when coalesce(v_doel, 0) > 0 then v_doel * 0.6 else 1000 end;
+
+  with deload as (
+    select (coalesce(f.deload_gestart_op, case when f.nummer is null then f.start_datum + f.bouw_weken * 7 end) + i)::date dag
+      from training_fases f, generate_series(0, greatest(f.deload_dagen, 1) - 1) i
+     where f.client_id = p_client
+       and coalesce(f.deload_gestart_op, case when f.nummer is null then f.start_datum + f.bouw_weken * 7 end) is not null
+  )
+  select count(*), regr_slope(w.weight, (w.date - v_van)::numeric) into v_weg, v_helling
+    from weight_challenge_logs w
+   where w.client_id = p_client and w.date between v_van and v_tot and w.weight > 0
+     and w.date not in (select dag from deload);
+
+  with deload as (
+    select (coalesce(f.deload_gestart_op, case when f.nummer is null then f.start_datum + f.bouw_weken * 7 end) + i)::date dag
+      from training_fases f, generate_series(0, greatest(f.deload_dagen, 1) - 1) i
+     where f.client_id = p_client
+       and coalesce(f.deload_gestart_op, case when f.nummer is null then f.start_datum + f.bouw_weken * 7 end) is not null
+  ), d as (
+    select (m.consumed_at at time zone 'Europe/Amsterdam')::date dag, sum(coalesce(m.calories, 0)) kcal
+      from consumed_meals m
+     where m.client_id = p_client
+       and m.consumed_at >= (v_van::timestamp at time zone 'Europe/Amsterdam')
+       and m.consumed_at <  ((v_tot + 1)::timestamp at time zone 'Europe/Amsterdam')
+     group by 1
+  )
+  select count(*), avg(kcal) into v_log, v_inname from d where kcal >= v_drempel and dag not in (select dag from deload);
+
+  if coalesce(v_weg, 0) < 8 or coalesce(v_log, 0) < 10 then
+    return jsonb_build_object('tdee_gemeten', null, 'tdee_formule', v_formule, 'betrouwbaarheid', 'te weinig data', 'weegdagen', coalesce(v_weg, 0), 'logdagen', coalesce(v_log, 0));
+  end if;
+  v_tdee := round((v_inname - coalesce(v_helling, 0) * 7700) / 10) * 10;
+  return jsonb_build_object('tdee_gemeten', v_tdee, 'tdee_formule', v_formule,
+    'betrouwbaarheid', case when v_log >= 14 and v_weg >= 12 then 'hoog' else 'middel' end, 'weegdagen', v_weg, 'logdagen', v_log);
+end $$;
+revoke all on function public._gemeten_tdee(uuid, int) from public, anon, authenticated;
+
+-- 12. Nachtrun, definitieve versie (vervangt die van punt 10): in een cut gaan
+--     de kcal bij de deload naar onderhoud, net als bij de knop van de coach:
+--     gemeten TDEE bij betrouwbaarheid hoog, anders clients.tdee.
+create or replace function public.mesocyclus_nachtrun() returns void
+language plpgsql security definer set search_path to 'public' as $$
+declare f record; v_vandaag date := (now() at time zone 'Europe/Amsterdam')::date; t jsonb; v_kcal int;
+begin
+  for f in select * from training_fases where actief and nummer is not null and afgerond_op is null loop
+    begin
+      if f.deload_gestart_op is null and v_vandaag >= f.start_datum + f.bouw_weken * 7 then
+        v_kcal := null;
+        if exists (select 1 from client_phases p where p.client_id = f.client_id and p.ended_on is null and lower(p.doel) = 'cut') then
+          t := _gemeten_tdee(f.client_id);
+          v_kcal := case when t ->> 'betrouwbaarheid' = 'hoog' then (t ->> 'tdee_gemeten')::numeric::int else (t ->> 'tdee_formule')::numeric::int end;
+        end if;
+        perform _start_deload(f.id, v_kcal, 'gepland');
+      elsif f.deload_gestart_op is not null and v_vandaag >= f.deload_gestart_op + f.deload_dagen then
+        perform _eind_deload(f.id);
+      end if;
+    exception when others then
+      null; -- één klant mag de rest niet tegenhouden
+    end;
+  end loop;
+end $$;
+revoke all on function public.mesocyclus_nachtrun() from public, anon, authenticated;
