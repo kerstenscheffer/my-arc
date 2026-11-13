@@ -52,6 +52,7 @@ const SPIER_BLOKKEN = [
 import KrachtGrafiek from './components/KrachtGrafiek'
 import WorkoutLogsModal from './components/WorkoutLogsModal'
 import PlanHistorieModal from './components/PlanHistorieModal'
+import GymKoppeling from './components/GymKoppeling'
 import SpierOverzicht from './components/SpierOverzicht'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -1233,6 +1234,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </option>
               ))}
             </select>
+          )}
+          {effectiveClient && selectedSchemaId && (
+            <GymKoppeling db={db} client={effectiveClient} schemaId={selectedSchemaId} weekStructure={huidigPlan?.week_structure} plannen={clientSchemas} knopStijl={iconKnop()} />
           )}
           {effectiveClient && (<>
             <KlantAanpassingen db={db} client={effectiveClient} knopStijl={iconKnop()} refreshKey={agendaKey} />

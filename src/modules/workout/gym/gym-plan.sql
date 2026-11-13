@@ -48,10 +48,9 @@ begin
 
     select schema_id, workout_schedule into g from client_gyms where id = new.actieve_gym_id and client_id = new.id;
     if g.schema_id is null or g.schema_id is not distinct from old.assigned_schema_id then return new; end if;
-    if not exists (select 1 from workout_schemas s where s.id = g.schema_id
-                    and (s.client_id = new.id or s.client_id is null) and not coalesce(s.is_archived, false)) then
-      return new;
-    end if;
+    -- Het plan moet nog bestaan. Niet strenger: het plan dat een klant al volgde
+    -- kan een gedeeld plan zijn dat niet op zijn naam staat.
+    if not exists (select 1 from workout_schemas s where s.id = g.schema_id) then return new; end if;
 
     -- Had de vorige sportschool nog geen plan, dan onthoudt hij nu wat er liep.
     if old.actieve_gym_id is not null and old.assigned_schema_id is not null then

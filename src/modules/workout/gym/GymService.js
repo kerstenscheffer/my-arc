@@ -28,7 +28,8 @@ export async function haalGyms(db, clientId) {
   if (!db?.supabase || !clientId) return { gyms: [], actiefId: null }
   const [gymRes, klantRes] = await Promise.all([
     db.supabase.from('client_gyms')
-      .select('id, naam, eenheid')
+      // schema_id: het plan dat bij deze sportschool hoort (gym-plan.sql).
+      .select('id, naam, eenheid, schema_id')
       .eq('client_id', clientId)
       .order('naam', { ascending: true })
       .then(r => r, e => ({ data: [], error: e })),
@@ -45,10 +46,16 @@ export async function haalGyms(db, clientId) {
   return { gyms, actiefId }
 }
 
+// Heeft de sportschool een eigen plan, dan wisselt de database het actieve
+// plan mee (trigger trg_gym_wissel_plan). `planGewisseld` zegt of dat gebeurde,
+// zodat het scherm het nieuwe plan kan ophalen.
 export async function kiesGym(db, clientId, gymId) {
-  const { error } = await db.supabase
-    .from('clients').update({ actieve_gym_id: gymId }).eq('id', clientId)
+  const { data: voor } = await db.supabase.from('clients').select('assigned_schema_id').eq('id', clientId).maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  const { data: na, error } = await db.supabase
+    .from('clients').update({ actieve_gym_id: gymId }).eq('id', clientId).select('assigned_schema_id').maybeSingle()
   if (error) return { error: error.message }
+  const planGewisseld = !!na && !!voor && na.assigned_schema_id !== voor.assigned_schema_id
 
   // Wissel je halverwege de dag, dan hoort de training van vandaag mee te
   // verhuizen. De sessie wordt bij de eerste set aangemaakt en draagt dan nog
@@ -59,7 +66,16 @@ export async function kiesGym(db, clientId, gymId) {
     .update({ gym_id: gymId })
     .eq('client_id', clientId)
     .eq('workout_date', vandaag)
-  return { error: null }
+  return { error: null, planGewisseld }
+}
+
+// Coach: een plan aan een sportschool hangen of ervan losmaken.
+// `weekindeling` = de startindeling voor dat plan ({ Monday: 'dag1', … }).
+export async function koppelPlanAanGym(db, gymId, schemaId, weekindeling = null) {
+  const { error } = await db.supabase.from('client_gyms')
+    .update({ schema_id: schemaId, workout_schedule: schemaId ? weekindeling : null, updated_at: new Date().toISOString() })
+    .eq('id', gymId)
+  return { error: error?.message || null }
 }
 
 export async function bewaarGym(db, { id, clientId, naam, eenheid }) {

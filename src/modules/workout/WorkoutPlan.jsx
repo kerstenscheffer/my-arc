@@ -155,6 +155,17 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
   // Het compliment verwijst naar de grafiek; die zit nu in een blad in plaats
   // van ergens onderaan de pagina, dus openen we dat blad.
 
+  // Van sportschool gewisseld en die heeft een eigen plan (13 nov 2026): klant
+  // en schema opnieuw ophalen, net als na een planwissel.
+  useEffect(() => {
+    const herlaad = async () => {
+      if (onClientUpdate) { try { await onClientUpdate() } catch { window.location.reload() } }
+      else window.location.reload()
+    }
+    window.addEventListener('myarc:plan-gewisseld', herlaad)
+    return () => window.removeEventListener('myarc:plan-gewisseld', herlaad)
+  }, [onClientUpdate])
+
   const handleWizardComplete = (newSchedule) => { setWeekSchedule(newSchedule); setShowWizard(false) }
   const handleWorkoutCompleted = () => { setChallengeRefreshKey(prev => prev + 1) }
 

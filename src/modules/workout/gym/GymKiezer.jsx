@@ -35,8 +35,10 @@ export default function GymKiezer({ db, client, isMobile }) {
   const wissel = async (gym) => {
     setActiefId(gym.id)
     setOpen(false)
-    const { error } = await kiesGym(db, client.id, gym.id)
-    if (error) { alert(`Wisselen mislukt: ${error}`); laad() }
+    const { error, planGewisseld } = await kiesGym(db, client.id, gym.id)
+    if (error) { alert(`Wisselen mislukt: ${error}`); laad(); return }
+    // Deze sportschool heeft een eigen plan: de workoutpagina haalt het op.
+    if (planGewisseld) window.dispatchEvent(new CustomEvent('myarc:plan-gewisseld'))
   }
 
   // Niets ingesteld: één zachte uitnodiging in plaats van een lege dropdown.
@@ -98,6 +100,8 @@ export default function GymKiezer({ db, client, isMobile }) {
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {g.naam}
                   </span>
+                  {/* Eigen plan: kiezen wisselt ook je training (13 nov 2026). */}
+                  {g.schema_id && <span style={{ flexShrink: 0, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>eigen plan</span>}
                   <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
                     {eenheidLabel(g.eenheid)}
                   </span>
