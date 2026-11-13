@@ -10,18 +10,19 @@
 // De klantkiezer staat in CoachAgendaTab en de rest in ClientAgendaView;
 // daarom staan deze stijlen apart en niet in één van die twee bestanden.
 
-export const BALK_HOOGTE = 30
-export const BALK_HOOGTE_MOBIEL = 28
+export const BALK_HOOGTE = 32
+export const BALK_HOOGTE_MOBIEL = 30
 
 export const balkHoogte = (isMobile) => (isMobile ? BALK_HOOGTE_MOBIEL : BALK_HOOGTE)
 
-const RAND = 'rgba(255,255,255,0.10)'
-const VULLING = 'rgba(255,255,255,0.04)'
+// Kaal, zoals de kopbalk van de workout-builder (13 nov 2026, Kersten): geen
+// vlak en geen rand, alleen tekst en iconen op één lijn. De randen blijven
+// als doorzichtige lijntjes bestaan, zodat een element dat wél een kleur zet
+// (de waarschuwing, "Vandaag") niet verspringt.
+const RAND = 'transparent'
+const VULLING = 'transparent'
 
-/**
- * Basisvorm voor elk element in de balk: knop, keuzelijst of label.
- * Hoekjes bewust vierkant — dat is de vorm die de agenda eronder ook heeft.
- */
+/** Basisvorm voor elk element in de balk: knop, keuzelijst of label. */
 export const balkVak = (isMobile, extra = {}) => ({
   height: balkHoogte(isMobile),
   display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -31,10 +32,10 @@ export const balkVak = (isMobile, extra = {}) => ({
   borderBottom: `1px solid ${RAND}`,
   borderLeft: `1px solid ${RAND}`,
   borderRight: `1px solid ${RAND}`,
-  borderRadius: 0,
-  color: 'rgba(255,255,255,0.85)',
+  borderRadius: 8,
+  color: 'rgba(255,255,255,0.75)',
   fontFamily: 'inherit',
-  fontSize: isMobile ? '0.72rem' : '0.74rem',
+  fontSize: isMobile ? '0.78rem' : '0.85rem',
   fontWeight: 800,
   whiteSpace: 'nowrap',
   outline: 'none',
@@ -64,9 +65,9 @@ export const balkIconKnop = (isMobile) => balkVak(isMobile, {
  * Dun streepje tussen twee groepen. Scheidt "welke klant / welke week" van
  * "wat doe ik" zonder er een kader omheen te zetten.
  */
-export const balkScheiding = (isMobile) => ({
+export const balkScheiding = () => ({
   width: 1,
-  height: balkHoogte(isMobile) - 10,
+  height: 18,
   background: 'rgba(255,255,255,0.12)',
   flexShrink: 0,
   margin: '0 2px',

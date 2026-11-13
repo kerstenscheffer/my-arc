@@ -1,7 +1,7 @@
 // CoachHub wrapper voor de client-agenda. Toont een dropdown om een
 // klant te kiezen en daaronder de ClientAgendaView voor die klant.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { User } from 'lucide-react'
 import ClientAgendaView from './ClientAgendaView'
 import { balkVak } from './werkbalkStijl'
@@ -23,6 +23,28 @@ export default function CoachAgendaTab({ db, clients = [], selectedClient, onCli
     }
   }, [clients, internalClient, onClientSelect])
 
+  // Vaste hoogte tot net boven de coach-navbalk: de werkbalk en de dagkoppen
+  // blijven dan staan en alleen het rooster scrollt. Zonder dit groeide de
+  // agenda mee met zijn inhoud en scrolde de hele pagina, werkbalk incluis.
+  // In split screen regelt de strook de hoogte al (--paneel-hoogte).
+  const vakRef = useRef(null)
+  const [hoogte, setHoogte] = useState('100%')
+  const [inSplit, setInSplit] = useState(false)
+  useLayoutEffect(() => {
+    const meet = () => {
+      const el = vakRef.current
+      if (!el) return
+      if (getComputedStyle(el).getPropertyValue('--paneel-hoogte').trim()) { setHoogte('100%'); setInSplit(true); return }
+      setInSplit(false)
+      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
+      // 90 = de ruimte die CoachHub onderaan vrijhoudt voor zijn navbalk.
+      setHoogte(`calc(100dvh - ${top + 90}px)`)
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [])
+
   const handleChange = (e) => {
     const c = clients.find(x => x.id === e.target.value)
     if (c) {
@@ -32,22 +54,23 @@ export default function CoachAgendaTab({ db, clients = [], selectedClient, onCli
   }
 
   return (
-    <div style={{
+    <div ref={vakRef} style={{
       display: 'flex', flexDirection: 'column',
-      height: '100%', overflow: 'hidden',
+      height: hoogte, overflow: 'hidden',
       background: '#0a0a0a',
     }}>
       {/* De klantkiezer stond als eigen regel boven de agenda. Hij schuift
           nu de werkbalk van de agenda in, zodat klantnaam, week, inplannen,
           selecteren en het weekbudget samen op één regel staan. */}
       {/* Agenda view */}
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {internalClient
           ? <ClientAgendaView
               client={internalClient} db={db} isMobile={isMobile}
               werkbalkExtra={(
-                <div style={balkVak(isMobile, { padding: '0 0 0 0.5rem', color: '#fff' })}>
-                  <User size={12} color="rgba(255,255,255,0.4)" />
+                // Linksboven zweeft de Terug-knop van CoachHub: daar blijft ruimte vrij.
+                <div style={balkVak(isMobile, { padding: 0, marginLeft: (!isMobile && !inSplit) ? 48 : 0 })}>
+                  <User size={14} />
                   <select
                     value={internalClient?.id || ''}
                     onChange={handleChange}

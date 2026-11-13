@@ -67,7 +67,10 @@ const VERZET_STAPPEN = [
 // Agenda. Dit past niet meer op één scherm — de omhullende scrollt, en dat
 // is hier de bedoeling: met alles samengeperst op 520 pixels stonden vier
 // maaltijden in de ochtend als streepjes op elkaar.
-const GRID_MIN_HOOGTE = { desktop: 1080, mobiel: 900 }
+// Desktop van 1080 naar 900 (13 nov 2026, Kersten: wat minder groot): 50
+// pixels per uur. Het rooster scrollt binnen zijn eigen vlak, de dagkoppen
+// blijven bovenaan staan.
+const GRID_MIN_HOOGTE = { desktop: 900, mobiel: 900 }
 const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
 const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
 const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
@@ -423,8 +426,10 @@ function DayColumn({
         padding: isMobile ? '0 0.3rem' : '0 0.4rem',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         borderBottom: `1px solid ${COLORS.border}`,
-        background: 'rgba(0,0,0,0.3)',
-        position: 'relative', boxSizing: 'border-box',
+        // Blijft staan terwijl het rooster eronder scrollt; dekkend, anders
+        // schemeren de blokken er doorheen.
+        background: '#070707',
+        position: 'sticky', top: 0, zIndex: 6, flexShrink: 0, boxSizing: 'border-box',
       }}>
         {/* Eén regel: WOENSDAG 2 SEPT. Stond als drie regels onder elkaar —
             dagnaam, datum, aantal items — wat de kop hoger maakte dan de
@@ -566,8 +571,9 @@ function TimeAxis({ isMobile }) {
       <div style={{
         padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
         borderBottom: `1px solid ${COLORS.border}`,
-        background: 'rgba(0,0,0,0.3)',
+        background: '#070707',
         height: kopHoogte(isMobile),
+        position: 'sticky', top: 0, zIndex: 6, flexShrink: 0, boxSizing: 'border-box',
       }} />
       <div style={{
         position: 'relative',
@@ -2063,6 +2069,8 @@ export default function ClientAgendaView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap',
         flexShrink: 0, paddingBottom: 2,
+        // Coach: een kopbalk met een lijn eronder, net als de workout-builder.
+        ...(!isClient && !isMobile ? { minHeight: 46, paddingBottom: 0, borderBottom: '1px solid rgba(255,255,255,0.12)' } : null),
         // Bij de klant staat de weekkeuze onder de agenda: hij komt hier om
         // zijn dag te zien, niet om weken te kiezen. `order` in plaats van
         // het blok verplaatsen, zodat de coach-kant ongemoeid blijft.
@@ -2399,7 +2407,7 @@ export default function ClientAgendaView({
 
       {/* Week grid */}
       <div style={{
-        flex: 1,
+        flex: 1, minHeight: 0,
         display: 'flex',
         border: `1px solid ${COLORS.border}`,
         borderRadius: 0,

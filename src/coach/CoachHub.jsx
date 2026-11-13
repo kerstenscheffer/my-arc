@@ -37,7 +37,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, Smartphone, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck
+  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck, Utensils
 } from 'lucide-react'
 
 // Tabbladen als losse stukken: alleen het tabblad dat je opent wordt
@@ -129,16 +129,16 @@ const MORE_CATEGORIES = [
       // De challenge-hub stond wél in de switch maar niet in dit menu, dus je
       // kon er alleen komen door het hash zelf in te typen.
       { id: 'challenge-hub', label: 'Challenge', icon: Trophy },
-      { id: 'results', label: 'Resultaten', icon: Trophy }
+      { id: 'results', label: 'Resultaten', icon: BarChart3 } // eigen icoon: zonder tekst was hij niet te onderscheiden van Challenge
     ]
   },
   {
     label: 'Plan Making',
     items: [
-      { id: 'client-agenda', label: 'Client Agenda', icon: Calendar },
-      { id: 'ai-meals', label: 'AI Meals', icon: Sparkles },
+      { id: 'client-agenda', label: 'Agenda', icon: Calendar },
+      { id: 'ai-meals', label: 'Meal Builder', icon: Utensils },
       { id: 'workout-builder', label: 'Workout Builder', icon: Dumbbell },
-      { id: 'coachvids', label: 'Videos', icon: Video }
+      { id: 'coachvids', label: "Video's", icon: Video }
     ]
   },
   {
@@ -149,6 +149,14 @@ const MORE_CATEGORIES = [
     ]
   }
 ]
+
+// Het Meer-menu onderin: twee kolommen (13 nov 2026, Kersten). Links alles
+// voor het bedrijf, rechts alles voor het coachen, met de bouwtools bovenaan.
+// Meekijken staat als oogje naast de titel Coaching. Een tab die hier niet
+// genoemd is, valt vanzelf onderaan Coaching, zodat er nooit een verdwijnt.
+const MEER_BUSINESS = ['output', 'productivity', 'notifications-hub', 'app-versies']
+const MEER_COACHING = ['client-agenda', 'ai-meals', 'workout-builder', 'coachvids', 'week-review', 'checkins', 'challenge-hub', 'results']
+const MEER_OOGJE = 'client-view'
 
 // De zwevende navbalk staat fixed op bottom:14 en is ~50px hoog.
 const ZWEVENDE_NAV_RUIMTE = 76
@@ -1165,58 +1173,56 @@ export default function CoachHub() {
             boxShadow: '0 -18px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.04)',
             zIndex: 2147483647,
           }}>
-            {MORE_CATEGORIES.map((cat, catIdx) => (
-              <div key={cat.label}>
-                <div style={{
-                  padding: '0.55rem 1.1rem 0.35rem',
-                  fontSize: '0.55rem',
-                  fontWeight: 800,
-                  color: G.text,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  borderTop: catIdx > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                }}>
-                  {cat.label}
+            {(() => {
+              const alle = MORE_CATEGORIES.flatMap(c => c.items)
+              const vind = (id) => alle.find(t => t.id === id)
+              const rest = alle.filter(t => ![...MEER_BUSINESS, ...MEER_COACHING, MEER_OOGJE].includes(t.id))
+              const kolommen = [
+                { titel: 'Business', items: MEER_BUSINESS.map(vind).filter(Boolean) },
+                { titel: 'Coaching', items: [...MEER_COACHING.map(vind).filter(Boolean), ...rest], oogje: vind(MEER_OOGJE) },
+              ]
+              const ga = (id) => { navigateTo(id); setMoreOpen(false) }
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobile ? 6 : 14, padding: isMobile ? '0.9rem 0.6rem 0.5rem' : '1.1rem 1rem 0.6rem' }}>
+                  {kolommen.map(kol => (
+                    <div key={kol.titel} style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '0 0.5rem 0.45rem' : '0 0.7rem 0.55rem' }}>
+                        <span style={{ flex: 1, fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{kol.titel}</span>
+                        {kol.oogje && (
+                          <button onClick={() => ga(kol.oogje.id)} title="Meekijken met een klant" aria-label="Meekijken" style={{
+                            width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', cursor: 'pointer',
+                            background: activeTab === kol.oogje.id ? '#fff' : 'transparent', color: activeTab === kol.oogje.id ? '#000' : '#fff',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}>
+                            <Eye size={19} strokeWidth={2.4} />
+                          </button>
+                        )}
+                      </div>
+                      {/* Grote vakken, twee naast elkaar: icoon met de naam klein
+                          eronder (13 nov 2026, Kersten). */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobile ? 6 : 8 }}>
+                        {kol.items.map(item => {
+                          const Icon = item.icon
+                          const isActive = activeTab === item.id
+                          return (
+                            <button key={item.id} onClick={() => ga(item.id)} title={item.label} aria-label={item.label} style={{
+                              height: isMobile ? 64 : 76, borderRadius: 14, cursor: 'pointer',
+                              background: isActive ? '#fff' : 'rgba(255,255,255,0.05)', color: isActive ? '#000' : '#fff',
+                              border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+                              fontFamily: 'inherit', padding: '0 4px', minWidth: 0,
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}>
+                              <Icon size={isMobile ? 22 : 26} strokeWidth={2.2} />
+                              <span style={{ maxWidth: '100%', fontSize: isMobile ? '0.6rem' : '0.66rem', fontWeight: 800, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: isActive ? 1 : 0.7 }}>{item.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {cat.items.map(item => {
-                  const Icon = item.icon
-                  const isActive = activeTab === item.id
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => { navigateTo(item.id); setMoreOpen(false) }}
-                      style={{
-                        width: '100%',
-                        padding: '0.7rem 1.1rem',
-                        background: isActive ? G.bgStrong : 'transparent',
-                        border: 'none',
-                        color: isActive ? G.primary : 'rgba(255,255,255,0.7)',
-                        fontSize: '0.85rem',
-                        fontWeight: isActive ? 700 : 500,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.7rem',
-                        textAlign: 'left',
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <Icon size={16} style={{ opacity: isActive ? 1 : 0.6, flexShrink: 0 }} />
-                      {item.label}
-                      {isActive && (
-                        <div style={{
-                          marginLeft: 'auto',
-                          width: 6, height: 6, borderRadius: '50%',
-                          background: G.primary,
-                          boxShadow: `0 0 8px ${G.primary}`,
-                        }} />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+              )
+            })()}
 
             {/* Wissel naar het client-portaal. Stond als los icoon in de
                 onderbalk; daar kwam het nergens anders terug, dus nu hier. */}
