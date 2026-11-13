@@ -13,9 +13,10 @@
 // De borg telt pas als winst zodra de verlenging betaald is: de trigger uit
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
-import { useState, useEffect, useCallback } from 'react'
-import { Check } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Check, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
 import TrajectModal from '../coach-command-center/components/TrajectModal'
 import { computePeriod, hervatTraject } from '../coach-command-center/components/trajectPeriode'
@@ -95,7 +96,9 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [rijen, setRijen] = useState(null)
   const [fout, setFout] = useState(null)
   const [bezig, setBezig] = useState(null)
-  const [bevestig, setBevestig] = useState(null)
+  const [bevestig, setBevestig] = useState(null) // client_id die 'Zeker?' toont (4 s)
+  const bevestigKlok = useRef(null)
+  const [rijFout, setRijFout] = useState({}) // client_id → fout, rood onder de naam
   const [traject, setTraject] = useState(null) // { client, rij, sinds }
   const [borgen, setBorgen] = useState([]) // open challenge-sales die al betaald zijn
   const [borgKeuze, setBorgKeuze] = useState({}) // client_id → gekozen borg
@@ -292,22 +295,49 @@ export default function GinoDoorstap({ isMobile = false }) {
     } catch (e) { setFout(e.message || 'Opslaan mislukt') }
   }
 
+  // Fout op de rij zelf (rood onder de naam) en in app_fouten. Bovenaan zag je hem vaak niet.
+  const rijMislukt = (clientId, e, wat) => {
+    const tekst = e?.message || wat
+    setRijFout(o => ({ ...o, [clientId]: tekst }))
+    const naam = rijen?.find(x => x.client_id === clientId)?.klant
+    const melding = new Error(`${wat}${naam ? ` (${naamVan(naam)})` : ''}: ${tekst}${e?.code ? ` [${e.code}]` : ''}`)
+    if (e?.stack) melding.stack = e.stack
+    meldFout(melding, null, 'coach:business-os-doorstap')
+  }
+  const rijFoutWeg = (clientId) => setRijFout(o => { if (!o[clientId]) return o; const n = { ...o }; delete n[clientId]; return n })
+
   const wijzig = async (clientId, klantCoach, status, pakket) => {
-    setBezig(clientId); setFout(null)
+    setBezig(clientId); setFout(null); rijFoutWeg(clientId)
     try {
       await zetStatus(clientId, klantCoach, status, pakket)
       await laad()
-    } catch (e) { setFout(e.message || 'Opslaan mislukt') }
+    } catch (e) { rijMislukt(clientId, e, 'Stand opslaan mislukt') }
     setBezig(null)
   }
 
+  useEffect(() => () => clearTimeout(bevestigKlok.current), [])
+
+  // Klik 1 = 'Zeker?' (4 seconden), klik 2 binnen die tijd = opslaan. Bewust een klok en
+  // geen onBlur: Safari geeft een knop bij klikken geen focus, dus daar klopte dat niet.
   const betaald = async (r) => {
-    if (bevestig !== r.client_id) { setBevestig(r.client_id); return }
-    setBevestig(null); setFout(null)
+    if (bezig === r.client_id) return
+    if (bevestig !== r.client_id) {
+      clearTimeout(bevestigKlok.current)
+      setBevestig(r.client_id)
+      bevestigKlok.current = setTimeout(() => setBevestig(b => (b === r.client_id ? null : b)), 4000)
+      return
+    }
+    clearTimeout(bevestigKlok.current)
+    setBevestig(null); setFout(null); rijFoutWeg(r.client_id)
     if (!r.sale) {
+      // Verlenging staat al op betaald, alleen de stand niet (vorige keer halverwege mislukt):
+      // dan alleen de stand. Anders zou TrajectModal de omzet een tweede keer boeken.
+      if (r.betaaldeSale) { await wijzig(r.client_id, r.coach_id, 'betaald', r.pakket); return }
+      setBezig(r.client_id)
       const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
         .then(x => x, e => ({ error: e }))
-      if (error) { setFout(error.message || 'Klant laden mislukt'); return }
+      setBezig(null)
+      if (error) { rijMislukt(r.client_id, error, 'Klant laden mislukt'); return }
       setTraject({ client, rij: r, sinds: new Date().toISOString() })
       return
     }
@@ -318,9 +348,12 @@ export default function GinoDoorstap({ isMobile = false }) {
         .eq('id', r.sale.id).select('id').then(x => x, e => ({ error: e }))
       if (error) throw error
       if (!data?.length) throw new Error('Betaling niet opgeslagen (geen rechten op deze rij?)')
+      // Zelfde vorm als na laden: de sale is nu de betaalde.
+      setRijen(l => l.map(x => (x.client_id === r.client_id ? { ...x, sale: null, betaaldeSale: { ...r.sale, payment_received: true, borg_movement_id: borg } } : x)))
       await zetStatus(r.client_id, r.coach_id, 'betaald', r.pakket)
+      setRijen(l => l.map(x => (x.client_id === r.client_id ? { ...x, status: 'betaald' } : x)))
       await laad()
-    } catch (e) { setFout(e.message || 'Opslaan mislukt') }
+    } catch (e) { rijMislukt(r.client_id, e, 'Betaald opslaan mislukt') }
     setBezig(null)
   }
 
@@ -333,13 +366,14 @@ export default function GinoDoorstap({ isMobile = false }) {
       .gte('moved_at', t.sinds).limit(1)
       .then(x => x, () => ({ data: [] }))
     if (!data?.length) { await laad(); return }
+    await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
     const borg = borgKeuze[t.rij.client_id]
     if (borg) {
       const { error } = await supabase.from('lead_movements').update({ borg_movement_id: borg }).eq('id', data[0].id)
         .then(x => x, e => ({ error: e }))
-      if (error) setFout(error.message || 'Borg koppelen mislukt')
+      if (error) rijMislukt(t.rij.client_id, error, 'Borg koppelen mislukt')
+      else await laad()
     }
-    await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
   }
 
   if (rijen === null) return null
@@ -419,6 +453,8 @@ export default function GinoDoorstap({ isMobile = false }) {
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
       {/* Telefoon: eerst naam, stand, bedrag en vinkje; daaronder traject, week, eisen en eindcall. */}
       <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }
+        @keyframes gd-draai { to { transform: rotate(360deg) } }
+        .gd-draai { animation: gd-draai 0.8s linear infinite }
         .gd-rij { display: flex !important; flex-wrap: wrap; column-gap: 6px; row-gap: 2px }
         .gd-rij > * { min-width: 0 }
         .gd-rij > :nth-child(1) { order: 1; flex: 1 1 calc(100% - 180px) }
@@ -507,20 +543,34 @@ export default function GinoDoorstap({ isMobile = false }) {
                       </select>
                     )}
                     <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bedrag ? colors.textPrimary : colors.textSecondary }}>{bedrag ? euro(bedrag) : ''}</span>
-                    <span style={{ textAlign: 'right' }}>
-                      {r.status === 'ja_mondeling' && (
-                        <button type="button" disabled={bezig === r.client_id} onClick={() => betaald(r)}
-                          onBlur={() => setBevestig(b => (b === r.client_id ? null : b))}
-                          title={bevestig === r.client_id ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label="Betaald"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, padding: 0, borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: bevestig === r.client_id ? G : colors.textPrimary, color: colors.bg,
-                          }}>
-                          <Check size={13} strokeWidth={3.2} />
-                        </button>
-                      )}
+                    <span style={{ textAlign: 'right', position: 'relative' }}>
+                      {r.status === 'ja_mondeling' && (() => {
+                        const zeker = bevestig === r.client_id
+                        const laadt = bezig === r.client_id
+                        return (
+                          <>
+                            {(zeker || laadt) && (
+                              // Over het bedrag heen, zodat de kolommen niet verspringen.
+                              <span aria-live="polite" style={{ position: 'absolute', right: 'calc(100% + 2px)', top: '50%', transform: 'translateY(-50%)', padding: '0 4px', background: colors.bg, whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 900, color: G }}>
+                                {laadt ? 'Bezig' : 'Zeker?'}
+                              </span>
+                            )}
+                            <button type="button" disabled={laadt} onClick={() => betaald(r)}
+                              title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, padding: 0, borderRadius: 6, border: 'none', cursor: laadt ? 'default' : 'pointer',
+                                background: zeker || laadt ? G : colors.textPrimary, color: colors.bg, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              }}>
+                              {laadt ? <Loader2 size={13} strokeWidth={3.2} className="gd-draai" /> : <Check size={13} strokeWidth={3.2} />}
+                            </button>
+                          </>
+                        )
+                      })()}
                     </span>
                   </div>
+                  {rijFout[r.client_id] && (
+                    <div role="alert" style={{ padding: '0 0 5px', fontSize: '0.75rem', fontWeight: 800, color: colors.danger }}>{rijFout[r.client_id]}</div>
+                  )}
                   {looptijd?.id === r.client_id && (() => {
                     const w = Number(looptijd.weken)
                     const nieuwEind = looptijd.start && w >= 1 ? new Date(new Date(`${looptijd.start}T12:00:00`).getTime() + (w * 7 + (Number(r.klant.coaching_paused_days_total) || 0)) * 864e5).toLocaleDateString('sv-SE') : null
