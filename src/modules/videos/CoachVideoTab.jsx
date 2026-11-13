@@ -748,6 +748,7 @@ export default function CoachVideoTab({ clients = [], db }) {
           }}
           onSave={() => loadVideos()}
           customCategories={customCategories}
+          clients={localClients}
           db={db}
         />
       )}

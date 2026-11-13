@@ -57,7 +57,7 @@ export default function VideoUploadModal({
     show_in_slider: false,
     // Belangrijk = moet gezien worden: de video staat dan als blok ín de
     // gekozen pagina's tot de klant hem afspeelt of afvinkt.
-    is_belangrijk: false,
+    is_belangrijk: voorinvulling?.is_personal === true,
     is_personal: voorinvulling?.is_personal === true,
     ...(voorinvulling?.category_id ? { category_id: voorinvulling.category_id } : null),
   })
@@ -294,7 +294,7 @@ export default function VideoUploadModal({
                 return (
                   <button
                     key={opt.key}
-                    onClick={() => setAudience(opt.key)}
+                    onClick={() => { setAudience(opt.key); setFormData(prev => ({ ...prev, is_belangrijk: opt.key === 'specific' })) }}
                     style={{
                       flex: 1, padding: '0.6rem 0.5rem',
                       background: on ? GOLD : 'transparent',
@@ -407,8 +407,27 @@ export default function VideoUploadModal({
                   )
                 })}
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, marginTop: '0.6rem' }}>
-                De video komt alleen bij {gekozenNamen || 'de gekozen klant'} te staan, op deze pagina.
+              {/* Op de pagina zelf of alleen in de video-balk (13 nov 2026, Kersten:
+                  een toegewezen video stond alleen in het videovenster). */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.9rem' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: '#fff', marginBottom: '0.15rem' }}>
+                    Als blok op de pagina zetten
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+                    {formData.is_belangrijk
+                      ? `Staat bovenaan de ${paginaLabel(assignPage)}-pagina van ${gekozenNamen || 'de klant'} tot hij bevestigt dat hij hem gezien heeft. Daarna alleen nog in de bibliotheek.`
+                      : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
+                  aria-pressed={formData.is_belangrijk}
+                  style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? '#fff' : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+                </button>
               </div>
             </div>
           )}

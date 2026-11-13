@@ -132,6 +132,14 @@ export default function VideoRow({
           >
             Delen
           </button>
+          {/* Bewerken direct op de kaart (13 nov 2026, Kersten); stond alleen in het menu. */}
+          <button onClick={onEdit} title="Bewerken" aria-label="Bewerken" style={{
+            width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
+            color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <Pencil size={14} />
+          </button>
           <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
             <button
               onClick={() => setMenuOpen(v => !v)}
@@ -247,6 +255,13 @@ export default function VideoRow({
         }}
       >
         Delen
+      </button>
+      <button onClick={onEdit} title="Bewerken" aria-label="Bewerken" style={{
+        width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
+        color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <Pencil size={15} />
       </button>
 
       <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>

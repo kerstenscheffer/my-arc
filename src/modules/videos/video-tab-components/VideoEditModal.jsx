@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
-  Edit, X, Globe, Camera, Image as ImageIcon, Check, Youtube,
+  Edit, X, ChevronDown, Globe, Camera, Image as ImageIcon, Check, Youtube,
   Home, Dumbbell, Utensils, ShoppingCart, Camera as TrackingIcon, Phone, User
 } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
@@ -27,11 +27,41 @@ const PAGE_OPTIONS = [
   { value: 'profile',      label: 'Profile',      icon: User }
 ]
 
+// Eén rij: links het onderwerp, rechts wat er nu staat. Met `id` klapt hij open
+// (één tegelijk); met `rechts` staat de bediening in de rij zelf. Buiten het
+// venster gedefinieerd: binnenin zou elke toetsaanslag het veld opnieuw
+// opbouwen en ben je je cursor kwijt.
+function Rij({ id, label, waarde, rechts, titel, children, open, setOpen, zij }) {
+  const isOpen = !!id && open === id
+  return (
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div onClick={id ? () => setOpen(isOpen ? null : id) : undefined} title={titel} role={id ? 'button' : undefined} aria-expanded={id ? isOpen : undefined}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: `0 ${zij}`, cursor: id ? 'pointer' : 'default' }}>
+        <span style={{ flexShrink: 0, fontSize: '0.84rem', fontWeight: 800, color: '#fff' }}>{label}</span>
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {isOpen ? '' : waarde}
+        </span>
+        {rechts || (id && <ChevronDown size={15} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />)}
+      </div>
+      {isOpen && <div style={{ padding: `0 ${zij} 0.8rem` }}>{children}</div>}
+    </div>
+  )
+}
+
+function Schakel({ aan, onClick }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={!!aan} style={{ width: 40, height: 22, flexShrink: 0, padding: 0, border: 'none', borderRadius: 11, position: 'relative', cursor: 'pointer', background: aan ? '#fff' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s ease' }}>
+      <span style={{ position: 'absolute', top: 2, left: aan ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: aan ? '#0a0a0a' : '#fff', transition: 'left 0.2s ease' }} />
+    </button>
+  )
+}
+
 export default function VideoEditModal({ 
   video, 
   onClose, 
   onSave,
   customCategories = [],
+  clients = [],
   db
 }) {
   const modalHost = useModalHost()
@@ -49,6 +79,35 @@ export default function VideoEditModal({
   const [thumbnailPreview, setThumbnailPreview] = useState(video.thumbnail_url || null)
   const [thumbnailChanged, setThumbnailChanged] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState('video')
+  const [open, setOpen] = useState(null) // welke rij is uitgeklapt
+
+  // Toewijzingen aan klanten: staan in video_assignments, los van de video zelf.
+  const [toewijzingen, setToewijzingen] = useState(null) // null = laden
+  const [klantZoek, setKlantZoek] = useState('')
+  const [nieuwePagina, setNieuwePagina] = useState('workout')
+  const [bezigKlant, setBezigKlant] = useState(null)
+  const [klantFout, setKlantFout] = useState(null)
+  const klantNaam = (c) => `${c?.first_name || ''} ${c?.last_name || ''}`.trim() || c?.email || 'Klant'
+  const laadToewijzingen = async () => setToewijzingen(await videoService.getVideoAssignments(video.id))
+  useEffect(() => { laadToewijzingen() }, [video.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const naKlantWijziging = async (res) => {
+    setBezigKlant(null)
+    if (res && res.success === false) { setKlantFout(res.error || 'Wijzigen mislukt'); return }
+    setKlantFout(null)
+    await laadToewijzingen()
+    if (onSave) onSave() // de lijst erachter telt de klanten opnieuw
+  }
+  const wijzigPagina = async (t, pagina) => { setBezigKlant(t.id); naKlantWijziging(await videoService.updateAssignment(t.id, { page_context: pagina })) }
+  const haalKlantWeg = async (t) => { setBezigKlant(t.id); naKlantWijziging(await videoService.unassignVideo(video.id, [t.client_id])) }
+  const voegKlantToe = async (c) => {
+    setBezigKlant(c.id); setKlantZoek('')
+    naKlantWijziging(await videoService.assignVideo(video.id, [c.id], { pageContext: nieuwePagina }))
+  }
+  const alToegewezen = new Set((toewijzingen || []).map(t => t.client_id))
+  const teKiezen = (clients || [])
+    .filter(c => !alToegewezen.has(c.id) && klantNaam(c).toLowerCase().includes(klantZoek.trim().toLowerCase()))
+    .slice(0, 6)
 
   const isMobile = useIsMobile()
 
@@ -145,16 +204,6 @@ export default function VideoEditModal({
   }
 
   // Shared styles
-  const labelStyle = {
-    display: 'block',
-    fontSize: '0.4rem',
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.3)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    marginBottom: '0.4rem'
-  }
-
   const inputStyle = {
     width: '100%',
     padding: '0.6rem 0.75rem',
@@ -166,6 +215,11 @@ export default function VideoEditModal({
     fontWeight: '600',
     outline: 'none'
   }
+
+  const zij = isMobile ? '0.875rem' : '1.125rem'
+  const rij = { open, setOpen, zij }
+  const kiesStijl = { flexShrink: 0, maxWidth: 150, background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 700, textAlign: 'right', cursor: 'pointer', outline: 'none', padding: '0.3rem 0' }
+  const knopKlein = { minHeight: 34, display: 'inline-flex', alignItems: 'center', padding: '0 0.8rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, color: '#fff', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }
 
   return createPortal(
     <div
@@ -249,6 +303,18 @@ export default function VideoEditModal({
           </button>
         </div>
 
+        {/* Twee tabbladen (13 nov 2026, Kersten): de video zelf, en voor wie hij is.
+            Stond als één lange lijst waarin de klanten ontbraken. */}
+        <div style={{ display: 'flex', gap: 6, padding: isMobile ? '0.55rem 0.875rem' : '0.6rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          {[['video', 'Video'], ['wie', `Voor wie${toewijzingen?.length ? ` · ${toewijzingen.length}` : ''}`]].map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setTab(id)} style={{
+              flex: 1, minHeight: 36, borderRadius: 9, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+              background: tab === id ? '#fff' : 'transparent', color: tab === id ? '#000' : 'rgba(255,255,255,0.7)',
+              border: `1px solid ${tab === id ? '#fff' : 'rgba(255,255,255,0.12)'}`, touchAction: 'manipulation',
+            }}>{label}</button>
+          ))}
+        </div>
+
         {/* BODY */}
         <div
           className="edit-modal-body"
@@ -258,414 +324,90 @@ export default function VideoEditModal({
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* ── TITEL ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={labelStyle}>Titel *</label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              style={inputStyle}
-            />
-          </div>
+          {/* Alles als één rij per onderwerp (13 nov 2026, Kersten): links wat het
+              is, rechts wat er nu staat. Tikken klapt alleen die ene rij open. */}
+          {tab === 'video' && (<>
+            <Rij {...rij} id="titel" label="Titel" waarde={formData.title || 'Geen'}>
+              <input type="text" autoFocus value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Titel van de video" style={inputStyle} />
+            </Rij>
+            <Rij {...rij} id="link" label="Link" waarde={formData.video_url.replace(/^https?:\/\/(www\.)?/, '') || 'Geen'}>
+              <input type="url" autoFocus value={formData.video_url} onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} placeholder="YouTube, Instagram, TikTok of Zoom" style={inputStyle} />
+            </Rij>
+            <Rij {...rij} id="omslag" label="Omslag" waarde={thumbnailPreview ? 'Ingesteld' : 'Geen'}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {thumbnailPreview && <img src={thumbnailPreview} alt="" style={{ width: 112, aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 8, background: '#000' }} />}
+                <label htmlFor="edit-omslag" style={{ ...knopKlein, cursor: 'pointer' }}>{thumbnailPreview ? 'Vervangen' : 'Kies afbeelding'}</label>
+                {thumbnailPreview && <button type="button" onClick={removeThumbnail} style={{ ...knopKlein, color: 'rgba(255,255,255,0.6)' }}>Weghalen</button>}
+                <input id="edit-omslag" type="file" accept="image/jpeg,image/png,image/jpg" onChange={handleThumbnailChange} style={{ display: 'none' }} />
+              </div>
+            </Rij>
+            <Rij {...rij} id="beschrijving" label="Beschrijving" waarde={formData.description || 'Geen'}>
+              <textarea autoFocus value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Wat leert de klant hier?" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }} />
+            </Rij>
+            <Rij {...rij} label="Categorie" rechts={
+              <select value={formData.category_id || ''} onChange={(e) => setFormData({ ...formData, category_id: e.target.value || null })} style={kiesStijl}>
+                <option value="" style={{ background: '#0a0a0a' }}>Geen</option>
+                {customCategories.map(cat => <option key={cat.id} value={cat.id} style={{ background: '#0a0a0a' }}>{cat.name}</option>)}
+              </select>
+            } />
+            <Rij {...rij} label="Persoonlijk" titel="Voor één klant: blijft uit de bibliotheek van de anderen en staat bij de klant onder Voor jou"
+              rechts={<Schakel aan={formData.is_personal === true} onClick={() => setFormData({ ...formData, is_personal: !formData.is_personal })} />} />
+          </>)}
 
-          {/* ── YOUTUBE URL ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{
-              ...labelStyle,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}>
-              <Youtube size={10} />
-              YouTube URL *
-            </label>
-            <input
-              type="url"
-              value={formData.video_url}
-              onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-              placeholder="https://youtube.com/watch?v=... of /shorts/..."
-              style={inputStyle}
-            />
-          </div>
-
-          {/* ── BESCHRIJVING ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={labelStyle}>Beschrijving</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={3}
-              style={{
-                ...inputStyle,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                lineHeight: 1.4
-              }}
-            />
-          </div>
-
-          {/* ── CATEGORIE ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{
-              ...labelStyle,
-              color: customCategories.length > 0 ? WIT : 'rgba(255, 255, 255, 0.3)'
-            }}>
-              Categorie
-              {customCategories.length === 0 && (
-                <span style={{
-                  marginLeft: '0.4rem',
-                  color: 'rgba(255, 255, 255, 0.25)',
-                  fontWeight: '600',
-                  textTransform: 'none',
-                  letterSpacing: 0
-                }}>
-                  — maak er eerst één aan
-                </span>
-              )}
-            </label>
-            <select
-              value={formData.category_id || ''}
-              onChange={(e) => setFormData({
-                ...formData,
-                category_id: e.target.value || null
-              })}
-              disabled={customCategories.length === 0}
-              style={{
-                ...inputStyle,
-                cursor: customCategories.length === 0 ? 'not-allowed' : 'pointer',
-                opacity: customCategories.length === 0 ? 0.4 : 1
-              }}
-            >
-              <option value="" style={{ background: '#0a0a0a' }}>
-                — Geen categorie —
-              </option>
-              {customCategories.map(cat => (
-                <option key={cat.id} value={cat.id} style={{ background: '#0a0a0a' }}>
-                  {cat.name}
-                </option>
+          {tab === 'wie' && (<>
+            <Rij {...rij} id="klanten" label="Klanten" waarde={toewijzingen === null ? 'Laden…' : toewijzingen.length ? toewijzingen.map(t => klantNaam(t.client)).join(', ') : 'Niemand'}>
+              {toewijzingen?.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {klantNaam(t.client)}
+                    {t.status && t.status !== 'pending' && <span style={{ marginLeft: 6, fontSize: '0.66rem', fontWeight: 700, color: '#10b981' }}>bekeken</span>}
+                  </span>
+                  <select value={t.page_context || 'home'} disabled={bezigKlant === t.id} onChange={(e) => wijzigPagina(t, e.target.value)} style={kiesStijl}>
+                    {PAGE_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#0a0a0a' }}>{o.label}</option>)}
+                    {!PAGE_OPTIONS.some(o => o.value === (t.page_context || 'home')) && <option value={t.page_context} style={{ background: '#0a0a0a' }}>{t.page_context}</option>}
+                  </select>
+                  <button type="button" onClick={() => haalKlantWeg(t)} disabled={bezigKlant === t.id} title="Weghalen bij deze klant" aria-label="Weghalen"
+                    style={{ width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer' }}>
+                    <X size={15} />
+                  </button>
+                </div>
               ))}
-            </select>
-          </div>
-
-          {/* ── PERSOONLIJK ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={formData.is_personal === true}
-                onChange={(e) => setFormData({ ...formData, is_personal: e.target.checked })}
-                style={{ marginTop: 3, width: 16, height: 16, accentColor: '#fff', cursor: 'pointer' }}
-              />
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
-                  Persoonlijke video
-                </span>
-                <span style={{ display: 'block', marginTop: 2, fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
-                  Voor één klant: zijn plan, een aanpassing, uitleg over zijn
-                  situatie. Blijft uit de bibliotheek van de anderen en staat bij
-                  de klant onder "Voor jou" zodra je hem toewijst.
-                </span>
-              </span>
-            </label>
-          </div>
-
-          {/* ── THUMBNAIL ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{
-              ...labelStyle,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}>
-              <Camera size={10} />
-              Thumbnail
-            </label>
-
-            {thumbnailPreview ? (
-              <div style={{
-                position: 'relative',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                aspectRatio: '16 / 9',
-                background: '#000'
-              }}>
-                <img
-                  src={thumbnailPreview}
-                  alt="Thumbnail"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: '0.4rem',
-                  right: '0.4rem',
-                  display: 'flex',
-                  gap: '0.3rem'
-                }}>
-                  <label
-                    htmlFor="thumbnail-replace"
-                    style={{
-                      padding: '0.35rem 0.55rem',
-                      background: 'rgba(0, 0, 0, 0.75)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '6px',
-                      color: '#fff',
-                      fontSize: '0.55rem',
-                      fontWeight: '800',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                  >
-                    Vervang
-                  </label>
-                  <button
-                    onClick={removeThumbnail}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      background: 'rgba(239, 68, 68, 0.85)',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
-                      borderRadius: '6px',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                {thumbnailChanged && thumbnailFile && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '0.4rem',
-                    left: '0.4rem',
-                    padding: '0.2rem 0.45rem',
-                    background: WIT,
-                    borderRadius: '4px',
-                    fontSize: '0.55rem',
-                    fontWeight: '800',
-                    color: '#000',
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.2rem'
-                  }}>
-                    <Check size={10} strokeWidth={3} />
-                    Nieuwe afbeelding
-                  </div>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <input type="text" value={klantZoek} onChange={(e) => setKlantZoek(e.target.value)} placeholder="Klant toevoegen…" style={{ ...inputStyle, flex: 1 }} />
+                <select value={nieuwePagina} onChange={(e) => setNieuwePagina(e.target.value)} aria-label="Pagina voor de nieuwe klant" style={kiesStijl}>
+                  {PAGE_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#0a0a0a' }}>{o.label}</option>)}
+                </select>
+                <span style={{ width: 28, flexShrink: 0 }} />
               </div>
-            ) : (
-              <label
-                htmlFor="thumbnail-replace"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  padding: '1.25rem',
-                  background: '#000',
-                  border: '1px dashed rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '88px'
-                }}
-              >
-                <ImageIcon size={22} color="rgba(255, 255, 255, 0.2)" />
-                <div style={{
-                  fontSize: '0.7rem',
-                  fontWeight: '700',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em'
-                }}>
-                  Kies afbeelding
-                </div>
-                <div style={{
-                  fontSize: '0.6rem',
-                  color: 'rgba(255, 255, 255, 0.25)'
-                }}>
-                  JPG of PNG — max 5MB
-                </div>
-              </label>
-            )}
-
-            <input
-              id="thumbnail-replace"
-              type="file"
-              accept="image/jpeg,image/png,image/jpg"
-              onChange={handleThumbnailChange}
-              style={{ display: 'none' }}
-            />
-          </div>
-
-          {/* ── STANDAARD PAGINA'S ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{
-              ...labelStyle,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}>
-              <Globe size={10} />
-              Standaard zichtbaar op
-              {formData.default_pages.length > 0 && (
-                <span style={{
-                  marginLeft: '0.3rem',
-                  padding: '0.1rem 0.35rem',
-                  background: WIT,
-                  color: '#000',
-                  borderRadius: '3px',
-                  fontSize: '0.5rem',
-                  fontWeight: '800',
-                  letterSpacing: 0
-                }}>
-                  {formData.default_pages.length}
-                </span>
-              )}
-            </label>
-            <div style={{
-              fontSize: '0.65rem',
-              color: 'rgba(255, 255, 255, 0.4)',
-              lineHeight: 1.4,
-              marginBottom: '0.5rem'
-            }}>
-              Video automatisch zichtbaar bij alle clients op deze pagina's.
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
-              gap: '0.3rem'
-            }}>
-              {PAGE_OPTIONS.map(page => {
-                const Icon = page.icon
-                const isSelected = formData.default_pages.includes(page.value)
-                return (
-                  <button
-                    key={page.value}
-                    onClick={() => togglePage(page.value)}
-                    style={{
-                      padding: '0.55rem 0.4rem',
-                      background: isSelected ? WIT : 'transparent',
-                      border: isSelected
-                        ? `1px solid ${WIT}`
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '6px',
-                      color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
-                      fontSize: '0.65rem',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.3rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      minHeight: '40px',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Icon size={12} />
-                    {page.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ── BELANGRIJK ── */}
-          {/* Staat direct onder de pagina's: die twee horen bij elkaar. Een
-              video die gezien moet worden zonder pagina heeft geen plek om te
-              verschijnen. */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.is_belangrijk ? `3px solid ${WIT}` : '3px solid transparent',
-            transition: 'border-left-color 0.2s ease'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', color: '#fff', marginBottom: '0.15rem' }}>
-                  Belangrijk — moet gezien worden
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
-                  {formData.is_belangrijk
-                    ? 'Staat als blok ín de gekozen pagina’s tot de klant hem afspeelt of afvinkt. Daarna alleen nog in de bibliotheek.'
-                    : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
-                </div>
+              {klantZoek.trim() && (teKiezen.length === 0
+                ? <div style={{ padding: '0.5rem 0', fontSize: '0.74rem', color: 'rgba(255,255,255,0.4)' }}>Niemand gevonden</div>
+                : teKiezen.map(c => (
+                  <button key={c.id} type="button" onClick={() => voegKlantToe(c)} disabled={bezigKlant === c.id} style={{
+                    display: 'block', width: '100%', textAlign: 'left', minHeight: 36, padding: 0, background: 'transparent', border: 'none',
+                    color: '#fff', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                  }}>+ {klantNaam(c)}</button>
+                )))}
+              {klantFout && <div style={{ marginTop: 6, fontSize: '0.72rem', fontWeight: 700, color: '#f87171' }}>{klantFout}</div>}
+            </Rij>
+            <Rij {...rij} id="iedereen" label="Voor iedereen op" waarde={formData.default_pages.length ? formData.default_pages.map(v => PAGE_OPTIONS.find(o => o.value === v)?.label || v).join(', ') : 'Geen pagina'}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {PAGE_OPTIONS.map(page => {
+                  const aan = formData.default_pages.includes(page.value)
+                  return (
+                    <button key={page.value} type="button" onClick={() => togglePage(page.value)} style={{
+                      minHeight: 36, padding: '0 4px', borderRadius: 8, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                      background: aan ? '#fff' : 'transparent', color: aan ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{page.label}</button>
+                  )
+                })}
               </div>
-              <button
-                onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
-                style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? WIT : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
-              </button>
-            </div>
-          </div>
-
-          {/* ── IN HOME-SLIDER? ── */}
-          <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.show_in_slider ? `3px solid ${WIT}` : '3px solid transparent',
-            transition: 'border-left-color 0.2s ease'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', color: '#fff', marginBottom: '0.15rem' }}>
-                  Tonen in home-slider
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
-                  Verschijnt in de auto-roterende slider bovenaan de home-pagina (voor alle clients).
-                </div>
-              </div>
-              <button
-                onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })}
-                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? WIT : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div style={{ position: 'absolute', top: '2px', left: formData.show_in_slider ? '20px' : '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
-              </button>
-            </div>
-          </div>
+            </Rij>
+            <Rij {...rij} label="Moet gezien worden" titel="Staat als blok op de pagina tot de klant bevestigt dat hij hem gezien heeft"
+              rechts={<Schakel aan={formData.is_belangrijk} onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })} />} />
+            <Rij {...rij} label="Home-slider" titel="In de slider bovenaan de home-pagina, voor alle klanten"
+              rechts={<Schakel aan={formData.show_in_slider} onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })} />} />
+          </>)}
 
           <div style={{ height: '0.5rem' }} />
         </div>
