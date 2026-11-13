@@ -4,11 +4,10 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }
 // ============================================
 import React from 'react'
-import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { Ruler, Camera, ExternalLink, Target, Table2, X } from 'lucide-react'
 import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl } from './kolomKopStijl'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
-import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import FasePaneel from './FasePaneel'
 import DoelModal from './DoelModal'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
@@ -18,32 +17,37 @@ import SlaapInsight from './SlaapInsight'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
-// Eén regel die een blok open- en dichtklapt. Zelfde vorm voor elk blok, zodat
-// je aan de rand van de kolom ziet wat er nog meer is zonder dat het in beeld
-// staat.
-function Uitklap({ label, extra, open, onKlik, isMobile }) {
+// Venster voor de drie dingen die niet altijd in beeld hoeven: doelen & macro's,
+// de wegingentabel en de omtrek (13 nov 2026, Kersten). Zelfde kader als DoelModal.
+function Venster({ titel, icoon, breed = 520, isMobile, onSluit, children }) {
+  React.useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onSluit() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onSluit])
   return (
-    <button
-      onClick={onKlik}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-        padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
-        background: 'transparent', border: 'none',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
-        {label}
-      </span>
-      {extra && (
-        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>{extra}</span>
-      )}
-      {open
-        ? <ChevronUp size={15} strokeWidth={3} color="#fff" />
-        : <ChevronDown size={15} strokeWidth={3} color="#fff" />}
-    </button>
+    <div onClick={onSluit} style={{
+      position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.8)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0.5rem' : '1rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: breed, maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 16, overflow: 'hidden',
+      }}>
+        <div style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+          padding: isMobile ? '0.9rem 1rem' : '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.14)',
+        }}>
+          {icoon}
+          <span style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{titel}</span>
+          <button onClick={onSluit} aria-label="Sluiten" style={{
+            width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent',
+            color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}><X size={17} /></button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>{children}</div>
+      </div>
+    </div>
   )
 }
 
@@ -63,7 +67,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   const [nieuweFase, setNieuweFase] = React.useState(0)
   // Doel en macro's: dicht bij binnenkomst, want je opent deze kolom om te
   // kijken. Pas als de band zegt dat er iets moet veranderen klap je 'm open.
-  const [toonDoelen, setToonDoelen] = React.useState(false)
+  // Welk venster open staat: 'doelen' | 'tabel' | 'omtrek' | null.
+  const [venster, setVenster] = React.useState(null)
   // Het voorstel uit de band: hoeveel kcal erbij of eraf. Wordt getoond boven
   // het macro-paneel, en pas toegepast als je erop drukt.
   const [voorstel, setVoorstel] = React.useState(null)
@@ -84,6 +89,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // metingen en de doellijn zit daar ook in.
 
 
+  const kopIcoon = { ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* De kop 'Gewicht & Body' stond boven een kolom waar alles al over
@@ -92,6 +99,20 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
       {/* Kolomkop: 'Plan' op dezelfde plek als bij Training en Voeding,
           hier het weekdoel en het tempo (DoelModal). */}
       <KolomKopInhoud>
+        {/* Foto's: een knop in de kop in plaats van een blok onderaan (13 nov
+            2026, Kersten). Opent hetzelfde overzicht als voorheen. */}
+        <button onClick={() => setVenster('doelen')} title={`Doelen & macro's${client?.target_calories ? ` · ${Math.round(client.target_calories)} kcal` : ''}`} aria-label="Doelen en macro's" style={kopIcoon}><Target size={15} /></button>
+        {history.length > 0 && (
+          <button onClick={() => setVenster('tabel')} title="Tabel met wegingen" aria-label="Tabel met wegingen" style={kopIcoon}><Table2 size={15} /></button>
+        )}
+        {circumData?.latest && (
+          <button onClick={() => setVenster('omtrek')} title="Omtrek" aria-label="Omtrek" style={kopIcoon}><Ruler size={15} /></button>
+        )}
+        {photos.length > 0 && onOpenGallery && (
+          <button onClick={onOpenGallery} title="Alle foto's bekijken" style={kopKnopStijl}>
+            <Camera size={12} /> Foto's <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{photos.length}</span>
+          </button>
+        )}
         <button onClick={() => setDoelOpen(true)} title="Weekdoel en tempo aanpassen" style={kopKnopStijl}>
           <ExternalLink size={11} /> Plan
         </button>
@@ -131,106 +152,16 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <GewichtBandGrafiek
             client={client} history={history} fase={actieveFase} fases={alleFases}
             onNieuweFase={() => setNieuweFase(n => n + 1)}
-            onBijsturen={(kcal) => { setVoorstel(kcal); setToonDoelen(true) }}
+            onBijsturen={(kcal) => { setVoorstel(kcal); setVenster('doelen') }}
             isMobile={isMobile}
+            toonOordeel={false}
           />
         )}
-        {/* Bijsturen. Staat direct onder het oordeel, want dat is de zin waar
-            je op handelt: 'twee weken te snel → 100-200 kcal eraf'. */}
-        <Uitklap
-          label="Doelen & macro's"
-          extra={client?.target_calories ? `${Math.round(client.target_calories)} kcal` : 'nog niet gezet'}
-          open={toonDoelen}
-          onKlik={() => setToonDoelen(v => !v)}
-          isMobile={isMobile}
-        />
-        {toonDoelen && (
-          <DoelenMacrosPaneel
-            client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile}
-            fase={actieveFase}
-            voorstel={voorstel} onVoorstelWeg={() => setVoorstel(null)}
-          />
-        )}
-
         {/* Slaap hoort bij gewicht: een week slecht slapen laat de weegschaal
             stijgen zonder dat er aan het eten iets veranderd is, en dan zoek je
             in de verkeerde hoek. Verschijnt alleen als de klant logt. */}
         <SlaapInsight db={db} client={client} isMobile={isMobile} />
 
-        {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor
-            week/dag en de periode — de uitklapper 'Alle metingen' met zijn
-            eigen week/dag-knop is daarin opgegaan. */}
-        {history.length > 0 && (
-          <MetingenTabel client={client} history={history} fase={actieveFase} isMobile={isMobile} />
-        )}
-        {circumData?.latest && (
-          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Ruler size={12} color="rgba(255,255,255,0.5)" /><span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>Omtrek</span></div>
-              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{formatDate(circumData.latest.measurement_date)}</span>
-            </div>
-            {circumFields.map(f => {
-              const val = circumData.latest[f.key]; const prev = circumData.previous?.[f.key]
-              if (!val) return null
-              const d = prev ? parseFloat((val - prev).toFixed(1)) : null
-              return (
-                <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{f.label}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#fff' }}>{parseFloat(val).toFixed(1)}<span style={{ fontSize: '0.72rem', fontWeight: '500', opacity: 0.4 }}>cm</span></span>
-                    {d !== null && d !== 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: d < 0 ? '#10b981' : '#ef4444' }}>{d > 0 ? '+' : ''}{d}</span>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-        {photos.length > 0 && (
-          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Camera size={12} color="rgba(168,85,247,0.5)" /><span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(168,85,247,0.4)', letterSpacing: '-0.01em' }}>Foto's</span></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{photos.length}</span>
-                {onOpenGallery && (
-                  <button onClick={onOpenGallery} title="Alle foto's — vergroot overzicht" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 26, padding: '0 0.5rem', borderRadius: 7, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                    <Maximize2 size={11} /> Overzicht
-                  </button>
-                )}
-              </div>
-            </div>
-            {/* Drie hoeken naast elkaar, elk eerste foto tegen laatste met de
-                MA-overlay — hetzelfde beeld als op de trackingpagina. Stond
-                eerder als strip miniaturen van 52 bij 52 pixels; daar zie je
-                geen verschil op. */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: isMobile ? '0.3rem' : '0.5rem',
-              // Zonder bovengrens rekken ze mee met het paneel: met één sectie
-              // open werd elk vak ruim 400px. Dit is een preview, geen galerij.
-              maxWidth: isMobile ? '100%' : 520,
-            }}>
-              {[
-                { hoek: 'front', label: 'Voor' },
-                { hoek: 'side',  label: 'Zij' },
-                { hoek: 'back',  label: 'Achter' },
-              ].map(v => (
-                <BeforeAfterCard
-                  key={v.hoek}
-                  client={client}
-                  isMobile={isMobile}
-                  bare
-                  hoek={v.hoek}
-                  bijschrift={v.label}
-                  fotos={photos}
-                />
-              ))}
-            </div>
-
-            {/* De losse miniaturen blijven bereikbaar via Overzicht hierboven;
-                een aparte strip eronder zou dezelfde foto's dubbel tonen. */}
-          </div>
-        )}
         {/* Geen fase en geen wegingen. "Geen data" was hier een doodlopende
             straat: waar dan de fase-regel en de grafiek staan, stond niets, en
             de enige knop om een fase te beginnen zit ín die grafiek. Nu staat
@@ -266,6 +197,45 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Nog geen wegingen</div>
         )}
       </div>
+
+      {venster === 'doelen' && (
+        <Venster titel="Doelen & macro's" icoon={<Target size={15} color="#fff" strokeWidth={2.6} />} breed={640} isMobile={isMobile} onSluit={() => setVenster(null)}>
+          <DoelenMacrosPaneel
+            client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile}
+            fase={actieveFase}
+            voorstel={voorstel} onVoorstelWeg={() => setVoorstel(null)}
+          />
+        </Venster>
+      )}
+      {venster === 'tabel' && (
+        <Venster titel="Wegingen" icoon={<Table2 size={15} color="#fff" strokeWidth={2.6} />} isMobile={isMobile} onSluit={() => setVenster(null)}>
+          <MetingenTabel client={client} history={history} fase={actieveFase} isMobile={isMobile} />
+        </Venster>
+      )}
+      {venster === 'omtrek' && circumData?.latest && (
+        <Venster titel="Omtrek" icoon={<Ruler size={15} color="#fff" strokeWidth={2.6} />} breed={420} isMobile={isMobile} onSluit={() => setVenster(null)}>
+          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',  }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Ruler size={12} color="rgba(255,255,255,0.5)" /><span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>Omtrek</span></div>
+              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{formatDate(circumData.latest.measurement_date)}</span>
+            </div>
+            {circumFields.map(f => {
+              const val = circumData.latest[f.key]; const prev = circumData.previous?.[f.key]
+              if (!val) return null
+              const d = prev ? parseFloat((val - prev).toFixed(1)) : null
+              return (
+                <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{f.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#fff' }}>{parseFloat(val).toFixed(1)}<span style={{ fontSize: '0.72rem', fontWeight: '500', opacity: 0.4 }}>cm</span></span>
+                    {d !== null && d !== 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: d < 0 ? '#10b981' : '#ef4444' }}>{d > 0 ? '+' : ''}{d}</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Venster>
+      )}
 
       {/* Het weekdoel en het goede-tempo-bereik. Opent vanaf het potlood bij
           'Doel per week' in de cijferbalk. */}

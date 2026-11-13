@@ -159,6 +159,8 @@ function WeekTabel({ weken, startDatum, isMobile }) {
 // afgeeft. De klant ziet de lijn, de band en de cijfers.
 export default function GewichtBandGrafiek({
   client, history, fase = null, fases = [], onNieuweFase = null, onBijsturen = null, isMobile,
+  // Coach Inzicht laat het oordeelblok weg (13 nov 2026, Kersten: gebruikt het niet).
+  toonOordeel = true,
   klantModus = false,
   // Trackingpagina van de klant: het weekdoel staat op dezelfde regel als de
   // keuzes, en `tussen` (de tempo-strook) komt tussen die regel en de grafiek.
@@ -601,7 +603,7 @@ export default function GewichtBandGrafiek({
           daaronder wat je ermee doet. De grijze regels eronder zijn de cijfers
           waar het op rust; die lees je alleen als je twijfelt. Alleen bij één
           fase: over een reeks fases heen is 'op koers' betekenisloos. */}
-      {laatste && !klantModus && !model.alles && !model.zonderBand && (
+      {toonOordeel && laatste && !klantModus && !model.alles && !model.zonderBand && (
         <div style={{
           marginTop: 10, padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
           borderRadius: 12,

@@ -48,12 +48,13 @@ const dagNaam = (d) => {
 // lopen. Vaste breedtes: met 1fr schiet de laatste kolom in een breed paneel
 // naar de rechterrand.
 const KOLOMMEN = {
-  week: '3.4rem 5rem 4rem 3rem 1fr',
-  dag: '5.5rem 5rem 4rem 5rem',
+  week: '4rem 6rem 4.5rem 3.5rem 1fr',
+  dag: '7rem 6rem 4.5rem 6rem',
 }
 
 export default function MetingenTabel({ client, history, fase, isMobile }) {
-  const [weergave, setWeergave] = useState('week')     // 'week' | 'dag'
+  // Standaard de losse wegingen (13 nov 2026, Kersten); per week zit achter de keuze.
+  const [weergave, setWeergave] = useState('dag')     // 'week' | 'dag'
   const [periode, setPeriode] = useState(fase ? 'fase' : '4w')
 
   const model = useMemo(() => {
@@ -97,16 +98,17 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
   const kop = {
     display: 'grid', gridTemplateColumns: KOLOMMEN[weergave],
     gap: '0 0.9rem', alignItems: 'center', maxWidth: 'max-content',
-    fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+    // Dik wit: kopletters en lijnen (13 nov 2026, Kersten).
+    fontSize: '0.64rem', fontWeight: 900, color: '#fff',
     textTransform: 'uppercase', letterSpacing: '0.06em',
-    paddingBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.1)',
+    paddingBottom: 6, borderBottom: '2px solid #fff',
   }
   const rij = {
     display: 'grid', gridTemplateColumns: KOLOMMEN[weergave],
     gap: '0 0.9rem', alignItems: 'center', maxWidth: 'max-content',
-    fontSize: '0.72rem', fontWeight: 900, color: '#fff',
+    fontSize: '0.86rem', fontWeight: 900, color: '#fff',
     fontVariantNumeric: 'tabular-nums',
-    padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+    padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.3)',
   }
 
   return (
@@ -159,7 +161,7 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
                   <span style={{ textAlign: 'right', color: w.metingen >= 5 ? '#fff' : '#f59e0b' }}>
                     {w.metingen}×
                   </span>
-                  <span style={{ textAlign: 'right', color: kleur, fontSize: '0.66rem' }}>
+                  <span style={{ textAlign: 'right', color: kleur, fontSize: '0.74rem' }}>
                     {STATUS_TEKST[w.status] || '—'}
                     {w.wekenBuiten > 1 ? ` ${w.wekenBuiten}×` : ''}
                   </span>
@@ -179,17 +181,17 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
           {[...model.dagen].reverse().map(d => (
             <div key={d.datum} style={rij}>
               <span>
-                <span style={{ color: 'rgba(255,255,255,0.4)', marginRight: 5 }}>{dagNaam(d.datum)}</span>
+                <span style={{ color: 'rgba(255,255,255,0.55)', marginRight: 6 }}>{dagNaam(d.datum)}</span>
                 {datumKort(d.datum)}
               </span>
               <span style={{ textAlign: 'right' }}>{d.meting} kg</span>
               <span style={{
                 textAlign: 'right',
-                color: d.verschil == null ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.65)',
+                color: d.verschil == null ? 'rgba(255,255,255,0.3)' : '#fff',
               }}>
                 {d.verschil == null ? '—' : `${d.verschil > 0 ? '+' : ''}${d.verschil}`}
               </span>
-              <span style={{ textAlign: 'right', color: 'rgba(255,255,255,0.65)' }}>
+              <span style={{ textAlign: 'right' }}>
                 {d.trend} kg
               </span>
             </div>
