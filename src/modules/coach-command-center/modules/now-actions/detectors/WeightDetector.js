@@ -24,63 +24,9 @@ class WeightDetector {
     }
   }
 
-  // Detect wanneer laatste weging was
+  // Detect wanneer laatste weging was — uitgeschakeld (coach wil deze melding niet)
   async detectLastWeighIn(client) {
-    try {
-      // Check weight_history table (de actieve table)
-      const { data: lastEntry, error } = await this.db.supabase
-        .from('weight_history')
-        .select('date, weight')
-        .eq('client_id', client.id)
-        .order('date', { ascending: false })
-        .limit(1)
-        .single()
-      
-      if (error || !lastEntry) {
-        // Nooit gewogen
-        return {
-          id: `weight_never_${client.id}`,
-          clientId: client.id,
-          clientName: client.first_name,
-          type: 'weight',
-          priority: 'today',
-          urgencyScore: 55,
-          icon: '⚖️',
-          message: 'Nog nooit gewogen',
-          detail: 'Start weight tracking',
-          buttonText: 'START TRACKING',
-          data: {
-            type: 'no_weight_data'
-          }
-        }
-      }
-      
-      const daysSince = this.getDaysSince(lastEntry.date)
-      
-      // Alert als meer dan 7 dagen niet gewogen
-      if (daysSince > 7) {
-        return {
-          id: `weight_inactive_${client.id}`,
-          clientId: client.id,
-          clientName: client.first_name,
-          type: 'weight',
-          priority: daysSince > 14 ? 'urgent' : 'today',
-          urgencyScore: daysSince > 14 ? 75 : 50,
-          icon: '📊',
-          message: `${daysSince} dagen niet gewogen`,
-          detail: `Laatste: ${lastEntry.weight}kg op ${new Date(lastEntry.date).toLocaleDateString('nl-NL')}`,
-          buttonText: 'WEEG NU',
-          data: {
-            days_since: daysSince,
-            last_weight: lastEntry.weight
-          }
-        }
-      }
-      
-      return null
-    } catch (error) {
-      return null
-    }
+    return null
   }
 
   // Detect weight trend problemen
