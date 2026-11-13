@@ -16,6 +16,7 @@ import {
   applyMacroRules, computeMacros, calcBMR, surplusRuleFor, normalizeGoal,
 } from '../../../macros/macroRules'
 import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLogger'
+import { berekenGemetenTdee } from '../../../workout/bouwfase/mesocyclus'
 import {
   C, CARDIO_TYPES, DEFAULT_KCAL_PER_SESSION, DEFAULT_LIFESTYLE, LIFESTYLE_LEVELS,
 } from './insightTokens'
@@ -139,55 +140,21 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
         if (!cancelled && data?.weight != null) setLiveWeight(parseFloat(data.weight))
       })
 
-    ;(async () => {
-      const since = new Date(); since.setDate(since.getDate() - 14)
-      const sinceIso = since.toISOString().split('T')[0]
-
-      const { data: meals } = await db.supabase
-        .from('consumed_meals')
-        .select('calories, consumed_at')
-        .eq('client_id', client.id)
-        .gte('consumed_at', sinceIso + 'T00:00:00')
-
-      const { data: weights } = await db.supabase
-        .from('weight_challenge_logs')
-        .select('weight, date')
-        .eq('client_id', client.id)
-        .gte('date', sinceIso)
-        .order('date', { ascending: true })
-
-      if (cancelled) return
-      if (!meals?.length || !weights || weights.length < 2) return
-
-      const dailyKcal = {}
-      for (const m of meals) {
-        const day = (m.consumed_at || '').split('T')[0]
-        if (!day) continue
-        dailyKcal[day] = (dailyKcal[day] || 0) + (m.calories || 0)
-      }
-      const validDays = Object.keys(dailyKcal).length
-      if (validDays < 5) return // te weinig data → geen schatting tonen
-
-      const avgKcal = Object.values(dailyKcal).reduce((s, v) => s + v, 0) / validDays
-      const firstW = parseFloat(weights[0].weight)
-      const lastW = parseFloat(weights[weights.length - 1].weight)
-      const deltaKg = lastW - firstW
-      const daysSpan = Math.max(
-        1,
-        (new Date(weights[weights.length - 1].date) - new Date(weights[0].date)) / 86400000
-      )
-      // Real TDEE = wat hij at − energie die in lichaam ging zitten.
-      // Negatief delta (afval) → real TDEE > consumed.
-      const realTdee = Math.round(avgKcal - (deltaKg * 7700) / daysSpan)
-      if (!cancelled) {
-        setLogEstimate({
-          realTdee,
-          days: validDays,
-          avgKcal: Math.round(avgKcal),
-          deltaKg: Math.round(deltaKg * 10) / 10,
-        })
-      }
-    })()
+    // Gemeten TDEE (13 nov 2026): dezelfde berekening als in het mesocyclus-blok
+    // van de builder. Trendlijn door alle wegingen van 21 dagen, alleen volledig
+    // gelogde dagen, op Nederlandse tijd. Eerst: eerste min laatste weging over
+    // 14 dagen, vanaf 5 logdagen, met de dag uit de UTC-tijd geknipt.
+    berekenGemetenTdee(db, client.id).then(t => {
+      if (cancelled || !t?.tdee_gemeten) return
+      setLogEstimate({
+        realTdee: t.tdee_gemeten,
+        days: t.logdagen,
+        avgKcal: t.inname,
+        // Wat de trendlijn over de periode van 21 dagen doet.
+        deltaKg: Math.round(t.kg_per_week * 3 * 10) / 10,
+        betrouwbaarheid: t.betrouwbaarheid,
+      })
+    }, () => {})
 
     return () => { cancelled = true }
   }, [db, client?.id])
@@ -792,7 +759,7 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
             <span>Δ {logEstimate.deltaKg > 0 ? '+' : ''}{logEstimate.deltaKg} kg</span>
           </>
         ) : null,
-        missingHint: !logEstimate ? 'Min. 5 dagen aan eet-logs nodig om te schatten.' : null,
+        missingHint: !logEstimate ? 'Minimaal 10 volledig gelogde dagen en 8 wegingen in 21 dagen nodig.' : null,
         kcalText: includeLog && logEstimate
           ? (logCorrection >= 0 ? `+${logCorrection} kcal` : `${logCorrection} kcal`)
           : '—',

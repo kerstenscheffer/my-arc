@@ -1159,7 +1159,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
     { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
     { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
-    { id: 'fase', icon: <Flag size={16} />, label: 'Trainingsfase', onClick: () => setFaseOpen(v => !v), actief: faseOpen && !!selectedSchemaId, uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Bouwfase van 6-7 weken starten of stoppen' },
+    { id: 'fase', icon: <Flag size={16} />, label: 'Mesocyclus', onClick: () => setFaseOpen(v => !v), actief: faseOpen && !!selectedSchemaId, uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Mesocyclus starten, deload en gemeten TDEE' },
     { id: 'info', icon: <BarChart3 size={16} />, label: 'Planinfo', onClick: () => setInfoOpen(v => !v), actief: infoOpen },
     { id: 'instellingen', icon: <ChevronDown size={16} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none' }} />, label: 'Planinstellingen', onClick: () => setInstellingenOpen(v => !v), actief: instellingenOpen },
   ]
@@ -1636,7 +1636,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               )}
             </div>
 
-            {faseOpen && effectiveClient && selectedSchemaId && <FaseStarter key={effectiveClient.id} db={db} client={effectiveClient} schemaId={selectedSchemaId} plannen={clientSchemas} />}
+            {faseOpen && effectiveClient && selectedSchemaId && <FaseStarter key={effectiveClient.id} db={db} client={effectiveClient} schemaId={selectedSchemaId} plannen={clientSchemas} onGewijzigd={herlaadKlant} />}
             {infoOpen && <PlanInfo days={workoutPlan.days} />}
 
             {instellingenOpen && (

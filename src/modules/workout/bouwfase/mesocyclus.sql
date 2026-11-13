@@ -1,19 +1,22 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- VOORSTEL, NOG NIET UITGEVOERD (13 nov 2026). Wacht op go van Kersten.
---
 -- Mesocyclus + deload + gemeten TDEE, bovenop de bestaande bouwfase
--- (training_fases). Alleen toevoegen: bestaande rijen en oude app-versies
--- blijven werken. Een rij zonder `nummer` is een oude bouwfase en gedraagt zich
--- zoals altijd (deload op datum, zonder schema- of macrowissel).
+-- (training_fases). Uitgevoerd op 13 nov 2026 na akkoord van Kersten.
+--
+-- Alleen toevoegen: bestaande rijen en oude app-versies blijven werken. Een rij
+-- zonder `nummer` is een oude bouwfase en gedraagt zich zoals altijd (deload
+-- op datum, zonder schema- of macrowissel).
 --
 -- Wat een deload bij een NIEUWE mesocyclus doet:
 --   * het deload-schema (kopie met halve sets en reps) wordt het actieve plan;
 --   * de weekindeling blijft staan (zelfde dagen, zelfde dagnummers);
---   * in een cut gaan de kcal naar onderhoud, het verschil komt bij koolhydraten;
+--   * in een cut gaan de kcal naar onderhoud, het verschil komt bij koolhydraten
+--     (alleen via de knop van de coach: de nachtrun kent de gemeten TDEE niet);
 --   * de klant krijgt GEEN melding "nieuw trainingsschema": de app toont overal
 --     "Deload week";
 --   * de sportschoolkoppeling (gym-plan.sql) neemt het deload-schema niet over;
 --   * einde deload zet schema, weekindeling en macro's terug.
+-- De deload start vanzelf op de geplande dag en eindigt na deload_dagen
+-- (mesocyclus_nachtrun, elke nacht). Eerder starten kan met de knop.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- 1. Mesocyclus-velden op de fase. Allemaal leeg voor bestaande rijen.
@@ -85,18 +88,103 @@ begin
   return new;
 end $$;
 
--- 5. Deload starten. p_kcal: de nieuwe kcal (onderhoud) als de klant in een cut
+-- 5. Het deload-schema: een kopie van het plan met halve sets en halve reps.
+--    Reps: "8-12" → "4-6", "10" → "5"; iets als "tot falen" blijft staan.
+create or replace function public.deload_reps(p text) returns text
+language plpgsql immutable as $$
+declare m text[];
+begin
+  if p ~ '^\s*\d+\s*$' then return ceil(trim(p)::numeric / 2)::int::text; end if;
+  m := regexp_match(p, '^\s*(\d+)\s*-\s*(\d+)\s*$');
+  if m is not null then return ceil(m[1]::numeric / 2)::int::text || '-' || ceil(m[2]::numeric / 2)::int::text; end if;
+  return p;
+end $$;
+
+-- p_week = week_structure van het plan; p_oud = het vorige deload-schema: de
+-- oefeningen die de coach daar als "proberen" klaarzette blijven staan.
+create or replace function public.deload_structuur(p_week jsonb, p_oud jsonb default null) returns jsonb
+language plpgsql stable as $$
+declare uit jsonb := '{}'::jsonb; k text; dag jsonb; oef jsonb; e jsonb; proberen jsonb;
+begin
+  for k in select jsonb_object_keys(p_week) loop
+    dag := p_week -> k;
+    if jsonb_typeof(dag) <> 'object' or jsonb_typeof(dag -> 'exercises') <> 'array' then
+      uit := uit || jsonb_build_object(k, dag); continue;
+    end if;
+    oef := '[]'::jsonb;
+    for e in select * from jsonb_array_elements(dag -> 'exercises') loop
+      if e ->> 'type' = 'cardio' then oef := oef || jsonb_build_array(e); continue; end if;
+      oef := oef || jsonb_build_array(e || jsonb_build_object(
+        'sets', greatest(1, ceil(coalesce(nullif(e ->> 'sets', '')::numeric, 2) / 2)::int),
+        'reps', deload_reps(coalesce(e ->> 'reps', '')),
+        'notes', 'Helft van je normale gewicht. Moet makkelijk voelen.',
+        'deload', true));
+    end loop;
+    -- Wat de coach klaarzette om te proberen, achteraan.
+    select coalesce(jsonb_agg(x), '[]'::jsonb) into proberen
+      from jsonb_array_elements(coalesce(p_oud -> k -> 'exercises', '[]'::jsonb)) x where (x ->> 'probeer')::boolean is true;
+    uit := uit || jsonb_build_object(k, dag || jsonb_build_object('exercises', oef || proberen));
+  end loop;
+  return uit;
+end $$;
+
+-- Maakt het deload-schema voor een fase, of ververst het uit het plan dat nu loopt.
+create or replace function public._maak_deload_schema(p_fase uuid) returns uuid
+language plpgsql security definer set search_path to 'public' as $$
+declare f record; bron record; v_bron uuid; v_id uuid; v_oud jsonb;
+begin
+  select * into f from training_fases where id = p_fase;
+  if f.id is null then return null; end if;
+  -- Het plan dat de klant nu volgt; staat hij al op het deload-schema, dan het plan van ervoor.
+  select assigned_schema_id into v_bron from clients where id = f.client_id;
+  if v_bron is null or v_bron = f.deload_schema_id then v_bron := coalesce(f.schema_voor_deload, f.schema_id); end if;
+  select * into bron from workout_schemas where id = v_bron;
+  if bron.id is null or bron.week_structure is null then return f.deload_schema_id; end if;
+
+  if f.deload_schema_id is not null then
+    select week_structure into v_oud from workout_schemas where id = f.deload_schema_id;
+  end if;
+  if v_oud is not null then
+    update workout_schemas set week_structure = deload_structuur(bron.week_structure, v_oud),
+           name = coalesce(bron.name, 'Plan') || ' | DELOAD', deload_van = bron.id, cyclus = bron.cyclus, updated_at = now()
+     where id = f.deload_schema_id;
+    return f.deload_schema_id;
+  end if;
+
+  insert into workout_schemas (user_id, name, description, client_name, primary_goal, specific_goal, experience_level,
+      days_per_week, time_per_session, equipment, split_type, split_name, week_structure, is_ai_generated, is_public,
+      is_template, client_id, cyclus, deload_van)
+  values (bron.user_id, coalesce(bron.name, 'Plan') || ' | DELOAD', bron.description, bron.client_name, bron.primary_goal, bron.specific_goal,
+      bron.experience_level, bron.days_per_week, bron.time_per_session, bron.equipment, bron.split_type, bron.split_name,
+      deload_structuur(bron.week_structure, null), false, false, false, f.client_id, bron.cyclus, bron.id)
+  returning id into v_id;
+  update training_fases set deload_schema_id = v_id, updated_at = now() where id = p_fase;
+  return v_id;
+end $$;
+revoke all on function public._maak_deload_schema(uuid) from public, anon, authenticated;
+
+create or replace function public.maak_deload_schema(p_fase uuid) returns uuid
+language plpgsql security definer set search_path to 'public' as $$
+begin
+  if not is_coach_van((select client_id from training_fases where id = p_fase)) then return null; end if;
+  return _maak_deload_schema(p_fase);
+end $$;
+revoke all on function public.maak_deload_schema(uuid) from public, anon;
+grant execute on function public.maak_deload_schema(uuid) to authenticated;
+
+-- 6. Deload starten. p_kcal: de nieuwe kcal (onderhoud) als de klant in een cut
 --    zit; leeg = macro's blijven zoals ze zijn. De app rekent p_kcal uit (gemeten
 --    TDEE bij betrouwbaarheid hoog, anders clients.tdee).
-create or replace function public.start_deload(p_fase uuid, p_kcal int default null, p_reden text default 'gepland')
+create or replace function public._start_deload(p_fase uuid, p_kcal int default null, p_reden text default 'gepland')
 returns text language plpgsql security definer set search_path to 'public' as $$
-declare f record; c record; v_extra int;
+declare f record; c record; v_extra int; v_deload uuid;
 begin
   select * into f from training_fases where id = p_fase;
   if f.id is null then return 'fase niet gevonden'; end if;
-  if not is_coach_van(f.client_id) then return 'geen toegang'; end if;
   if f.deload_gestart_op is not null then return 'deload loopt al'; end if;
-  if f.deload_schema_id is null then return 'nog geen deload-schema'; end if;
+  -- Vers uit het plan zoals het nu is: sets die er in de bouwweken bij kwamen tellen mee.
+  v_deload := _maak_deload_schema(p_fase);
+  if v_deload is null then return 'geen plan om een deload van te maken'; end if;
 
   select assigned_schema_id, workout_schedule, target_calories, target_protein, target_carbs, target_fat
     into c from clients where id = f.client_id for update;
@@ -104,12 +192,12 @@ begin
   update training_fases set
     schema_voor_deload = c.assigned_schema_id, rooster_voor_deload = c.workout_schedule,
     macros_voor_deload = jsonb_build_object('calories', c.target_calories, 'protein', c.target_protein, 'carbs', c.target_carbs, 'fat', c.target_fat),
-    deload_gestart_op = current_date, deload_reden = p_reden, updated_at = now()
+    deload_gestart_op = (now() at time zone 'Europe/Amsterdam')::date, deload_reden = p_reden, updated_at = now()
   where id = p_fase;
 
   -- Twee stappen: het plan wisselen zet de weekindeling op standaard, daarna
   -- zetten we de eigen indeling van de klant terug (zelfde dagnummers).
-  update clients set assigned_schema_id = f.deload_schema_id, updated_at = now() where id = f.client_id;
+  update clients set assigned_schema_id = v_deload, updated_at = now() where id = f.client_id;
   update clients set workout_schedule = c.workout_schedule where id = f.client_id;
 
   -- Cut: kcal naar onderhoud, eiwit en vet gelijk, het verschil naar koolhydraten.
@@ -121,17 +209,24 @@ begin
   end if;
   return 'ok';
 end $$;
+revoke all on function public._start_deload(uuid, int, text) from public, anon, authenticated;
+
+create or replace function public.start_deload(p_fase uuid, p_kcal int default null, p_reden text default 'gepland')
+returns text language plpgsql security definer set search_path to 'public' as $$
+begin
+  if not is_coach_van((select client_id from training_fases where id = p_fase)) then return 'geen toegang'; end if;
+  return _start_deload(p_fase, p_kcal, p_reden);
+end $$;
 revoke all on function public.start_deload(uuid, int, text) from public, anon;
 grant execute on function public.start_deload(uuid, int, text) to authenticated;
 
--- 6. Deload beëindigen: schema, weekindeling en macro's terug, mesocyclus dicht.
-create or replace function public.eind_deload(p_fase uuid)
+-- 7. Deload beëindigen: schema, weekindeling en macro's terug, mesocyclus dicht.
+create or replace function public._eind_deload(p_fase uuid)
 returns text language plpgsql security definer set search_path to 'public' as $$
 declare f record;
 begin
   select * into f from training_fases where id = p_fase;
   if f.id is null then return 'fase niet gevonden'; end if;
-  if not is_coach_van(f.client_id) then return 'geen toegang'; end if;
   if f.deload_gestart_op is null then return 'deload is niet gestart'; end if;
   if f.afgerond_op is not null then return 'al afgerond'; end if;
 
@@ -144,7 +239,7 @@ begin
       update clients set workout_schedule = f.rooster_voor_deload where id = f.client_id;
     end if;
   end if;
-  if f.macros_voor_deload is not null then
+  if f.macros_voor_deload is not null and (f.macros_voor_deload ->> 'calories') is not null then
     update clients set
       target_calories = (f.macros_voor_deload->>'calories')::numeric,
       target_protein  = (f.macros_voor_deload->>'protein')::numeric,
@@ -153,13 +248,44 @@ begin
     where id = f.client_id;
   end if;
 
-  update training_fases set afgerond_op = current_date, actief = false, updated_at = now() where id = p_fase;
+  update training_fases set afgerond_op = (now() at time zone 'Europe/Amsterdam')::date, actief = false, updated_at = now() where id = p_fase;
   return 'ok';
+end $$;
+revoke all on function public._eind_deload(uuid) from public, anon, authenticated;
+
+create or replace function public.eind_deload(p_fase uuid)
+returns text language plpgsql security definer set search_path to 'public' as $$
+begin
+  if not is_coach_van((select client_id from training_fases where id = p_fase)) then return 'geen toegang'; end if;
+  return _eind_deload(p_fase);
 end $$;
 revoke all on function public.eind_deload(uuid) from public, anon;
 grant execute on function public.eind_deload(uuid) to authenticated;
 
--- 7. Gemeten TDEE: één plek die de kcal per dag telt, op Nederlandse tijd.
+-- 8. Nieuwe mesocyclus: sluit de vorige af, maakt de nieuwe (nummer + 1) en zet
+--    het deload-schema alvast klaar, zodat de coach er oefeningen om te proberen
+--    in kan zetten.
+create or replace function public.start_mesocyclus(p_client uuid, p_schema uuid, p_start date, p_bouw int default 4, p_deload int default 7)
+returns uuid language plpgsql security definer set search_path to 'public' as $$
+declare v_nr int; v_id uuid; oud record;
+begin
+  if not is_coach_van(p_client) then raise exception 'geen toegang'; end if;
+  for oud in select id, deload_gestart_op, afgerond_op from training_fases where client_id = p_client and actief loop
+    if oud.deload_gestart_op is not null and oud.afgerond_op is null then perform _eind_deload(oud.id); end if;
+    update training_fases set actief = false, afgerond_op = coalesce(afgerond_op, (now() at time zone 'Europe/Amsterdam')::date), updated_at = now() where id = oud.id;
+  end loop;
+  select greatest(coalesce(max(nummer), 0), count(*)) + 1 into v_nr from training_fases where client_id = p_client;
+  insert into training_fases (client_id, coach_id, schema_id, start_datum, bouw_weken, deload_dagen, actief, nummer, client_phase_id)
+  values (p_client, auth.uid(), p_schema, p_start, p_bouw, p_deload, true, v_nr,
+          (select id from client_phases where client_id = p_client and ended_on is null order by started_on desc limit 1))
+  returning id into v_id;
+  perform _maak_deload_schema(v_id);
+  return v_id;
+end $$;
+revoke all on function public.start_mesocyclus(uuid, uuid, date, int, int) from public, anon;
+grant execute on function public.start_mesocyclus(uuid, uuid, date, int, int) to authenticated;
+
+-- 9. Gemeten TDEE: één plek die de kcal per dag telt, op Nederlandse tijd.
 --    (De bestaande schatting knipte de dag uit de UTC-tijd: een maaltijd net na
 --    middernacht viel dan op de vorige dag.) Leest met de rechten van de
 --    aanroeper, dus alleen eigen klanten.
@@ -176,13 +302,25 @@ language sql stable security invoker set search_path to 'public' as $$
 $$;
 grant execute on function public.kcal_per_dag(uuid, date, date) to authenticated;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 8. OPTIONEEL, alleen als de deload vanzelf bij de cyclus hoort (zie vraag in
---    het gesprek): elke nacht om 03:10 de deload starten op de geplande dag en
---    beëindigen na het aantal deload-dagen. Alleen voor nieuwe mesocycli
---    (nummer gevuld). De macro's in een cut wisselen dan NIET vanzelf mee:
---    de nachtrun kent de gemeten TDEE niet; dat blijft de knop van de coach.
---
--- create or replace function public.mesocyclus_nachtrun() returns void ... (volgt na go)
--- select cron.schedule('mesocyclus-nachtrun', '10 3 * * *', $$select public.mesocyclus_nachtrun()$$);
--- ─────────────────────────────────────────────────────────────────────────────
+-- 10. Nachtrun: de deload start op de geplande dag en eindigt na deload_dagen.
+--     Alleen nieuwe mesocycli (nummer gevuld). Macro's wisselen hier niet mee.
+create or replace function public.mesocyclus_nachtrun() returns void
+language plpgsql security definer set search_path to 'public' as $$
+declare f record; v_vandaag date := (now() at time zone 'Europe/Amsterdam')::date;
+begin
+  for f in select * from training_fases where actief and nummer is not null and afgerond_op is null loop
+    begin
+      if f.deload_gestart_op is null and v_vandaag >= f.start_datum + f.bouw_weken * 7 then
+        perform _start_deload(f.id, null, 'gepland');
+      elsif f.deload_gestart_op is not null and v_vandaag >= f.deload_gestart_op + f.deload_dagen then
+        perform _eind_deload(f.id);
+      end if;
+    exception when others then
+      null; -- één klant mag de rest niet tegenhouden
+    end;
+  end loop;
+end $$;
+revoke all on function public.mesocyclus_nachtrun() from public, anon, authenticated;
+
+select cron.unschedule('mesocyclus-nachtrun') where exists (select 1 from cron.job where jobname = 'mesocyclus-nachtrun');
+select cron.schedule('mesocyclus-nachtrun', '10 2 * * *', $cron$select public.mesocyclus_nachtrun()$cron$);

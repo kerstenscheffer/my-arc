@@ -37,7 +37,7 @@ export const spierWoord = (k) => String(spierLabel(k) || '').toLowerCase()
 export async function leesActieveFase(sb, clientId) {
   if (!sb || !clientId) return null
   const { data } = await sb.from('training_fases')
-    .select('id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, reflectie, created_at')
+    .select('id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, reflectie, created_at, schema_id, nummer, deload_schema_id, deload_gestart_op, afgerond_op, deload_reden, macros_voor_deload')
     .eq('client_id', clientId).eq('actief', true)
     .order('start_datum', { ascending: false }).limit(1)
     .then(r => r, () => ({ data: null }))
@@ -53,6 +53,17 @@ export function faseStand(fase, datum = vandaagIso()) {
   const weken = Number(fase.bouw_weken) || 7
   const deload = Number(fase.deload_dagen) || 0
   if (dagNr < 0) return { soort: 'nog_niet', week: 0, weken, dag: 0, dagen: deload }
+  // Mesocyclus nieuwe stijl (nummer gevuld, zie mesocyclus.sql): de deload loopt
+  // pas als hij gestart is (nachtrun of knop van de coach), niet op de datum.
+  if (fase.nummer != null) {
+    if (fase.afgerond_op) return { soort: 'klaar', week: weken, weken, dag: 0, dagen: deload, meso: fase.nummer }
+    if (fase.deload_gestart_op) {
+      const d0 = new Date(`${String(fase.deload_gestart_op).slice(0, 10)}T12:00:00`)
+      const dag = Math.min(Math.max(1, deload), Math.max(1, Math.round((nu - d0) / 86400000) + 1))
+      return { soort: 'deload', week: weken, weken, dag, dagen: deload, meso: fase.nummer }
+    }
+    return { soort: 'bouw', week: Math.min(weken, Math.floor(dagNr / 7) + 1), weken, dag: dagNr, dagen: deload, meso: fase.nummer }
+  }
   if (dagNr < weken * 7) return { soort: 'bouw', week: Math.floor(dagNr / 7) + 1, weken, dag: dagNr, dagen: deload }
   if (dagNr < weken * 7 + deload) return { soort: 'deload', week: weken, weken, dag: dagNr - weken * 7 + 1, dagen: deload }
   return { soort: 'klaar', week: weken, weken, dag: 0, dagen: deload }
