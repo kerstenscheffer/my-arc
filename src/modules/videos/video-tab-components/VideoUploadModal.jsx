@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User } from 'lucide-react'
+import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User, ChevronDown } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 import { getBronMeta } from '../utils/youtubeHelpers'
@@ -11,6 +11,12 @@ import { getBronMeta } from '../utils/youtubeHelpers'
 // Wit is het accent, zoals in de rest van de app. Stond hier op goud: met
 // gekleurde vlakken voor elke keuze werd dit venster een stoplicht.
 const GOLD = '#fff'
+
+// Omslag als de coach er geen kiest en de bron er zelf geen levert (Zoom,
+// Instagram, TikTok): het logo op zwart (13 nov 2026, Kersten). Volledige
+// URL: de app draait op capacitor://localhost en oudere app-versies hebben
+// het bestand niet in hun bundel.
+const STANDAARD_OMSLAG = 'https://www.myarcfitness.com/video-omslag-standaard.jpg'
 
 // Pagina's matchen ClientDashboard — zelfde set als de edit-modal. Een video
 // met een pagina in default_pages verschijnt AUTOMATISCH bij alle clients (ook
@@ -68,6 +74,9 @@ export default function VideoUploadModal({
   const [selectedClientIds, setSelectedClientIds] = useState([])
   const [clientSearch, setClientSearch] = useState('')
   const [assignPage, setAssignPage] = useState('home')
+  // Het venster loodst in drie stappen: voor wie, waar, welke video.
+  const [stap, setStap] = useState(1)
+  const [meerOpen, setMeerOpen] = useState(false)
 
   const toggleClient = (id) => {
     setSelectedClientIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -78,6 +87,16 @@ export default function VideoUploadModal({
   )
 
   const isMobile = useIsMobile()
+  const kanVerder = stap !== 1 || audience === 'everyone' || selectedClientIds.length > 0
+  const gekozenNamen = (clients || []).filter(c => selectedClientIds.includes(c.id)).map(clientName).join(', ')
+  const paginaLabel = (v) => PAGE_OPTIONS.find(p => p.value === v)?.label || v
+  const STAP_VRAAG = { 1: 'Voor wie is de video?', 2: 'Op welke pagina komt hij?', 3: 'Welke video is het?' }
+  // Wat je in de vorige stappen koos, als één regel onder de vraag.
+  const gekozenRegel = [
+    stap > 1 ? (audience === 'specific' ? gekozenNamen : 'Iedereen') : null,
+    stap > 2 ? (audience === 'specific' ? paginaLabel(assignPage)
+      : (formData.default_pages.length ? formData.default_pages.map(paginaLabel).join(', ') : 'Alleen in de bibliotheek')) : null,
+  ].filter(Boolean).join(' · ')
 
   const togglePage = (pageValue) => {
     setFormData(prev => prev.default_pages.includes(pageValue)
@@ -126,6 +145,8 @@ export default function VideoUploadModal({
           alert(`Thumbnail upload mislukt: ${uploadResult.error}`)
         }
       }
+
+      if (!thumbnailUrl && getBronMeta(formData.video_url)?.omslagZelf) thumbnailUrl = STANDAARD_OMSLAG
 
       const specific = audience === 'specific'
       await onSave({
@@ -215,12 +236,13 @@ export default function VideoUploadModal({
               color: '#fff',
               letterSpacing: '-0.025em'
             }}>
-              Nieuwe video
+              {STAP_VRAAG[stap]}
             </div>
-            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-              {voorinvulling?.is_personal
-                ? 'Persoonlijk, voor één klant'
-                : 'Titel en link zijn genoeg om te beginnen'}
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Nieuwe video · stap {stap} van 3{gekozenRegel ? ` · ${gekozenRegel}` : ''}
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginTop: 7 }}>
+              {[1, 2, 3].map(n => <span key={n} style={{ flex: 1, height: 3, borderRadius: 2, background: n <= stap ? '#fff' : 'rgba(255,255,255,0.14)' }} />)}
             </div>
           </div>
           <button
@@ -254,21 +276,256 @@ export default function VideoUploadModal({
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* ── TITEL ── */}
+          {/* Drie stappen (13 nov 2026, Kersten): eerst voor wie, dan waar, dan
+              de video zelf. Stond als één lange lijst, met de klant en de pagina
+              helemaal onderaan. */}
+          {stap === 1 && (<>
+          {/* ── VOOR WIE? — Iedereen vs specifieke klant(en) ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <label style={labelStyle}>Titel *</label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Bv. Welkom bij MY ARC — App Uitleg"
-              style={inputStyle}
-            />
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {[
+                { key: 'everyone', label: 'Iedereen', Icon: Globe, sub: 'Alle clients' },
+                { key: 'specific', label: 'Specifieke klant', Icon: User, sub: 'Kies wie' },
+              ].map(opt => {
+                const on = audience === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setAudience(opt.key)}
+                    style={{
+                      flex: 1, padding: '0.6rem 0.5rem',
+                      background: on ? GOLD : 'transparent',
+                      border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px', cursor: 'pointer',
+                      color: on ? '#000' : 'rgba(255,255,255,0.55)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <opt.Icon size={15} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{opt.label}</span>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 600, opacity: 0.7 }}>{opt.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
+          {audience === 'specific' && (
+            <div style={{
+              padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+              borderLeft: `3px solid ${GOLD}`,
+            }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <User size={10} />
+                Kies klant(en)
+                {selectedClientIds.length > 0 && (
+                  <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: 800, letterSpacing: 0 }}>
+                    {selectedClientIds.length}
+                  </span>
+                )}
+              </label>
+
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => setClientSearch(e.target.value)}
+                placeholder="Zoek klant…"
+                style={{ ...inputStyle, marginBottom: '0.4rem' }}
+              />
+
+              <div style={{
+                maxHeight: '168px', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', background: '#000',
+              }}>
+                {filteredClients.length === 0 ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                    Geen klanten gevonden.
+                  </div>
+                ) : filteredClients.map(c => {
+                  const on = selectedClientIds.includes(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleClient(c.id)}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        padding: '0.5rem 0.65rem', background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        cursor: 'pointer', textAlign: 'left',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <span style={{
+                        width: 16, height: 16, flexShrink: 0, borderRadius: '4px',
+                        border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.2)'}`,
+                        background: on ? GOLD : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {on && <Check size={11} strokeWidth={3} color="#000" />}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 700, color: on ? '#fff' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {clientName(c)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          </>)}
+
+          {stap === 2 && audience === 'specific' && (
+            <div style={{ padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem' }}>
+              <label style={{ ...labelStyle, marginTop: '0.6rem' }}>Verschijnt op pagina</label>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
+                {PAGE_OPTIONS.map(page => {
+                  const Icon = page.icon
+                  const on = assignPage === page.value
+                  return (
+                    <button
+                      key={page.value}
+                      onClick={() => setAssignPage(page.value)}
+                      style={{
+                        padding: '0.5rem 0.4rem',
+                        background: on ? GOLD : 'transparent',
+                        border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '6px', color: on ? '#000' : 'rgba(255,255,255,0.5)',
+                        fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+                        textTransform: 'uppercase', letterSpacing: '0.03em', minHeight: '38px',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Icon size={12} />
+                      {page.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, marginTop: '0.6rem' }}>
+                De video komt alleen bij {gekozenNamen || 'de gekozen klant'} te staan, op deze pagina.
+              </div>
+            </div>
+          )}
+
+          {stap === 2 && audience === 'everyone' && (<>
+          {/* ── STANDAARD ZICHTBAAR OP (default_pages) ── */}
+          <div style={{
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.default_pages.length > 0 ? `3px solid ${GOLD}` : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Globe size={10} />
+              Standaard zichtbaar voor iedereen op
+              {formData.default_pages.length > 0 && (
+                <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: '800', letterSpacing: 0 }}>
+                  {formData.default_pages.length}
+                </span>
+              )}
+            </label>
+            <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4, marginBottom: '0.5rem' }}>
+              Automatisch zichtbaar bij ALLE clients (ook nieuwe) op de gekozen pagina's. Laat leeg om de video alleen los toe te wijzen.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
+              {PAGE_OPTIONS.map(page => {
+                const Icon = page.icon
+                const isSelected = formData.default_pages.includes(page.value)
+                return (
+                  <button
+                    key={page.value}
+                    onClick={() => togglePage(page.value)}
+                    style={{
+                      padding: '0.55rem 0.4rem',
+                      background: isSelected ? GOLD : 'transparent',
+                      border: isSelected ? `1px solid ${GOLD}` : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '6px',
+                      color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '0.65rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '40px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Icon size={12} />
+                    {page.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── BELANGRIJK ── */}
+          <div style={{
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.is_belangrijk ? '3px solid #fff' : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', color: '#fff', marginBottom: '0.15rem' }}>
+                  Belangrijk — moet gezien worden
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
+                  {formData.is_belangrijk
+                    ? 'Staat als blok ín de gekozen pagina’s tot de klant hem afspeelt of afvinkt. Daarna alleen nog in de bibliotheek.'
+                    : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
+                style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? '#fff' : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── IN HOME-SLIDER? ── */}
+          <div style={{
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.show_in_slider ? `3px solid ${GOLD}` : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', color: '#fff', marginBottom: '0.15rem' }}>
+                  Tonen in home-slider
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
+                  Verschijnt in de auto-roterende slider bovenaan de home-pagina (voor alle clients).
+                </div>
+              </div>
+              <button
+                onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })}
+                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? GOLD : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div style={{ position: 'absolute', top: '2px', left: formData.show_in_slider ? '20px' : '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
+            </div>
+          </div>
+          </>)}
+
+          {stap === 3 && (<>
           {/* ── YOUTUBE URL ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
@@ -292,89 +549,19 @@ export default function VideoUploadModal({
             />
           </div>
 
-          {/* ── BESCHRIJVING ── */}
+          {/* ── TITEL ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <label style={labelStyle}>Beschrijving</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Wat kan de client hier leren?"
-              rows={3}
-              style={{
-                ...inputStyle,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                lineHeight: 1.4
-              }}
+            <label style={labelStyle}>Titel *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Bv. Welkom bij MY ARC — App Uitleg"
+              style={inputStyle}
             />
-          </div>
-
-          {/* ── MIJN CATEGORIE (custom) ── */}
-          <div style={{
-            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={{
-              ...labelStyle,
-              color: customCategories.length > 0 ? GOLD : 'rgba(255, 255, 255, 0.3)'
-            }}>
-              Mijn categorie
-              {customCategories.length === 0 && (
-                <span style={{
-                  marginLeft: '0.4rem',
-                  color: 'rgba(255, 255, 255, 0.25)',
-                  fontWeight: '600',
-                  textTransform: 'none',
-                  letterSpacing: 0
-                }}>
-                  — nog geen gemaakt
-                </span>
-              )}
-            </label>
-            <select
-              value={formData.category_id || ''}
-              onChange={(e) => setFormData({
-                ...formData,
-                category_id: e.target.value || null
-              })}
-              disabled={customCategories.length === 0}
-              style={{
-                ...inputStyle,
-                cursor: customCategories.length === 0 ? 'not-allowed' : 'pointer',
-                opacity: customCategories.length === 0 ? 0.4 : 1
-              }}
-            >
-              <option value="" style={{ background: '#0a0a0a' }}>
-                — Geen categorie —
-              </option>
-              {customCategories.map(cat => (
-                <option key={cat.id} value={cat.id} style={{ background: '#0a0a0a' }}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* ── TAG / LEGACY CATEGORY ── */}
-          <div style={{
-            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            <label style={labelStyle}>Type / Tag</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              {categories.map(cat => (
-                <option key={cat.value} value={cat.value} style={{ background: '#0a0a0a' }}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* ── THUMBNAIL ── */}
@@ -408,8 +595,8 @@ export default function VideoUploadModal({
                   color: bron.kleur,
                 }}>
                   <span>
-                    {bron.label} levert geen omslag — upload er zelf een, anders
-                    blijft de kaart leeg.
+                    {bron.label} levert geen omslag. Kies er zelf een, anders komt het
+                    MY ARC-logo erop.
                   </span>
                 </div>
               )
@@ -524,244 +711,101 @@ export default function VideoUploadModal({
             />
           </div>
 
-          {/* ── VOOR WIE? — Iedereen vs specifieke klant(en) ── */}
+          <button type="button" onClick={() => setMeerOpen(v => !v)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: isMobile ? '0.7rem 0.9rem' : '0.75rem 1.1rem', background: 'transparent', border: 'none',
+            borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#fff', fontFamily: 'inherit',
+            fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation',
+          }}>
+            <span>Meer opties <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>· beschrijving, categorie, type</span></span>
+            <ChevronDown size={15} style={{ transform: meerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
+          {meerOpen && (<>
+          {/* ── BESCHRIJVING ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <label style={labelStyle}>Voor wie is deze video?</label>
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              {[
-                { key: 'everyone', label: 'Iedereen', Icon: Globe, sub: 'Alle clients' },
-                { key: 'specific', label: 'Specifieke klant', Icon: User, sub: 'Kies wie' },
-              ].map(opt => {
-                const on = audience === opt.key
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => setAudience(opt.key)}
-                    style={{
-                      flex: 1, padding: '0.6rem 0.5rem',
-                      background: on ? GOLD : 'transparent',
-                      border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.1)'}`,
-                      borderRadius: '8px', cursor: 'pointer',
-                      color: on ? '#000' : 'rgba(255,255,255,0.55)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    <opt.Icon size={15} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{opt.label}</span>
-                    <span style={{ fontSize: '0.55rem', fontWeight: 600, opacity: 0.7 }}>{opt.sub}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <label style={labelStyle}>Beschrijving</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Wat kan de client hier leren?"
+              rows={3}
+              style={{
+                ...inputStyle,
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                lineHeight: 1.4
+              }}
+            />
           </div>
 
-          {/* ── SPECIFIEKE KLANT(EN) — picker + pagina ── */}
-          {audience === 'specific' && (
-            <div style={{
-              padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-              borderLeft: `3px solid ${GOLD}`,
-            }}>
-              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <User size={10} />
-                Kies klant(en)
-                {selectedClientIds.length > 0 && (
-                  <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: 800, letterSpacing: 0 }}>
-                    {selectedClientIds.length}
-                  </span>
-                )}
-              </label>
-
-              <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => setClientSearch(e.target.value)}
-                placeholder="Zoek klant…"
-                style={{ ...inputStyle, marginBottom: '0.4rem' }}
-              />
-
-              <div style={{
-                maxHeight: '168px', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', background: '#000',
-              }}>
-                {filteredClients.length === 0 ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
-                    Geen klanten gevonden.
-                  </div>
-                ) : filteredClients.map(c => {
-                  const on = selectedClientIds.includes(c.id)
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => toggleClient(c.id)}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        padding: '0.5rem 0.65rem', background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
-                        border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        cursor: 'pointer', textAlign: 'left',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <span style={{
-                        width: 16, height: 16, flexShrink: 0, borderRadius: '4px',
-                        border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.2)'}`,
-                        background: on ? GOLD : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {on && <Check size={11} strokeWidth={3} color="#000" />}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 700, color: on ? '#fff' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {clientName(c)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Op welke pagina verschijnt de video bij deze klant(en)? */}
-              <label style={{ ...labelStyle, marginTop: '0.6rem' }}>Verschijnt op pagina</label>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
-                {PAGE_OPTIONS.map(page => {
-                  const Icon = page.icon
-                  const on = assignPage === page.value
-                  return (
-                    <button
-                      key={page.value}
-                      onClick={() => setAssignPage(page.value)}
-                      style={{
-                        padding: '0.5rem 0.4rem',
-                        background: on ? GOLD : 'transparent',
-                        border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '6px', color: on ? '#000' : 'rgba(255,255,255,0.5)',
-                        fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                        textTransform: 'uppercase', letterSpacing: '0.03em', minHeight: '38px',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <Icon size={12} />
-                      {page.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {audience === 'everyone' && (<>
-          {/* ── STANDAARD ZICHTBAAR OP (default_pages) ── */}
+          {/* ── MIJN CATEGORIE (custom) ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.default_pages.length > 0 ? `3px solid ${GOLD}` : '3px solid transparent',
-            transition: 'border-left-color 0.2s ease'
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <Globe size={10} />
-              Standaard zichtbaar voor iedereen op
-              {formData.default_pages.length > 0 && (
-                <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: '800', letterSpacing: 0 }}>
-                  {formData.default_pages.length}
+            <label style={{
+              ...labelStyle,
+              color: customCategories.length > 0 ? GOLD : 'rgba(255, 255, 255, 0.3)'
+            }}>
+              Mijn categorie
+              {customCategories.length === 0 && (
+                <span style={{
+                  marginLeft: '0.4rem',
+                  color: 'rgba(255, 255, 255, 0.25)',
+                  fontWeight: '600',
+                  textTransform: 'none',
+                  letterSpacing: 0
+                }}>
+                  — nog geen gemaakt
                 </span>
               )}
             </label>
-            <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4, marginBottom: '0.5rem' }}>
-              Automatisch zichtbaar bij ALLE clients (ook nieuwe) op de gekozen pagina's. Laat leeg om de video alleen los toe te wijzen.
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
-              {PAGE_OPTIONS.map(page => {
-                const Icon = page.icon
-                const isSelected = formData.default_pages.includes(page.value)
-                return (
-                  <button
-                    key={page.value}
-                    onClick={() => togglePage(page.value)}
-                    style={{
-                      padding: '0.55rem 0.4rem',
-                      background: isSelected ? GOLD : 'transparent',
-                      border: isSelected ? `1px solid ${GOLD}` : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '6px',
-                      color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
-                      fontSize: '0.65rem',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.3rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      minHeight: '40px',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Icon size={12} />
-                    {page.label}
-                  </button>
-                )
+            <select
+              value={formData.category_id || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                category_id: e.target.value || null
               })}
-            </div>
+              disabled={customCategories.length === 0}
+              style={{
+                ...inputStyle,
+                cursor: customCategories.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: customCategories.length === 0 ? 0.4 : 1
+              }}
+            >
+              <option value="" style={{ background: '#0a0a0a' }}>
+                — Geen categorie —
+              </option>
+              {customCategories.map(cat => (
+                <option key={cat.id} value={cat.id} style={{ background: '#0a0a0a' }}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* ── BELANGRIJK ── */}
+          {/* ── TAG / LEGACY CATEGORY ── */}
           <div style={{
             padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.is_belangrijk ? '3px solid #fff' : '3px solid transparent',
-            transition: 'border-left-color 0.2s ease'
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', color: '#fff', marginBottom: '0.15rem' }}>
-                  Belangrijk — moet gezien worden
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
-                  {formData.is_belangrijk
-                    ? 'Staat als blok ín de gekozen pagina’s tot de klant hem afspeelt of afvinkt. Daarna alleen nog in de bibliotheek.'
-                    : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
-                style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? '#fff' : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
-              </button>
-            </div>
+            <label style={labelStyle}>Type / Tag</label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              {categories.map(cat => (
+                <option key={cat.value} value={cat.value} style={{ background: '#0a0a0a' }}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
           </div>
-
-          {/* ── IN HOME-SLIDER? ── */}
-          <div style={{
-            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.show_in_slider ? `3px solid ${GOLD}` : '3px solid transparent',
-            transition: 'border-left-color 0.2s ease'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', color: '#fff', marginBottom: '0.15rem' }}>
-                  Tonen in home-slider
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
-                  Verschijnt in de auto-roterende slider bovenaan de home-pagina (voor alle clients).
-                </div>
-              </div>
-              <button
-                onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })}
-                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? GOLD : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div style={{ position: 'absolute', top: '2px', left: formData.show_in_slider ? '20px' : '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
-              </button>
-            </div>
-          </div>
+          </>)}
           </>)}
 
           {/* Filler to ensure action buttons aren't flush against last field */}
@@ -770,70 +814,51 @@ export default function VideoUploadModal({
 
         {/* ── ACTIONS (sticky bottom) ── */}
         <div style={{
-          display: 'flex',
-          gap: '0.4rem',
+          display: 'flex', gap: '0.4rem', flexShrink: 0, background: '#0a0a0a',
           padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1.125rem',
           borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-          flexShrink: 0,
-          background: '#0a0a0a'
         }}>
           <button
-            onClick={onClose}
+            onClick={stap === 1 ? onClose : () => setStap(stap - 1)}
             disabled={uploading}
             style={{
-              flex: 1,
-              padding: '0.625rem',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '10px',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: '0.8rem',
-              fontWeight: 900,
-              cursor: uploading ? 'not-allowed' : 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px',
-              letterSpacing: '-0.01em'
+              flex: 1, padding: '0.625rem', background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', color: 'rgba(255, 255, 255, 0.75)',
+              fontSize: '0.8rem', fontWeight: 900, cursor: uploading ? 'not-allowed' : 'pointer', minHeight: '44px',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', letterSpacing: '-0.01em',
             }}
           >
-            Annuleer
+            {stap === 1 ? 'Annuleer' : 'Terug'}
           </button>
+          {stap < 3 ? (
+            <button
+              onClick={() => setStap(stap + 1)}
+              disabled={!kanVerder}
+              style={{
+                flex: 2, padding: '0.625rem', background: '#fff', opacity: kanVerder ? 1 : 0.35, border: 'none',
+                borderRadius: '10px', color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, minHeight: '44px',
+                cursor: kanVerder ? 'pointer' : 'not-allowed', letterSpacing: '-0.01em',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {stap === 1 && audience === 'specific' && selectedClientIds.length === 0 ? 'Kies eerst een klant' : 'Volgende'}
+            </button>
+          ) : (
           <button
             onClick={handleSubmit}
             disabled={uploading || !formData.title || !formData.video_url}
             style={{
-              flex: 2,
-              padding: '0.625rem',
-              background: '#fff',
+              flex: 2, padding: '0.625rem', background: '#fff',
               opacity: (uploading || !formData.title || !formData.video_url) ? 0.35 : 1,
-              border: 'none',
-              borderRadius: '10px',
-              color: '#0a0a0a',
-              fontSize: '0.8rem',
-              fontWeight: 900,
-              cursor: uploading || !formData.title || !formData.video_url
-                ? 'not-allowed'
-                : 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px',
-              letterSpacing: '-0.01em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem'
+              border: 'none', borderRadius: '10px', color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900,
+              cursor: uploading || !formData.title || !formData.video_url ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', letterSpacing: '-0.01em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
             }}
           >
             {uploading ? (
               <>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  border: '2px solid rgba(0, 0, 0, 0.3)',
-                  borderTopColor: '#000',
-                  borderRadius: '50%',
-                  animation: 'vm-spin 0.8s linear infinite'
-                }} />
+                <div style={{ width: '12px', height: '12px', border: '2px solid rgba(0, 0, 0, 0.3)', borderTopColor: '#000', borderRadius: '50%', animation: 'vm-spin 0.8s linear infinite' }} />
                 Uploaden...
               </>
             ) : (
@@ -843,6 +868,7 @@ export default function VideoUploadModal({
               </>
             )}
           </button>
+          )}
         </div>
       </div>
 
