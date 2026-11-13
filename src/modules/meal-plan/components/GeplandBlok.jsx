@@ -24,7 +24,9 @@ const momentVan = (r) => (MOMENTEN.some(([m]) => m === r.meal_type) ? r.meal_typ
 // (een dag in de toekomst kun je nog niet gegeten hebben).
 // `versie` telt op als er elders iets gepland is; `onGelogd` laat het
 // dagschema de gelogde maaltijden opnieuw ophalen.
-export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, gegeten = null, targets = null, onPlan, onGelogd, isMobile }) {
+// `onMomenten` meldt voor welke eetmomenten er iets gepland staat: het
+// dagschema laat het lege vak van dat moment dan weg.
+export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, onPlan, onGelogd, onMomenten = null, isMobile }) {
   const [rijen, setRijen] = useState([])
   const [bezig, setBezig] = useState(null)
   const [fout, setFout] = useState(null)
@@ -38,6 +40,7 @@ export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, 
     if (!error) setRijen(data || [])
   }, [db, client?.id, datum])
   useEffect(() => { laad() }, [laad, versie])
+  useEffect(() => { onMomenten?.([...new Set(rijen.map(momentVan))]) }, [rijen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const weg = async (r) => {
     setBezig(r.id)
@@ -67,11 +70,10 @@ export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, 
     setBezig(null)
   }
 
+  // Niets gepland: geen blok. Inplannen doe je op de lege vakken in het dagschema.
+  if (rijen.length === 0) return null
   const zij = isMobile ? '0.9rem' : '1.25rem'
   const gepland = som(rijen)
-  const al = gegeten || { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  const totaal = { calories: gepland.calories + (Number(al.calories) || 0), protein: gepland.protein + (Number(al.protein) || 0), carbs: gepland.carbs + (Number(al.carbs) || 0), fat: gepland.fat + (Number(al.fat) || 0) }
-  const doel = Number(targets?.calories) || 0
 
   return (
     <div style={{ margin: `0 0 ${isMobile ? '0.6rem' : '0.8rem'}` }}>
@@ -84,15 +86,9 @@ export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, 
         )}
       </div>
 
-      {/* Wat de dag optelt als je alles eet wat er staat, tegen het doel. */}
-      {rijen.length > 0 && (
-        <div style={{ margin: `0 ${zij} 8px`, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
-          {al.calories > 0 ? 'Met wat je al at' : 'Eet je dit allemaal'}: <b style={{ color: '#fff', fontWeight: 900 }}>{rond(totaal.calories)} kcal</b>{doel ? ` van ${rond(doel)}` : ''} · {rond(totaal.protein)} E · {rond(totaal.carbs)} K · {rond(totaal.fat)} V
-        </div>
-      )}
-
       {MOMENTEN.map(([moment, label, slot]) => {
         const items = rijen.filter(r => momentVan(r) === moment)
+        if (!items.length) return null
         return (
           <div key={moment} style={{ margin: `0 ${isMobile ? '0.5rem' : '0.75rem'} 0.4rem`, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40, padding: '0 0.4rem 0 0.75rem' }}>

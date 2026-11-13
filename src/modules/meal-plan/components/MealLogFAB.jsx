@@ -6,10 +6,11 @@
 
 import React from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { Plus } from 'lucide-react'
+import { Plus, CalendarPlus } from 'lucide-react'
 import { useOnderMarge } from '../../../client/components/videoBalkHoogte'
 
-export default function MealLogFAB({ onClick, isMobile: propMobile }) {
+// `label`: 'Log' of, op een dag die nog moet komen in de vrije stand, 'Plan'.
+export default function MealLogFAB({ onClick, isMobile: propMobile, label = 'Log' }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   const size = isMobile ? 64 : 72
   // Boven de navigatiebalk (op 22, ~62 hoog) met wat lucht ertussen. Komt de
@@ -23,7 +24,7 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
   return createPortal(
     <button
       onClick={onClick}
-      aria-label="Maaltijd loggen"
+      aria-label={label === 'Plan' ? 'Maaltijd inplannen' : 'Maaltijd loggen'}
       style={{
         position: 'fixed',
         left: isMobile ? 18 : 28,
@@ -50,14 +51,16 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         e.currentTarget.style.transform = 'scale(1)'
       }}
     >
-      <Plus size={isMobile ? 28 : 32} strokeWidth={3} />
+      {label === 'Plan'
+        ? <CalendarPlus size={isMobile ? 25 : 28} strokeWidth={2.6} style={{ marginBottom: 3 }} />
+        : <Plus size={isMobile ? 28 : 32} strokeWidth={3} />}
       <span style={{
         fontSize: '0.56rem', fontWeight: 900,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         marginTop: -3,
         lineHeight: 1,
       }}>
-        Log
+        {label}
       </span>
     </button>
   , document.body)

@@ -12,7 +12,7 @@ import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../../supplements/utils/productFoto'
 
 // Icoon per vast moment voor een lege plek in de tijdlijn.
-const LEEG_ICOON = { breakfast: Sunrise, lunch: Salad, snack1: Apple, dinner: UtensilsCrossed, pre_workout: Zap }
+const LEEG_ICOON = { breakfast: Sunrise, lunch: Salad, snack1: Apple, dinner: UtensilsCrossed, pre_workout: Zap, eigen: Plus }
 
 // Label van het moment waarop iets gelogd is, voor op de foto van de kaart.
 const MOMENT_LABEL = {
@@ -221,12 +221,17 @@ export default function MealTimelineMobile({
               </div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0.8rem' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{p.label}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{klok(p.min)} · {p.sub || 'nog niets gepland'}</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{p.zonderTijd ? '' : `${klok(p.min)} · `}{p.sub || 'nog niets gepland'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', paddingRight: '0.9rem', color: '#fff' }}>
-                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Plus size={15} strokeWidth={3} />
-                </span>
+                {/* Vrij loggen: op dit vak plan je in, loggen gaat met de grote plusknop. */}
+                {p.actie ? (
+                  <span style={{ height: 28, padding: '0 0.7rem', borderRadius: 999, background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', fontSize: '0.74rem', fontWeight: 900 }}>{p.actie}</span>
+                ) : (
+                  <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Plus size={15} strokeWidth={3} />
+                  </span>
+                )}
               </div>
             </button>
           )

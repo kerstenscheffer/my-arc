@@ -2,7 +2,7 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
-import { X, ArrowLeft, AlertCircle, Heart, Plus } from 'lucide-react'
+import { X, ArrowLeft, AlertCircle, Heart, Plus, CalendarCheck } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -301,16 +301,18 @@ export default function FoodLogModal({
           animation: 'flmFadeIn 0.2s ease'
         }}>
           <div style={{ marginBottom: '1.25rem' }}>
-            <GelogdAnimatie grootte={isMobile ? 104 : 120} />
+            <GelogdAnimatie grootte={isMobile ? 104 : 120} {...(planDatum ? { Icoon: CalendarCheck } : null)} />
           </div>
           <div style={{ fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: '0.3rem', animation: 'flmFadeIn 0.3s ease 0.35s both' }}>
-            {successData.isEdit ? 'Bijgewerkt!' : 'Gelogd!'}
+            {successData.isEdit ? 'Bijgewerkt!' : planDatum ? 'Ingepland!' : 'Gelogd!'}
           </div>
           <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.55)', textAlign: 'center', maxWidth: '260px', animation: 'flmFadeIn 0.3s ease 0.45s both' }}>
             {successData.name}
           </div>
           <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', color: '#fff', fontWeight: 900, marginTop: '0.5rem', animation: 'flmFadeIn 0.3s ease 0.55s both' }}>
-            +{successData.calories} kcal → {MOMENT_LABELS[successData.meal_type] || 'Gelogd'}
+            {planDatum
+              ? `${successData.calories} kcal · ${MOMENT_LABELS[successData.meal_type] || 'Gepland'} op ${new Date(`${planDatum}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'long' })}`
+              : `+${successData.calories} kcal → ${MOMENT_LABELS[successData.meal_type] || 'Gelogd'}`}
           </div>
         </div>
       )}
@@ -464,6 +466,7 @@ export default function FoodLogModal({
                 isMobile={isMobile}
                 client={client}
                 onQuickLog={handleLog}
+                planModus={!!planDatum}
                 defaultMealMoment={defaultMealMoment}
                 bron={filter === 'favorieten' ? 'favorieten' : 'alles'}
               />

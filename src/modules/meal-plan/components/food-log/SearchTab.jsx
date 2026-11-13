@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import { Search, Loader, X, ChevronRight, Plus, Heart } from 'lucide-react'
+import { Search, Loader, X, ChevronRight, Plus, Heart, CalendarPlus } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { vulZoekFotos } from './enrichImageFromOFF'
@@ -45,7 +45,9 @@ const snelTekst = ({ aantal, eenheid }) => {
 }
 
 // `bron` komt van de knoppenrij in het log-venster: 'alles' of 'favorieten'.
-export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles' }) {
+// `planModus`: het venster plant in voor een dag in plaats van te loggen; de
+// snelknop bij recente logs krijgt dan een agenda-icoon.
+export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles', planModus = false }) {
   // Zoeken doet altijd producten; maaltijden en snel zitten in eigen knoppen.
   const mode = 'products'
   // Elke zoekpoging naar zoek_log: wat zocht de klant, en klikte hij iets aan?
@@ -664,7 +666,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                       return <SterKnop aan={isFavoriet(item)} onClick={() => wisselFavoriet(item)} />
                     })()}
                     acties={[
-                      ...(onQuickLog ? [{ icon: <Plus size={11} strokeWidth={3} />, label: 'Loggen', onClick: () => handleQuickLog(meal) }] : []),
+                      ...(onQuickLog ? [{ icon: planModus ? <CalendarPlus size={12} strokeWidth={2.6} /> : <Plus size={11} strokeWidth={3} />, label: planModus ? 'Inplannen' : 'Loggen', onClick: () => handleQuickLog(meal) }] : []),
                       { icon: <ChevronRight size={11} strokeWidth={2.6} />, label: 'Aanpassen', onClick: () => handleSelectRecent(meal) },
                     ]}
                   />

@@ -8,7 +8,7 @@
 // Wissel, Barcode, Eigen maaltijd…) en het Inzicht-scherm van de klant opent
 // hier ook.
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import {
@@ -244,12 +244,6 @@ function bouwDagen(rijen, wissels) {
   return uit
 }
 
-const secundaireKnop = {
-  minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '0 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: radius.btn,
-  color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-}
 const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
 
 export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db, coachId, onGeneratePlan }) {
@@ -378,7 +372,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     carbs: Math.round(Number(doelBron.target_carbs) || 0), fat: Math.round(Number(doelBron.target_fat) || 0),
   } : (mealData.targets || null)
   const vandaagSleutel = sleutelVan(new Date())
-  const days = useMemo(() => Object.keys(dailyLog).sort((a, b) => (a < b ? 1 : -1)), [dailyLog])
 
   const pct = (val, target) => target > 0 ? Math.min(100, Math.round((val / target) * 100)) : 0
   // Binnen 10% van het doel is op doel (groen = behaald); verder eraf blijft wit.

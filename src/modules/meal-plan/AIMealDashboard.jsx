@@ -940,6 +940,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       {!alleenKijken && <MealLogFAB
         onClick={() => { setFoodLogTab('search'); setFoodLogTrigger(n => n + 1) }}
         isMobile={isMobile}
+        // Vrij loggen op een dag die nog moet komen: de knop plant in (13 nov 2026).
+        label={mealMode === 'free' && (dayKeyToIndex(selectedDay) - getTodayIndex()) + weekOffset * 7 > 0 ? 'Plan' : 'Log'}
       />}
 
       {/* Week Planner */}

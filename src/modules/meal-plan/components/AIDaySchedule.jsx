@@ -81,6 +81,7 @@ export default function AIDaySchedule({
   // logvenster zet de maaltijd klaar voor die dag in plaats van hem te loggen.
   const [planDatum, setPlanDatum] = useState(null)
   const [geplandVersie, setGeplandVersie] = useState(0)
+  const [geplandeMomenten, setGeplandeMomenten] = useState([])
   const isMobile = window.innerWidth <= 768
   // Gelogd-animatie na Afronden (zelfde als in het log-venster).
   const [afgerond, setAfgerond] = useState(null)
@@ -501,7 +502,13 @@ export default function AIDaySchedule({
         { slot: 'lunch', label: 'Lunch', min: 12 * 60 + 30, zoek: 'lunch', moment: 'lunch' },
         { slot: 'snack1', label: 'Snack', min: 15 * 60, zoek: 'snack', moment: 'snack' },
         { slot: 'dinner', label: 'Diner', min: 18 * 60 + 30, zoek: 'dinner', moment: 'dinner' },
-      ].filter(p => !gelogd(p.zoek)).map(p => ({ ...p, sub: 'nog niets gelogd' }))
+      ].filter(p => !gelogd(p.zoek))
+        // Vandaag en later plan je op dit vak in (13 nov 2026, Kersten: het
+        // losse blok met plusjes erboven was dubbelop). Staat er al iets
+        // gepland voor dit moment, dan toont het blok Gepland het en valt het
+        // lege vak weg. Een dag in het verleden: daar log je nog gewoon na.
+        .filter(p => dagInVerleden || !geplandeMomenten.includes(p.moment))
+        .map(p => (dagInVerleden ? { ...p, sub: 'nog niets gelogd' } : { ...p, sub: 'nog niets gepland', actie: 'Inplannen' }))
     }
     if (alleenKijken || !activePlan?.week_structure) return []
     const dagSleutel = daysOfWeek[currentDay]?.key
@@ -516,7 +523,11 @@ export default function AIDaySchedule({
       const t = trainingStarts[dagSleutel]
       lijst.push({ slot: PRE_WORKOUT_SLOT, label: 'Pre-workout', min: Number.isFinite(t) ? Math.max(0, t - 60) : 15 * 60 + 30, zoek: PRE_WORKOUT_SLOT })
     }
-    return lijst.filter(p => !heeft(p.zoek))
+    // Altijd onderaan: een vak waar de klant zelf iets bij zijn plan zet
+    // (13 nov 2026, Kersten). Het plan van de coach blijft zoals het is; wat
+    // hij hier inplant staat in het blok Gepland en telt mee zodra hij het eet.
+    const eigen = dagInVerleden ? [] : [{ slot: 'eigen', eigen: true, label: 'Eigen maaltijd', min: 24 * 60, sub: 'zet er zelf iets bij', actie: 'Inplannen', zonderTijd: true }]
+    return [...lijst.filter(p => !heeft(p.zoek)), ...eigen]
   })()
 
   const handleDayClick = (dayIndex) => {
@@ -833,11 +844,12 @@ export default function AIDaySchedule({
           (DagBewaarBalk, DagTemplatePaneel, DayTemplateService) staat er nog,
           terugzetten = dit blok weer renderen met onOpenDagen. */}
 
-      {/* Vrij loggen: wat je alvast klaarzette voor deze dag, met de optelsom.
-          Alleen vandaag en later, of als er op een eerdere dag nog iets openstaat. */}
-      {isFreeMode && client?.id && !alleenKijken && !dagInVerleden && (
+      {/* Wat de klant zelf klaarzette voor deze dag, met de optelsom: in de vrije
+          stand alles, met een plan wat hij er via "Eigen maaltijd" bij zette.
+          Alleen vandaag en later. */}
+      {client?.id && !alleenKijken && !dagInVerleden && (
         <GeplandBlok db={db} client={client} datum={gekozenDatum} magLoggen={!dagInToekomst} versie={geplandVersie}
-          gegeten={combinedTotals} targets={clientTargets} isMobile={isMobile}
+          isMobile={isMobile} onMomenten={setGeplandeMomenten}
           onPlan={(moment) => { setEditingMeal(null); setDefaultMealMoment(moment); setPlanDatum(gekozenDatum); setShowFoodLog(true) }}
           onGelogd={() => { loadConsumedMeals(currentDay); if (!isVandaag() && onPastDayUpdate) onPastDayUpdate(); onMealLogged?.() }} />
       )}
@@ -863,9 +875,15 @@ export default function AIDaySchedule({
             // toekomst kun je nog niet gegeten hebben: daar plan je.
             setEditingMeal(null)
             setDefaultMealMoment(plek.moment || null)
-            setPlanDatum(dagInToekomst ? gekozenDatum : null)
+            setPlanDatum(dagInVerleden ? null : gekozenDatum)
             setShowFoodLog(true)
-          } : (plek) => onOpenAlternatives?.({
+          } : (plek) => plek.eigen ? (() => {
+            // Het eigen vak: het zoekvenster in de planstand voor deze dag.
+            setEditingMeal(null)
+            setDefaultMealMoment(null)
+            setPlanDatum(gekozenDatum)
+            setShowFoodLog(true)
+          })() : onOpenAlternatives?.({
             slot: plek.slot, _leeg: true, name: plek.label, display_label: plek.label,
             calories: 0, protein: 0, carbs: 0, fat: 0, timing: null,
           })}

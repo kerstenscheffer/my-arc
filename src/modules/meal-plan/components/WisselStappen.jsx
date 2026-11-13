@@ -69,6 +69,11 @@ export default function WisselStappen({
   }, [week]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const lijst = DAGEN.filter(d => gekozen.has(d.key))
+  // Snelkeuzes: vandaag, of de hele week.
+  const vandaagKey = DAGEN[(new Date().getDay() + 6) % 7].key
+  const weekDagen = (aanwezig.size > 0 ? DAGEN.filter(d => aanwezig.has(d.key)) : DAGEN).map(d => d.key).filter(mag)
+  const alleenVandaagAan = week === 0 && gekozen.size === 1 && gekozen.has(vandaagKey)
+  const heleWeekAan = weekDagen.length > 0 && gekozen.size === weekDagen.length && weekDagen.every(k => gekozen.has(k))
   const wissel = (key) => mag(key) && setGekozen(prev => {
     const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n
   })
@@ -129,6 +134,21 @@ export default function WisselStappen({
             {kortDatum(weekMaandag)} – {kortDatum(plus(weekMaandag, 6))}
           </span>
           <button onClick={() => setWeek(w => Math.min(2, w + 1))} disabled={week === 2} aria-label="Volgende week" style={pijl(week === 2)}><ChevronRight size={18} strokeWidth={2.8} /></button>
+        </div>
+        {/* Twee snelkeuzes boven de dagen (13 nov 2026, Kersten): alleen vandaag,
+            of de hele week. Hele week = de dagen waar de maaltijd nu staat; is
+            dat onbekend, dan alle zeven. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          {[
+            { label: 'Alleen vandaag', aan: alleenVandaagAan, doe: () => { setWeek(0); setGekozen(new Set(mag(vandaagKey) ? [vandaagKey] : [])) }, uit: !mag(vandaagKey) },
+            { label: 'Hele week', aan: heleWeekAan, doe: () => setGekozen(new Set(weekDagen)), uit: weekDagen.length === 0 },
+          ].map(k => (
+            <button key={k.label} type="button" onClick={k.doe} disabled={k.uit || bezig} aria-pressed={k.aan} style={{
+              minHeight: 40, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: k.uit ? 'default' : 'pointer',
+              background: k.aan ? '#fff' : 'transparent', color: k.aan ? '#000' : '#fff', opacity: k.uit ? 0.3 : 1,
+              border: `1px solid ${k.aan ? '#fff' : 'rgba(255,255,255,0.18)'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>{k.label}</button>
+          ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
           {DAGEN.map((d, i) => {
