@@ -115,6 +115,21 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
     return () => { weg = true }
   }, [client?.id, version])
 
+  // Elders afgevinkt (het blok op de pagina zelf): hier ook meteen weg.
+  useEffect(() => {
+    const weg = (e) => {
+      const id = e?.detail?.videoId
+      if (!id) return
+      setItems(prev => {
+        const over = prev.filter(i => i.video_id !== id)
+        if (over.length === 0) setFase('init')
+        return over
+      })
+    }
+    window.addEventListener('myarc:video-gezien', weg)
+    return () => window.removeEventListener('myarc:video-gezien', weg)
+  }, [])
+
   // De pill schudt af en toe, anders wordt hij deel van het meubilair.
   useEffect(() => {
     if (fase !== 'pill') return undefined

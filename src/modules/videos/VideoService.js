@@ -206,6 +206,10 @@ const videoService = {
           .update({ status: 'completed', viewed_at: new Date().toISOString(), completed_at: new Date().toISOString() })
           .eq('id', assignmentId)
       }
+      // De video staat op twee plekken: als blok op zijn pagina en in de
+      // herinnering. Wie hem op de ene afvinkt, moet hem op de andere ook kwijt
+      // zijn zonder de pagina te verversen (13 nov 2026).
+      try { window.dispatchEvent(new CustomEvent('myarc:video-gezien', { detail: { videoId } })) } catch { /* geen venster */ }
       return { success: true }
     } catch (e) {
       console.error('markeerVideoGezien error:', e)

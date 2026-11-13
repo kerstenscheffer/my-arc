@@ -52,6 +52,16 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
     return () => { weg = true }
   }, [client?.id, pagina])
 
+  // In de herinnering afgevinkt: het blok hier ook meteen weg.
+  useEffect(() => {
+    const weg = (e) => {
+      const id = e?.detail?.videoId
+      if (id) setItems(prev => prev.filter(i => i.video_id !== id))
+    }
+    window.addEventListener('myarc:video-gezien', weg)
+    return () => window.removeEventListener('myarc:video-gezien', weg)
+  }, [])
+
   const afvinken = async (item, via) => {
     setBevestig(null)
     setBezig(item.video_id)
