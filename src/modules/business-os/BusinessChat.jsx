@@ -499,6 +499,15 @@ export function OpmaakTekst({ tekst, sleutel }) {
   )
 }
 
+// De dichtstbijzijnde ouder die zelf verticaal scrolt (de berichtenlijst).
+function scrollOuder(el) {
+  for (let o = el?.parentElement; o; o = o.parentElement) {
+    const stijl = getComputedStyle(o).overflowY
+    if ((stijl === 'auto' || stijl === 'scroll') && o.scrollHeight > o.clientHeight) return o
+  }
+  return null
+}
+
 function Inkort({ tekst, achter, alineas = null }) {
   const ref = useRef(null)
   const [lang, setLang] = useState(false)
@@ -512,8 +521,26 @@ function Inkort({ tekst, achter, alineas = null }) {
   // Tijdens voorlezen staat het hele bericht open, anders valt de zin weg onder "meer".
   const open = openGezet || !!plek
   const actiefRef = useRef(null)
+  // Meescrollen alleen binnen de berichtenlijst en alleen als de zin buiten beeld
+  // valt (13 nov 2026). scrollIntoView verschoof ook het venster eromheen, en de
+  // lijst trok intussen naar onderen omdat het bericht openklapt: het beeld
+  // sprong. Tijdens het voorlezen blijft de lijst daarom staan (data-leest).
+  const leest = !!plek
+  useLayoutEffect(() => {
+    const lijst = leest ? scrollOuder(ref.current) : null
+    if (!lijst) return undefined
+    lijst.dataset.leest = '1'
+    return () => { delete lijst.dataset.leest }
+  }, [leest])
   useEffect(() => {
-    if (actieveZin) actiefRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    const zin = actieveZin ? actiefRef.current : null
+    const lijst = zin ? scrollOuder(zin) : null
+    if (!lijst) return
+    const z = zin.getBoundingClientRect(), l = lijst.getBoundingClientRect()
+    const RAND = 12
+    const schuif = z.top < l.top + RAND ? z.top - l.top - RAND
+      : z.bottom > l.bottom - RAND ? z.bottom - l.bottom + RAND : 0
+    if (schuif) lijst.scrollTo({ top: lijst.scrollTop + schuif, behavior: 'smooth' })
   }, [actieveZin])
   useLayoutEffect(() => {
     const el = ref.current
@@ -2071,7 +2098,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     lijst.current = el
     if (!el) return
     onderaan.current = true
-    const naarOnder = () => { if (onderaan.current) el.scrollTop = el.scrollHeight }
+    const naarOnder = () => { if (onderaan.current && !el.dataset.leest) el.scrollTop = el.scrollHeight }
     naarOnder()
     const raf = requestAnimationFrame(naarOnder)
     const mo = new MutationObserver(naarOnder)
