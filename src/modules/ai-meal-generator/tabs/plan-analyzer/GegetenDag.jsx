@@ -29,7 +29,6 @@ function Macro({ val, label, m }) {
   )
 }
 const DAG_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
-const rond = (n) => Math.round(Number(n) || 0)
 // Hoeveelheid zoals de klant hem logde: gram, of een aantal porties (1 portie laten we weg).
 const hoeveel = (r) => {
   const n = Number(r.amount) || 0
@@ -111,7 +110,12 @@ export default function GegetenDag({ week, dagIndex, targets, isMobile }) {
                       {r.meal_name || 'Zonder naam'}
                       {hoeveel(r) && <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}> · {hoeveel(r)}</span>}
                     </span>
-                    <span style={{ flexShrink: 0, fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{rond(r.calories)} kcal · {rond(r.protein)} E</span>
+                    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'baseline', gap: isMobile ? '0.45rem' : '0.6rem', fontVariantNumeric: 'tabular-nums' }}>
+                      <Macro val={r.calories} label="kcal" m={isMobile} />
+                      <Macro val={r.protein} label="E" m={isMobile} />
+                      <Macro val={r.carbs} label="K" m={isMobile} />
+                      <Macro val={r.fat} label="V" m={isMobile} />
+                    </span>
                   </div>
                 ))}
               </div>
