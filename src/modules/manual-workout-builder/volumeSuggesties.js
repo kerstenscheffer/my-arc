@@ -273,7 +273,7 @@ function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set(), ma
     for (const d of stand) {
       if (d.min + MIN_PER_EXTRA_SET > budget || d.frac + 1 > maxSessie || d.totaal + 1 > maxTraining) continue
       for (const o of d.oefs) {
-        if (o.ex.type === 'cardio' || spierVan(o.ex) !== spier || pijn.has(sleutel(o.ex.name))) continue // geen set erbij op een oefening met pijn
+        if (o.ex.type === 'cardio' || o.ex.power || spierVan(o.ex) !== spier || pijn.has(sleutel(o.ex.name))) continue // geen set erbij op een oefening met pijn, en niet op power
         // Minste sets eerst; gelijk: liefst vooraan in de training (output is daar hoger),
         // dan de dag waar deze spier het minst krijgt.
         if (!beste || o.sets < beste.o.sets || (o.sets === beste.o.sets && (o.plek < beste.o.plek || (o.plek === beste.o.plek && d.frac < beste.d.frac)))) beste = { d, o }

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, Gauge } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, Gauge, Zap } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 // Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
 // met de hele workoutpagina mee.
@@ -20,6 +20,7 @@ import OpwarmPoort from './OpwarmPoort'
 // Bouwfase-tracking (9 nov 2026): feedback per oefening en herstelvraag, alleen
 // als de coach het voor deze klant aanzette.
 import useBouwfase from '../../../bouwfase/useBouwfase'
+import { isPower, POWER_UITLEG, SNELHEDEN, snelheidVan } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
 import { leesFeedbackVanDag, spiergroepVan, vandaagIso } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
@@ -138,7 +139,7 @@ function SetsKiezer({ waarde, gelogd, onKies }) {
 // De wizard rekent in de eenheid van de sportschool waar je staat: je draait
 // aan het wiel in lb en er gaan kilo's naar buiten. Alles wat deze component
 // verlaat via onComplete is kilo, zodat er nooit een pond in de database komt.
-function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false, eenheid = 'kg' }) {
+function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false, eenheid = 'kg', power = false }) {
   const EH = eenheidLabel(eenheid)
   const toon = (kilo) => vanKg(kilo, eenheid)
   const [step, setStep] = useState(1)
@@ -154,12 +155,14 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
   const stepTitles = {
     1: editMode ? 'Gewicht aanpassen' : (eenheid === 'lb' ? 'Hoeveel pond?' : 'Hoeveel kilo?'),
     2: editMode ? 'Reps aanpassen' : 'Hoeveel reps?',
-    3: 'Partials?',
+    3: power ? 'Hoe snel ging het?' : 'Partials?',
     4: 'Dropset?',
     5: dropStep === 1 ? 'Dropset — Gewicht?' : `Dropset ${dropWeight}${EH} — Reps?`
   }
 
-  const totalSteps = snel ? 2 : (hasDropset ? 5 : 4)
+  // Power: gewicht, herhalingen, en dan hoe snel het ging. Geen partials of
+  // dropsets: die horen bij uitputting, niet bij explosief werk.
+  const totalSteps = power ? 3 : snel ? 2 : (hasDropset ? 5 : 4)
   const displayStep = step <= 4 ? Math.min(step, totalSteps) : totalSteps
 
   const handleFinish = () => {
@@ -180,7 +183,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
     <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', zIndex: 10001, display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease' }}>
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {editMode ? 'SET AANPASSEN' : snel ? `STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
+          {editMode ? 'SET AANPASSEN' : power ? `STAP ${Math.min(step, 3)}/3` : snel ? `STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
         </div>
         <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '0.35rem 0.75rem', touchAction: 'manipulation' }}>
           Annuleren
@@ -193,9 +196,21 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
         </h3>
 
         {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />}
-        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => (editMode || snel) ? handleFinishWithoutDrop() : setStep(3)} />}
+        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : power ? setStep(3) : snel ? handleFinishWithoutDrop() : setStep(3)} />}
 
-        {step === 3 && !editMode && (
+        {step === 3 && !editMode && power && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>{EH}</span> × {reps}</div>
+            <InfoTip text="Kijk naar je laatste herhaling. Was die nog net zo snel als de eerste?" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
+              {SNELHEDEN.map((s, i) => (
+                <button key={s.id} onClick={() => onComplete({ weight: naarKg(weight, eenheid), reps, partials: 0, dropsets: [], snelheid: s.id })} style={{ padding: isMobile ? '0.9rem' : '1rem', background: i === 0 ? '#fff' : 'transparent', border: `1px solid ${i === 0 ? '#fff' : 'rgba(255,255,255,0.2)'}`, borderRadius: 14, color: i === 0 ? '#0a0a0a' : '#fff', fontSize: isMobile ? '0.92rem' : '0.96rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 3 && !editMode && !power && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>{EH}</span> × {reps}</div>
             <InfoTip text="Partials zijn onvolledige herhalingen aan het einde van je set, wanneer je de volle beweging niet meer kunt maken maar nog wél een stukje." />
@@ -341,6 +356,11 @@ function LoggedSetRow({ set, index, eerder = [], actief = 0, onAddDropset, onEdi
               {set.reps}
               {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{set.partials}p</span>}
             </div>
+            {snelheidVan(set.snelheid) && (
+              <div style={{ fontSize: '0.72rem', color: snelheidVan(set.snelheid).kleur, fontWeight: 800, marginTop: 1 }}>
+                {snelheidVan(set.snelheid).label}
+              </div>
+            )}
             {set.dropsets?.length > 0 && (
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
                 {set.dropsets.map((ds, i) => (
@@ -491,7 +511,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const bouwfase = useBouwfase(client, db)
   const spier = spiergroepVan(exercise)
   // Alleen voor vandaag; een oude dag naloggen vraagt niets.
-  const bfAan = bouwfase.aan && (!datum || datum === vandaagIso())
+  const power = isPower(exercise)
+  const bfAan = bouwfase.aan && !power && (!datum || datum === vandaagIso())
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
   const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
   const herstelGehad = useRef(false)
@@ -741,7 +762,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
         const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).eq('exercise_name', exercise.name).order('created_at', { ascending: true })
         if (progress?.length > 0) {
           const existingSets = []
-          progress.forEach(p => { if (p.sets && Array.isArray(p.sets)) p.sets.forEach(s => existingSets.push({ weight: s.weight || 0, reps: s.reps || 0, partials: s.partials || 0, dropsets: s.dropsets || [] })) })
+          progress.forEach(p => { if (p.sets && Array.isArray(p.sets)) p.sets.forEach(s => existingSets.push({ weight: s.weight || 0, reps: s.reps || 0, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}) })) })
           setLoggedSets(existingSets)
           const lastNote = progress[progress.length - 1]?.notes
           if (lastNote) setExerciseNote(lastNote)
@@ -752,7 +773,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   }
 
   const handleSetComplete = async (setData) => {
-    const newSet = { weight: setData.weight, reps: setData.reps, partials: setData.partials || 0, dropsets: setData.dropsets || [] }
+    // Bij het aanpassen van een set wordt de snelheid niet opnieuw gevraagd: die blijft staan.
+    const snelheid = setData.snelheid || (editingIndex !== null ? loggedSets[editingIndex]?.snelheid : null)
+    const newSet = { weight: setData.weight, reps: setData.reps, partials: setData.partials || 0, dropsets: setData.dropsets || [], ...(snelheid ? { snelheid } : {}) }
     let newSets
 
     if (editingIndex !== null) {
@@ -860,7 +883,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     if (!client?.id || !db) return
     setSaving(true)
     try {
-      const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [] }))
+      const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}) }))
       const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, notitie || null, vandaag)
 
       console.log('💾 progress id:', progress?.id, '| attachment:', attachmentUsed, '| settings:', machineSettings)
@@ -942,7 +965,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // vraag naar de uitvoering staat er bewust bij — twaalf slordige reps zijn
   // geen reden om te verzwaren.
   const krap = isMobile && bfAan // drie pillen onder Set toevoegen op een telefoon
-  const tipZwaarder = loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
+  const tipZwaarder = !power && loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
 
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
@@ -1242,6 +1265,22 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           </div>
         ) : (
           <>
+            {/* Power: uitleg bovenaan, elke keer dat je de oefening opent. */}
+            {power && (
+              <div style={{ margin: isMobile ? '0.8rem 0.9rem 0.2rem' : '1rem 1.25rem 0.3rem', padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                  <Zap size={13} strokeWidth={2.8} /> Power
+                </div>
+                {String(exercise.notes || '').trim() && (
+                  <div style={{ fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 800, color: '#fff', lineHeight: 1.45, marginBottom: 6, whiteSpace: 'pre-wrap' }}>{String(exercise.notes).trim()}</div>
+                )}
+                {POWER_UITLEG.map(regel => (
+                  <div key={regel} style={{ display: 'flex', gap: 7, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45 }}>
+                    <span aria-hidden style={{ color: '#10b981', fontWeight: 900, flexShrink: 0 }}>→</span><span>{regel}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* ── VORIGE PRESTATIES ── */}
 
             {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
@@ -1511,6 +1550,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 editMode={editingIndex !== null}
                 snel={rustTimerAan && editingIndex === null}
                 eenheid={eenheid}
+                power={power}
               />
             )}
 

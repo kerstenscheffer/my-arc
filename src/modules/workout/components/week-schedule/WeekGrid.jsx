@@ -44,7 +44,8 @@ export default function WeekGrid({
     onDayClick(day, assignedWorkout)
   }
 
-  const gap = isMobile ? '0.3rem' : '0.5rem'
+  // Dagen tegen elkaar: één strook met een haarlijn ertussen (13 nov 2026, Kersten).
+  const gap = '1px'
   // Weekpijlen in het Ma- en Zo-vak van de strook zelf, zodat de kaarten
   // eronder de volle breedte houden.
   const pijl = {
@@ -105,6 +106,7 @@ export default function WeekGrid({
       gap,
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
       minWidth: 0, width: '100%',
+      borderRadius: isMobile ? 12 : 14, overflow: 'hidden',
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]
@@ -188,6 +190,7 @@ export default function WeekGrid({
             onOpenCardioGedaan={onOpenCardioGedaan}
             smal={leeg[index]}
             metLabel={false}
+            aaneen
             trainingTijd={trainingTijdPerDag[index] || null}
             stappen={Array.isArray(stappenPerDag) ? stappenPerDag[index] : null}
             stappenDoel={stappenDoel}

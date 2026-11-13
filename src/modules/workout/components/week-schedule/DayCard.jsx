@@ -16,7 +16,7 @@ import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
 // Eén tegel: foto, verloop, eyebrow + titel linksonder, pijltjes onderin.
-function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null, onderBand = false }) {
+function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null, band = null, aaneen = false }) {
   // Als variabele met hoofdletter, anders telt de lint-regel de JSX-aanroep niet.
   const Icoon = icoon
   return (
@@ -24,13 +24,19 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
       onClick={onClick}
       style={{
         position: 'relative', flex: groei, minHeight: isMobile ? 58 : 66, width: '100%',
-        borderRadius: onderBand ? '0 0 10px 10px' : 10, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
-        border: `1px solid ${klaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.08)'}`,
-        ...(onderBand ? { borderTop: 'none' } : null),
+        overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+        // Aaneen: de dagen vormen samen één strook, dus geen eigen hoeken of
+        // rand. Gedaan blijft herkenbaar aan een groene lijn binnenin.
+        ...(aaneen
+          ? { borderRadius: 0, boxShadow: klaar ? 'inset 0 0 0 1px rgba(16,185,129,0.55)' : 'none' }
+          : { borderRadius: 10, border: `1px solid ${klaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.08)'}` }),
       }}
     >
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.45 : 1 }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.88) 100%)' }} />
+      {/* Stappen van de dag: een strook over de bovenkant van de foto, binnen
+          de rand van de tegel, zodat het één kaart is. */}
+      {band}
       <div style={{ position: 'absolute', left: 4, right: 4, bottom: kanSchuiven ? (isMobile ? 20 : 22) : 4, textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.46rem' : '0.52rem', fontWeight: 900, color: klaar ? '#10b981' : 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
           {klaar ? <Check size={9} strokeWidth={3.2} /> : <Icoon size={9} strokeWidth={2.8} />}{klaar ? 'Gedaan' : eyebrow}
@@ -54,7 +60,7 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
           cardio voorgoed. */}
       {onVerwijder && !klaar && (
         <button onClick={(e) => { e.stopPropagation(); onVerwijder(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Weghalen" style={{
-          position: 'absolute', top: 2, right: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
+          position: 'absolute', top: band ? (isMobile ? 17 : 19) : 2, right: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
           background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
           filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.7))',
@@ -66,7 +72,7 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
       {/* Uitplannen (alleen builder): uit de week, blijft in het plan staan. */}
       {onUitplannen && !klaar && (
         <button onClick={(e) => { e.stopPropagation(); onUitplannen(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Uitplannen" title="Uit de week halen, blijft in het plan" style={{
-          position: 'absolute', top: 2, left: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
+          position: 'absolute', top: band ? (isMobile ? 17 : 19) : 2, left: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
           background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.75)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
           filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.7))', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -122,6 +128,8 @@ export default function DayCard({
   gedaanAnders = null,
   extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null, onUitplannen = null, onUitplannenExtra = null,
   onCardioInfo = null,
+  // Dagen zonder tussenruimte naast elkaar (WeekGrid).
+  aaneen = false,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
   const heeftTraining = !!workoutData || isActivity || !!gedaanAnders || extraTrainingen.length > 0
@@ -150,28 +158,35 @@ export default function DayCard({
   const hoogte = isMobile ? 144 : 168
   const dateNum = dayDate ? dayDate.getDate() : null
 
-  const stappenKop = (() => {
+  // inTegel: strook over de foto van de bovenste tegel (13 nov 2026, Kersten:
+  // de losse grijze band erboven hoorde er niet bij). Los = een rustdag, waar
+  // geen tegel is om hem op te leggen.
+  const stappenBand = (inTegel) => {
     if (!stappen) return null
     const n = Number(stappen.steps) || 0
     const tekst = n === 0 ? (stappen.toekomst ? '' : '0') : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(n)
     const deel = Math.min(1, n / Math.max(1, stappenDoel))
-    const kleur = stappen.gehaald ? '#10b981' : n > 0 ? '#fff' : 'rgba(255,255,255,0.3)'
-    // Band bovenop de eerste tegel (13 nov 2026, Kersten): de balk is de
-    // vulling van de band zelf, het getal staat erop. Eén kaart, geen losse
-    // regel en streep boven de foto.
+    // Van grijs naar groen naarmate er meer stappen staan: 3.000 is een
+    // beetje groen, 10.000 helemaal (13 nov 2026, Kersten).
+    const groen = Math.min(1, n / 10000)
+    const meng = (van, naar) => Math.round(van + (naar - van) * groen)
+    const kleur = n > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)'
+    const vulling = `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * groen).toFixed(2)})`
     return (
       <div title={`${n.toLocaleString('nl-NL')} stappen`} style={{
-        position: 'relative', width: '100%', flexShrink: 0, height: isMobile ? 16 : 18, marginBottom: -3,
-        borderRadius: '10px 10px 0 0', overflow: 'hidden', background: 'rgba(255,255,255,0.08)', boxSizing: 'border-box',
+        width: '100%', flexShrink: 0, height: isMobile ? 16 : 18, overflow: 'hidden', boxSizing: 'border-box',
+        ...(inTegel
+          ? { position: 'absolute', top: 0, left: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }
+          : { position: 'relative', borderRadius: aaneen ? 0 : 8, background: 'rgba(255,255,255,0.06)' }),
       }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(deel * 100)}%`, background: stappen.gehaald ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.22)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(deel * 100)}%`, background: vulling, transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
         <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: smal ? (isMobile ? '0.58rem' : '0.64rem') : (isMobile ? '0.64rem' : '0.7rem'), fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
           {!smal && <Footprints size={isMobile ? 9 : 10} strokeWidth={2.6} style={{ opacity: 0.8 }} />}
           <span>{tekst || '·'}</span>
         </div>
       </div>
     )
-  })()
+  }
   const kaart = {
     position: 'relative', width: '100%', minWidth: 0,
     minHeight: hoogte, borderRadius: isMobile ? 12 : 14,
@@ -200,13 +215,13 @@ export default function DayCard({
       <div style={{ position: 'relative', minWidth: 0 }}>
         <div onClick={swapMode ? handleClick : undefined} style={{
           ...kaart, paddingLeft: 0, paddingRight: 0,
-          ...(!metLabel ? { paddingTop: 0, paddingBottom: 0, borderRadius: 8 } : {}),
-          background: isToday && metLabel ? 'rgba(255,255,255, 0.05)' : 'transparent',
-          border: isToday && metLabel ? `1px solid ${tone.border}` : '1px dashed rgba(255,255,255,0.12)',
+          ...(!metLabel ? { paddingTop: 0, paddingBottom: 0, borderRadius: aaneen ? 0 : 8 } : {}),
+          background: isToday && metLabel ? 'rgba(255,255,255, 0.05)' : aaneen ? 'rgba(255,255,255,0.035)' : 'transparent',
+          border: aaneen ? 'none' : isToday && metLabel ? `1px solid ${tone.border}` : '1px dashed rgba(255,255,255,0.12)',
           cursor: swapMode ? 'pointer' : 'default', opacity: gedimd ? 0.7 : 1,
         }}>
           {metLabel && (isToday ? todayPill : dayLabel)}
-          {stappenKop}
+          {stappenBand(false)}
           <div style={{ fontSize: smal ? '0.5rem' : (isMobile ? '0.6rem' : '0.65rem'), fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: smal ? '0.04em' : '0.1em', textTransform: 'uppercase', marginTop: 'auto', marginBottom: 'auto' }}>
             Rust
           </div>
@@ -216,8 +231,8 @@ export default function DayCard({
   }
 
   // Alleen de bovenste tegel sluit aan op de stappenband.
-  let bandVrij = !!stappenKop
-  const onderBand = () => { const ja = bandVrij; bandVrij = false; return ja }
+  let bandVrij = !!stappen
+  const band = () => { const ja = bandVrij; bandVrij = false; return ja ? stappenBand(true) : null }
   const titelTraining = (workoutData?.name || workoutData?.focus || (isActivity ? workoutKey : '')).trim()
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
@@ -230,15 +245,14 @@ export default function DayCard({
           : { background: 'transparent', border: 'none', padding: 0, borderRadius: 0, overflow: 'visible' }),
       }}>
         {metLabel && (isToday ? todayPill : dayLabel)}
-        {stappenKop}
-        <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: aaneen ? 1 : 3 }}>
           {gedaanAnders && (
             <Tegel
               foto={getWorkoutImage({ name: gedaanAnders.naam || 'Training' })}
               eyebrow="Gedaan" titel={gedaanAnders.naam || 'Training'}
               klaar kanSchuiven={false}
               onClick={onOpenGedaan || undefined}
-              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
+              aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
             />
           )}
           {(workoutData || isActivity) && (
@@ -250,7 +264,7 @@ export default function DayCard({
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
               onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || kanBekijken || swapMode ? handleClick : undefined)}
-              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
+              aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
               onUitplannen={kanPlannen && workoutData ? onUitplannen : null}
@@ -263,7 +277,7 @@ export default function DayCard({
               klaar={x.klaar}
               kanSchuiven={false}
               onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
-              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
+              aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
               onUitplannen={kanPlannen && onUitplannenExtra ? () => onUitplannenExtra(x.rosterKey) : null}
             />
@@ -281,7 +295,7 @@ export default function DayCard({
               onLinks={() => onCardioShiftLeft?.(c)} onRechts={() => onCardioShiftRight?.(c)}
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
               onClick={c.gedaan && onOpenCardioGedaan ? () => onOpenCardioGedaan(c) : (kanOpenen ? () => logCardio(c) : (kanBekijken && onCardioInfo ? () => onCardioInfo(c) : undefined))}
-              isMobile={isMobile} icoon={HeartPulse} onderBand={onderBand()}
+              aaneen={aaneen} isMobile={isMobile} icoon={HeartPulse} band={band()}
               onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(c) : null}
             />
           ))}

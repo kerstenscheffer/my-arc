@@ -724,7 +724,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         }) : ({
           name: ex.name, sets: parseInt(ex.sets) || 2, reps: ex.reps, rust: ex.rust, rpe: ex.rpe,
           equipment: ex.equipment, primairSpieren: ex.primairSpieren, notes: ex.notes || '',
-          type: ex.type || 'compound', stretch: ex.stretch || false, priority: ex.priority || 1, goalPriority: ex.goalPriority || false
+          type: ex.type || 'compound', stretch: ex.stretch || false, priority: ex.priority || 1, goalPriority: ex.goalPriority || false,
+          ...(ex.power ? { power: true } : {}), // power-oefening: eigen blok en eigen log bij de klant
         }))
       }
     })

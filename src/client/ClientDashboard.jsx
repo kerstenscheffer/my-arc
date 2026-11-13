@@ -595,7 +595,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         left: isMobile ? 10 : '50%',
         right: isMobile ? 10 : 'auto',
         transform: isMobile ? 'none' : 'translateX(-50%)',
-        width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
+        // Ingebed (meekijk-paneel) telt de breedte van het paneel, niet het scherm.
+        width: isMobile ? 'auto' : `min(680px, calc(${ingebed ? '100%' : '100vw'} - 32px))`,
         // Geen backdrop-blur: een vaste vervaagde balk kost bij elke scrollframe
         // rekenwerk op de telefoon. Bijna-dekkend zwart ziet er hetzelfde uit.
         background: 'rgba(10, 10, 10, 0.96)',

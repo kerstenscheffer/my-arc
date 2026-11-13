@@ -1,6 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseList.jsx
 import { useState, useEffect, useRef } from 'react'
-import { Plus, RotateCcw, ChevronRight, Check } from 'lucide-react'
+import { Plus, RotateCcw, ChevronRight, Check, Zap } from 'lucide-react'
+import { isPower, POWER_UITLEG } from '../../../utils/power'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
@@ -18,7 +19,9 @@ const GROEP_NAMEN = {
   schouders: 'Shoulders', schouder: 'Shoulders', buik: 'Abs',
   bicep: 'Biceps', tricep: 'Triceps', billen: 'Glutes', kuiten: 'Calves',
 }
+const POWER_GROEP = 'Power'
 const groepVan = (ex) => {
+  if (isPower(ex)) return POWER_GROEP
   const ruw = String(ex?.primairSpieren || ex?.muscleGroup || '').trim()
   if (!ruw) return 'Overig'
   const klein = ruw.toLowerCase()
@@ -289,6 +292,8 @@ export default function ExerciseList({
     if (!groep) { groep = { naam, items: [] }; groepen.push(groep) }
     groep.items.push({ ex, index })
   })
+  // Power altijd bovenaan: explosief werk doe je fris, vóór de rest.
+  groepen.sort((a, b) => (b.naam === POWER_GROEP) - (a.naam === POWER_GROEP))
 
   // Klaar = alle geplande sets gelogd. Die oefeningen gaan uit de lijst en
   // vallen in het stapeltje bovenaan, net als op de dagagenda (12 nov 2026,
@@ -372,7 +377,17 @@ export default function ExerciseList({
                   fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 800,
                   color: 'rgba(255,255,255,0.3)',
                 }}>{groep.zichtbaar.length}</span>
+                {groep.naam === POWER_GROEP && <Zap size={13} strokeWidth={2.8} color="#fff" style={{ alignSelf: 'center' }} />}
               </div>
+              {groep.naam === POWER_GROEP && groep.zichtbaar.length > 0 && (
+                <div style={{
+                  margin: isMobile ? '0 0.9rem 0.45rem' : '0 1.25rem 0.5rem',
+                  fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 600, lineHeight: 1.45,
+                  color: 'rgba(255,255,255,0.6)',
+                }}>
+                  {POWER_UITLEG[0]} {POWER_UITLEG[1]}
+                </div>
+              )}
               {groep.items.map(({ ex: exercise, index }) => {
                 // Plek tussen de kaarten die nog moeten; -1 = klaar. Een klare
                 // kaart staat onder het stapeltje, en alleen als dat open is.

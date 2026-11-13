@@ -353,6 +353,17 @@ export default function CoachHub() {
   // combinatie is. De split-weergave leunt verder nergens op clientMode.
   const splitActief = !!splitTab && !isMobile
 
+  // Meekijken met een klant op volle breedte: de klant-app loopt dan tot de
+  // onderrand en heeft daar zijn eigen navbalk. Die van de coach gaat zolang
+  // weg, anders liggen er twee balken over elkaar. ClientViewTab seint dit.
+  const [meekijkBezig, setMeekijkBezig] = useState(false)
+  useEffect(() => {
+    const op = (e) => setMeekijkBezig(!!e.detail?.actief)
+    window.addEventListener('myarc:meekijken', op)
+    return () => window.removeEventListener('myarc:meekijken', op)
+  }, [])
+  const meekijkVol = meekijkBezig && activeTab === 'client-view' && !splitActief
+
   // Hoe hoog mag de split-strook zijn? Dat hangt af van waar 'ie begint (de
   // header erboven verandert van hoogte met de doelgroepenbalk en de veilige
   // zone) en van de zwevende navbalk onderaan. Meten in plaats van een getal
@@ -991,7 +1002,7 @@ export default function CoachHub() {
         minHeight: 'calc(100vh - 100px)',
         // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
         // ClientDashboard) — anders verdwijnt content onder de balk.
-        paddingBottom: splitActief ? 0 : '90px',
+        paddingBottom: (splitActief || meekijkVol) ? 0 : '90px',
       }}>
         {splitActief ? (
           // Twee tabbladen naast elkaar. De hele strook is schermhoog en elk
@@ -1067,7 +1078,7 @@ export default function CoachHub() {
       {/* Command / Leads / Business OS / Meer / Split / Uitloggen.
           Output, Productivity en Agenda zitten in Meer. Verborgen in
           klantmodus (terug via de oog-toggle linksonder). */}
-      {!clientMode && (
+      {!clientMode && !meekijkVol && (
         <nav style={{
           position: 'fixed',
           bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',

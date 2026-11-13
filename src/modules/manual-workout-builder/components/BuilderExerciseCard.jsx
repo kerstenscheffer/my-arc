@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight } from 'lucide-react'
+import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight, Zap } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
 import { LABEL as SPIER_LABEL, KEUZE as SPIER_KEUZE, spierVan } from '../spierGroepen'
@@ -269,6 +269,9 @@ export default function BuilderExerciseCard({
               {isCardio ? 'Cardio' : (exercise.primairSpieren || exercise.muscle)}
             </span>
           )}
+          {exercise.power && (
+            <span style={{ flexShrink: 0, fontSize: '0.52rem', fontWeight: 900, color: '#000', background: '#fff', padding: '2px 6px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>Power</span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{statText}</span>
@@ -415,8 +418,23 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                 <input value={exercise.equipment ?? ''} onChange={(e) => onField('equipment', e.target.value)} placeholder='Gekozen apparaat — of typ vrij, bv. "Smith machine" / "Kettlebell 16 kg"' list="bec-equipment-list" style={{ ...input, marginTop: 8 }} />
               </div>
 
-              <div><label style={label}>Notitie</label>
-                <textarea value={exercise.notes ?? ''} onChange={(e) => onField('notes', e.target.value)} placeholder="Coach-notitie / techniek-tip…" rows={3} style={{ ...input, resize: 'vertical', lineHeight: 1.45 }} />
+              {/* Power (13 nov 2026): eigen blok en eigen log bij de klant. */}
+              <button type="button" onClick={() => onField('power', !exercise.power)} aria-pressed={!!exercise.power} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '0.6rem 0.75rem', textAlign: 'left',
+                background: exercise.power ? '#fff' : 'transparent', color: exercise.power ? '#000' : '#fff',
+                border: `1px solid ${exercise.power ? '#fff' : 'rgba(255,255,255,0.18)'}`, borderRadius: 10,
+                fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation',
+              }}>
+                <Zap size={16} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900 }}>Power-oefening</span>
+                  <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, opacity: 0.65 }}>Komt bij de klant in het blok Power, met uitleg en een eigen log (snelheid per set)</span>
+                </span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{exercise.power ? 'Aan' : 'Uit'}</span>
+              </button>
+
+              <div><label style={label}>{exercise.power ? 'Instructie voor de klant' : 'Notitie'}</label>
+                <textarea value={exercise.notes ?? ''} onChange={(e) => onField('notes', e.target.value)} placeholder={exercise.power ? 'Bv. "Spring zo hoog als je kan, land zacht, reset tussen elke herhaling"' : 'Coach-notitie / techniek-tip…'} rows={3} style={{ ...input, resize: 'vertical', lineHeight: 1.45 }} />
               </div>
             </>
           )}

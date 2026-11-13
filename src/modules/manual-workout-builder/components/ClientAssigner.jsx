@@ -52,7 +52,8 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
             type: ex.type || 'compound',
             stretch: ex.stretch || false,
             priority: ex.priority || 1,
-            goalPriority: ex.goalPriority || false
+            goalPriority: ex.goalPriority || false,
+            ...(ex.power ? { power: true } : {})
           }))
         }
       })

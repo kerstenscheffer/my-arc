@@ -14,7 +14,7 @@
 // Vandaar de balk bovenaan: zonder dat onderscheid is het te makkelijk te
 // denken dat je in zijn account zit.
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Search, User, X, Eye } from 'lucide-react'
 import ClientDashboard from '../../client/ClientDashboard'
 
@@ -67,6 +67,33 @@ export default function ClientViewTab({ db, isMobile }) {
       `${c.first_name || ''} ${c.last_name || ''} ${c.email || ''}`.toLowerCase().includes(q)
     ).slice(0, 40)
   }, [clients, zoek])
+
+  // Buiten split screen krijgt de klant-app het hele scherm tot de onderrand.
+  // De coach-navbalk zou daar overheen vallen, dus CoachHub haalt die weg
+  // zolang je meekijkt (seintje hieronder); Sluiten brengt hem terug. In split
+  // screen regelt de strook de hoogte al (--paneel-hoogte staat dan gezet).
+  const paneelRef = useRef(null)
+  const [hoogte, setHoogte] = useState('100%')
+  const kijkt = !!gekozen
+  useEffect(() => {
+    if (!kijkt) return
+    const sein = (actief) => window.dispatchEvent(new CustomEvent('myarc:meekijken', { detail: { actief } }))
+    sein(true)
+    return () => sein(false)
+  }, [kijkt])
+  useLayoutEffect(() => {
+    if (!kijkt) return
+    const meet = () => {
+      const el = paneelRef.current
+      if (!el) return
+      if (getComputedStyle(el).getPropertyValue('--paneel-hoogte').trim()) { setHoogte('100%'); return }
+      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
+      setHoogte(`calc(100dvh - ${top}px)`)
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [kijkt])
 
   const naam = (c) => `${c?.first_name || ''} ${c?.last_name || ''}`.trim() || c?.email || 'Klant'
 
@@ -173,7 +200,7 @@ export default function ClientViewTab({ db, isMobile }) {
 
   // ── De klant-weergave ──
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div ref={paneelRef} style={{ display: 'flex', flexDirection: 'column', height: hoogte, minHeight: 0 }}>
       {/* Blijft staan zolang je kijkt. Zonder deze balk is niet te zien dat
           dit iemand anders' scherm is met jouw sessie eronder. */}
       <div style={{
@@ -209,9 +236,15 @@ export default function ClientViewTab({ db, isMobile }) {
         </button>
       </div>
 
-      {/* De klant-app zelf. Eigen scroll, zodat de balk erboven blijft staan. */}
-      <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'auto', position: 'relative' }}>
-        <ClientDashboard previewClientId={gekozen.id} ingebed />
+      {/* De klant-app zelf. De transform maakt van dit vlak het kader voor
+          alles wat in de klant-app position:fixed is (navbalk, vervaging,
+          modals): die blijven zo binnen dit paneel in plaats van over de
+          coach-navbalk te vallen. De scroll zit een laag dieper, anders
+          schuift de navbalk mee met de inhoud. */}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', transform: 'translateZ(0)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <ClientDashboard previewClientId={gekozen.id} ingebed />
+        </div>
       </div>
     </div>
   )
