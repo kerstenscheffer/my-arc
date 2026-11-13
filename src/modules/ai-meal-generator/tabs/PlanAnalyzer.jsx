@@ -6,6 +6,7 @@ import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Grid3X3,
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
+import GegetenDag from './plan-analyzer/GegetenDag'
 import MealCard from './plan-analyzer/MealCard'
 import WisselModal from './plan-analyzer/WisselModal'
 import BereikKeuze from './plan-analyzer/BereikKeuze'
@@ -286,6 +287,8 @@ export default function PlanAnalyzer({
   clients = [], selectedClient = null, onSelectClient, onOpenTargets,
 }) {
   const [activeDay, setActiveDay] = useState(0)
+  // Plan of wat de klant echt gegeten heeft (13 nov 2026).
+  const [gegeten, setGegeten] = useState(false)
   // Agenda opent nu in het dock-vak (dockedSection === 'agenda').
   // Bump counter dat de embedded ClientAgendaView dwingt opnieuw te
   // laden — elke meal-swap / move / delete in plan-analyzer schrijft
@@ -2458,6 +2461,22 @@ export default function PlanAnalyzer({
 
               {/* ── RECHTS: de maaltijden ── */}
               <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%' }}>
+              {/* Plan of Gegeten: wat je bouwt, of wat de klant echt gelogd heeft. */}
+              {resolvedClientId && (
+                <div style={{ display: 'flex', gap: 6, margin: m ? '0.5rem 0.75rem 0.6rem' : '0 0.75rem 0.7rem' }}>
+                  {[[false, 'Plan'], [true, 'Gegeten']].map(([waarde, label]) => (
+                    <button key={label} type="button" onClick={() => setGegeten(waarde)} aria-pressed={gegeten === waarde} style={{
+                      flex: 1, minHeight: 34, borderRadius: 9, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+                      background: gegeten === waarde ? '#fff' : 'transparent', color: gegeten === waarde ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: `1px solid ${gegeten === waarde ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                    }}>{label}</button>
+                  ))}
+                </div>
+              )}
+              {gegeten && resolvedClientId ? (
+                <GegetenDag db={db} clientId={resolvedClientId} weekStart={weekModus || dezeMaandag()} dagIndex={activeDay}
+                  targets={targets || {}} isMobile={m} onKiesDag={setActiveDay} />
+              ) : (<>
               {/* Ringen op één rij, even breed als de maaltijdkaarten eronder;
                   geen kader, weinig lucht erboven en eronder (Kersten, 24 okt 2026). */}
               {!m && (
@@ -2551,6 +2570,7 @@ export default function PlanAnalyzer({
                 db={db} clientId={resolvedClientId}
                 onChanged={(lijst) => { setSupplementen(lijst); setAgendaRefreshKey(k => k + 1) }}
               />
+              </>)}
               </div>
             </div>
 
