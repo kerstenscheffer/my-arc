@@ -88,14 +88,15 @@ function workoutRegels(r) {
   return regels.length ? regels : ['Workoutplan aangepast']
 }
 
-export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTeruggezet }) {
+export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTeruggezet, altijdOpen = false }) {
   const [versies, setVersies] = useState([])
   const [namen, setNamen] = useState({})
   const [bezig, setBezig] = useState(null)   // id
   const [zeker, setZeker] = useState(null)   // id dat om bevestiging vraagt
   const [melding, setMelding] = useState({}) // id -> tekst
   const [alles, setAlles] = useState(false)
-  const [open, wissel] = useInklap(`terugzetten_${soort}`)
+  const [openKeuze, wissel] = useInklap(`terugzetten_${soort}`)
+  const open = altijdOpen || openKeuze
 
   const laad = useCallback(async () => {
     if (!client?.id || !db?.supabase) { setVersies([]); return }
@@ -132,7 +133,7 @@ export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTe
 
   return (
     <div style={{ marginBottom: '0.4rem' }}>
-      <InklapKop titel="Blijvend aangepast door klant" aantal={versies.filter(v => !v.teruggezet_at).length} open={open} onWissel={wissel} />
+      {!altijdOpen && <InklapKop titel="Blijvend aangepast door klant" aantal={versies.filter(v => !v.teruggezet_at).length} open={open} onWissel={wissel} />}
       {zichtbaar.map(r => {
         const regels = soort === 'meal' ? maaltijdRegels(r, namen) : workoutRegels(r)
         const datum = new Date(r.created_at).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })

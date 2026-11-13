@@ -4,7 +4,7 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState, useMemo, useEffect } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward, Footprints, Layers, HeartPulse, History } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -125,10 +125,11 @@ const SOORT = {
   overgeslagen: { icoon: SkipForward, tekst: (r) => r.oefening || 'Oefening', sub: 'overgeslagen deze week' },
 }
 
-function PlanWijzigingen({ db, client, isMobile }) {
+function PlanWijzigingen({ db, client, isMobile, altijdOpen = false }) {
   const [rijen, setRijen] = useState([])
   const [alles, setAlles] = useState(false)
-  const [open, wissel] = useInklap('plan_wijzigingen')
+  const [openKeuze, wissel] = useInklap('plan_wijzigingen')
+  const open = altijdOpen || openKeuze
   useEffect(() => {
     if (!client?.id || !db?.supabase) { setRijen([]); return }
     db.supabase.from('client_plan_changes')
@@ -142,7 +143,7 @@ function PlanWijzigingen({ db, client, isMobile }) {
   const zichtbaar = alles ? rijen : rijen.slice(0, 5)
   return (
     <div style={{ marginBottom: '0.4rem' }}>
-      <InklapKop titel="Aangepast in plan" aantal={rijen.length} open={open} onWissel={wissel} />
+      {!altijdOpen && <InklapKop titel="Aangepast in plan" aantal={rijen.length} open={open} onWissel={wissel} />}
       {open && zichtbaar.map(r => {
         const m = SOORT[r.soort] || SOORT.toegevoegd
         const Icoon = m.icoon
@@ -178,6 +179,9 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [selectedExercise, setSelectedExercise] = useState(null)
   const [swappedExercises, setSwappedExercises] = useState([])
   const [krachtOpen, setKrachtOpen] = useState(false)
+  // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'stappen' |
+  // 'bouwfase' | 'cardio' | 'aangepast' | null. In beeld blijven de week en de sessies.
+  const [venster, setVenster] = useState(null)
   const workouts = workoutData?.workouts || []
 
   // Wissels van de klant in dít plan. Eerder telde dit alle overrides van
@@ -376,6 +380,17 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           {workoutData?.totalWorkouts > 0 && (
             <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>
           )}
+          {[
+            ['stappen', 'Stappendoel', Footprints],
+            ['bouwfase', 'Bouwfase en herstel per spiergroep', Layers],
+            ['cardio', 'Cardio die de klant logde', HeartPulse],
+            ['aangepast', 'Door de klant aangepast in het plan', History],
+          ].map(([id, titel, Icoon]) => (
+            <button key={id} onClick={() => setVenster(id)} title={titel} aria-label={titel}
+              style={{ ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }}>
+              {React.createElement(Icoon, { size: 15 })}
+            </button>
+          ))}
           <button
             onClick={() => setKrachtOpen(true)}
             title="Kracht: per oefening de stand tegen de band van de fase, zoals de klant het ziet"
@@ -395,6 +410,23 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <KrachtBlad db={db} client={client} isMobile={isMobile} />
         </BladModal>
 
+        {/* De vensters achter de iconen in de kop. Een blok dat niets te
+            tonen heeft geeft niets terug; dan zegt het venster dat zelf. */}
+        <style>{`.ci-venster:empty::after{content:'Nog niets om te tonen.';display:block;padding:1.5rem 1rem;font-size:0.82rem;font-weight:700;color:rgba(255,255,255,0.45)}`}</style>
+        <BladModal open={venster === 'stappen'} titel="Stappendoel" onClose={() => setVenster(null)} zIndex={12000}>
+          <div className="ci-venster"><StappenInsight db={db} client={client} isMobile={isMobile} alleenDoel /></div>
+        </BladModal>
+        <BladModal open={venster === 'bouwfase'} titel="Bouwfase" onClose={() => setVenster(null)} zIndex={12000}>
+          <div className="ci-venster"><BouwfaseInzicht db={db} client={client} isMobile={isMobile} altijdOpen /></div>
+        </BladModal>
+        <BladModal open={venster === 'cardio'} titel="Cardio" onClose={() => setVenster(null)} zIndex={12000}>
+          <div className="ci-venster"><CardioInsightBlock db={db} client={client} isMobile={isMobile} /></div>
+        </BladModal>
+        <BladModal open={venster === 'aangepast'} titel="Aangepast door klant" onClose={() => setVenster(null)} zIndex={12000}>
+          {/* Wat de klant zelf veranderde, en de blijvende wijzigingen met terugzetten. */}
+          <div className="ci-venster"><PlanWijzigingen db={db} client={client} isMobile={isMobile} altijdOpen /><KlantPlanTerugzetten db={db} client={client} soort="workout" isMobile={isMobile} altijdOpen /></div>
+        </BladModal>
+
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio
               en stappen per dag, met pijlen naar eerdere weken. */}
@@ -402,16 +434,6 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <div style={{ padding: isMobile ? '0.5rem 0.25rem 0' : '0.6rem 0.5rem 0', overflowX: 'auto' }}>
             <KlantWeekrooster client={client} db={db} isMobile={isMobile} />
           </div>
-          {/* Stappen: alleen het dagdoel zetten, de week staat al in de agenda */}
-          <StappenInsight db={db} client={client} isMobile={isMobile} alleenDoel />
-          {/* Bouwfase-tracking aan/uit + herstel-indicator per spiergroep */}
-          <BouwfaseInzicht db={db} client={client} isMobile={isMobile} />
-          {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
-          <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
-          {/* Wat de klant zelf aan het plan veranderde, met "door klant" erbij. */}
-          <PlanWijzigingen db={db} client={client} isMobile={isMobile} />
-          {/* Blijvende wijzigingen door de klant, met terugzetten. */}
-          <KlantPlanTerugzetten db={db} client={client} soort="workout" isMobile={isMobile} />
           </>}
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, alleenSessies ? 60 : 20).map((w, idx) => {

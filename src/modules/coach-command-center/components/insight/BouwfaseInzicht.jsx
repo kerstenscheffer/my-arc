@@ -23,8 +23,10 @@ function indicatie(herstel, pijn) {
   return null
 }
 
-export default function BouwfaseInzicht({ db, client, isMobile }) {
-  const [open, wissel] = useInklap('bouwfase', true)
+export default function BouwfaseInzicht({ db, client, isMobile, altijdOpen = false }) {
+  const [openKeuze, wissel] = useInklap('bouwfase', true)
+  // In een venster (Coach Inzicht, 13 nov 2026) is er geen inklapkop: altijd open.
+  const open = altijdOpen || openKeuze
   const [fase, setFase] = useState(undefined) // undefined = laden
   const [rijen, setRijen] = useState([])
   const [progressie, setProgressie] = useState([])
@@ -64,7 +66,7 @@ export default function BouwfaseInzicht({ db, client, isMobile }) {
 
   return (
     <div style={{ marginBottom: '0.4rem' }}>
-      <InklapKop titel="Bouwfase" aantal={rijen.length} open={open} onWissel={wissel} />
+      {!altijdOpen && <InklapKop titel="Bouwfase" aantal={rijen.length} open={open} onWissel={wissel} />}
       {open && (
         <div style={{ padding: pad }}>
           {!fase ? (
