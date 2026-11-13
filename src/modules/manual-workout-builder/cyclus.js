@@ -71,10 +71,19 @@ export function cyclusVan(plan, { rooster = null, actief = false, schemaId = nul
   // week zoals de klant hem ziet, slots[7..] = `los` = niet ingepland.
   const r = uitRooster(rooster, schemaId, actief, keyNaarId)
   if (r && ids.length <= STANDAARD_LENGTE) {
+    // Dezelfde training twee keer in de week (Pull op ma en do) blijft op beide
+    // dagen staan: eerst werd de tweede keer een rustdag, waardoor de kolommen
+    // niet klopten met het weekrooster erboven (13 nov 2026, Duuk). `herhaald`
+    // = de plekken waar een training voor de tweede keer staat.
     const gezien = new Set()
-    const week = r.map(id => (id != null && ids.includes(id) && !gezien.has(id) ? (gezien.add(id), id) : null))
+    const herhaald = []
+    const week = r.map((id, plek) => {
+      if (id == null || !ids.includes(id)) return null
+      if (gezien.has(id)) herhaald.push(plek); else gezien.add(id)
+      return id
+    })
     const los = ids.filter(id => !gezien.has(id))
-    return { lengte: STANDAARD_LENGTE, slots: [...week, ...los], bron: 'rooster', weekdagen: true, ingepland: STANDAARD_LENGTE, los }
+    return { lengte: STANDAARD_LENGTE, slots: [...week, ...los], bron: 'rooster', weekdagen: true, ingepland: STANDAARD_LENGTE, los, herhaald }
   }
   if (c?.volgorde?.length) return { lengte: Math.max(STANDAARD_LENGTE, ids.length), slots: normaliseer(c.volgorde, ids, STANDAARD_LENGTE), bron: 'plan', weekdagen: false }
   const L = Math.max(STANDAARD_LENGTE, ids.length)

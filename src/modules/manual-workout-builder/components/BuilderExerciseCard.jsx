@@ -5,7 +5,8 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight, Zap } from 'lucide-react'
+import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical, ArrowLeftRight, Zap, TrendingUp } from 'lucide-react'
+import OefeningLogsModal from './OefeningLogsModal'
 import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
 import { LABEL as SPIER_LABEL, KEUZE as SPIER_KEUZE, spierVan } from '../spierGroepen'
@@ -47,6 +48,10 @@ export default function BuilderExerciseCard({
   const hasVid = hasVideo || !!exercise.video_url
   const isCardio = exercise.type === 'cardio'
   const [editing, setEditing] = useState(false)
+  // Logs van de klant voor deze oefening (alleen met een klant, niet bij cardio).
+  const [logsOpen, setLogsOpen] = useState(false)
+  const kanLogs = !!client?.id && !isCardio && !!exercise.name
+  const logsModal = logsOpen && kanLogs ? <OefeningLogsModal db={db} client={client} exercise={exercise} isMobile={isMobile} onClose={() => setLogsOpen(false)} /> : null
   const [coachEquip, setCoachEquip] = useState(_equipCache.data ?? [])
 
   useEffect(() => {
@@ -114,16 +119,21 @@ export default function BuilderExerciseCard({
           </div>
         </div>
         <div style={{ display: 'flex', borderTop: `1px solid ${DIV}` }}>
-          <button onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video' : 'Video koppelen'} style={actie()}><Video size={14} /></button>
+          {/* Video zit in Bewerken (13 nov 2026, Kersten): één knop minder.
+              Ervoor in de plaats: de logs en krachtgrafiek van de klant. */}
+          <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken en video" style={actie()}><Pencil size={13} /></button>
           <div style={{ width: 1, background: DIV }} />
-          <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken" style={actie()}><Pencil size={13} /></button>
-          <div style={{ width: 1, background: DIV }} />
+          {kanLogs && <>
+            <button onClick={(e) => { stop(e); setLogsOpen(true) }} title="Logs en krachtgrafiek van de klant" style={actie()}><TrendingUp size={14} /></button>
+            <div style={{ width: 1, background: DIV }} />
+          </>}
           {onSwap && <>
             <button onClick={(e) => { stop(e); onSwap() }} title="Wisselen" style={actie()}><ArrowLeftRight size={13} /></button>
             <div style={{ width: 1, background: DIV }} />
           </>}
           <button onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={actie('#ef4444')}><Trash2 size={13} /></button>
         </div>
+        {logsModal}
         {editing && (
           <ExerciseEditModal
             exercise={exercise} isCardio={isCardio} isMobile={isMobile}
@@ -209,13 +219,16 @@ export default function BuilderExerciseCard({
         </div>
 
         <div style={{ display: 'flex', borderTop: `1px solid ${DIV}` }}>
-          <button onClick={(e) => { stop(e); onVideo() }} style={actie()}><Video size={m ? 13 : 14} /> {hasVid ? 'Video' : 'Video +'}</button>
-          <div style={{ width: 1, background: DIV }} />
           <button onClick={(e) => { stop(e); setEditing(true) }} style={actie()}><Pencil size={m ? 13 : 14} /> Edit</button>
           <div style={{ width: 1, background: DIV }} />
+          {kanLogs && <>
+            <button onClick={(e) => { stop(e); setLogsOpen(true) }} style={actie()}><TrendingUp size={m ? 13 : 14} /> Logs</button>
+            <div style={{ width: 1, background: DIV }} />
+          </>}
           <button onClick={(e) => { stop(e); onDelete() }} style={actie('#ef4444')}><Trash2 size={m ? 13 : 14} /> Wis</button>
         </div>
 
+        {logsModal}
         {editing && (
           <ExerciseEditModal
             exercise={exercise} isCardio={isCardio} isMobile={isMobile}

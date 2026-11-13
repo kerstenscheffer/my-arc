@@ -700,8 +700,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // tellen ook niet mee in rust, weekvolume en advies.
   const weekSlots = cyc.ingepland ? cyc.slots.slice(0, cyc.ingepland) : cyc.slots
   const losIds = cyc.los || []
+  // Volgt het weekrooster: een training die twee keer in de week staat telt
+  // twee keer mee in weekvolume, advies en het aantal trainingen.
   const weekDagen = useMemo(
-    () => (losIds.length ? workoutPlan.days.filter(d => !losIds.includes(d.id)) : workoutPlan.days),
+    () => (cyc.bron === 'rooster'
+      ? weekSlots.filter(id => id != null).map(id => workoutPlan.days.find(d => d.id === id)).filter(Boolean)
+      : (losIds.length ? workoutPlan.days.filter(d => !losIds.includes(d.id)) : workoutPlan.days)),
     [workoutPlan.days, cyc], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const rust = useMemo(() => rustPerSpier(weekSlots, spierenVanDag), [cyc, workoutPlan.days]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1419,6 +1423,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               const i = workoutPlan.days.findIndex(d => d.id === slotId)
               const dag = workoutPlan.days[i]
               if (!dag) return null
+              // Tweede keer dezelfde training in de week: een smalle kolom die
+              // naar de eerste verwijst. Bewerken doe je op één plek.
+              if (cyc.herhaald?.includes(plek)) {
+                const eerste = cyc.slots.indexOf(slotId)
+                return (
+                  <div key={`herhaal-${plek}`} style={{ width: 120, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.12)' }}>
+                    {slotKop}
+                    <button onClick={() => document.querySelector(`[data-dag="${dag.id}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })} title="Naar de kolom van deze training" style={{ padding: '0.6rem 0.7rem', background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+                      <div style={{ fontSize: '0.98rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dag.name || `Dag ${i + 1}`}</div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Zelfde als {WEEKDAG_KORT[eerste]}</div>
+                    </button>
+                  </div>
+                )
+              }
               // Spieren die de vorige cyclusdag ook al direct trainde: geen rustdag ertussen.
               const vorige = isLos ? null : weekSlots[(plek - 1 + weekSlots.length) % weekSlots.length]
               const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
