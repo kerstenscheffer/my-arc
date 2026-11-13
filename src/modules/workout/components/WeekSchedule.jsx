@@ -52,6 +52,8 @@ export default function WeekSchedule({
   zonderKop = false,
   // { opgeslagen: ['dag1', …], onOpen(key) }: toont plandagen die niet in deze week staan.
   nietIngepland = null,
+  // Coach-weergave: geen stappenregel onder het rooster, wel het doel bij vandaag.
+  stappenCompact = false,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -80,7 +82,7 @@ export default function WeekSchedule({
     return () => { weg = true; window.removeEventListener(STAPPEN_EVENT, laad) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, db, weekOffset])
-  const stappenPerDag = stappenWeek.length === 7 ? stappenWeek.map(d => ({ steps: d.steps, gehaald: (d.steps || 0) >= stappenDoel, toekomst: d.toekomst, isVandaag: d.isVandaag })) : null
+  const stappenPerDag = stappenWeek.length === 7 ? stappenWeek.map(d => ({ steps: d.steps, gehaald: (d.steps || 0) >= stappenDoel, toekomst: d.toekomst, isVandaag: d.isVandaag, doelTonen: stappenCompact && d.isVandaag, onKlik: stappenCompact ? () => setStappenInzicht(true) : null })) : null
   const stappenTotaal = stappenWeek.filter(d => !d.toekomst).reduce((t, d) => t + (d.steps || 0), 0)
   const stappenDagenGehaald = stappenWeek.filter(d => !d.toekomst && (d.steps || 0) >= stappenDoel).length
   // Andere plannen van de klant waar een dag van is ingepland (plan_<id>__<dag>).
@@ -1018,7 +1020,7 @@ export default function WeekSchedule({
             {tussenBlok}
             {/* Stappen van de week, direct onder het rooster; de cijfers per dag
                 staan in de tegels. De knop opent de lange lijn (30 & 90 dagen). */}
-            {stappenPerDag && (
+            {stappenPerDag && !stappenCompact && (
               <div style={{
                 padding: isMobile ? '0.1rem 1rem 0.5rem' : '0.2rem 1.25rem 0.6rem',
                 display: 'flex', alignItems: 'center', gap: 8,

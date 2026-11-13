@@ -176,6 +176,9 @@ export default function DayCard({
     if (!stappen) return null
     const n = Number(stappen.steps) || 0
     const tekst = n === 0 ? (stappen.toekomst ? '' : '0') : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(n)
+    const kort = (x) => (x >= 10000 ? `${Math.round(x / 1000)}k` : x >= 1000 ? `${(x / 1000).toFixed(1).replace('.', ',').replace(',0', '')}k` : String(x))
+    // Coach-rooster: bij vandaag het doel achter de stand (13 nov 2026, Kersten).
+    const metDoel = !!stappen.doelTonen && stappenDoel > 0
     const deel = Math.min(1, n / Math.max(1, stappenDoel))
     // Van grijs naar groen naarmate er meer stappen staan: 3.000 is een
     // beetje groen, 10.000 helemaal (13 nov 2026, Kersten).
@@ -184,7 +187,12 @@ export default function DayCard({
     const kleur = n > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)'
     const vulling = `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * groen).toFixed(2)})`
     return (
-      <div title={`${n.toLocaleString('nl-NL')} stappen`} style={{
+      <div title={`${n.toLocaleString('nl-NL')} stappen${metDoel ? ` · doel ${stappenDoel.toLocaleString('nl-NL')}` : ''}${stappen.onKlik ? ' · klik voor 30 en 90 dagen' : ''}`}
+        // Coach-rooster: de stappen openen de grafiek over 30 en 90 dagen.
+        onClick={stappen.onKlik ? (e) => { e.stopPropagation(); stappen.onKlik() } : undefined}
+        onPointerDown={stappen.onKlik ? (e) => e.stopPropagation() : undefined}
+        style={{
+        cursor: stappen.onKlik ? 'pointer' : undefined,
         width: '100%', flexShrink: 0, height: isMobile ? 16 : 18, overflow: 'hidden', boxSizing: 'border-box',
         ...(inTegel
           ? { position: 'absolute', top: 0, left: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }
@@ -193,7 +201,7 @@ export default function DayCard({
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(deel * 100)}%`, background: vulling, transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
         <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: smal ? (isMobile ? '0.58rem' : '0.64rem') : (isMobile ? '0.64rem' : '0.7rem'), fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
           {!smal && <Footprints size={isMobile ? 9 : 10} strokeWidth={2.6} style={{ opacity: 0.8 }} />}
-          <span>{tekst || '·'}</span>
+          <span>{tekst || '·'}{metDoel && <span style={{ opacity: 0.6 }}> / {kort(stappenDoel)}</span>}</span>
         </div>
       </div>
     )

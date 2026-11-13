@@ -363,7 +363,68 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   }
 
   // ── SESSIONS ──
-  if (view === 'sessions') {
+  // In Coach Inzicht blijft dit scherm staan; een sessie opent in een pop-up
+  // eroverheen (13 nov 2026, Kersten). Alleen de sessie-pop-up van de workout-
+  // builder (alleenSessies) wisselt nog het hele vlak.
+  if (view === 'sessions' || !alleenSessies) {
+    const sluitDetail = () => { setView('sessions'); setSelectedSession(null); setSelectedExercise(null) }
+    const detail = alleenSessies ? null
+      : view === 'exercises' && selectedSession ? (
+        <SessieOefeningen
+          db={db} isMobile={isMobile} selectedSession={selectedSession}
+          exs={getSessionExercises()}
+          onBack={sluitDetail}
+          onKies={(naam) => { setSelectedExercise(naam); setView('progress') }}
+        />
+      ) : view === 'progress' && selectedExercise ? (
+        <ProgressView db={db} client={client} isMobile={isMobile} selectedExercise={selectedExercise} entries={getExerciseHistory()} onBack={() => setView(selectedSession ? 'exercises' : 'sessions')} />
+      ) : null
+    // Eén regel per sessie: "Push · vrijdag 13/11" met rechts de notities.
+    const RIJ_HOOGTE = 42
+    const sessieRijen = workouts.length === 0
+      ? <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Nog geen trainingen gelogd</div>
+      : (
+        // Vijf tegelijk in beeld, de rest door te scrollen.
+        <div style={{ maxHeight: RIJ_HOOGTE * 5, overflowY: 'auto', WebkitOverflowScrolling: 'touch', margin: '0.5rem 0.9rem 0.6rem', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+          {workouts.slice(0, 60).map((w, idx) => {
+            const parsed = parseSessionNote(w.notes)
+            const notities = (exerciseNotesBySession[w.id] || 0) + (parsed.note ? 1 : 0)
+            const trainingNaam = naamVoorSessie(w)
+            const naam = trainingNaam || 'Training'
+            const d = w.workout_date ? new Date(`${String(w.workout_date).slice(0, 10)}T00:00:00`) : null
+            const wanneer = d && !isNaN(d) ? `${d.toLocaleDateString('nl-NL', { weekday: 'long' })} ${d.getDate()}/${d.getMonth() + 1}` : ''
+            const wissels = wisselsVoorSessie(w)
+            const aantalWissels = Object.keys(wissels).length
+            return (
+              <button
+                key={`${w.workout_date}-${idx}`}
+                onClick={() => { setSelectedSession({ ...w, workout_naam: trainingNaam || w.workout_naam || null, _wissels: wissels }); setView('exercises') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: RIJ_HOOGTE, boxSizing: 'border-box',
+                  padding: '0 0.2rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.12)',
+                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.88rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {naam}{wanneer && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}> · {wanneer}</span>}
+                </span>
+                {aantalWissels > 0 && (
+                  <span title={`${aantalWissels} oefening${aantalWissels === 1 ? '' : 'en'} gewisseld`} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, color: '#f59e0b' }}>
+                    <ArrowLeftRight size={13} strokeWidth={2.6} />{aantalWissels}
+                  </span>
+                )}
+                {notities > 0 && (
+                  <span title={`${notities} notitie${notities === 1 ? '' : 's'}`} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, color: '#fff' }}>
+                    <MessageSquare size={13} strokeWidth={2.6} />{notities}
+                  </span>
+                )}
+                <ChevronRight size={15} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+              </button>
+            )
+          })}
+        </div>
+      )
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         {/* In de kolomkop: plan, voortgang en knoppen (zie KolomKop). */}
@@ -435,8 +496,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             <KlantWeekrooster client={client} db={db} isMobile={isMobile} />
           </div>
           </>}
-          {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
-          {workouts.length > 0 ? workouts.slice(0, alleenSessies ? 60 : 20).map((w, idx) => {
+          {alleenSessies && workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
+          {!alleenSessies ? sessieRijen : workouts.length > 0 ? workouts.slice(0, 60).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
             const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
             const FeelingIcon = feelingCfg?.icon
@@ -531,6 +592,20 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             )
           }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Nog geen trainingen gelogd</div>}
         </div>
+        {/* De gekozen sessie (en van daaruit de progressie per oefening) als pop-up. */}
+        {detail && (
+          <div onClick={sluitDetail} style={{
+            position: 'fixed', inset: 0, zIndex: 12000, background: 'rgba(0,0,0,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0.5rem' : '1.5rem',
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              width: '100%', maxWidth: 620, height: isMobile ? '92vh' : '85vh', overflow: 'hidden',
+              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 16,
+            }}>
+              {detail}
+            </div>
+          </div>
+        )}
       </div>
     )
   }

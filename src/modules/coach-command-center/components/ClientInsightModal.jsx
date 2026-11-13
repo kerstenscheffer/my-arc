@@ -157,7 +157,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // aparte lade onderaan.
   // De inhoud in het midden houden. Volle breedte leest bij één kolom als een
   // heel scherm vol losse cijfers; een kolom met marges eromheen is rustiger.
-  const middenBreedte = openSecties.length > 1 ? 1500 : 980
+  // Gewicht + Training staan gestapeld in één kolom en tellen dus als één.
+  const aantalKolommen = openSecties.length - (['weight', 'workout'].every(id => openSecties.includes(id)) ? 1 : 0)
+  const middenBreedte = aantalKolommen > 1 ? 1500 : 980
 
   // Het huidige gewicht stond als eerste cel in de cijferregel. Die regel is nu
   // dicht, en dit getal wil je bij de naam zien — het is wie je voor je hebt,
@@ -510,21 +512,41 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 }}>
                   Kies hierboven wat je wil zien.
                 </div>
-              ) : SECTIES.filter(sec => openSecties.includes(sec.id)).map((sec, i) => (
-                <div key={sec.id} style={{
-                  flex: '1 1 0',
-                  minWidth: openSecties.length > 1 ? 300 : 0,
-                  overflow: 'hidden',
-                  borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
-                }}>
-                  {/* Elke kolom dezelfde kopbalk; de kolom zet er zijn
-                      belangrijkste info en knoppen in (KolomKopInhoud). */}
-                  <KolomKop icon={sec.icon} titel={sec.label}
-                    onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
-                    {renderSectie(sec.id, false)}
-                  </KolomKop>
-                </div>
-              ))}
+              ) : (() => {
+                // Gewicht en Training delen één kolom, boven en onder elkaar
+                // (13 nov 2026, Kersten): beide zijn kort genoeg, en zo blijft
+                // er breedte over voor wat er verder open staat.
+                const open = SECTIES.filter(sec => openSecties.includes(sec.id))
+                const stapel = ['weight', 'workout'].every(id => openSecties.includes(id))
+                const kolommen = []
+                open.forEach(sec => {
+                  if (stapel && sec.id === 'workout') return
+                  kolommen.push(stapel && sec.id === 'weight' ? [sec, SECTIES.find(x => x.id === 'workout')] : [sec])
+                })
+                return kolommen.map((groep, i) => (
+                  <div key={groep[0].id} style={{
+                    flex: '1 1 0',
+                    minWidth: kolommen.length > 1 ? 300 : 0,
+                    overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column',
+                    borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                  }}>
+                    {groep.map((sec, j) => (
+                      <div key={sec.id} style={{
+                        flex: '1 1 0', minHeight: 0, overflow: 'hidden',
+                        borderTop: j > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                      }}>
+                        {/* Elke kolom dezelfde kopbalk; de kolom zet er zijn
+                            belangrijkste info en knoppen in (KolomKopInhoud). */}
+                        <KolomKop icon={sec.icon} titel={sec.label}
+                          onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                          {renderSectie(sec.id, false)}
+                        </KolomKop>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              })()}
               </div>
             </div>
           )}

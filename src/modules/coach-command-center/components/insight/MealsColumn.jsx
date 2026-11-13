@@ -13,7 +13,7 @@ import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import {
   UtensilsCrossed, ChevronRight, ArrowLeft, Zap, ExternalLink, Droplet, Info,
-  ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays,
+  ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays, Pill, FileText,
 } from 'lucide-react'
 import MealDaySummaryModal from '../../../meal-plan/components/MealDaySummaryModal'
 import { BRONNEN, bronVan, wisselsPerDag } from '../../../meal-plan/utils/logBron'
@@ -257,6 +257,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   const [selectedDay, setSelectedDay] = useState(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
+  // 'aangepast' | 'supplementen' | 'documenten' | null. In beeld blijven de dagen.
+  const [venster, setVenster] = useState(null)
   // Gelogde maaltijd waarvan het info-blad open staat, plus zijn ingrediënten.
   const [infoMeal, setInfoMeal] = useState(null)
   const [infoIngredienten, setInfoIngredienten] = useState(null)
@@ -594,6 +597,17 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                 <Zap size={14} strokeWidth={2.6} />
               </button>
             )}
+            {[
+              ['water', 'Water: doel en deze week', Droplet],
+              ['aangepast', 'Door de klant aangepast in het plan', History],
+              ['supplementen', 'Supplementen', Pill],
+              ['documenten', 'Documenten', FileText],
+            ].map(([id, titel, Icoon]) => (
+              <button key={id} onClick={() => setVenster(id)} title={titel} aria-label={titel}
+                style={{ ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }}>
+                {React.createElement(Icoon, { size: 15 })}
+              </button>
+            ))}
             <button onClick={() => setStatsOpen(true)} style={kopKnopStijl} title="Maand- en dagoverzicht, zoals de klant het ziet">
               <CalendarDays size={13} strokeWidth={2.6} /> Inzicht
             </button>
@@ -606,13 +620,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             )}
           </KolomKopInhoud>
 
-          {/* Waterdoel — in liters op de klant (clients.water_intake_target). De
-              fles op de maaltijdpagina rekent daarmee; 3 liter is de standaard
-              als je niets invult. */}
-          <WaterDoel client={client} db={db} isMobile={isMobile} />
-
-          {/* Blijvende wijzigingen die de klant zelf in het plan zette, met terugzetten. */}
-          <KlantPlanTerugzetten db={db} client={client} soort="meal" isMobile={isMobile} />
 
           {days.length === 0 && !laden ? (
             <div style={{ padding: pad, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>
@@ -699,26 +706,28 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             </div>
           )}
 
-          {/* Supplementen horen bij voeding, dus hier en niet in een eigen
-              kolom. Toont zichzelf niet als er geen supplementplan is. */}
-          {db && client?.id && (
-            <div style={{ marginTop: '1.5rem' }}>
-              <SupplementTrouw db={db} client={client} isMobile={isMobile} />
-            </div>
-          )}
-
-          {/* ── DOCUMENTEN SECTIE ── */}
-          {db && client?.id && (
-            <ClientDocumentsSection
-              db={db}
-              clientId={client.id}
-              coachId={coachId}
-              isMobile={isMobile}
-              isClientView={false}
-            />
-          )}
         </div>
       </div>
+
+      {/* De vensters achter de iconen in de kop. Een blok dat niets te tonen
+          heeft geeft niets terug; dan zegt het venster dat zelf. */}
+      <style>{`.ci-venster:empty::after{content:'Nog niets om te tonen.';display:block;padding:1.5rem 1rem;font-size:0.82rem;font-weight:700;color:rgba(255,255,255,0.45)}`}</style>
+      {/* Waterdoel in liters op de klant (clients.water_intake_target); de fles
+          op de maaltijdpagina rekent daarmee, 3 liter is de standaard. */}
+      <BladModal open={venster === 'water'} titel="Water" onClose={() => setVenster(null)} zIndex={12000}>
+        <div className="ci-venster"><WaterDoel client={client} db={db} isMobile={isMobile} /></div>
+      </BladModal>
+      <BladModal open={venster === 'aangepast'} titel="Aangepast door klant" onClose={() => setVenster(null)} zIndex={12000}>
+        <div className="ci-venster"><KlantPlanTerugzetten db={db} client={client} soort="meal" isMobile={isMobile} altijdOpen /></div>
+      </BladModal>
+      <BladModal open={venster === 'supplementen'} titel="Supplementen" onClose={() => setVenster(null)} zIndex={12000}>
+        <div className="ci-venster">{db && client?.id && <SupplementTrouw db={db} client={client} isMobile={isMobile} />}</div>
+      </BladModal>
+      <BladModal open={venster === 'documenten'} titel="Documenten" onClose={() => setVenster(null)} zIndex={12000}>
+        <div className="ci-venster">{db && client?.id && (
+          <ClientDocumentsSection db={db} clientId={client.id} coachId={coachId} isMobile={isMobile} isClientView={false} />
+        )}</div>
+      </BladModal>
 
       {/* Het Inzicht-scherm van de klant: dag, week en maand. */}
       {statsOpen && (

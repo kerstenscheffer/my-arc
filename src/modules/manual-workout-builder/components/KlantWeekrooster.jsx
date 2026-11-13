@@ -83,6 +83,9 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
       client={client}
       isMobile={isMobile}
       zonderKop={zonderKop}
+      // Coach: geen weekregel met stappen onder het rooster; het doel staat
+      // bij vandaag in de tegel.
+      stappenCompact
       // Alleen in de builder: plandagen die niet in de week staan, om weer in te plannen.
       nietIngepland={onKiesTraining ? { opgeslagen: Object.keys(schema.week_structure || {}), onOpen: onKiesTraining, onVerwijder: verwijderPlandag } : null}
     />
