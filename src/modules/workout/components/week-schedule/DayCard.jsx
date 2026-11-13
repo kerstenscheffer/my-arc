@@ -16,7 +16,7 @@ import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
 // Eén tegel: foto, verloop, eyebrow + titel linksonder, pijltjes onderin.
-function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null }) {
+function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null, onUitplannen = null, onderBand = false }) {
   // Als variabele met hoofdletter, anders telt de lint-regel de JSX-aanroep niet.
   const Icoon = icoon
   return (
@@ -24,8 +24,9 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
       onClick={onClick}
       style={{
         position: 'relative', flex: groei, minHeight: isMobile ? 58 : 66, width: '100%',
-        borderRadius: 10, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+        borderRadius: onderBand ? '0 0 10px 10px' : 10, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
         border: `1px solid ${klaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.08)'}`,
+        ...(onderBand ? { borderTop: 'none' } : null),
       }}
     >
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.45 : 1 }} />
@@ -155,14 +156,18 @@ export default function DayCard({
     const tekst = n === 0 ? (stappen.toekomst ? '' : '0') : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(n)
     const deel = Math.min(1, n / Math.max(1, stappenDoel))
     const kleur = stappen.gehaald ? '#10b981' : n > 0 ? '#fff' : 'rgba(255,255,255,0.3)'
+    // Band bovenop de eerste tegel (13 nov 2026, Kersten): de balk is de
+    // vulling van de band zelf, het getal staat erop. Eén kaart, geen losse
+    // regel en streep boven de foto.
     return (
-      <div title={`${n.toLocaleString('nl-NL')} stappen`} style={{ width: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3, padding: smal ? '0 1px' : '0 2px', boxSizing: 'border-box', marginBottom: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: smal ? (isMobile ? '0.64rem' : '0.72rem') : (isMobile ? '0.78rem' : '0.88rem'), fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.02em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-          {!smal && <Footprints size={isMobile ? 10 : 11} strokeWidth={2.6} style={{ opacity: 0.8 }} />}
+      <div title={`${n.toLocaleString('nl-NL')} stappen`} style={{
+        position: 'relative', width: '100%', flexShrink: 0, height: isMobile ? 16 : 18, marginBottom: -3,
+        borderRadius: '10px 10px 0 0', overflow: 'hidden', background: 'rgba(255,255,255,0.08)', boxSizing: 'border-box',
+      }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(deel * 100)}%`, background: stappen.gehaald ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.22)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
+        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: smal ? (isMobile ? '0.58rem' : '0.64rem') : (isMobile ? '0.64rem' : '0.7rem'), fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+          {!smal && <Footprints size={isMobile ? 9 : 10} strokeWidth={2.6} style={{ opacity: 0.8 }} />}
           <span>{tekst || '·'}</span>
-        </div>
-        <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-          <div style={{ width: `${Math.round(deel * 100)}%`, height: '100%', background: stappen.gehaald ? '#10b981' : 'rgba(255,255,255,0.7)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
         </div>
       </div>
     )
@@ -210,6 +215,9 @@ export default function DayCard({
     )
   }
 
+  // Alleen de bovenste tegel sluit aan op de stappenband.
+  let bandVrij = !!stappenKop
+  const onderBand = () => { const ja = bandVrij; bandVrij = false; return ja }
   const titelTraining = (workoutData?.name || workoutData?.focus || (isActivity ? workoutKey : '')).trim()
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
@@ -230,7 +238,7 @@ export default function DayCard({
               eyebrow="Gedaan" titel={gedaanAnders.naam || 'Training'}
               klaar kanSchuiven={false}
               onClick={onOpenGedaan || undefined}
-              isMobile={isMobile} icoon={Dumbbell}
+              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
             />
           )}
           {(workoutData || isActivity) && (
@@ -242,7 +250,7 @@ export default function DayCard({
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
               onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || kanBekijken || swapMode ? handleClick : undefined)}
-              isMobile={isMobile} icoon={Dumbbell}
+              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
               onUitplannen={kanPlannen && workoutData ? onUitplannen : null}
@@ -255,26 +263,28 @@ export default function DayCard({
               klaar={x.klaar}
               kanSchuiven={false}
               onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
-              isMobile={isMobile} icoon={Dumbbell}
+              isMobile={isMobile} icoon={Dumbbell} onderBand={onderBand()}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
               onUitplannen={kanPlannen && onUitplannenExtra ? () => onUitplannenExtra(x.rosterKey) : null}
             />
           ))}
-          {heeftCardio && (
-            <Tegel
-              foto={cardioFoto(cardio[0].soort)}
-              eyebrow="Cardio" titel={cardio[0].soort + (cardio.length > 1 ? ` +${cardio.length - 1}` : '')}
-              soortTraining={cardio[0].sublabel || null}
-              sub={`${cardio[0].tijd}${cardio[0].duur ? ` · ${cardio[0].duur} min` : ''}`}
-              klaar={cardioKlaar}
-              kanSchuiven={!cardioKlaar && kanPlannen && !!onCardioShiftLeft}
-              onLinks={() => onCardioShiftLeft?.(cardio[0])} onRechts={() => onCardioShiftRight?.(cardio[0])}
+          {/* Elke cardiosessie een eigen tegel (13 nov 2026): eerst stond
+              alleen de eerste er, met "+1" achter de naam. */}
+          {heeftCardio && cardio.map((c, i) => (
+            <Tegel key={c.id || i}
+              foto={cardioFoto(c.soort)}
+              eyebrow="Cardio" titel={c.soort}
+              soortTraining={c.sublabel || null}
+              sub={`${c.tijd}${c.duur ? ` · ${c.duur} min` : ''}`}
+              klaar={!!c.gedaan}
+              kanSchuiven={!c.gedaan && kanPlannen && !!onCardioShiftLeft}
+              onLinks={() => onCardioShiftLeft?.(c)} onRechts={() => onCardioShiftRight?.(c)}
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
-              onClick={cardioKlaar && onOpenCardioGedaan ? () => onOpenCardioGedaan(cardio[0]) : (kanOpenen ? () => logCardio(cardio[0]) : (kanBekijken && onCardioInfo ? () => onCardioInfo(cardio[0]) : undefined))}
-              isMobile={isMobile} icoon={HeartPulse}
-              onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(cardio[0]) : null}
+              onClick={c.gedaan && onOpenCardioGedaan ? () => onOpenCardioGedaan(c) : (kanOpenen ? () => logCardio(c) : (kanBekijken && onCardioInfo ? () => onCardioInfo(c) : undefined))}
+              isMobile={isMobile} icoon={HeartPulse} onderBand={onderBand()}
+              onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(c) : null}
             />
-          )}
+          ))}
         </div>
       </div>
     </div>
