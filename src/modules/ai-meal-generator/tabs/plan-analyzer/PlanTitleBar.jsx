@@ -40,6 +40,8 @@ export default function PlanTitleBar({
   // Weergave (10 nov 2026): 'day' of 'kolommen' (de week naast elkaar). Klik
   // op de actieve knop = terug naar de andere, zoals in de workout builder.
   weergave = null, onWeergave = null,
+  // Plan of wat de klant echt at (13 nov 2026).
+  gegeten = false, onGegeten = null,
 }) {
   const m = isMobile
   const [editing, setEditing] = useState(false)
@@ -156,6 +158,15 @@ export default function PlanTitleBar({
 
       {/* Rechts: ongedaan maken, activeren, menu. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        {onGegeten && (<>
+          {[[false, 'Plan', 'Het plan dat je bouwt'], [true, 'Gegeten', 'Wat de klant echt gelogd heeft']].map(([waarde, label, titel]) => (
+            <button key={label} type="button" onClick={() => onGegeten(waarde)} title={titel} aria-pressed={gegeten === waarde} style={{
+              height: 30, padding: '0 0.7rem', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+              background: gegeten === waarde ? '#fff' : 'transparent', color: gegeten === waarde ? '#000' : 'rgba(255,255,255,0.7)',
+            }}>{label}</button>
+          ))}
+          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
+        </>)}
         {weergave && onWeergave && (<>
           <button onClick={() => onWeergave('day')} title="Eén dag" aria-label="Eén dag" aria-pressed={weergave === 'day'}
             style={{ ...ikoon(false), background: weergave === 'day' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>

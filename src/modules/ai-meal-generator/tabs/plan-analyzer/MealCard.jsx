@@ -246,7 +246,7 @@ export default function MealCard({
   }
 
   // Zo compact als de maaltijdkaart van de klant (9 okt 2026).
-  const photoSize = m ? 60 : 66
+  const photoSize = m ? 72 : 84
 
   return (
     <div style={{
@@ -264,7 +264,7 @@ export default function MealCard({
         {/* Foto-kolom — gebruikt fallback per slot als meal geen eigen
             image_url heeft. Lege ai_meals laten geen kaal vlak meer zien. */}
         <button onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMomentOpen({ top: r.bottom + 6, left: r.left, boven: r.top }) }} title="Moment en tijd aanpassen" style={{
-          width: photoSize, height: photoSize,
+          width: photoSize, minHeight: photoSize, alignSelf: 'stretch',
           flexShrink: 0, padding: 0, border: 'none', cursor: 'pointer',
           background: `url(${getMealImage(meal, slot)}) center/cover`,
           position: 'relative', fontFamily: 'inherit', textAlign: 'left',
@@ -288,11 +288,11 @@ export default function MealCard({
         </button>
 
         {/* Info area */}
-        <div style={{
-          flex: 1, minWidth: 0,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: m ? '0.35rem 0.65rem' : '0.4rem 0.85rem',
-        }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            padding: m ? '0.4rem 0.65rem 0.35rem' : '0.45rem 0.85rem 0.4rem',
+          }}>
           {/* Naam + kcal */}
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: 6,
@@ -358,10 +358,10 @@ export default function MealCard({
               </span>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Acties: Swap | ✎ | Recept | ⋯ (Dagen / Ingrediënten / Wis in dropdown) */}
+          </div>
+      {/* Acties rechts van de foto, alleen iconen (13 nov 2026, Kersten): de
+          kaart is één regel lager en de foto loopt over de volle hoogte. De
+          naam van elke knop staat in de tooltip. */}
       <div style={{ display: 'flex', borderTop: `1px solid ${DIVIDER}`, position: 'relative' }}>
         <ActionCell
           icon={<Shuffle size={m ? 13 : 14} />}
@@ -447,6 +447,9 @@ export default function MealCard({
           </div>
           </div>, modalHost
         )}
+      </div>
+
+        </div>
       </div>
 
       {/* Kliks in het blad (een portal) lopen in React terug naar de kaart;
@@ -714,12 +717,12 @@ function ActionCell({ icon, label, onClick, m, active, danger }) {
   const color = danger ? '#ef4444' : active ? GOLD : 'rgba(255,255,255,0.65)'
   return (
     <button
-      onClick={onClick}
+      onClick={onClick} title={label} aria-label={label}
       style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 4,
-        padding: m ? '0.42rem 0.3rem' : '0.5rem 0.4rem',
+        padding: m ? '0.3rem' : '0.34rem',
         background: 'transparent', border: 'none',
         color,
         fontSize: m ? '0.62rem' : '0.66rem',
@@ -727,11 +730,10 @@ function ActionCell({ icon, label, onClick, m, active, danger }) {
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: 32,
+        minHeight: 30,
       }}
     >
       {icon}
-      <span>{label}</span>
     </button>
   )
 }

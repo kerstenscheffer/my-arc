@@ -7,6 +7,7 @@ import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
 import GegetenDag from './plan-analyzer/GegetenDag'
+import { useGegetenWeek } from './plan-analyzer/gegetenWeek'
 import MealCard from './plan-analyzer/MealCard'
 import WisselModal from './plan-analyzer/WisselModal'
 import BereikKeuze from './plan-analyzer/BereikKeuze'
@@ -390,6 +391,7 @@ export default function PlanAnalyzer({
   }
   const [allClientPlans, setAllClientPlans] = useState([])
   const [resolvedClientId, setResolvedClientId] = useState(clientId || null)
+  const gegetenWeek = useGegetenWeek(db, resolvedClientId, weekModus || dezeMaandag(), gegeten)
 
   // Activate/PDF state
   const [activating, setActivating] = useState(false)
@@ -1952,12 +1954,15 @@ export default function PlanAnalyzer({
 
   // Wat er deze dag afwijkt van de doelen, in grammen (kcal in kcal).
   // Zelfde grenzen als de ringen: onder 85% en boven 115%.
-  const afwijkingen = [
-    { label: 'Kcal', w: dagTotalen.kcal, d: targets?.calories, e: ' kcal' },
-    { label: 'Eiwit', w: dagTotalen.protein, d: targets?.protein, e: ' g' },
-    { label: 'Koolh', w: dagTotalen.carbs, d: targets?.carbs, e: ' g' },
-    { label: 'Vet', w: dagTotalen.fat, d: targets?.fat, e: ' g' },
-  ].filter(x => Number(x.d) > 0).map(x => {
+  // In Gegeten gaan ze over wat de klant logde; een dag zonder logs meldt niets.
+  const gegetenDag = gegeten ? gegetenWeek.totalen[activeDay] : null
+  const afwTot = gegetenDag ? { kcal: gegetenDag.calories, protein: gegetenDag.protein, carbs: gegetenDag.carbs, fat: gegetenDag.fat } : dagTotalen
+  const afwijkingen = (gegetenDag && !gegetenDag.calories ? [] : [
+    { label: 'Kcal', w: afwTot.kcal, d: targets?.calories, e: ' kcal' },
+    { label: 'Eiwit', w: afwTot.protein, d: targets?.protein, e: ' g' },
+    { label: 'Koolh', w: afwTot.carbs, d: targets?.carbs, e: ' g' },
+    { label: 'Vet', w: afwTot.fat, d: targets?.fat, e: ' g' },
+  ]).filter(x => Number(x.d) > 0).map(x => {
     const pct = (Number(x.w) || 0) / Number(x.d) * 100
     const verschil = Math.round(Math.abs((Number(x.w) || 0) - Number(x.d)))
     if (pct < 85) return { label: x.label, tekst: `${verschil}${x.e} onder doel`, kleur: '#ef4444' }
@@ -2067,6 +2072,8 @@ export default function PlanAnalyzer({
             onActivate={planMeta ? handleActivate : null} activating={activating}
             weergave={weekData ? viewMode : null}
             onWeergave={(v) => { setSelectie(new Set()); setViewMode(v) }}
+            gegeten={gegeten}
+            onGegeten={weekData && resolvedClientId ? (v) => { setGegeten(v); if (v && viewMode !== 'day') setViewMode('day') } : null}
           />
           </div>
         )}
@@ -2301,7 +2308,8 @@ export default function PlanAnalyzer({
             die dag openen (vanuit de weekagenda terug naar de dag). */}
         <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
-            <DagStrip dagen={dagStripDagen} actief={activeDay}
+            {/* Gegeten: dezelfde strook, met wat de klant per dag logde. */}
+            <DagStrip dagen={gegeten ? dagStripDagen.map((d, i) => ({ ...d, kcal: Math.round(gegetenWeek.totalen[i]?.calories || 0), eiwit: Math.round(gegetenWeek.totalen[i]?.protein || 0) })) : dagStripDagen} actief={activeDay}
               onKies={(i) => { setActiveDay(i); if (viewMode !== 'day') setViewMode('day') }}
               doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0} isMobile={m}
               weekStart={weekModus}
@@ -2461,21 +2469,8 @@ export default function PlanAnalyzer({
 
               {/* ── RECHTS: de maaltijden ── */}
               <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%' }}>
-              {/* Plan of Gegeten: wat je bouwt, of wat de klant echt gelogd heeft. */}
-              {resolvedClientId && (
-                <div style={{ display: 'flex', gap: 6, margin: m ? '0.5rem 0.75rem 0.6rem' : '0 0.75rem 0.7rem' }}>
-                  {[[false, 'Plan'], [true, 'Gegeten']].map(([waarde, label]) => (
-                    <button key={label} type="button" onClick={() => setGegeten(waarde)} aria-pressed={gegeten === waarde} style={{
-                      flex: 1, minHeight: 34, borderRadius: 9, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
-                      background: gegeten === waarde ? '#fff' : 'transparent', color: gegeten === waarde ? '#000' : 'rgba(255,255,255,0.7)',
-                      border: `1px solid ${gegeten === waarde ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                    }}>{label}</button>
-                  ))}
-                </div>
-              )}
               {gegeten && resolvedClientId ? (
-                <GegetenDag db={db} clientId={resolvedClientId} weekStart={weekModus || dezeMaandag()} dagIndex={activeDay}
-                  targets={targets || {}} isMobile={m} onKiesDag={setActiveDay} />
+                <GegetenDag week={gegetenWeek} dagIndex={activeDay} targets={targets || {}} isMobile={m} />
               ) : (<>
               {/* Ringen op één rij, even breed als de maaltijdkaarten eronder;
                   geen kader, weinig lucht erboven en eronder (Kersten, 24 okt 2026). */}
