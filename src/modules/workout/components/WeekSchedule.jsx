@@ -1062,8 +1062,13 @@ export default function WeekSchedule({
         onHervatten={(() => {
           if (!isHuidigeWeek || !sessieBlad || !onDayClick) return null
           const dagCapitalized = weekDays.find(d => d.toLowerCase() === sessieBlad.day)
-          const workoutKey = dagCapitalized ? tempSchedule[dagCapitalized] : null
-          if (!dagCapitalized || !workoutKey) return null
+          if (!dagCapitalized) return null
+          // De training van die dag; staat de gedane training er als tweede
+          // training of op een andere dag in het rooster, dan die (op naam).
+          const gelijk = (k) => String(getWorkoutData(k)?.name || '').trim().toLowerCase() === String(sessieBlad.sublabel || '').trim().toLowerCase()
+          const vanDeDag = trainingenVanDag(tempSchedule, dagCapitalized)
+          const workoutKey = vanDeDag.find(gelijk) || tempSchedule[dagCapitalized] || Object.values(tempSchedule).find(k => k && gelijk(k)) || null
+          if (!workoutKey) return null
           return () => { setSessieBlad(null); onDayClick(dagCapitalized, workoutKey) }
         })()} />
       {oefeningLog && (

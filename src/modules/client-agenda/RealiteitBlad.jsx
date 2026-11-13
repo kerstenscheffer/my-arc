@@ -7,7 +7,7 @@
 
 import { verwijderSessie } from '../workout/utils/sessieVerwijderen'
 import { useEffect, useState } from 'react'
-import { MessageSquare, Info } from 'lucide-react'
+import { MessageSquare, Pencil } from 'lucide-react'
 import BladModal from '../workout/components/todays-workout/components/BladModal'
 import MealCard from '../meal-plan/components/day-schedule/MealCard'
 import { foodImageFallback } from '../meal-plan/foodImageFallback'
@@ -167,13 +167,15 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
                 background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
-                <Info size={17} strokeWidth={2.4} />
+                <Pencil size={16} strokeWidth={2.4} />
               </button>
             )}
           </div>
         )
       })}
-      {onHervatten && !meta.afgerond && (
+      {/* Ook bij een afgeronde training (13 nov 2026): een klant rondde per
+          ongeluk af en kon daarna niet meer verder. Afronden zet niets op slot. */}
+      {onHervatten && (
         <button
           onClick={onHervatten}
           style={{
@@ -184,7 +186,7 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
             cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          Doorgaan met training
+          {meta.afgerond ? 'Verder met deze training' : 'Doorgaan met training'}
         </button>
       )}
       {onVerwijderd && meta.sessionId && (vraagWeg ? (
