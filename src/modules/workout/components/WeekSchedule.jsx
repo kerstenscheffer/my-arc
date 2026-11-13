@@ -1,6 +1,6 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
+import { AlertCircle, RefreshCw, Plus, Info, X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { Trash2, Lock } from 'lucide-react'
@@ -113,11 +113,12 @@ export default function WeekSchedule({
       const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7 + i); return faseStand(bouwfase, iso(d))
     })
     const deload = standen.find(x => x?.soort === 'deload')
-    if (deload) return { tekst: `Deload · ${deload.dagen} dagen`, kleur: '#f59e0b' }
+    if (deload) return { tekst: `Deload · ${deload.dagen} dagen`, kort: `Deload ${deload.dagen} dagen`, kleur: '#f59e0b' }
     const stand = standen[(new Date().getDay() + 6) % 7]
     const bouw = stand?.soort === 'bouw' ? stand : standen.find(x => x?.soort === 'bouw')
-    return bouw ? { tekst: faseTekst(bouw), kleur: '#10b981' } : null
+    return bouw ? { tekst: faseTekst(bouw), kort: `Bouwfase W${bouw.week}/W${bouw.weken}`, kleur: '#fff' } : null
   })()
+  const [faseInfo, setFaseInfo] = useState(false)
   const isToekomst = weekOffset > 0
   const kanPlannen = isHuidigeWeek || isToekomst
 
@@ -821,7 +822,20 @@ export default function WeekSchedule({
         padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Fase boven de titel, dik wit, met een i die uitlegt wat het is
+              (13 nov 2026, Kersten). Deload blijft oranje. */}
+          {faseRegel && (
+            <button type="button" onClick={() => setFaseInfo(true)} aria-label="Uitleg over de bouwfase" style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: 0, marginBottom: 3, background: 'transparent', border: 'none',
+              color: faseRegel.kleur, fontFamily: 'inherit', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 900,
+              letterSpacing: '-0.01em', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              {faseRegel.kort}
+              <Info size={isMobile ? 13 : 14} strokeWidth={2.6} style={{ opacity: 0.6 }} />
+            </button>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <div style={{
             minWidth: 0, fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff',
             letterSpacing: '-0.025em', lineHeight: 1.1,
@@ -839,6 +853,7 @@ export default function WeekSchedule({
               <RefreshCw size={isMobile ? 17 : 19} strokeWidth={2.8} />
             </button>
           )}
+          </div>
         </div>
         {kanPlannen && (
           <button onClick={() => setToevoegenOpen(true)} style={{
@@ -864,13 +879,14 @@ export default function WeekSchedule({
         const cardioPerDag = cardioPerDagVan(dayDates)
         return (
           <>
-            {faseRegel && (
+            {faseRegel && zonderKop && (
               <div style={{ padding: isMobile ? '0 1rem 0.4rem' : '0 1.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: faseRegel.kleur }}>
                 {faseRegel.tekst}
               </div>
             )}
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
-            <div style={{ padding: isMobile ? '0 0.4rem' : '0 1rem' }}>
+            {/* Telefoon: de week van rand tot rand (13 nov 2026, Kersten). */}
+            <div style={{ padding: isMobile ? 0 : '0 1rem' }}>
               <WeekGrid
                 stappenPerDag={stappenPerDag} stappenDoel={stappenDoel}
                 cardioPerDag={cardioPerDag}
@@ -887,6 +903,7 @@ export default function WeekSchedule({
                 onOpenGedaan={(day) => { const g = gedaneDagen.find(u => u.workout_day === day); if (g?.blok) setSessieBlad(g.blok) }}
                 onOpenCardioGedaan={(c) => c?.log && setCardioBlad({ log: c.log, soort: c.soort, gepland: c.duur })}
                 onRemoveTraining={vraagTraining}
+                randloos={isMobile}
                 onUitplannen={nietIngepland ? uitplannen : null}
                 onRemoveCardio={vraagCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
@@ -1078,6 +1095,36 @@ export default function WeekSchedule({
             onKies={voerTrainingWegUit}
             onClose={() => !trainingWegBezig && setTrainingWeg(null)}
           />
+        </div>,
+        document.body
+      )}
+
+      {/* Uitleg bij de fase: wat het is en waar de klant nu staat. */}
+      {faseInfo && bouwfase && createPortal(
+        <div onClick={() => setFaseInfo(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: '0.8rem' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{faseRegel?.tekst || 'Bouwfase'}</div>
+                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                  Start {new Date(`${bouwfase.start_datum}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} · {bouwfase.bouw_weken} weken bouwen · {bouwfase.deload_dagen} dagen deload
+                </div>
+              </div>
+              <button onClick={() => setFaseInfo(false)} aria-label="Sluiten" style={{ width: 32, height: 32, flexShrink: 0, background: 'transparent', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={18} strokeWidth={2.6} />
+              </button>
+            </div>
+            {[
+              'Je traint een aantal weken hetzelfde schema en bouwt elke week op.',
+              'Bij je training vraagt de app hoe je hersteld bent en hoe zwaar het voelde.',
+              'Met die antwoorden stuurt je coach je sets per spiergroep bij.',
+              'Daarna volgt de deload: een paar lichte dagen om te herstellen, en dan een nieuw schema.',
+            ].map(regel => (
+              <div key={regel} style={{ display: 'flex', gap: 8, fontSize: '0.86rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.45, marginTop: 6 }}>
+                <span aria-hidden style={{ color: '#10b981', fontWeight: 900, flexShrink: 0 }}>→</span><span>{regel}</span>
+              </div>
+            ))}
+          </div>
         </div>,
         document.body
       )}

@@ -25,6 +25,8 @@ export default function WeekGrid({
   // Stappen per dag (zeven items: { steps, gehaald, toekomst, isVandaag }) en
   // het dagdoel; samen met de training in dezelfde kolommen (8 okt 2026).
   stappenPerDag = null, stappenDoel = 8000,
+  // Van schermrand tot schermrand: dan geen afgeronde hoeken.
+  randloos = false,
 }) {
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
@@ -106,7 +108,7 @@ export default function WeekGrid({
       gap,
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
       minWidth: 0, width: '100%',
-      borderRadius: isMobile ? 12 : 14, overflow: 'hidden',
+      borderRadius: randloos ? 0 : (isMobile ? 12 : 14), overflow: 'hidden',
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]

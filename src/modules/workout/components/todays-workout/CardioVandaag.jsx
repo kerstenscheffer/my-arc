@@ -6,7 +6,7 @@
 // (8 okt 2026). Dezelfde bron als het rooster: client_agenda_blocks met
 // label "Cardio · <soort>" en de logs uit CardioService.
 
-import { Check, HeartPulse, ChevronRight } from 'lucide-react'
+import { Check, HeartPulse, ChevronRight, Dumbbell } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 
 const logCardio = (c) => {
@@ -22,7 +22,7 @@ export default function CardioVandaag({ lijst, isMobile, volledig = false }) {
   if (volledig) {
     const c = lijst[0]
     return (
-      <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 140 : 180 }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${cardioFoto(c.soort)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)' }} />
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14, padding: isMobile ? '0 1rem' : '0 1.5rem', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
@@ -48,7 +48,7 @@ export default function CardioVandaag({ lijst, isMobile, volledig = false }) {
               display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              Loggen <ChevronRight size={16} strokeWidth={3} />
+              <Dumbbell size={16} strokeWidth={2.6} /> Start
             </button>
           )}
         </div>

@@ -384,7 +384,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   )
 
   if (!todaysWorkout) return dagFade(
-    <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+    <div style={{ position: 'relative', width: '100%', height: isMobile ? 140 : 180 }}>
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `url(${workoutFoto(null)})`,
@@ -424,7 +424,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   // de kop boven de oefeningenlijst, zodat de pagina en het log-scherm op
   // elkaar lijken. De kaart eronder laat zijn eigen foto dan weg.
   const kop = (
-    <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+    <div style={{ position: 'relative', width: '100%', height: isMobile ? 140 : 180 }}>
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `url(${workoutFoto(todaysWorkout)})`,

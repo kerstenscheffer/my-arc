@@ -14,7 +14,7 @@ export function WorkoutKopSkelet({ isMobile }) {
   return (
     <div aria-hidden>
       <SkeletStijl />
-      <div style={{ position: 'relative', height: isMobile ? 200 : 250, background: 'rgba(255,255,255,0.04)', ...PULS }}>
+      <div style={{ position: 'relative', height: isMobile ? 140 : 180, background: 'rgba(255,255,255,0.04)', ...PULS }}>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0) 40%, #0a0a0a 100%)' }} />
       </div>
       <div style={{ padding: pad, marginTop: isMobile ? -46 : -56, position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
