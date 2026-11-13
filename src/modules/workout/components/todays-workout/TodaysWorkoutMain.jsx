@@ -445,14 +445,14 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   // Bouwfase-regel boven de kaart, en het afrondblad met het overzicht van vandaag.
   // Tijdens de bouwweken zelf staat er niets meer ("Bouwfase · week 1 van 7"
   // mocht weg, 12 nov 2026, Kersten). In de deload en daarna blijft de regel:
-  // daar staat de uitleg en de enige knop naar "Bouwfase afronden".
+  // daar staat de uitleg en de enige knop naar "Bouwfase check-in" (heette "Bouwfase afronden").
   const faseRegel = bouwfase.aan && bouwfase.stand && bouwfase.stand.soort !== 'bouw' && bouwfase.stand.soort !== 'nog_niet' ? (
     <div style={{ padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: bouwfase.stand.soort === 'deload' ? '#f59e0b' : '#10b981' }}>
       {faseTekst(bouwfase.stand)}
       {bouwfase.stand.soort === 'deload' && <div style={{ marginTop: 2, fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: 'rgba(255,255,255,0.6)' }}>Zelfde oefeningen, minder sets en lichter.</div>}
       {magReflecteren(bouwfase.stand) && !bouwfase.fase?.reflectie && (
         <button onClick={() => setReflectieOpen(true)} style={{ display: 'block', marginTop: 8, height: 36, padding: '0 0.9rem', borderRadius: 10, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
-          Bouwfase afronden
+          Bouwfase check-in
         </button>
       )}
     </div>

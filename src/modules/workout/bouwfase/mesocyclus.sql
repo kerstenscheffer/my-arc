@@ -88,7 +88,7 @@ begin
   return new;
 end $$;
 
--- 5. Het deload-schema: een kopie van het plan met halve sets en halve reps.
+-- 5. Het deload-schema: een kopie van het plan met halve sets (minimaal 2) en halve reps.
 --    Reps: "8-12" → "4-6", "10" → "5"; iets als "tot falen" blijft staan.
 create or replace function public.deload_reps(p text) returns text
 language plpgsql immutable as $$
@@ -104,7 +104,7 @@ end $$;
 -- oefeningen die de coach daar als "proberen" klaarzette blijven staan.
 create or replace function public.deload_structuur(p_week jsonb, p_oud jsonb default null) returns jsonb
 language plpgsql stable as $$
-declare uit jsonb := '{}'::jsonb; k text; dag jsonb; oef jsonb; e jsonb; proberen jsonb;
+declare uit jsonb := '{}'::jsonb; k text; dag jsonb; oef jsonb; e jsonb; proberen jsonb; v_sets numeric;
 begin
   for k in select jsonb_object_keys(p_week) loop
     dag := p_week -> k;
@@ -114,8 +114,11 @@ begin
     oef := '[]'::jsonb;
     for e in select * from jsonb_array_elements(dag -> 'exercises') loop
       if e ->> 'type' = 'cardio' then oef := oef || jsonb_build_array(e); continue; end if;
+      v_sets := coalesce(nullif(e ->> 'sets', '')::numeric, 2);
       oef := oef || jsonb_build_array(e || jsonb_build_object(
-        'sets', greatest(1, ceil(coalesce(nullif(e ->> 'sets', '')::numeric, 2) / 2)::int),
+        -- Halveren, maar nooit onder de 2 sets: wie er 2 heeft houdt er 2
+        -- (13 nov 2026, Kersten). Eén set blijft één set. 1→1, 2→2, 3→2, 4→2, 5→3, 6→3.
+        'sets', greatest(least(v_sets, 2), ceil(v_sets / 2))::int,
         'reps', deload_reps(coalesce(e ->> 'reps', '')),
         'notes', 'Helft van je normale gewicht. Moet makkelijk voelen.',
         'deload', true));

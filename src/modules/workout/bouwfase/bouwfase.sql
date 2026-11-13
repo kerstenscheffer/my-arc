@@ -58,8 +58,10 @@ create policy rls_eigen on public.training_feedback for all to authenticated
 create or replace function public.bewaar_fase_reflectie(p_fase_id uuid, p_reflectie jsonb)
 returns void language plpgsql security definer set search_path = public as $$
 begin
+  -- De klant zelf, of zijn coach (die kijkt mee in de klantweergave; 13 nov 2026:
+  -- als coach ingelogd gaf opslaan "fase niet gevonden"). is_coach_van staat in mesocyclus.sql.
   update training_fases set reflectie = p_reflectie, updated_at = now()
-  where id = p_fase_id and client_id in (select rls_mijn_client_ids());
+  where id = p_fase_id and (client_id in (select rls_mijn_client_ids()) or is_coach_van(client_id));
   if not found then raise exception 'fase niet gevonden'; end if;
 end $$;
 revoke all on function public.bewaar_fase_reflectie(uuid, jsonb) from public, anon;

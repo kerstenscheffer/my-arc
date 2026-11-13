@@ -86,7 +86,7 @@ export default function DeloadBalk({ client, db, isMobile }) {
             Deze week draait om herstellen. Je lichaam verwerkt de afgelopen weken, en daar word je sterker van. Minder doen is nu het plan.
           </div>
           <Blok kop="Training" regels={[
-            metSchema ? 'Je schema staat op de helft: halve sets en halve herhalingen.' : 'Doe ongeveer de helft van je normale sets.',
+            metSchema ? 'Je schema is lichter gemaakt: minder sets (minimaal 2) en halve herhalingen.' : 'Doe ongeveer de helft van je normale sets.',
             'Pak ongeveer de helft van je normale gewicht. Het moet makkelijk voelen.',
             'Geen sets tot falen en geen records deze week.',
             'Kom wel trainen: licht bewegen helpt je herstel.',

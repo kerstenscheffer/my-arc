@@ -94,9 +94,21 @@ export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslage
       await bewaarReflectie(db.supabase, fase.id, reflectie)
       onOpgeslagen?.(reflectie)
       onClose?.()
-    } catch (e) { setFout(e.message || 'Opslaan mislukt') }
+    } catch (e) {
+      setFout(/fase niet gevonden/i.test(e.message || '')
+        ? 'Opslaan lukte niet: deze bouwfase hoort niet bij het account waarmee je bent ingelogd.'
+        : (e.message || 'Opslaan mislukt'))
+    }
     setBezig(false)
   }
+
+  // Samenvatting van de progressie (eerste tegen laatste training per oefening).
+  const stats = lijst?.length ? {
+    aantal: lijst.length,
+    vooruit: lijst.filter(o => o.verschil > 0).length,
+    gemiddeld: Math.round(lijst.reduce((t, o) => t + o.verschil, 0) / lijst.length),
+    beste: lijst[0], // de lijst staat op grootste vooruitgang eerst
+  } : null
 
   // De slides. De resultaten alleen als er iets te vergelijken valt.
   const slides = [
@@ -160,13 +172,30 @@ export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslage
     {
       titel: 'Oefeningen',
       inhoud: (<>
-        <Tekstvraag kop="Heb je oefeningen die je niet hebt gehad, maar die volgens jou wel goed voor je zouden zijn?" waarde={tekst.erbij} onChange={zet('erbij')} placeholder="Laat leeg als je er geen hebt" />
+        <Tekstvraag kop="Heb je oefeningen die je niet hebt gehad, maar die je wel graag in je plan terugziet?" waarde={tekst.erbij} onChange={zet('erbij')} placeholder="Laat leeg als je er geen hebt" />
         <Tekstvraag kop="Heb je oefeningen van afgelopen fase die je weg wilt laten?" waarde={tekst.weg} onChange={zet('weg')} placeholder="Laat leeg als je er geen hebt" />
       </>),
     },
     {
       titel: 'Slotwoord',
-      inhoud: <Tekstvraag kop="Beschrijf afgelopen fase in één of meer zinnen." waarde={tekst.slotwoord} onChange={zet('slotwoord')} placeholder="Hoe kijk je erop terug?" />,
+      inhoud: (<>
+        {/* Je progressie in drie cijfers, als geheugensteun bij het terugkijken. */}
+        {stats && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            {[
+              [`${stats.gemiddeld > 0 ? '+' : ''}${stats.gemiddeld}%`, 'gemiddeld sterker', stats.gemiddeld > 0 ? '#10b981' : stats.gemiddeld < 0 ? '#ef4444' : '#fff'],
+              [`${stats.vooruit} van ${stats.aantal}`, 'oefeningen vooruit', '#fff'],
+              [`${stats.beste.verschil > 0 ? '+' : ''}${stats.beste.verschil}%`, stats.beste.naam, stats.beste.verschil > 0 ? '#10b981' : '#fff'],
+            ].map(([cijfer, onder, kleur]) => (
+              <div key={onder} style={{ flex: 1, minWidth: 0, padding: '0.55rem 0.4rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: kleur, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{cijfer}</div>
+                <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{onder}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Tekstvraag kop="Beschrijf afgelopen fase in één of meer zinnen." waarde={tekst.slotwoord} onChange={zet('slotwoord')} placeholder="Hoe kijk je erop terug?" />
+      </>),
     },
   ]
   const nu = Math.min(stap, slides.length - 1)
@@ -183,7 +212,7 @@ export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslage
               <button onClick={() => setStap(nu - 1)} aria-label="Vorige" style={{ width: 36, height: 36, marginLeft: -8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><ChevronLeft size={20} strokeWidth={2.8} /></button>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>Bouwfase afronden · {nu + 1} van {slides.length}</div>
+              <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>Bouwfase check-in · {nu + 1} van {slides.length}</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{slides[nu].titel}</div>
             </div>
             <button onClick={onClose} aria-label="Sluiten" style={{ width: 36, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} strokeWidth={2.6} /></button>
