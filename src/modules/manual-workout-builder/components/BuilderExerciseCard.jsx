@@ -423,7 +423,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
               </div>
 
               {/* Power (13 nov 2026): eigen blok en eigen log bij de klant. */}
-              <button type="button" onClick={() => { const aan = !exercise.power; onField('power', aan); if (aan) onField('reps', '2-4') }} aria-pressed={!!exercise.power} style={{
+              <button type="button" onClick={() => { const aan = !exercise.power; onField(aan ? { power: true, reps: '2-4' } : { power: false }) }} aria-pressed={!!exercise.power} style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '0.6rem 0.75rem', textAlign: 'left',
                 background: exercise.power ? '#fff' : 'transparent', color: exercise.power ? '#000' : '#fff',
                 border: `1px solid ${exercise.power ? '#fff' : 'rgba(255,255,255,0.18)'}`, borderRadius: 10,

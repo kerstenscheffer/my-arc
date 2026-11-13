@@ -26,7 +26,7 @@ import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History, FileClock } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
@@ -51,6 +51,7 @@ const SPIER_BLOKKEN = [
 ]
 import KrachtGrafiek from './components/KrachtGrafiek'
 import WorkoutLogsModal from './components/WorkoutLogsModal'
+import PlanHistorieModal from './components/PlanHistorieModal'
 import SpierOverzicht from './components/SpierOverzicht'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
@@ -78,6 +79,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [wissel, setWissel] = useState(null)
   const [krachtOpen, setKrachtOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
+  const [historieOpen, setHistorieOpen] = useState(false)
   // Dag-editor helemaal dicht (10 nov 2026): nog een klik op het actieve
   // weergave-icoon sluit hem, een klik op een icoon opent die weergave weer.
   const [dagenDicht, setDagenDicht] = useState(false)
@@ -96,6 +98,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [bulk, setBulk] = useState({ sets: '', reps: '', rust: '' })
   const lassoRef = useRef(null)
   const kolommenRef = useRef(null)
+  const [klembord, setKlembord] = useState([])
+  const [plakDag, setPlakDag] = useState(null)
+  const plakDagRef = useRef(null)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
   // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
@@ -332,6 +337,28 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     })
     setSelectedSchemaId(schema.id)
     setBewaardeStand(null)
+  }
+
+  // Een oude stand uit de plangeschiedenis terug in de builder (13 nov 2026).
+  // Alleen de dagen en de weekindeling; het blijft hetzelfde plan en wordt pas
+  // definitief met Opslaan. Via setWorkoutPlan, zodat Cmd+Z het terugdraait.
+  const herstelVersie = (versie) => {
+    if (!versie?.week_structure) return
+    const days = Object.entries(versie.week_structure)
+      .sort((a, b) => parseInt(a[0].replace('dag', '')) - parseInt(b[0].replace('dag', '')))
+      .map(([key, day], index) => ({
+        _bronKey: key,
+        id: Date.now() + index,
+        name: day.name || `DAG ${index + 1}`,
+        focus: day.focus || '',
+        geschatteTijd: day.geschatteTijd || '60 minutes',
+        exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() })),
+      }))
+    dagSleutels.current = new Map(days.map(d => [d.id, d._bronKey]))
+    const cyclus = cyclusUitOpslag(versie.cyclus, new Map(days.map(d => [d._bronKey, d.id])))
+    setWorkoutPlan(prev => ({ ...prev, days, days_per_week: days.length, cyclus }), { coalesce: false })
+    setActiveDay(days[0]?.id ?? null)
+    setHistorieOpen(false)
   }
 
   const loadTemplates = async () => {
@@ -571,6 +598,61 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     }))
     setBulk({ sets: '', reps: '', rust: '' })
   }
+  // Kopiëren en plakken (13 nov 2026, Kersten): Cmd/Ctrl+C zet de selectie op
+  // het klembord, Cmd/Ctrl+V plakt in de dag waar de muis boven staat. De
+  // oefeningen komen bij hun spiergroep en blijven daarna geselecteerd, zodat
+  // je ze meteen kunt bijstellen of met Cmd+Z terug kunt.
+  const kopieerSelectie = () => {
+    const items = []
+    workoutPlan.days.forEach(d => d.exercises.forEach(ex => { if (selectie.has(`${d.id}|${ex.id}`)) items.push(ex) }))
+    if (!items.length) return
+    setKlembord(items)
+    setSelectie(new Set())
+  }
+  const plakIn = (dagId) => {
+    const dag = workoutPlan.days.find(d => String(d.id) === String(dagId))
+    if (!dag || !klembord.length) return
+    const basis = Date.now()
+    const nieuw = klembord.map((ex, i) => ({ ...ex, id: basis + i + Math.random() }))
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: prev.days.map(d => {
+        if (d.id !== dag.id) return d
+        const exercises = nieuw.reduce((lijst, ex) => bijZijnGroep(lijst, ex), d.exercises)
+        return { ...d, exercises, geschatteTijd: `${schatMinuten(exercises)} minutes` }
+      }),
+    }))
+    setSelectie(new Set(nieuw.map(ex => `${dag.id}|${ex.id}`)))
+  }
+  useEffect(() => {
+    if (!alleDagen) return undefined
+    const toets = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
+      const k = e.key.toLowerCase()
+      if (k !== 'c' && k !== 'v') return
+      // In een tekstveld of met tekst geselecteerd hoort C/V gewoon tekst te doen.
+      const tag = (e.target?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return
+      if (k === 'c') {
+        if (!selectie.size || String(window.getSelection?.() || '')) return
+        e.preventDefault()
+        kopieerSelectie()
+      } else {
+        if (!klembord.length || !plakDagRef.current) return
+        e.preventDefault()
+        plakIn(plakDagRef.current)
+      }
+    }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }) // eslint-disable-line react-hooks/exhaustive-deps
+  // Boven welke dag staat de muis? Daar plakt Cmd+V.
+  const volgMuis = (e) => {
+    const id = e.target.closest?.('[data-dag]')?.dataset.dag || null
+    plakDagRef.current = id
+    if (klembord.length) setPlakDag(prev => (prev === id ? prev : id))
+  }
+
   const wisSelectie = () => {
     setWorkoutPlan(prev => ({
       ...prev,
@@ -1169,6 +1251,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <History size={17} />
             </button>
           )}
+          {effectiveClient?.id && (
+            <button onClick={() => setHistorieOpen(true)} title="Plangeschiedenis: wat was het plan op een datum" aria-label="Plangeschiedenis" style={iconKnop(false, historieOpen)}>
+              <FileClock size={17} />
+            </button>
+          )}
           {!m && workoutPlan.days.length > 1 && (<>
             {kopScheiding}
             <button onClick={() => kiesWeergave(false)} aria-pressed={!alleDagen && !dagenDicht} title={!alleDagen && !dagenDicht ? 'Dag-editor sluiten' : 'Eén dag tegelijk'} aria-label="1 dag" style={iconKnop(false, !alleDagen && !dagenDicht)}><RectangleVertical size={17} /></button>
@@ -1300,7 +1387,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             {cyc.bron === 'rooster' && <span title="Bij een week van 7 dagen volgt de volgorde het weekrooster van de klant; pas het daar aan">· volgorde uit weekrooster</span>}
           </div>
         )}
-        {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
+        {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} onPointerMove={volgMuis} onPointerLeave={() => { plakDagRef.current = null; setPlakDag(null) }} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'center', height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {/* Eén blok: kolommen tegen elkaar met lijnen ertussen, in de volgorde van de cyclus. */}
             <div style={{ display: 'flex', height: 'calc(100% - 1rem)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden' }}>
@@ -1332,7 +1419,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               const vorige = isLos ? null : weekSlots[(plek - 1 + weekSlots.length) % weekSlots.length]
               const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
               return (
-              <div key={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+              <div key={dag.id} data-dag={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: (klembord.length > 0 && plakDag === String(dag.id)) ? 'rgba(255,255,255,0.08)' : dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 {slotKop}
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1632,8 +1719,23 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             height: 36, padding: '0 0.9rem', borderRadius: 9, border: 'none', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
             background: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.12)' : '#fff', color: (!bulk.sets && !bulk.reps && !bulk.rust) ? 'rgba(255,255,255,0.4)' : '#000',
           }}>Toepassen</button>
+          <button onClick={kopieerSelectie} title="Kopiëren (Cmd+C)" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Copy size={15} /></button>
           <button onClick={wisSelectie} title="Geselecteerde oefeningen verwijderen" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash2 size={15} /></button>
           <button onClick={() => setSelectie(new Set())} title="Selectie opheffen (Esc)" style={{ width: 36, height: 36, borderRadius: 9, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} /></button>
+        </div>,
+        document.body,
+      )}
+      {historieOpen && effectiveClient?.id && <PlanHistorieModal db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setHistorieOpen(false)} onHerstel={workoutPlan._schemaId ? herstelVersie : null} />}
+      {alleDagen && !m && klembord.length > 0 && selectie.size === 0 && createPortal(
+        <div onPointerDown={(e) => e.stopPropagation()} style={{
+          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 2147483000,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px 8px 14px',
+          background: '#111', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+        }}>
+          <Copy size={15} color="#fff" />
+          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>{klembord.length} gekopieerd</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>Ga met je muis op een dag staan en druk Cmd+V</span>
+          <button onClick={() => { setKlembord([]); setPlakDag(null) }} title="Klembord leegmaken" style={{ width: 36, height: 36, borderRadius: 9, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} /></button>
         </div>,
         document.body,
       )}

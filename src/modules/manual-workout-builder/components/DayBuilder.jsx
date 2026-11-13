@@ -79,7 +79,10 @@ export default function DayBuilder({
   const sleep = useSleepVolgorde(day.exercises.length, herschik)
 
   const handleExerciseField = (exerciseId, field, value) => {
-    let updated = day.exercises.map(ex => ex.id === exerciseId ? { ...ex, [field]: value } : ex)
+    // `field` mag ook een object zijn: meerdere velden in één keer. Twee losse
+    // aanroepen achter elkaar overschrijven elkaar, omdat `day` dan nog de oude is.
+    const patch = field && typeof field === 'object' ? field : { [field]: value }
+    let updated = day.exercises.map(ex => ex.id === exerciseId ? { ...ex, ...patch } : ex)
     // Andere spiergroep gekozen: de oefening schuift naar zijn groep (10 nov 2026).
     if (field === 'primairSpieren') {
       const ex = updated.find(x => x.id === exerciseId)
