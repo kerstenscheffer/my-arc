@@ -181,6 +181,7 @@ export default function WeekGrid({
             onRemoveTraining={onRemoveTraining ? () => onRemoveTraining(day) : null}
             extraTrainingen={extraTrainingen}
             onOpenExtra={(key) => handleCardClick(day, key)}
+            onShiftExtra={onShift ? (rk, richting) => onShift(day, richting, rk) : null}
             onRemoveExtra={onRemoveTraining ? (rk) => onRemoveTraining(day, rk) : null}
             onUitplannen={onUitplannen ? () => onUitplannen(day) : null}
             onUitplannenExtra={onUitplannen ? (rk) => onUitplannen(day, rk) : null}

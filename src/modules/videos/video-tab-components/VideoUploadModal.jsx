@@ -13,10 +13,11 @@ import { getBronMeta } from '../utils/youtubeHelpers'
 const GOLD = '#fff'
 
 // Omslag als de coach er geen kiest en de bron er zelf geen levert (Zoom,
-// Instagram, TikTok): het logo op zwart (13 nov 2026, Kersten). Volledige
-// URL: de app draait op capacitor://localhost en oudere app-versies hebben
-// het bestand niet in hun bundel.
-const STANDAARD_OMSLAG = 'https://www.myarcfitness.com/video-omslag-standaard.jpg'
+// Instagram, TikTok): het logo op zwart (13 nov 2026, Kersten). Een pad
+// vanaf de eigen site, zodat het lokaal, op de website en in de app-bundel
+// hetzelfde bestand is. Een app-versie van vóór deze release heeft het bestand
+// nog niet en toont dan een lege omslag tot de eerstvolgende live-update.
+const STANDAARD_OMSLAG = '/video-omslag-standaard.jpg'
 
 // Pagina's matchen ClientDashboard — zelfde set als de edit-modal. Een video
 // met een pagina in default_pages verschijnt AUTOMATISCH bij alle clients (ook

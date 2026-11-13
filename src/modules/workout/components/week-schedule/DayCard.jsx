@@ -126,7 +126,7 @@ export default function DayCard({
   // Een gedane sessie die niet bij de geplande training hoort (bv. na een
   // planwissel): { naam }. Komt als eigen groene tegel boven de planning.
   gedaanAnders = null,
-  extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null, onUitplannen = null, onUitplannenExtra = null,
+  extraTrainingen = [], onOpenExtra = null, onShiftExtra = null, onRemoveExtra = null, onUitplannen = null, onUitplannenExtra = null,
   onCardioInfo = null,
   // Dagen zonder tussenruimte naast elkaar (WeekGrid).
   aaneen = false,
@@ -212,7 +212,7 @@ export default function DayCard({
   // Lege dag: smalle kolom met 'Rust'.
   if (!heeftTraining && !heeftCardio) {
     return (
-      <div style={{ position: 'relative', minWidth: 0 }}>
+      <div style={{ position: 'relative', minWidth: 0, display: 'flex' }}>
         <div onClick={swapMode ? handleClick : undefined} style={{
           ...kaart, paddingLeft: 0, paddingRight: 0,
           ...(!metLabel ? { paddingTop: 0, paddingBottom: 0, borderRadius: aaneen ? 0 : 8 } : {}),
@@ -235,7 +235,7 @@ export default function DayCard({
   const band = () => { const ja = bandVrij; bandVrij = false; return ja ? stappenBand(true) : null }
   const titelTraining = (workoutData?.name || workoutData?.focus || (isActivity ? workoutKey : '')).trim()
   return (
-    <div style={{ position: 'relative', minWidth: 0 }}>
+    <div style={{ position: 'relative', minWidth: 0, display: 'flex' }}>
       <div style={{
         ...kaart, opacity: gedimd ? 0.7 : 1,
         // Met de dagenstrook erboven staan de tegels op zichzelf: geen vlak,
@@ -275,7 +275,11 @@ export default function DayCard({
               foto={getWorkoutImage(x.data || { name: x.key })}
               eyebrow={`Training ${i + 2}`} titel={(x.data?.name || x.data?.focus || x.key || 'Training').trim()}
               klaar={x.klaar}
-              kanSchuiven={false}
+              // Ook een tweede training van de dag kun je verschuiven (13 nov
+              // 2026, Kersten: Push verloor zijn pijltjes zodra hij erbij kwam).
+              kanSchuiven={!x.klaar && kanPlannen && !!onShiftExtra}
+              onLinks={() => onShiftExtra?.(x.rosterKey, -1)} onRechts={() => onShiftExtra?.(x.rosterKey, +1)}
+              kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
               onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
               aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}

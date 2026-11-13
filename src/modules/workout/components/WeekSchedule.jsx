@@ -507,10 +507,19 @@ export default function WeekSchedule({
 
   // Verschuif workout van `day` één positie in `direction` (-1 = vorige dag,
   // +1 = volgende dag). Bezet → swap; leeg of al gedaan → move.
-  const handleShift = (day, direction) => {
+  // `rosterKey`: een tweede of derde training van de dag ('Thursday#2'). Die
+  // wisselt niet met de buurdag maar schuift er los naartoe (13 nov 2026).
+  const handleShift = (day, direction, rosterKey = null) => {
     const sourceIdx = weekDays.indexOf(day)
     const targetIdx = sourceIdx + direction
     if (sourceIdx < 0 || targetIdx < 0 || targetIdx >= weekDays.length) return
+    if (rosterKey) {
+      const extra = tempSchedule[rosterKey]
+      const doel = weekDays[targetIdx]
+      if (!extra || trainingenVanDag(tempSchedule, doel).includes(extra)) return
+      handleAutoSave(voegTrainingToe(verwijderTrainingVanDag(tempSchedule, day, rosterKey), doel, extra))
+      return
+    }
     const sourceWorkout = tempSchedule[day]
     if (!sourceWorkout) return
     const targetDay = weekDays[targetIdx]

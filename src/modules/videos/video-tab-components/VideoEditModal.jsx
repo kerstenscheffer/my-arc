@@ -81,6 +81,10 @@ export default function VideoEditModal({
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState('video')
   const [open, setOpen] = useState(null) // welke rij is uitgeklapt
+  // Voor wie: alleen de gekozen klanten, of alle klanten. Eén keuze bovenaan,
+  // zodat "voor iedereen" nooit per ongeluk aan kan staan naast een klant
+  // (13 nov 2026, Kersten).
+  const [bereik, setBereik] = useState((video.default_pages || []).length > 0 || video.show_in_slider ? 'iedereen' : 'klanten')
 
   // Toewijzingen aan klanten: staan in video_assignments, los van de video zelf.
   const [toewijzingen, setToewijzingen] = useState(null) // null = laden
@@ -163,8 +167,9 @@ export default function VideoEditModal({
         video_url: formData.video_url.trim(),
         category_id: formData.category_id || null,
         is_personal: formData.is_personal === true,
-        default_pages: formData.default_pages,
-        show_in_slider: formData.show_in_slider,
+        // Alleen gekozen klanten: nergens standaard voor iedereen.
+        default_pages: bereik === 'iedereen' ? formData.default_pages : [],
+        show_in_slider: bereik === 'iedereen' ? formData.show_in_slider : false,
         is_belangrijk: formData.is_belangrijk === true
       }
 
@@ -355,7 +360,17 @@ export default function VideoEditModal({
           </>)}
 
           {tab === 'wie' && (<>
-            <Rij {...rij} id="klanten" label="Klanten" waarde={toewijzingen === null ? 'Laden…' : toewijzingen.length ? toewijzingen.map(t => klantNaam(t.client)).join(', ') : 'Niemand'}>
+            <div style={{ display: 'flex', gap: 6, padding: `0.7rem ${zij}`, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {[['klanten', 'Alleen gekozen klanten'], ['iedereen', 'Alle klanten']].map(([id, label]) => (
+                <button key={id} type="button" onClick={() => { setBereik(id); setOpen(id === 'klanten' ? 'klanten' : 'iedereen') }} aria-pressed={bereik === id} style={{
+                  flex: 1, minHeight: 36, borderRadius: 9, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+                  background: bereik === id ? '#fff' : 'transparent', color: bereik === id ? '#000' : 'rgba(255,255,255,0.7)',
+                  border: `1px solid ${bereik === id ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                }}>{label}</button>
+              ))}
+            </div>
+            {bereik === 'klanten' && (
+            <Rij {...rij} id="klanten" label="Klanten" waarde={toewijzingen === null ? 'Laden…' : toewijzingen.length ? toewijzingen.map(t => `${klantNaam(t.client)} · ${PAGE_OPTIONS.find(o => o.value === t.page_context)?.label || t.page_context || 'Home'}`).join(', ') : 'Niemand'}>
               {toewijzingen?.map(t => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40 }}>
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -374,10 +389,14 @@ export default function VideoEditModal({
               ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                 <input type="text" value={klantZoek} onChange={(e) => setKlantZoek(e.target.value)} placeholder="Klant toevoegen…" style={{ ...inputStyle, flex: 1 }} />
-                <select value={nieuwePagina} onChange={(e) => setNieuwePagina(e.target.value)} aria-label="Pagina voor de nieuwe klant" style={kiesStijl}>
-                  {PAGE_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#0a0a0a' }}>{o.label}</option>)}
-                </select>
-                <span style={{ width: 28, flexShrink: 0 }} />
+                {/* Pas zichtbaar als je iemand zoekt: los eronder leek het een
+                    tweede pagina voor de klant erboven. */}
+                {klantZoek.trim() && (<>
+                  <select value={nieuwePagina} onChange={(e) => setNieuwePagina(e.target.value)} aria-label="Pagina voor de nieuwe klant" style={kiesStijl}>
+                    {PAGE_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#0a0a0a' }}>{o.label}</option>)}
+                  </select>
+                  <span style={{ width: 28, flexShrink: 0 }} />
+                </>)}
               </div>
               {klantZoek.trim() && (teKiezen.length === 0
                 ? <div style={{ padding: '0.5rem 0', fontSize: '0.74rem', color: 'rgba(255,255,255,0.4)' }}>Niemand gevonden</div>
@@ -385,11 +404,13 @@ export default function VideoEditModal({
                   <button key={c.id} type="button" onClick={() => voegKlantToe(c)} disabled={bezigKlant === c.id} style={{
                     display: 'block', width: '100%', textAlign: 'left', minHeight: 36, padding: 0, background: 'transparent', border: 'none',
                     color: '#fff', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                  }}>+ {klantNaam(c)}</button>
+                  }}>+ {klantNaam(c)} <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>op {PAGE_OPTIONS.find(o => o.value === nieuwePagina)?.label}</span></button>
                 )))}
               {klantFout && <div style={{ marginTop: 6, fontSize: '0.72rem', fontWeight: 700, color: '#f87171' }}>{klantFout}</div>}
             </Rij>
-            <Rij {...rij} id="iedereen" label="Voor iedereen op" waarde={formData.default_pages.length ? formData.default_pages.map(v => PAGE_OPTIONS.find(o => o.value === v)?.label || v).join(', ') : 'Geen pagina'}>
+            )}
+            {bereik === 'iedereen' && (
+            <Rij {...rij} id="iedereen" label="Bij alle klanten op" waarde={formData.default_pages.length ? formData.default_pages.map(v => PAGE_OPTIONS.find(o => o.value === v)?.label || v).join(', ') : 'Geen pagina'}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                 {PAGE_OPTIONS.map(page => {
                   const aan = formData.default_pages.includes(page.value)
@@ -403,10 +424,11 @@ export default function VideoEditModal({
                 })}
               </div>
             </Rij>
+            )}
             <Rij {...rij} label="Moet gezien worden" titel="Staat als blok op de pagina tot de klant bevestigt dat hij hem gezien heeft"
               rechts={<Schakel aan={formData.is_belangrijk} onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })} />} />
-            <Rij {...rij} label="Home-slider" titel="In de slider bovenaan de home-pagina, voor alle klanten"
-              rechts={<Schakel aan={formData.show_in_slider} onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })} />} />
+            {bereik === 'iedereen' && <Rij {...rij} label="Home-slider" titel="In de slider bovenaan de home-pagina, voor alle klanten"
+              rechts={<Schakel aan={formData.show_in_slider} onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })} />} />}
           </>)}
 
           <div style={{ height: '0.5rem' }} />
