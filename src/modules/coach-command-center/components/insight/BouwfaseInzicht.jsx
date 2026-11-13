@@ -86,8 +86,18 @@ export default function BouwfaseInzicht({ db, client, isMobile, altijdOpen = fal
             <>
               <div style={LABEL}>Reflectie einde fase</div>
               <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Fase:</b> {fase.reflectie.cijfer}/10 · <b style={{ fontWeight: 900 }}>Herstel:</b> {fase.reflectie.herstel}/10</span></div>
-              {fase.reflectie.goed && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Ging het beste:</b> {fase.reflectie.goed}</span></div>}
-              {fase.reflectie.beter && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Volgende fase anders:</b> {fase.reflectie.beter}</span></div>}
+              {fase.reflectie.goed && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Vond hij fijn:</b> {fase.reflectie.goed}</span></div>}
+              {fase.reflectie.beter && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Minder fijn:</b> {fase.reflectie.beter}</span></div>}
+              {/* Uitgebreide reflectie (13 nov 2026): alleen wat de klant invulde. */}
+              {(fase.reflectie.performance != null || fase.reflectie.zwaarte != null) && (
+                <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Performance:</b> {fase.reflectie.performance ?? '-'}/10 · <b style={{ fontWeight: 900 }}>Zwaarte:</b> {fase.reflectie.zwaarte ?? '-'}/10</span></div>
+              )}
+              {fase.reflectie.focus && (
+                <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Focus volgende fase:</b> {fase.reflectie.focus === 'zelfde' ? 'hetzelfde als nu' : fase.reflectie.focus === 'geen' ? 'niet specifiek' : (fase.reflectie.focus_tekst || 'ja, niet ingevuld')}</span></div>
+              )}
+              {fase.reflectie.oefeningen_erbij && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Oefeningen erbij:</b> {fase.reflectie.oefeningen_erbij}</span></div>}
+              {fase.reflectie.oefeningen_weg && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Oefeningen weg:</b> {fase.reflectie.oefeningen_weg}</span></div>}
+              {fase.reflectie.slotwoord && <div style={REGEL}>{PIJL}<span><b style={{ fontWeight: 900 }}>Slotwoord:</b> {fase.reflectie.slotwoord}</span></div>}
             </>
           )}
 

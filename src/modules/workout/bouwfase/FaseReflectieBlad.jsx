@@ -1,36 +1,77 @@
 // src/modules/workout/bouwfase/FaseReflectieBlad.jsx
 //
-// Einde bouwfase: per oefening eerste tegen laatste training, en een korte
-// reflectie (training_fases.reflectie). Daarna maakt de coach het nieuwe schema.
+// Einde bouwfase: de klant kijkt terug in een paar stappen (13 nov 2026,
+// Kersten: één lange lijst werd een reeks slides). Eerst zijn resultaten per
+// oefening, dan vier cijfers, dan wat werkte, waar de focus heen moet, welke
+// oefeningen erbij of eraf mogen, en een slotwoord. Alles komt in
+// training_fases.reflectie; de coach bouwt daarmee de volgende fase.
+//
+// `cijfer`, `herstel`, `goed` en `beter` houden hun oude naam: het coachscherm
+// en oudere reflecties gebruiken die.
 
 import { useEffect, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, Check } from 'lucide-react'
+import { X, Check, ChevronLeft } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
 import { faseProgressie, bewaarReflectie } from './bouwfaseData'
 
 const veld = {
-  width: '100%', minHeight: 60, padding: '0.6rem 0.75rem', boxSizing: 'border-box', marginBottom: 12,
+  width: '100%', minHeight: 76, padding: '0.65rem 0.75rem', boxSizing: 'border-box',
   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12,
-  color: '#fff', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'inherit', outline: 'none', resize: 'none',
+  color: '#fff', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit', outline: 'none', resize: 'none',
 }
-const vraag = { fontSize: '0.92rem', fontWeight: 900, color: '#fff', textAlign: 'center', margin: '4px 0 10px' }
-const setTekst = (s) => `${s.weight}×${s.reps}`
+const vraag = { fontSize: '0.92rem', fontWeight: 900, color: '#fff', margin: '0 0 8px' }
+const setAlsTekst = (s) => `${s.weight}×${s.reps}`
 const CIJFERS = Array.from({ length: 10 }, (_, k) => k + 1)
+// De schuif begint op een streepje (nog niets gekozen), daarna 1 tot 10.
+const LEEG = '–'
+const SCHUIF = [LEEG, ...CIJFERS]
+
+// De vier cijfers van de eerste vragenslide: [sleutel in reflectie, vraag].
+const SCORES = [
+  ['cijfer', 'Hoe voelde deze bouwfase?'],
+  ['herstel', 'Hoe goed voelde je herstel deze bouwfase?'],
+  ['performance', 'Hoe goed vond je je performance tijdens trainingen?'],
+  ['zwaarte', 'Hoe zwaar voelde deze bouwfase?'],
+]
+// Het woord bij een cijfer, boven de schuif. Zwaarte heeft zijn eigen woorden:
+// daar is hoog niet "goed" maar "zwaar".
+const WOORD_GOED = ['Slecht', 'Slecht', 'Matig', 'Matig', 'Oké', 'Oké', 'Goed', 'Goed', 'Top', 'Top']
+const WOORD_ZWAAR = ['Heel licht', 'Heel licht', 'Licht', 'Licht', 'Gemiddeld', 'Gemiddeld', 'Zwaar', 'Zwaar', 'Heel zwaar', 'Heel zwaar']
+const KLEUR_GOED = ['#ef4444', '#ef4444', '#f59e0b', '#f59e0b', '#fff', '#fff', '#10b981', '#10b981', '#10b981', '#10b981']
+const woordVoor = (sleutel, n) => (sleutel === 'zwaarte' ? WOORD_ZWAAR : WOORD_GOED)[n - 1] || ''
+const kleurVoor = (sleutel, n) => (sleutel === 'zwaarte' ? '#fff' : KLEUR_GOED[n - 1] || '#fff')
+
+const FOCUS = [
+  ['zelfde', 'Ja, hetzelfde als nu'],
+  ['anders', 'Ja, namelijk:'],
+  ['geen', 'Niet specifiek'],
+]
+
+function Tekstvraag({ kop, waarde, onChange, placeholder }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={vraag}>{kop}</div>
+      <textarea value={waarde} onChange={e => onChange(e.target.value)} rows={3} placeholder={placeholder} style={veld} />
+    </div>
+  )
+}
 
 export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslagen }) {
   const [lijst, setLijst] = useState(null)
-  const [cijfer, setCijfer] = useState(7)
-  const [herstel, setHerstel] = useState(7)
-  const [goed, setGoed] = useState('')
-  const [beter, setBeter] = useState('')
+  const [stap, setStap] = useState(0)
+  // Leeg tot de klant kiest: met een vooringevuld cijfer klik je er zo doorheen.
+  const [scores, setScores] = useState({ cijfer: null, herstel: null, performance: null, zwaarte: null })
+  const [tekst, setTekst] = useState({ goed: '', beter: '', focusTekst: '', erbij: '', weg: '', slotwoord: '' })
+  const [focus, setFocus] = useState(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  const zet = (k) => (v) => setTekst(t => ({ ...t, [k]: v }))
 
   useEffect(() => {
     if (!open || !fase) return undefined
     let weg = false
-    setLijst(null); setFout(null)
+    setLijst(null); setFout(null); setStap(0)
     faseProgressie(db.supabase, fase).then(l => { if (!weg) setLijst(l) }, () => { if (!weg) setLijst([]) })
     return () => { weg = true }
   }, [open, fase, db])
@@ -41,7 +82,15 @@ export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslage
     if (bezig) return
     setBezig(true); setFout(null)
     try {
-      const reflectie = { cijfer, herstel, goed: goed.trim() || null, beter: beter.trim() || null, ingevuld_op: new Date().toISOString() }
+      const t = (s) => s.trim() || null
+      const reflectie = {
+        ...scores,
+        goed: t(tekst.goed), beter: t(tekst.beter),
+        focus: focus || null, focus_tekst: focus === 'anders' ? t(tekst.focusTekst) : null,
+        oefeningen_erbij: t(tekst.erbij), oefeningen_weg: t(tekst.weg),
+        slotwoord: t(tekst.slotwoord),
+        ingevuld_op: new Date().toISOString(),
+      }
       await bewaarReflectie(db.supabase, fase.id, reflectie)
       onOpgeslagen?.(reflectie)
       onClose?.()
@@ -49,39 +98,111 @@ export default function FaseReflectieBlad({ open, onClose, db, fase, onOpgeslage
     setBezig(false)
   }
 
+  // De slides. De resultaten alleen als er iets te vergelijken valt.
+  const slides = [
+    ...(lijst?.length > 0 ? [{
+      titel: 'Je bouwfase in cijfers',
+      inhoud: (
+        <div>
+          {lijst.map(o => (
+            <div key={o.naam} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900, color: '#fff' }}>{o.naam}</span>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{setAlsTekst(o.eerste)} → {setAlsTekst(o.laatste)}</span>
+              </span>
+              <span style={{ flexShrink: 0, fontSize: '0.88rem', fontWeight: 900, color: o.verschil > 0 ? '#10b981' : o.verschil < 0 ? '#ef4444' : 'rgba(255,255,255,0.6)' }}>{o.verschil > 0 ? '+' : ''}{o.verschil}%</span>
+            </div>
+          ))}
+        </div>
+      ),
+    }] : []),
+    {
+      titel: 'Wat vond je van deze bouwfase?',
+      // De schuif, met het woord er direct boven en weinig lucht ertussen. Hij
+      // begint op een streepje: pas als de klant schuift of tikt telt het.
+      klaar: SCORES.every(([sleutel]) => scores[sleutel] != null),
+      inhoud: SCORES.map(([sleutel, kop]) => (
+        <div key={sleutel} style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', textAlign: 'center', lineHeight: 1.25 }}>{kop}</div>
+          <div style={{ textAlign: 'center', fontSize: '0.76rem', fontWeight: 900, marginTop: 2, color: scores[sleutel] ? kleurVoor(sleutel, scores[sleutel]) : 'rgba(255,255,255,0.35)' }}>
+            {scores[sleutel] ? woordVoor(sleutel, scores[sleutel]) : 'Schuif om te kiezen'}
+          </div>
+          <HorizontaleSlider waarden={SCHUIF} waarde={scores[sleutel] ?? LEEG} itemBreedte={58} hoogte={50} groot="1.8rem"
+            onChange={v => setScores(sc => ({ ...sc, [sleutel]: v === LEEG ? null : v }))} />
+        </div>
+      )),
+    },
+    {
+      titel: 'Wat vond je fijn, en wat minder?',
+      inhoud: (<>
+        <Tekstvraag kop="Wat vond je fijn deze fase?" waarde={tekst.goed} onChange={zet('goed')} placeholder="Bijvoorbeeld een oefening, de indeling of het tempo" />
+        <Tekstvraag kop="Wat vond je minder fijn deze fase?" waarde={tekst.beter} onChange={zet('beter')} placeholder="Wat liep stroef of wil je anders" />
+      </>),
+    },
+    {
+      titel: 'Focus voor de volgende fase',
+      inhoud: (<>
+        <div style={vraag}>Heb je spiergroepen waar je volgende fase de focus op wilt leggen?</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {FOCUS.map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setFocus(id)} aria-pressed={focus === id} style={{
+              minHeight: 48, padding: '0 0.9rem', borderRadius: 12, fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 900, textAlign: 'left', cursor: 'pointer',
+              background: focus === id ? '#fff' : 'transparent', color: focus === id ? '#0a0a0a' : '#fff',
+              border: `1px solid ${focus === id ? '#fff' : 'rgba(255,255,255,0.18)'}`, touchAction: 'manipulation',
+            }}>{label}</button>
+          ))}
+        </div>
+        {focus === 'anders' && (
+          <textarea autoFocus value={tekst.focusTekst} onChange={e => zet('focusTekst')(e.target.value)} rows={2} placeholder="Welke spiergroepen?" style={{ ...veld, marginTop: 10 }} />
+        )}
+      </>),
+    },
+    {
+      titel: 'Oefeningen',
+      inhoud: (<>
+        <Tekstvraag kop="Heb je oefeningen die je niet hebt gehad, maar die volgens jou wel goed voor je zouden zijn?" waarde={tekst.erbij} onChange={zet('erbij')} placeholder="Laat leeg als je er geen hebt" />
+        <Tekstvraag kop="Heb je oefeningen van afgelopen fase die je weg wilt laten?" waarde={tekst.weg} onChange={zet('weg')} placeholder="Laat leeg als je er geen hebt" />
+      </>),
+    },
+    {
+      titel: 'Slotwoord',
+      inhoud: <Tekstvraag kop="Beschrijf afgelopen fase in één of meer zinnen." waarde={tekst.slotwoord} onChange={zet('slotwoord')} placeholder="Hoe kijk je erop terug?" />,
+    },
+  ]
+  const nu = Math.min(stap, slides.length - 1)
+  const laatste = nu === slides.length - 1
+  // Een slide met `klaar: false` houdt Volgende dicht tot alles gekozen is.
+  const kanNietVerder = slides[nu].klaar === false
+
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483100, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '1.1rem 1rem 1.2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ flex: 1, fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Je bouwfase</div>
-          <button onClick={onClose} aria-label="Sluiten" style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}><X size={18} strokeWidth={2.8} /></button>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: '92dvh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, overflow: 'hidden' }}>
+        <div style={{ flexShrink: 0, padding: '1rem 1rem 0.8rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {nu > 0 && (
+              <button onClick={() => setStap(nu - 1)} aria-label="Vorige" style={{ width: 36, height: 36, marginLeft: -8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><ChevronLeft size={20} strokeWidth={2.8} /></button>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>Bouwfase afronden · {nu + 1} van {slides.length}</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{slides[nu].titel}</div>
+            </div>
+            <button onClick={onClose} aria-label="Sluiten" style={{ width: 36, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} strokeWidth={2.6} /></button>
+          </div>
+          <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
+            {slides.map((_, i) => <span key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= nu ? '#fff' : 'rgba(255,255,255,0.14)' }} />)}
+          </div>
         </div>
 
-        {lijst?.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            {lijst.map(o => (
-              <div key={o.naam} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '0.35rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 900, color: '#fff' }}>{o.naam}</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{setTekst(o.eerste)} → {setTekst(o.laatste)}</span>
-                </span>
-                <span style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 900, color: o.verschil > 0 ? '#10b981' : o.verschil < 0 ? '#ef4444' : 'rgba(255,255,255,0.6)' }}>{o.verschil > 0 ? '+' : ''}{o.verschil}%</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.4rem 1rem 0.6rem' }}>
+          {slides[nu].inhoud}
+          {fout && <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#ef4444', marginTop: 6 }}>{fout}</div>}
+        </div>
 
-        <div style={vraag}>Hoe ging deze bouwfase?</div>
-        <HorizontaleSlider waarden={CIJFERS} waarde={cijfer} onChange={setCijfer} itemBreedte={64} />
-        <div style={{ ...vraag, marginTop: 14 }}>Hoe goed kon je herstellen?</div>
-        <HorizontaleSlider waarden={CIJFERS} waarde={herstel} onChange={setHerstel} itemBreedte={64} />
-        <div style={{ height: 14 }} />
-        <textarea value={goed} onChange={e => setGoed(e.target.value)} rows={2} placeholder="Wat ging het beste?" style={veld} />
-        <textarea value={beter} onChange={e => setBeter(e.target.value)} rows={2} placeholder="Wat wil je de volgende fase anders?" style={veld} />
-        {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
-        <button onClick={bewaar} disabled={bezig} style={{ width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', opacity: bezig ? 0.6 : 1 }}>
-          <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : 'Opslaan'}
-        </button>
+        <div style={{ flexShrink: 0, padding: '0.6rem 1rem 1rem' }}>
+          <button onClick={laatste ? bewaar : () => setStap(nu + 1)} disabled={bezig || kanNietVerder} style={{ width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: kanNietVerder ? 'default' : 'pointer', opacity: bezig || kanNietVerder ? 0.35 : 1 }}>
+            {laatste ? <><Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : 'Opslaan'}</> : (kanNietVerder ? 'Kies eerst alle vier' : 'Volgende')}
+          </button>
+        </div>
       </div>
     </div>,
     document.body,

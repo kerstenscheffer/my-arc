@@ -6,12 +6,36 @@
 // losse melding "nieuw schema": dit is wat de klant ziet.
 
 import { useState } from 'react'
-import { BatteryCharging, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import BladModal from '../components/todays-workout/components/BladModal'
 import useBouwfase from './useBouwfase'
 
 const ORANJE = '#f59e0b'
 const datumKort = (d) => d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+
+// Een batterij met één streepje per deload-dag (13 nov 2026, Kersten). Elke
+// dag komt er een streepje bij en loopt de kleur van oranje naar groen: je
+// laadt op. Zo zie je in één oogopslag hoe ver de week is.
+function Batterij({ dag, dagen }) {
+  const n = Math.max(1, Math.min(14, Number(dagen) || 7))
+  const vol = Math.max(0, Math.min(n, Number(dag) || 0))
+  const streep = 3, tussen = 1.5, rand = 2.5, hoogte = 14
+  const breedte = rand * 2 + n * streep + (n - 1) * tussen
+  // Oranje (245,158,11) → groen (16,185,129), naar hoe ver de week is.
+  const deel = n > 1 ? (vol - 1) / (n - 1) : 1
+  const meng = (a, b) => Math.round(a + (b - a) * Math.max(0, deel))
+  const kleur = `rgb(${meng(245, 16)},${meng(158, 185)},${meng(11, 129)})`
+  return (
+    <svg width={breedte + 3} height={hoogte} viewBox={`0 0 ${breedte + 3} ${hoogte}`} aria-hidden style={{ flexShrink: 0 }}>
+      <rect x="0.75" y="0.75" width={breedte - 1.5} height={hoogte - 1.5} rx="3" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
+      <rect x={breedte + 0.5} y={hoogte / 2 - 2.5} width="2" height="5" rx="1" fill="rgba(255,255,255,0.45)" />
+      {Array.from({ length: n }, (_, i) => (
+        <rect key={i} x={rand + i * (streep + tussen)} y={rand + 0.5} width={streep} height={hoogte - rand * 2 - 1} rx="0.8"
+          fill={i < vol ? kleur : 'rgba(255,255,255,0.12)'} />
+      ))}
+    </svg>
+  )
+}
 
 function Blok({ kop, regels }) {
   return (
@@ -40,17 +64,17 @@ export default function DeloadBalk({ client, db, isMobile }) {
 
   return (
     <>
+      {/* Eén regel op een oranje vlak, zonder rand (13 nov 2026, Kersten): de
+          batterij, dik wit, de dag ernaast. */}
       <button onClick={() => setOpen(true)} style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 40, padding: isMobile ? '0 1rem' : '0 1.25rem',
-        background: 'rgba(245,158,11,0.12)', border: 'none', borderBottom: '1px solid rgba(245,158,11,0.25)',
-        color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 38, padding: isMobile ? '0 1rem' : '0 1.25rem',
+        background: 'rgba(245,158,11,0.14)', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
-        <BatteryCharging size={17} color={ORANJE} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: '0.86rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          Deload week <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>· dag {stand.dag} van {stand.dagen} · herstellen</span>
-        </span>
-        <ChevronRight size={16} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+        <Batterij dag={stand.dag} dagen={stand.dagen} />
+        <span style={{ fontSize: '0.86rem', fontWeight: 900, whiteSpace: 'nowrap' }}>Deload week</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>dag {stand.dag} van {stand.dagen}</span>
+        <ChevronRight size={15} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
       </button>
 
       <BladModal open={open} titel="Deload week" onClose={() => setOpen(false)}>
