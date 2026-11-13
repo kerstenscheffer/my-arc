@@ -352,12 +352,21 @@ export default function AIDaySchedule({
     }
 
     // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
+    // Andere dag in beeld: eerst leeg, zodat de logs van de vorige dag niet blijven
+    // staan tijdens het laden. Zelfde dag (herladen na een log): laten staan, anders knippert de lijst.
+    if (laatsteDag.current !== `${weekOffset}|${currentDay}`) { laatsteDag.current = `${weekOffset}|${currentDay}`; setConsumedMeals([]) }
     if (client?.id) loadConsumedMeals(currentDay)
   }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides, dagRefreshKey, schemaSleutel])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
+  // Alleen het antwoord op de laatste vraag telt (13 nov 2026): blader je snel
+  // van week of dag, dan kon een trager antwoord van de vorige dag als laatste
+  // binnenkomen en zag je de logs van vorige week zondag op aankomende zondag.
+  const consumedVraag = useRef(0)
+  const laatsteDag = useRef(null)
   const loadConsumedMeals = async (dayIndex) => {
     if (!db?.supabase || !client?.id) return
+    const vraagNr = ++consumedVraag.current
     try {
       const { vanaf, tot } = dagVenster(dayIndex)
 
@@ -370,6 +379,7 @@ export default function AIDaySchedule({
         .order('consumed_at', { ascending: true })
 
       if (error) throw error
+      if (vraagNr !== consumedVraag.current) return
       setConsumedMeals(data || [])
     } catch (err) {
       console.error('Failed to load consumed meals:', err)
