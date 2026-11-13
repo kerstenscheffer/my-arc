@@ -24,6 +24,7 @@ import MediaBibliotheek from './components/MediaBibliotheek'
 import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
 import BelangrijkeVideo from './components/BelangrijkeVideo'
+import DeloadBalk from '../modules/workout/bouwfase/DeloadBalk'
 import WaterFles from './components/WaterFles'
 import { syncStappen, resetStappenCooldown } from '../modules/steps/stappenSync'
 import StappenVerzoek from '../modules/steps/StappenVerzoek'
@@ -518,6 +519,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                 en zou alles hier eronder leggen), op Workout onder de training
                 van vandaag, op Home onder de dagkiezer. De overige pagina's
                 krijgen hem hier bovenaan. */}
+            {/* Deload week: op elke pagina bovenaan zolang de deload loopt. */}
+            {!focusMode && client?.id && <DeloadBalk client={client} db={db} isMobile={isMobile} />}
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}

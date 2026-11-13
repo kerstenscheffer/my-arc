@@ -55,7 +55,8 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
         ])
         if (!alive) return
         if (std?.error) console.error('templates laden:', std.error)
-        setPlans(eigen?.plans || [])
+        // Een deload-schema kies je niet zelf: dat zet de mesocyclus aan en uit.
+        setPlans((eigen?.plans || []).filter(p => viewerRole === 'coach' || !p.deload_van || p.isActive))
         setStandaard((std?.data || []).filter(p => !p.is_archived))
       } catch (e) { console.error('Plannen laden mislukt:', e); if (alive) { setPlans([]); setStandaard([]) } }
       finally { if (alive) setLoading(false) }

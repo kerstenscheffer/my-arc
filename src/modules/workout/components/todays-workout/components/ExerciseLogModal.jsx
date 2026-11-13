@@ -22,7 +22,7 @@ import OpwarmPoort from './OpwarmPoort'
 import useBouwfase from '../../../bouwfase/useBouwfase'
 import { isPower, POWER_UITLEG, POWER_PCT, SNELHEDEN, snelheidVan, schat1RM, basisNaam } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
-import { leesFeedbackVanDag, spiergroepVan, vandaagIso } from '../../../bouwfase/bouwfaseData'
+import { leesFeedbackVanDag, spiergroepVan, vandaagIso, bewaarFeedback } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
 import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
@@ -512,6 +512,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const spier = spiergroepVan(exercise)
   // Alleen voor vandaag; een oude dag naloggen vraagt niets.
   const power = isPower(exercise)
+  // Mesocyclus: gehalveerde oefening in de deload, of een nieuwe om te proberen.
+  // Beide zonder "je kan omhoog" en zonder de bouwfase-vragen: het gaat om herstel.
+  const rustig = !!exercise?.deload || !!exercise?.probeer
+  const [probeerKeuze, setProbeerKeuze] = useState(null) // 'probeer_ja' | 'probeer_nee'
   // Power: geschatte 1RM van deze klant op deze oefening, voor het adviesgewicht.
   const [max1RM, setMax1RM] = useState(null)
   useEffect(() => {
@@ -530,7 +534,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     })()
     return () => { weg = true }
   }, [power, client?.id, db, exercise.name])
-  const bfAan = bouwfase.aan && !power && (!datum || datum === vandaagIso())
+  const bfAan = bouwfase.aan && !power && !rustig && (!datum || datum === vandaagIso())
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
   const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
   const herstelGehad = useRef(false)
@@ -983,7 +987,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // vraag naar de uitvoering staat er bewust bij — twaalf slordige reps zijn
   // geen reden om te verzwaren.
   const krap = isMobile && bfAan // drie pillen onder Set toevoegen op een telefoon
-  const tipZwaarder = !power && loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
+  const tipZwaarder = !power && !rustig && loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
 
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
@@ -1283,6 +1287,35 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           </div>
         ) : (
           <>
+            {/* Deload of proberen: wat de bedoeling is, bovenaan. */}
+            {rustig && (
+              <div style={{ margin: isMobile ? '0.8rem 0.9rem 0.2rem' : '1rem 1.25rem 0.3rem', padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                <div style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 900, color: exercise.probeer ? '#fff' : '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                  {exercise.probeer ? 'Nieuw om te proberen' : 'Deload week'}
+                </div>
+                <div style={{ fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 700, color: '#fff', lineHeight: 1.45 }}>
+                  {exercise.probeer
+                    ? (String(exercise.notes || '').trim() || 'Test deze oefening rustig met licht gewicht. Het gaat om het gevoel, niet om de prestatie.')
+                    : 'Helft van je normale gewicht. Moet makkelijk voelen.'}
+                </div>
+                {exercise.probeer && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    {[['probeer_ja', 'Wil ik in mijn volgende fase'], ['probeer_nee', 'Liever niet']].map(([id, label]) => (
+                      <button key={id} type="button" onClick={async () => {
+                        setProbeerKeuze(id)
+                        try {
+                          await bewaarFeedback(db.supabase, { client_id: client.id, soort: 'oefening', fase_id: bouwfase.fase?.id || null, oefening: exercise.name, spiergroep: spier || null, score: null, gevoel: id, opmerking: null })
+                        } catch (e) { console.warn('Keuze niet bewaard:', e?.message); setProbeerKeuze(null) }
+                      }} style={{
+                        flex: 1, minHeight: 40, padding: '0 0.5rem', borderRadius: 10, fontFamily: 'inherit', fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 900, cursor: 'pointer',
+                        background: probeerKeuze === id ? '#fff' : 'transparent', color: probeerKeuze === id ? '#000' : '#fff',
+                        border: `1px solid ${probeerKeuze === id ? '#fff' : 'rgba(255,255,255,0.2)'}`, touchAction: 'manipulation',
+                      }}>{label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {/* Power: uitleg bovenaan, elke keer dat je de oefening opent. */}
             {power && (
               <div style={{ margin: isMobile ? '0.8rem 0.9rem 0.2rem' : '1rem 1.25rem 0.3rem', padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>

@@ -817,6 +817,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           equipment: ex.equipment, primairSpieren: ex.primairSpieren, notes: ex.notes || '',
           type: ex.type || 'compound', stretch: ex.stretch || false, priority: ex.priority || 1, goalPriority: ex.goalPriority || false,
           ...(ex.power ? { power: true } : {}), // power-oefening: eigen blok en eigen log bij de klant
+          // Mesocyclus: `deload` = gehalveerd in het deload-schema, `probeer` = nieuw om te proberen.
+          ...(ex.deload ? { deload: true } : {}), ...(ex.probeer ? { probeer: true } : {}),
         }))
       }
     })

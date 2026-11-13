@@ -1354,7 +1354,7 @@ async getClientSchemas(clientId) {
       const activeId = client?.assigned_schema_id || null
       const { data: plans, error } = await supabase
         .from('workout_schemas')
-        .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at')
+        .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at, deload_van')
         .eq('client_id', clientId)
         .neq('is_template', true)
         .order('created_at', { ascending: false })
@@ -1364,7 +1364,7 @@ async getClientSchemas(clientId) {
       // alsnog meenemen zodat de header/lijst 'm toont.
       if (activeId && !list.some(p => p.id === activeId)) {
         const { data: act } = await supabase.from('workout_schemas')
-          .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at')
+          .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at, deload_van')
           .eq('id', activeId).single()
         if (act) list = [{ ...act, isActive: true }, ...list]
       }
