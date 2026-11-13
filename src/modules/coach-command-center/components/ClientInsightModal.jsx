@@ -76,7 +76,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Desktop: welke secties naast elkaar staan. De kopregel vinkt ze aan en uit,
   // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
   // een leeg paneel is geen bruikbare toestand.
-  const [openSecties, setOpenSecties] = useState(['weight'])
+  const [openSecties, setOpenSecties] = useState(['weight', 'workout', 'meals', 'checkin', 'logboek'])
   // De looptijd stond altijd open als balkenrij onder de kop. Dat is een blok
   // dat je één keer per maand nodig hebt en de rest van de tijd meekijkt, dus
   // nu dicht tenzij je erom vraagt.
@@ -158,7 +158,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // De inhoud in het midden houden. Volle breedte leest bij één kolom als een
   // heel scherm vol losse cijfers; een kolom met marges eromheen is rustiger.
   // Gewicht + Training staan gestapeld in één kolom en tellen dus als één.
-  const aantalKolommen = openSecties.length - (['weight', 'workout'].every(id => openSecties.includes(id)) ? 1 : 0)
+  // Per stapel de vakken van boven naar beneden; een vak kan meerdere
+  // secties naast elkaar bevatten.
+  const STAPELS = [[['workout'], ['weight']], [['meals'], ['logboek', 'checkin']]]
+  const aantalKolommen = (() => {
+    const isOpen = (id) => openSecties.includes(id)
+    const gestapeld = STAPELS.filter(st => st.every(vak => vak.some(isOpen)))
+    const inStapel = gestapeld.flat(2).filter(isOpen).length
+    return openSecties.length - inStapel + gestapeld.length
+  })()
   const middenBreedte = aantalKolommen > 1 ? 1500 : 980
 
   // Het huidige gewicht stond als eerste cel in de cijferregel. Die regel is nu
@@ -513,35 +521,46 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   Kies hierboven wat je wil zien.
                 </div>
               ) : (() => {
-                // Gewicht en Training delen één kolom, boven en onder elkaar
-                // (13 nov 2026, Kersten): beide zijn kort genoeg, en zo blijft
-                // er breedte over voor wat er verder open staat.
+                // Vaste indeling in vakken (13 nov 2026, Kersten): links
+                // Training boven Gewicht, rechts Voeding boven een vak met
+                // Check-in en Logboek naast elkaar. Een stapel geldt zodra in
+                // elk vak iets open staat; anders is elke sectie een eigen kolom.
                 const open = SECTIES.filter(sec => openSecties.includes(sec.id))
-                const stapel = ['weight', 'workout'].every(id => openSecties.includes(id))
-                const kolommen = []
+                const isOpen = (id) => openSecties.includes(id)
+                const gestapeld = STAPELS.filter(st => st.every(vak => vak.some(isOpen)))
+                const kolommen = [] // kolom = lijst vakken, vak = lijst secties naast elkaar
                 open.forEach(sec => {
-                  if (stapel && sec.id === 'workout') return
-                  kolommen.push(stapel && sec.id === 'weight' ? [sec, SECTIES.find(x => x.id === 'workout')] : [sec])
+                  const st = gestapeld.find(x => x.some(vak => vak.includes(sec.id)))
+                  if (!st) { kolommen.push([[sec]]); return }
+                  if (sec.id !== st[0].find(isOpen)) return
+                  kolommen.push(st.map(vak => vak.filter(isOpen).map(id => SECTIES.find(x => x.id === id))))
                 })
-                return kolommen.map((groep, i) => (
-                  <div key={groep[0].id} style={{
+                return kolommen.map((kolom, i) => (
+                  <div key={kolom[0][0].id} style={{
                     flex: '1 1 0',
                     minWidth: kolommen.length > 1 ? 300 : 0,
                     overflow: 'hidden',
                     display: 'flex', flexDirection: 'column',
                     borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
                   }}>
-                    {groep.map((sec, j) => (
-                      <div key={sec.id} style={{
-                        flex: '1 1 0', minHeight: 0, overflow: 'hidden',
+                    {kolom.map((vak, j) => (
+                      <div key={vak[0].id} style={{
+                        flex: '1 1 0', minHeight: 0, overflow: 'hidden', display: 'flex',
                         borderTop: j > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
                       }}>
-                        {/* Elke kolom dezelfde kopbalk; de kolom zet er zijn
-                            belangrijkste info en knoppen in (KolomKopInhoud). */}
-                        <KolomKop icon={sec.icon} titel={sec.label}
-                          onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
-                          {renderSectie(sec.id, false)}
-                        </KolomKop>
+                        {vak.map((sec, k) => (
+                          <div key={sec.id} style={{
+                            flex: '1 1 0', minWidth: 0, overflow: 'hidden',
+                            borderLeft: k > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                          }}>
+                            {/* Elk vak dezelfde kopbalk; de sectie zet er zijn
+                                belangrijkste info en knoppen in (KolomKopInhoud). */}
+                            <KolomKop icon={sec.icon} titel={sec.label}
+                              onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                              {renderSectie(sec.id, false)}
+                            </KolomKop>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>

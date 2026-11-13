@@ -11,6 +11,7 @@ import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
 import MealTimelineMobile from './day-schedule/MealTimelineMobile'
 import FoodLogModal from './food-log/FoodLogModal'
+import GeplandBlok from './GeplandBlok'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst, voegEigenSupplementToe, verwijderEigenSupplement } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
@@ -76,6 +77,10 @@ export default function AIDaySchedule({
   // Training verzet: tijden, dagen en pre-workout opnieuw bepalen.
   const schemaSleutel = JSON.stringify(workoutSchedule || null)
   const isFreeMode = mode === 'free'
+  // Vrij loggen met vooruit plannen (13 nov 2026): `planDatum` gevuld = het
+  // logvenster zet de maaltijd klaar voor die dag in plaats van hem te loggen.
+  const [planDatum, setPlanDatum] = useState(null)
+  const [geplandVersie, setGeplandVersie] = useState(0)
   const isMobile = window.innerWidth <= 768
   // Gelogd-animatie na Afronden (zelfde als in het log-venster).
   const [afgerond, setAfgerond] = useState(null)
@@ -159,6 +164,14 @@ export default function AIDaySchedule({
   // klant tussen 00:00 en 02:00 logde in de dag ervoor.
   // "Vandaag" is alleen vandaag als je ook in deze week kijkt.
   const isVandaag = (dayIndex = currentDay) => weekOffset === 0 && dayIndex === getTodayIndex()
+  // De dag in beeld als datum, en of die voor of na vandaag ligt.
+  const dagVerschil = (currentDay - getTodayIndex()) + weekOffset * 7
+  const gekozenDatum = (() => {
+    const d = new Date(); d.setDate(d.getDate() + dagVerschil)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+  const dagInToekomst = dagVerschil > 0
+  const dagInVerleden = dagVerschil < 0
 
   // De kalenderdatum van de dag die je bekijkt. Dagtemplates die maar één week
   // gelden hangen aan een datum, niet aan een weekdag.
@@ -216,8 +229,10 @@ export default function AIDaySchedule({
   useEffect(() => {
     if (foodLogTrigger === vorigeTrigger.current) return
     vorigeTrigger.current = foodLogTrigger
+    // Vrij loggen op een dag in de toekomst: de plusknop plant, hij logt niet.
+    setPlanDatum(isFreeMode && dagInToekomst ? gekozenDatum : null)
     setShowFoodLog(true)
-  }, [foodLogTrigger])
+  }, [foodLogTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedDay) {
@@ -818,6 +833,15 @@ export default function AIDaySchedule({
           (DagBewaarBalk, DagTemplatePaneel, DayTemplateService) staat er nog,
           terugzetten = dit blok weer renderen met onOpenDagen. */}
 
+      {/* Vrij loggen: wat je alvast klaarzette voor deze dag, met de optelsom.
+          Alleen vandaag en later, of als er op een eerdere dag nog iets openstaat. */}
+      {isFreeMode && client?.id && !alleenKijken && !dagInVerleden && (
+        <GeplandBlok db={db} client={client} datum={gekozenDatum} magLoggen={!dagInToekomst} versie={geplandVersie}
+          gegeten={combinedTotals} targets={clientTargets} isMobile={isMobile}
+          onPlan={(moment) => { setEditingMeal(null); setDefaultMealMoment(moment); setPlanDatum(gekozenDatum); setShowFoodLog(true) }}
+          onGelogd={() => { loadConsumedMeals(currentDay); if (!isVandaag() && onPastDayUpdate) onPastDayUpdate(); onMealLogged?.() }} />
+      )}
+
       {loading ? (
         <MaaltijdKaartenSkelet isMobile={isMobile} />
       ) : !hasContent && !client ? (
@@ -835,9 +859,11 @@ export default function AIDaySchedule({
           onSupplementToevoegen={alleenKijken || isFreeMode ? null : supplementToevoegen}
           onSupplementVerwijderen={alleenKijken ? null : supplementVerwijderen}
           onVoegToe={alleenKijken ? null : isFreeMode ? (plek) => {
-            // Vrij loggen: meteen het logscherm op dat moment.
+            // Vrij loggen: meteen het logscherm op dat moment. Een dag in de
+            // toekomst kun je nog niet gegeten hebben: daar plan je.
             setEditingMeal(null)
             setDefaultMealMoment(plek.moment || null)
+            setPlanDatum(dagInToekomst ? gekozenDatum : null)
             setShowFoodLog(true)
           } : (plek) => onOpenAlternatives?.({
             slot: plek.slot, _leeg: true, name: plek.label, display_label: plek.label,
@@ -1063,12 +1089,15 @@ export default function AIDaySchedule({
           <FoodLogModal
             isOpen={showFoodLog}
             startTab={foodLogTab}
-            onClose={() => { setShowFoodLog(false); setDefaultMealMoment(null); setEditingMeal(null) }}
+            onClose={() => { setShowFoodLog(false); setDefaultMealMoment(null); setEditingMeal(null); setPlanDatum(null) }}
+            planDatum={planDatum}
             client={client}
             db={db}
             targets={clientTargets}
             consumedToday={consumedToday}
             onMealLogged={(data) => {
+              // Gepland, niet gegeten: alleen het blok Gepland verversen.
+              if (planDatum || data?._gepland) { setGeplandVersie(v => v + 1); return }
               handleMealLogged(data)
               // Always reload the day we're looking at — so a past-day
               // log appears immediately in the timeline.

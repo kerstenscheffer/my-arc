@@ -26,6 +26,8 @@ export default function FoodLogModal({
   // ISO timestamp to stamp on consumed_at. Pass when logging meals for a
   // non-today date (e.g. backfilling yesterday). Null/omitted = use now.
   consumedAt = null,
+  // 'jjjj-mm-dd': de maaltijd wordt gepland voor die dag in plaats van gelogd.
+  planDatum = null,
   // Op welk tabblad het venster opent. 'meals' = Mijn maaltijden, gebruikt
   // door de knop "Maaltijd aanmaken" in het wisselvenster.
   startTab = 'search',
@@ -198,6 +200,8 @@ export default function FoodLogModal({
         enrichIngredientImage(db, logData.sourceId).catch(() => {})
       }
 
+      // Planstand: de service zet de maaltijd klaar in plaats van hem te loggen.
+      loggingService.planDatum = planDatum || null
       const result = await loggingService.logMeal(client.id, {
         name: logData.name,
         sourceId: logData.sourceId || null,
@@ -355,7 +359,7 @@ export default function FoodLogModal({
             db={db}
             client={client}
             loggingService={loggingService}
-            knopTekst={addIngredientCallback ? 'Toevoegen aan maaltijd' : 'Loggen'}
+            knopTekst={addIngredientCallback ? 'Toevoegen aan maaltijd' : planDatum ? 'Plannen' : 'Loggen'}
           />
         </>
       ) : !successData ? (
@@ -375,6 +379,12 @@ export default function FoodLogModal({
             <X size={22} strokeWidth={2.4} />
           </button>
 
+          {/* Planstand: zeg duidelijk dat dit nog niet als gegeten telt. */}
+          {planDatum && (
+            <div style={{ margin: isMobile ? '0 1rem 0.4rem' : '0 1.25rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, color: '#f59e0b' }}>
+              Plannen voor {new Date(`${planDatum}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })} · telt pas mee als je hem eet
+            </div>
+          )}
           <FoodLogHeader
             weergave={weergave}
             onWeergave={setWeergave}

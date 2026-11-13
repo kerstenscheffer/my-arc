@@ -148,6 +148,24 @@ export default class SmartLoggingService {
       }
     })
 
+    // Planstand (13 nov 2026): de maaltijd wordt klaargezet voor `planDatum`
+    // in plaats van gelogd. Hij telt pas mee als de klant op "Gegeten" tikt
+    // (GeplandBlok); tot dan staat de hele rij als payload in geplande_maaltijden.
+    if (this.planDatum) {
+      const { data: gepland, error: planFout } = await this.supabase
+        .from('geplande_maaltijden')
+        .insert({
+          client_id: payload.client_id, datum: this.planDatum,
+          meal_type: payload.meal_type, meal_name: payload.meal_name,
+          calories: payload.calories, protein: payload.protein, carbs: payload.carbs, fat: payload.fat,
+          amount: payload.amount, per_unit: payload.per_unit, image_url: payload.image_url,
+          payload,
+        })
+        .select('id').single()
+      if (planFout) throw planFout
+      return { ...payload, id: gepland.id, _gepland: true }
+    }
+
     const { data, error } = await this.supabase
       .from('consumed_meals')
       .insert(payload)

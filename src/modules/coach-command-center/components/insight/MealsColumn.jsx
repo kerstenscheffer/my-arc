@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import {
-  UtensilsCrossed, ChevronRight, ArrowLeft, Zap, ExternalLink, Droplet, Info,
+  UtensilsCrossed, ChevronRight, ChevronLeft, ArrowLeft, Zap, ExternalLink, Droplet, Info,
   ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays, Pill, FileText,
 } from 'lucide-react'
 import MealDaySummaryModal from '../../../meal-plan/components/MealDaySummaryModal'
@@ -260,6 +260,8 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
   // 'aangepast' | 'supplementen' | 'documenten' | null. In beeld blijven de dagen.
   const [venster, setVenster] = useState(null)
+  // Welke week de strook toont: 0 = deze week, -1 = vorige, enzovoort.
+  const [weekTerug, setWeekTerug] = useState(0)
   // Gelogde maaltijd waarvan het info-blad open staat, plus zijn ingrediënten.
   const [infoMeal, setInfoMeal] = useState(null)
   const [infoIngredienten, setInfoIngredienten] = useState(null)
@@ -301,8 +303,12 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     return () => { weg = true }
   }, [db, client?.id, vanaf])
 
-  const meerTerug = eersteLog && new Date(eersteLog) < vanaf
-  const laadOuder = () => setVanaf(v => { const d = new Date(v); d.setDate(d.getDate() - STAP_DAGEN); return d })
+  // Blader je naar een week van vóór wat er geladen is, dan halen we die erbij.
+  useEffect(() => {
+    const ma = vanSleutel(maandagVan(sleutelVan(new Date())))
+    ma.setDate(ma.getDate() + weekTerug * 7)
+    if (ma < vanaf) setVanaf(ma)
+  }, [weekTerug, vanaf])
 
   // Wat zat erin, en wat heeft de klant veranderd? Een log vanuit de agenda
   // kreeg tot 13 okt geen ingrediënten mee. Dan vallen we terug op de
@@ -560,23 +566,29 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     )
   }
 
-  // ── DAYS LIST ──
-  // Dagen per week groeperen: bij een lange geschiedenis zie je zo waar je bent.
-  const weken = []
-  days.forEach(dag => {
-    const wk = maandagVan(dag)
-    if (!weken.length || weken[weken.length - 1].wk !== wk) weken.push({ wk, dagen: [] })
-    weken[weken.length - 1].dagen.push(dag)
+  // ── WEEKSTROOK ──
+  // Zeven balkjes naast elkaar in plaats van een dagenlijst (13 nov 2026,
+  // Kersten): de week in één blik, in dezelfde vorm als het rooster bij Training.
+  const weekMa = vanSleutel(maandagVan(vandaagSleutel)); weekMa.setDate(weekMa.getDate() + weekTerug * 7)
+  const weekZo = new Date(weekMa); weekZo.setDate(weekZo.getDate() + 6)
+  const weekDagen = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekMa); d.setDate(d.getDate() + i); return sleutelVan(d) })
+  const gelogd = weekDagen.filter(k => dailyLog[k])
+  const weekGem = gelogd.length ? {
+    kcal: Math.round(gelogd.reduce((t, k) => t + dailyLog[k].calories, 0) / gelogd.length),
+    eiwit: Math.round(gelogd.reduce((t, k) => t + dailyLog[k].protein, 0) / gelogd.length),
+  } : null
+  const weekTitel = weekTerug === 0 ? 'Deze week' : weekTerug === -1 ? 'Vorige week'
+    : `${weekMa.getDate()} ${weekMa.toLocaleDateString('nl-NL', { month: 'short' })} – ${weekZo.getDate()} ${weekZo.toLocaleDateString('nl-NL', { month: 'short' })}`
+  // Verder terug dan de eerste log valt er niets te zien.
+  const kanTerug = !!eersteLog && new Date(eersteLog) < weekMa
+  const doelKcal = targets?.calories > 0 ? targets.calories : 0
+  const schaal = Math.max(doelKcal * 1.25, ...gelogd.map(k => dailyLog[k].calories), 1)
+  const BALK_HOOGTE = isMobile ? 96 : 120
+  const pijlKnop = (aan) => ({
+    width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none',
+    color: '#fff', opacity: aan ? 0.9 : 0.25, cursor: aan ? 'pointer' : 'default',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
   })
-  const dezeWeek = maandagVan(vandaagSleutel)
-  const weekNaam = (wk) => {
-    if (wk === dezeWeek) return 'Deze week'
-    const vorige = vanSleutel(dezeWeek); vorige.setDate(vorige.getDate() - 7)
-    if (wk === sleutelVan(vorige)) return 'Vorige week'
-    const ma = vanSleutel(wk); const zo = new Date(ma); zo.setDate(zo.getDate() + 6)
-    return `${ma.getDate()} ${ma.toLocaleDateString('nl-NL', { month: 'short' })} – ${zo.getDate()} ${zo.toLocaleDateString('nl-NL', { month: 'short' })}`
-  }
-  const pad = isMobile ? '0 0.9rem' : '0 1.1rem'
 
   return (
     <>
@@ -620,92 +632,62 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             )}
           </KolomKopInhoud>
 
-
-          {days.length === 0 && !laden ? (
-            <div style={{ padding: pad, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>
-              {eersteLog === null
-                ? 'Deze klant heeft nog niets gelogd. Zodra er een maaltijd binnenkomt, zie je hem hier met zijn bron.'
-                : `In de laatste ${Math.round((Date.now() - vanaf.getTime()) / 86400000)} dagen niets gelogd.`}
+          <div style={{ padding: isMobile ? '0.6rem 0.9rem 0' : '0.7rem 1.1rem 0' }}>
+            {/* Week kiezen, met rechts het gemiddelde over de gelogde dagen. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+              <button onClick={() => kanTerug && setWeekTerug(w => w - 1)} disabled={!kanTerug} aria-label="Vorige week" title="Vorige week" style={pijlKnop(kanTerug)}><ChevronLeft size={17} strokeWidth={2.8} /></button>
+              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', minWidth: 96, textAlign: 'center' }}>{weekTitel}</span>
+              <button onClick={() => weekTerug < 0 && setWeekTerug(w => w + 1)} disabled={weekTerug >= 0} aria-label="Volgende week" title="Volgende week" style={pijlKnop(weekTerug < 0)}><ChevronRight size={17} strokeWidth={2.8} /></button>
+              <span style={{ marginLeft: 'auto', fontSize: '0.78rem', fontWeight: 800, color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                {laden ? 'laden…' : weekGem ? <>gem. <b style={{ color: '#fff', fontWeight: 900 }}>{weekGem.kcal.toLocaleString('nl-NL')}</b>{doelKcal ? ` / ${Math.round(doelKcal).toLocaleString('nl-NL')}` : ''} kcal · E <b style={{ color: '#fff', fontWeight: 900 }}>{weekGem.eiwit}</b>g · {gelogd.length}/7</> : 'niets gelogd'}
+              </span>
             </div>
-          ) : weken.map(({ wk, dagen }) => {
-            const gem = Math.round(dagen.reduce((t, d) => t + dailyLog[d].calories, 0) / dagen.length)
-            return (
-              <div key={wk} style={{ marginTop: '0.6rem' }}>
-                <div style={{ padding: pad, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{weekNaam(wk)}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted, fontVariantNumeric: 'tabular-nums' }}>{dagen.length} {dagen.length === 1 ? 'dag' : 'dagen'} · gem. {gem.toLocaleString('nl-NL')} kcal</span>
-                </div>
-                {dagen.map(dag => {
-                  const d = dailyLog[dag]
-                  const kcal = Math.round(d.calories)
-                  const kleur = targets ? kcalKleur(kcal, targets.calories, '#fff') : '#fff'
-                  // Hoeveel uit het plan, en wat de klant zelf deed, als
-                  // icoontjes met aantallen: de mix van de dag in één regel.
-                  const mix = {}
-                  d.meals.forEach(m => { const b = m.bron || bronVan(m); mix[b] = (mix[b] || 0) + 1 })
-                  const mixLijst = Object.entries(mix).sort((a, b) => (uitPlan(b[0]) - uitPlan(a[0])) || (b[1] - a[1]))
-                  const datum = vanSleutel(dag)
-                  return (
-                    <button key={dag} onClick={() => { setSelectedDay(dag); setView('detail') }} style={{
-                      display: 'block', width: '100%', margin: 0,
-                      padding: isMobile ? '0.7rem 0.9rem' : '0.75rem 1.1rem',
-                      textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                      background: dag === vandaagSleutel ? 'rgba(34,197,94,0.06)' : colors.surface,
-                      border: 'none', borderBottom: `1px solid ${colors.borderSubtle}`,
-                      borderLeft: `3px solid ${dag === vandaagSleutel ? colors.success : 'transparent'}`,
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? 4 : 8 }}>
+              {weekDagen.map(dag => {
+                const d = dailyLog[dag]
+                const datum = vanSleutel(dag)
+                const isVandaag = dag === vandaagSleutel
+                const toekomst = dag > vandaagSleutel
+                const kcal = d ? Math.round(d.calories) : 0
+                const kleur = d ? (targets ? kcalKleur(kcal, targets.calories, '#fff') : '#fff') : 'rgba(255,255,255,0.3)'
+                return (
+                  <button key={dag} disabled={!d}
+                    onClick={() => { if (d) { setSelectedDay(dag); setView('detail') } }}
+                    title={d ? `${datum.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}: ${kcal.toLocaleString('nl-NL')} kcal, ${Math.round(d.protein)} g eiwit, ${d.meals.length} gelogd` : toekomst ? '' : 'Niets gelogd'}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 5, minWidth: 0,
+                      padding: '6px 4px 7px', borderRadius: 10, fontFamily: 'inherit', color: '#fff',
+                      background: isVandaag ? 'rgba(255,255,255,0.07)' : 'transparent',
+                      border: `1px solid ${isVandaag ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                      cursor: d ? 'pointer' : 'default', opacity: toekomst ? 0.4 : 1,
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 38, flexShrink: 0, textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.62rem', fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{datum.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2)}</div>
-                          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{datum.getDate()}</div>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                            <span style={{ fontSize: '0.95rem', fontWeight: 900, color: kleur, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{kcal.toLocaleString('nl-NL')}</span>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted }}>{targets ? `/ ${Math.round(targets.calories).toLocaleString('nl-NL')} kcal` : 'kcal'}</span>
-                            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary, fontVariantNumeric: 'tabular-nums' }}>E {Math.round(d.protein)}g</span>
-                          </div>
-                          {targets?.calories > 0 && (
-                            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct(kcal, targets.calories)}%`, background: kleur, borderRadius: 2 }} />
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6 }}>
-                            {mixLijst.map(([b, n]) => {
-                              const Icoon = BRON_ICOON[b] || UtensilsCrossed
-                              return (
-                                <span key={b} title={BRONNEN[b]?.tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.68rem', fontWeight: 800, color: uitPlan(b) ? colors.success : colors.textSecondary }}>
-                                  <Icoon size={11} strokeWidth={2.6} /> {n} {BRONNEN[b]?.tekst.toLowerCase()}
-                                </span>
-                              )
-                            })}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-
-          {/* Verder terug kijken. Zonder eerdere logs staat er waar het begon. */}
-          {days.length > 0 && (
-            <div style={{ padding: pad, marginTop: '0.75rem' }}>
-              {meerTerug ? (
-                <button onClick={laadOuder} disabled={laden} style={{ ...secundaireKnop, width: '100%', opacity: laden ? 0.5 : 1 }}>
-                  <History size={15} strokeWidth={2.6} /> {laden ? 'Laden…' : `Nog ${STAP_DAGEN} dagen terug`}
-                </button>
-              ) : eersteLog ? (
-                <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 700, color: colors.textMuted }}>
-                  Eerste log op {formatDate(eersteLog)}
-                </div>
-              ) : null}
+                    <span style={{ fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: isVandaag ? '#fff' : colors.textMuted, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {datum.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2)} {datum.getDate()}
+                    </span>
+                    {/* De balk: hoogte naar kcal, het streepje is het doel. */}
+                    <span style={{ position: 'relative', display: 'block', height: BALK_HOOGTE, borderRadius: 6, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+                      {d && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (kcal / schaal) * 100)}%`, background: kleur, opacity: 0.85, borderRadius: '4px 4px 0 0' }} />}
+                      {doelKcal > 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doelKcal / schaal) * 100}%`, height: 2, background: '#fff' }} />}
+                    </span>
+                    <span style={{ fontSize: isMobile ? '0.7rem' : '0.82rem', fontWeight: 900, color: kleur, textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                      {d ? kcal.toLocaleString('nl-NL') : '–'}
+                    </span>
+                    <span style={{ fontSize: isMobile ? '0.6rem' : '0.68rem', fontWeight: 800, color: colors.textMuted, textAlign: 'center', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {d ? `E ${Math.round(d.protein)}g` : ' '}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          )}
 
+            {eersteLog === null && (
+              <div style={{ marginTop: 10, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>
+                Deze klant heeft nog niets gelogd. Zodra er een maaltijd binnenkomt, zie je hem hier.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
