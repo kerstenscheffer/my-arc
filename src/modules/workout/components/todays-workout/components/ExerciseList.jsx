@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, RotateCcw, ChevronRight, Check, Zap } from 'lucide-react'
 import { isPower, POWER_UITLEG } from '../../../utils/power'
+import { corrigeerSpier } from '../../../../manual-workout-builder/spierGroepen'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
@@ -24,7 +25,8 @@ const groepVan = (ex) => {
   if (isPower(ex)) return POWER_GROEP
   const ruw = String(ex?.primairSpieren || ex?.muscleGroup || '').trim()
   if (!ruw) return 'Overig'
-  const klein = ruw.toLowerCase()
+  // Een verkeerd ingevulde groep rechtzetten op de naam (Calf extension stond onder Chest).
+  const klein = corrigeerSpier(ruw.toLowerCase() === 'borst' ? 'chest' : ruw.toLowerCase(), ex?.name)
   return GROEP_NAMEN[klein] || klein.charAt(0).toUpperCase() + klein.slice(1)
 }
 

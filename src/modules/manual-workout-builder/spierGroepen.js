@@ -37,9 +37,22 @@ export function verfijn(groep, naam = '') {
   return groep
 }
 
+// Verkeerd ingevulde spiergroep rechtzetten op de naam (13 nov 2026). Een
+// oefening zonder spiergroep kreeg bij het toewijzen of zelf aanmaken stil
+// 'chest' mee: "Calf extension" stond zo in 23 plannen onder Borst. Alleen
+// waar de naam geen twijfel laat.
+export function corrigeerSpier(groep, naam = '') {
+  const n = String(naam || '')
+  if (/\bcal(f|ves)\b|kuit/i.test(n)) return 'calves'
+  if (groep !== 'chest') return groep
+  if (/tricep/i.test(n)) return 'triceps'
+  if (/\bchin|pull.?up|pulldown|\brow\b|sled pull|lower back|back extension|rug/i.test(n)) return 'back'
+  return groep
+}
+
 export function spierVan(ex) {
   const ruw = String(ex.primairSpieren || '').split(/[,/]/)[0].trim().toLowerCase()
-  if (ruw) return verfijn(GELIJK[ruw] || ruw, ex.name)
+  if (ruw) return verfijn(corrigeerSpier(GELIJK[ruw] || ruw, ex.name), ex.name)
   // Geen spier ingevuld: een paar namen herkennen we zelf.
   const n = String(ex.name || '').toLowerCase()
   if (/cr?h?un?s?ch|sit.?up|zit.?up|plank|leg raise/.test(n)) return 'abs'

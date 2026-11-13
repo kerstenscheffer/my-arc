@@ -47,7 +47,8 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
             rust: ex.rust || '2 min',
             rpe: ex.rpe || '7-8',
             equipment: ex.equipment || 'dumbbells',
-            primairSpieren: ex.primairSpieren || 'chest',
+            // Geen 'chest' als terugval: zo kwam Calf extension onder Borst (13 nov 2026).
+            primairSpieren: ex.primairSpieren || '',
             notes: ex.notes || '',
             type: ex.type || 'compound',
             stretch: ex.stretch || false,

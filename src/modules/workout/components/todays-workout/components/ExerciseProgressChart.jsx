@@ -289,6 +289,12 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     )
   }
 
+  // Een kleurverloop werkt in SVG niet op een lijn die precies horizontaal
+  // loopt (zijn vlak heeft dan geen hoogte) en dan verdwijnt de hele lijn.
+  // Gebeurde bij een klant die weken hetzelfde tilde (13 nov 2026). Dan één kleur.
+  const vlak = data.length > 0 && data.every(p => p.gewicht === data[0].gewicht)
+  const lijnKleur = vlak ? (KLEUR_VOOR[data[data.length - 1]?.oordeel] || '#fff') : `url(#kracht-lijn-${velling})`
+
   return (
     <div style={{
       margin: isMobile ? '0.75rem 1rem 0' : '0.9rem 1.25rem 0',
@@ -400,12 +406,12 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
                 schieten, dus nooit een bult die er niet was) met een zachte
                 gloed eronder in dezelfde kleuren. */}
             <Line
-              type="monotone" dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`}
+              type="monotone" dataKey="gewicht" stroke={lijnKleur}
               strokeWidth={9} strokeOpacity={0.14} strokeLinecap="round"
               dot={false} activeDot={false} isAnimationActive={false} legendType="none"
             />
             <Line
-              type="monotone" dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`} strokeWidth={2.4}
+              type="monotone" dataKey="gewicht" stroke={lijnKleur} strokeWidth={2.4}
               strokeLinejoin="round" strokeLinecap="round"
               dot={<Punt />} activeDot={false} isAnimationActive={false}
             />
