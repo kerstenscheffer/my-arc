@@ -11,6 +11,7 @@ import QuickLogModal from './components/QuickLogModal'
 import ActiveWorkoutModal from './components/ActiveWorkoutModal'
 import WorkoutStatsSection from './components/WorkoutStatsSection'
 import WorkoutTemplatesSection from './components/WorkoutTemplatesSection'
+import WorkoutSummaryModal from './components/WorkoutSummaryModal'
 
 export const THEME = {
   primary: '#f97316',
@@ -46,6 +47,8 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
   const [exerciseData, setExerciseData] = useState({})
   const [restTimer, setRestTimer] = useState(null)
   const [restEndTime, setRestEndTime] = useState(null)
+  const [showSummary, setShowSummary] = useState(false)
+  const [summaryData, setSummaryData] = useState(null)
   
   const workoutService = new WorkoutService(db)
   const isMobile = window.innerWidth <= 768
@@ -300,7 +303,7 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
   const finishWorkout = async () => {
     if (!activeWorkout || !client?.id) return
 
-    const duration = workoutStartTime 
+    const duration = workoutStartTime
       ? Math.floor((new Date() - workoutStartTime) / 1000 / 60)
       : 0
 
@@ -312,6 +315,33 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
           sets: exercise.sets
         }))
 
+      // Fetch previous bests before saving so we can detect PRs
+      const previousBests = {}
+      try {
+        const exerciseNames = completedExercises.map(ex => ex.name)
+        const { data: prevSessions } = await db.supabase
+          .from('workout_sessions')
+          .select('id')
+          .eq('client_id', client.id)
+
+        if (prevSessions?.length > 0) {
+          const sessionIds = prevSessions.map(s => s.id)
+          const { data: prevProgress } = await db.supabase
+            .from('workout_progress')
+            .select('exercise_name, sets')
+            .in('session_id', sessionIds)
+            .in('exercise_name', exerciseNames)
+
+          for (const prog of prevProgress || []) {
+            const sets = Array.isArray(prog.sets) ? prog.sets : []
+            const maxWeight = Math.max(0, ...sets.map(s => s.weight || 0))
+            if (maxWeight > (previousBests[prog.exercise_name] || 0)) {
+              previousBests[prog.exercise_name] = maxWeight
+            }
+          }
+        }
+      } catch (_) {}
+
       await workoutService.logWorkout(client.id, {
         workoutId: activeWorkout.key || activeWorkout.id,
         exercises: completedExercises,
@@ -319,6 +349,25 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
         feeling: 'good',
         notes: ''
       })
+
+      // Detect PRs by comparing current max weights against historical bests
+      const prs = completedExercises.flatMap(ex => {
+        const maxCurrent = Math.max(0, ...ex.sets.map(s => s.weight || 0))
+        const prevBest = previousBests[ex.name] || 0
+        if (maxCurrent > prevBest && ex.sets.length > 0) {
+          const bestSet = ex.sets.reduce((best, s) => (s.weight || 0) >= (best.weight || 0) ? s : best)
+          return [{ name: ex.name, weight: maxCurrent, reps: bestSet.reps }]
+        }
+        return []
+      })
+
+      setSummaryData({
+        workoutName: activeWorkout.name,
+        duration,
+        exercises: completedExercises,
+        prs
+      })
+      setShowSummary(true)
 
       setActiveWorkout(null)
       setWorkoutStartTime(null)
@@ -449,10 +498,18 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
         </div>
       </div>
 
+      {/* Workout summary overlay */}
+      {showSummary && summaryData && (
+        <WorkoutSummaryModal
+          summaryData={summaryData}
+          onClose={() => { setShowSummary(false); setSummaryData(null) }}
+        />
+      )}
+
       {/* Content */}
       {activeView === 'log' && (
         <div>
-          
+
           {/* Modals */}
           {activeWorkout && (
             <ActiveWorkoutModal 
