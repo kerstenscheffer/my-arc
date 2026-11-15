@@ -45,7 +45,7 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
   const [currentExercise, setCurrentExercise] = useState(0)
   const [exerciseData, setExerciseData] = useState({})
   const [restTimer, setRestTimer] = useState(null)
-  const [restStartTime, setRestStartTime] = useState(null)
+  const [restEndTime, setRestEndTime] = useState(null)
   
   const workoutService = new WorkoutService(db)
   const isMobile = window.innerWidth <= 768
@@ -65,24 +65,32 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
     }
   }, [client?.id])
 
-  // Rest timer effect
+  // Rest timer effect - uses wall-clock time so it stays accurate when the screen is off
   useEffect(() => {
-    if (restTimer > 0) {
-      const interval = setInterval(() => {
-        setRestTimer(prev => {
-          if (prev <= 1) {
-            if (navigator.vibrate) {
-              navigator.vibrate([200, 100, 200, 100, 200])
-            }
-            return null
-          }
-          return prev - 1
-        })
-      }, 1000)
-      
-      return () => clearInterval(interval)
+    if (!restEndTime) return
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((restEndTime - Date.now()) / 1000))
+      setRestTimer(remaining || null)
+      if (remaining <= 0) {
+        setRestEndTime(null)
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200, 100, 200])
+        }
+      }
     }
-  }, [restTimer])
+
+    tick()
+    const interval = setInterval(tick, 1000)
+
+    const handleVisibility = () => { if (!document.hidden) tick() }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [restEndTime])
 
   // ===== DATA LOADING =====
   const loadAllExercises = async () => {
@@ -273,7 +281,7 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
     if (currentSets < targetSets - 1) {
       const restTime = exerciseData[exerciseIndex]?.restTime || 60
       setRestTimer(restTime)
-      setRestStartTime(new Date())
+      setRestEndTime(Date.now() + restTime * 1000)
     }
 
     if (navigator.vibrate) {
@@ -285,7 +293,7 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
     if (currentExercise < activeWorkout.exercises.length - 1) {
       setCurrentExercise(currentExercise + 1)
       setRestTimer(null)
-      setRestStartTime(null)
+      setRestEndTime(null)
     }
   }
 
@@ -317,6 +325,7 @@ export default function WorkoutLogModule({ client, db, schema, weekSchedule }) {
       setCurrentExercise(0)
       setExerciseData({})
       setRestTimer(null)
+      setRestEndTime(null)
 
       await loadData()
       await loadTodaysData()
