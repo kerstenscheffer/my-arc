@@ -328,6 +328,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   
   const handleMealLogged = async (loggedData) => {
     console.log('✅ [OPTIMISTIC] Meal logged:', loggedData)
+    // Zonder rij valt er niets bij te tellen (en crashte de pagina, 15 nov 2026).
+    if (!loggedData) return
 
     setDashboardData(prev => {
       if (!prev?.dailyTotals) return prev

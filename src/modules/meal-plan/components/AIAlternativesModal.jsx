@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import useZoekLog from './food-log/useZoekLog'
 import MealCard from './day-schedule/MealCard'
+import FoodLogModal from './food-log/FoodLogModal'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan } from './food-log/portionPresets'
@@ -12,7 +13,7 @@ import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil, History } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 // Gedeelde cache voor wat voor iedereen gelijk is: alle maaltijden (~1,5 MB)
@@ -128,10 +129,8 @@ export default function AIAlternativesModal({
   // Aangetikte maaltijd: verschijnt in de cirkel bovenaan, met een knop
   // onderaan om door te gaan (27 okt 2026).
   const [gekozen, setGekozen] = useState(null)
-  // Recent gelogd in plaats van de maaltijdenlijst.
-  const [recentAan, setRecentAan] = useState(false)
-  const [recent, setRecent] = useState(null) // null = nog niet geladen
-  const [recentBezig, setRecentBezig] = useState(null)
+  // Bovenin: Gerechten, of het hele zoek- en logvenster (15 nov 2026).
+  const [logModus, setLogModus] = useState(false)
   // Bewerkstand voor de gekozen maaltijd: grammen per ingrediënt aanpassen
   // terwijl de macro's bovenin meelopen. De aangepaste versie gaat alleen
   // naar het plan van deze klant; de maaltijd in de database blijft gelijk.
@@ -795,59 +794,41 @@ export default function AIAlternativesModal({
     }
   }
 
-  // Recent gelogd: de laatste 45 dagen, per naam de nieuwste log.
-  useEffect(() => {
-    if (!recentAan || recent !== null || !client?.id || !db?.supabase) return
-    const sinds = new Date(); sinds.setDate(sinds.getDate() - 45)
-    db.supabase.from('consumed_meals')
-      .select('id, meal_name, calories, protein, carbs, fat, amount, per_unit, ingredients, image_url, consumed_at')
-      .eq('client_id', client.id).gte('consumed_at', sinds.toISOString())
-      .order('consumed_at', { ascending: false }).limit(300)
-      .then(({ data }) => {
-        const gezien = new Set(); const uit = []
-        for (const r of data || []) {
-          const k = String(r.meal_name || '').trim().toLowerCase()
-          if (!k || gezien.has(k) || !(Number(r.calories) > 0)) continue
-          gezien.add(k); uit.push(r)
-        }
-        setRecent(uit.slice(0, 40))
-      }, () => setRecent([]))
-  }, [recentAan]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Een log kiezen om mee te wisselen. Het plan werkt met maaltijden, dus de
-  // log wordt (één keer) een eigen maaltijd in Mijn maaltijden en die kiezen
-  // we, net als bij een aangepaste maaltijd hierboven.
-  const kiesRecent = async (r) => {
-    const bestaand = customMeals.find(m => String(m.name || '').trim().toLowerCase() === String(r.meal_name || '').trim().toLowerCase())
-    if (bestaand) { setRecentAan(false); kies(bestaand); return }
-    setRecentBezig(r.id)
+  // Uit "Zoeken en mijn logs" gekozen om mee te wisselen (15 nov 2026). Het plan
+  // werkt met maaltijden, dus de keuze wordt (één keer) een eigen maaltijd in
+  // Mijn maaltijden en die kiezen we, net als bij een aangepaste maaltijd.
+  // `d` = wat het logvenster anders zou loggen: naam, macro's, hoeveelheid.
+  const kiesUitLog = async (d) => {
+    setLogModus(false)
+    if (!d?.name) return
+    const naam = String(d.name).trim()
+    const bestaand = customMeals.find(m => String(m.name || '').trim().toLowerCase() === naam.toLowerCase()
+      && Math.round(m.calories || 0) === Math.round(d.calories || 0))
+    if (bestaand) { kies(bestaand); return }
     try {
-      const uitLog = Array.isArray(r.ingredients) ? r.ingredients.filter(i => i && (i.calories || i.protein)) : []
-      const eenheid = r.per_unit === 'gram' ? 'gram' : 'portie'
+      const uitLog = Array.isArray(d.ingredients) ? d.ingredients.filter(i => i && (i.calories || i.protein)) : []
+      const isGram = d.per_unit === 'gram' || d.per100g === true
       const { data, error } = await db.supabase.from('ai_custom_meals').insert({
         client_id: client.id,
-        name: r.meal_name,
-        calories: Math.round(r.calories || 0), protein: Math.round(r.protein || 0),
-        carbs: Math.round(r.carbs || 0), fat: Math.round(r.fat || 0), fiber: 0,
-        // Geen losse ingrediënten in de log: dan de log zelf als enige regel.
+        name: naam,
+        calories: Math.round(d.calories || 0), protein: Math.round(d.protein || 0),
+        carbs: Math.round(d.carbs || 0), fat: Math.round(d.fat || 0), fiber: 0,
+        // Geen losse ingrediënten: dan het product zelf als enige regel.
         ingredients_list: uitLog.length ? uitLog : [{
-          name: r.meal_name, amount: Number(r.amount) || 1, unit: eenheid,
-          calories: Math.round(r.calories || 0), protein: Number(r.protein) || 0, carbs: Number(r.carbs) || 0, fat: Number(r.fat) || 0,
+          name: naam, amount: Number(d.amount) || (isGram ? 100 : 1), unit: isGram ? 'gram' : 'portie',
+          calories: Math.round(d.calories || 0), protein: Number(d.protein) || 0, carbs: Number(d.carbs) || 0, fat: Number(d.fat) || 0,
         }],
-        image_url: r.image_url || null,
+        image_url: d.image_url || null,
         section: MOMENT_NAAR_SECTIE[basisMoment(moment !== 'alles' ? moment : slotKey)] || null,
         is_active: true,
       }).select().single()
       if (error) throw error
       const nieuw = { ...data, _isCustom: true }
       setCustomMeals(prev => [...prev, nieuw])
-      setRecentAan(false)
       kies(nieuw)
     } catch (e) {
-      console.error('Recente log kiezen mislukt:', e)
-      alert('Kon deze log niet als maaltijd kiezen.')
-    } finally {
-      setRecentBezig(null)
+      console.error('Keuze uit de logs overnemen mislukt:', e)
+      alert('Kon dit niet als maaltijd kiezen.')
     }
   }
 
@@ -1090,6 +1071,14 @@ export default function AIAlternativesModal({
 
           {!waarInhoud && !bewerk && (<>
           {/* Search */}
+          {/* Gerechten of het hele zoek- en logvenster: wie liever via zijn logs kiest
+              schakelt hier om (15 nov 2026, Kersten). */}
+          {!embedded && client?.id && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+              <button type="button" aria-pressed style={{ minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, background: '#fff', color: '#000', border: '1px solid #fff' }}>Gerechten</button>
+              <button type="button" onClick={() => setLogModus(true)} style={{ minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>Zoeken en mijn logs</button>
+            </div>
+          )}
           <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
             <Search
               size={15}
@@ -1127,21 +1116,10 @@ export default function AIAlternativesModal({
           {/* Moment als pilletjes (de gekozen wit) en één filterknop. */}
           <div style={{ display: 'flex', alignItems: 'center', margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', padding: isMobile ? '0 0 0 1rem' : '0 0 0 1.5rem' }}>
-              {/* Recent gelogd (13 nov 2026, Kersten): wisselen naar iets wat je
-                  kortgeleden at, voor wie liever via zijn logs kiest. */}
-              {!embedded && (
-                <button onClick={() => setRecentAan(v => !v)} aria-pressed={recentAan} style={{
-                  flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 5,
-                  background: recentAan ? '#fff' : 'transparent', color: recentAan ? '#0a0a0a' : '#fff',
-                  border: `1px solid ${recentAan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
-                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}><History size={14} strokeWidth={2.8} /> Recent</button>
-              )}
               {momentOpties.map(o => {
-                const aan = !recentAan && moment === o.id
+                const aan = moment === o.id
                 return (
-                  <button key={o.id} onClick={() => { setRecentAan(false); setMoment(o.id) }} style={{
+                  <button key={o.id} onClick={() => setMoment(o.id)} style={{
                     flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
                     background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
                     fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -1197,30 +1175,6 @@ export default function AIAlternativesModal({
           {waarInhoud ? (
             <div style={{ padding: isMobile ? '0.9rem 1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
               {waarInhoud}
-            </div>
-          ) : recentAan && !embedded ? (
-            <div style={{ padding: isMobile ? '0.6rem 0 calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 0 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: isMobile ? '0 1rem 0.4rem' : '0 1.5rem 0.5rem' }}>
-                Recent gelogd
-              </div>
-              {recent === null && <div style={{ padding: '1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', textAlign: 'center' }}>Laden…</div>}
-              {recent?.length === 0 && <div style={{ padding: '1rem', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', textAlign: 'center' }}>Je hebt de laatste weken nog niets gelogd.</div>}
-              {(recent || []).filter(r => searchTerm.trim().length < 2 || String(r.meal_name || '').toLowerCase().includes(searchTerm.trim().toLowerCase())).map(r => (
-                <button key={r.id} onClick={() => kiesRecent(r)} disabled={recentBezig === r.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, width: `calc(100% - ${isMobile ? '2rem' : '3rem'})`, margin: isMobile ? '0 1rem 0.45rem' : '0 1.5rem 0.5rem',
-                  padding: 0, minHeight: 60, borderRadius: 12, overflow: 'hidden', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', opacity: recentBezig === r.id ? 0.5 : 1,
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <span style={{ width: 60, alignSelf: 'stretch', flexShrink: 0, background: `url(${r.image_url || foodImageFallback(r.meal_name, slotKey, 160)}) center/cover` }} />
-                  <span style={{ flex: 1, minWidth: 0, padding: '0.4rem 0.6rem 0.4rem 0' }}>
-                    <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.meal_name}</span>
-                    <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
-                      {Math.round(r.calories || 0)} kcal · {Math.round(r.protein || 0)} E · {Math.round(r.carbs || 0)} K · {Math.round(r.fat || 0)} V
-                    </span>
-                  </span>
-                </button>
-              ))}
             </div>
           ) : bewerk ? (
             <div style={{ padding: isMobile ? '0.6rem 0 calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 0 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
@@ -1698,7 +1652,16 @@ export default function AIAlternativesModal({
       `}</style>
     </>
   )
-  return embedded ? inhoud : createPortal(inhoud, document.body)
+  if (embedded) return inhoud
+  return (<>
+    {/* In de logstand toont alleen het logvenster zich: dat ligt anders onder dit venster. */}
+    {!logModus && createPortal(inhoud, document.body)}
+    {logModus && (
+      <FoodLogModal isOpen client={client} db={db} startTab="search"
+        defaultMealMoment={basisMoment(moment !== 'alles' ? moment : slotKey)}
+        onClose={() => setLogModus(false)} onNaarGerechten={() => setLogModus(false)} onKies={kiesUitLog} />
+    )}
+  </>)
 }
 
 // ── Single meal row in the list ──

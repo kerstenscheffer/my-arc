@@ -62,7 +62,8 @@ export default function GeplandBlok({ db, client, datum, magLoggen, versie = 0, 
       await db.supabase.from('geplande_maaltijden').update({ gelogd_id: data.id, updated_at: nu.toISOString() }).eq('id', r.id)
       if (navigator.vibrate) navigator.vibrate([20, 40, 20])
       await laad()
-      onGelogd?.()
+      // De gelogde rij gaat mee: de pagina telt de macro's ervan bij het dagtotaal.
+      onGelogd?.({ ...r.payload, id: data.id, consumed_at })
     } catch (e) {
       console.error('Geplande maaltijd loggen mislukt:', e)
       setFout('Loggen lukte niet. Probeer het nog eens.')

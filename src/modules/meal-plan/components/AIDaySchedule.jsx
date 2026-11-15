@@ -861,7 +861,13 @@ export default function AIDaySchedule({
         <GeplandBlok db={db} client={client} datum={gekozenDatum} magLoggen={!dagInToekomst} versie={geplandVersie}
           isMobile={isMobile} onMomenten={setGeplandeMomenten}
           onPlan={(moment) => { setEditingMeal(null); setDefaultMealMoment(moment); setPlanDatum(gekozenDatum); setShowFoodLog(true) }}
-          onGelogd={() => { loadConsumedMeals(currentDay); if (!isVandaag() && onPastDayUpdate) onPastDayUpdate(); onMealLogged?.() }} />
+          // 15 nov 2026: hier stond onMealLogged() zonder de gelogde rij. De pagina
+          // rekende dan met `undefined.calories` en crashte bij elke tik op Gegeten.
+          onGelogd={(rij) => {
+            loadConsumedMeals(currentDay)
+            if (isVandaag()) { if (rij && onMealLogged) onMealLogged(rij) }
+            else if (onPastDayUpdate) onPastDayUpdate()
+          }} />
       )}
 
       {loading ? (
