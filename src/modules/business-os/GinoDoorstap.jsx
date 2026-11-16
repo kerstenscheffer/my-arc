@@ -14,7 +14,7 @@
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2, FileDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
@@ -24,6 +24,7 @@ import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
 import { haalEisen, haalInstellingen, zetInstelling, borgOordeel } from '../challenge-monitor/challengeCoach'
 import { rekenGeld } from './challengeGeld'
+import { maakChallengePdf } from './challengePdf'
 
 const STATUS_KEUZE = [
   ['ja_mondeling', 'Ja'],
@@ -133,6 +134,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [soortFilter, setSoortFilter] = useState(leesFilter)
   const [looptijd, setLooptijd] = useState(null) // { id, start, weken } terwijl je hem aanpast
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
+  const [pdfBezig, setPdfBezig] = useState(false)
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -470,6 +472,64 @@ export default function GinoDoorstap({ isMobile = false }) {
   const klein = { fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textSecondary }
   const dun = { background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none', maxWidth: '100%' }
 
+  // Pdf om te delen: dezelfde cijfers en klanten als op het scherm, in dezelfde groepen.
+  const exporteer = async () => {
+    if (pdfBezig) return
+    setPdfBezig(true); setFout(null)
+    try {
+      const soort = SOORT_FILTERS.find(([k]) => k === soortFilter)?.[1] || 'Challenge'
+      const vandaag = new Date()
+      const standTekst = (r) => (r.status === 'betaald' ? 'Betaald' : STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (gesprekNodig(r) ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : ''))
+      const eisenTekst = (r) => {
+        const e = eisen[r.client_id]
+        if (!r.challenge || !e) return ''
+        const o = borgOordeel(e, instellingen.get(r.client_id))
+        const ok = r.gepauzeerd ? null : (o ? o.geschikt : e.prognose?.ok)
+        return `${e.behaald}/${e.totaal}${ok == null ? '' : ok ? ' ok' : ' niet'}`
+      }
+      const rij = (r) => {
+        const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
+        return [
+          naamVan(r.klant),
+          r.onbeperkt ? '' : r.week ? `${r.week}/${r.weken}` : '',
+          r.onbeperkt ? 'Onbeperkt' : `${dagKort(r.start)} – ${dagKort(r.eind)}${dagenTekst(r) ? ` (${dagenTekst(r).toLowerCase()})` : ''}`,
+          eisenTekst(r),
+          r.volgendeCall ? callKort(r.volgendeCall.start) : r.eindcallNodig ? 'Geen' : '',
+          standTekst(r),
+          bedrag ? euro(bedrag).replace('€', '€ ') : '',
+          watNu(r).tekst,
+        ]
+      }
+      const getallen = soortFilter === 'challenge' && geld ? [
+        { label: 'Verkocht', waarde: euro(geld.verkocht), sub: `${geld.aantal} challenges` },
+        { label: 'Zeker', waarde: euro(geld.zeker) },
+        { label: 'Toegezegd', waarde: euro(geld.toegezegd) },
+        { label: 'Onzeker', waarde: euro(geld.onzeker), sub: `${geld.onzekerAantal} borgen` },
+        { label: 'Refunds', waarde: euro(geld.refund) },
+        { label: doorstapGetal.label, waarde: doorstapGetal.waarde, sub: doorstapGetal.sub },
+      ] : coachingGetallen.map(g => ({ label: g.label, waarde: g.waarde, sub: g.sub }))
+      await maakChallengePdf({
+        kop: {
+          titel: `${soort}-overzicht`,
+          sub: `Stand van ${vandaag.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${zichtbaar.length} klanten`,
+          bestand: `myarc-${soort.toLowerCase()}-overzicht-${vandaag.toLocaleDateString('sv-SE')}`,
+        },
+        getallen,
+        groepen: GROEPEN.map(([groep, naam]) => ({ naam, rijen: zichtbaar.filter(x => watNu(x).groep === groep).map(rij) })),
+        lijsten: soortFilter === 'challenge' && geld ? [
+          { naam: 'Zeker', totaal: geld.zeker, regels: geld.lijsten.zeker },
+          { naam: 'Toegezegd', totaal: geld.toegezegd, regels: geld.lijsten.toegezegd },
+          { naam: 'Onzeker', totaal: geld.onzeker, regels: geld.lijsten.onzeker },
+          { naam: 'Refunds', totaal: geld.refund, regels: geld.lijsten.refund },
+        ] : [],
+      })
+    } catch (e) {
+      setFout(`Pdf maken mislukt: ${e.message || 'onbekende fout'}`)
+      meldFout(e, null, 'coach:business-os-doorstap-pdf')
+    }
+    setPdfBezig(false)
+  }
+
   return (
     <div style={{ marginBottom: 24 }}>
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
@@ -482,6 +542,13 @@ export default function GinoDoorstap({ isMobile = false }) {
         }}>
           {SOORT_FILTERS.map(([k, l]) => <option key={k} value={k} style={{ background: '#0a0a0a', color: '#fff' }}>{l}</option>)}
         </select>
+        {/* Het overzicht als pdf om te delen. */}
+        <button type="button" onClick={exporteer} disabled={pdfBezig || !zichtbaar.length} title="Dit overzicht als pdf opslaan" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, marginLeft: 14, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.25)',
+          background: 'transparent', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, cursor: pdfBezig ? 'default' : 'pointer', opacity: pdfBezig || !zichtbaar.length ? 0.5 : 1,
+        }}>
+          {pdfBezig ? <Loader2 size={13} strokeWidth={3} className="gd-draai" /> : <FileDown size={14} strokeWidth={2.6} />} {pdfBezig ? 'Bezig' : 'Pdf'}
+        </button>
       </div>
       {soortFilter === 'challenge' ? geld && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))', gap: isMobile ? '10px 8px' : '12px 18px', paddingBottom: 14 }}>
