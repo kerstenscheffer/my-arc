@@ -396,7 +396,7 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       {/* ═══ CAMERA VIEW ═══ */}
       {!manualMode && (
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
           {/* Vierkant kader: een productbarcode is breder dan hoog, dus een
               staand vak liet mensen hun product draaien — en wie dat niet
