@@ -1200,7 +1200,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       .map(i => ({
                         id: i,
                         ...periodeKop(historie[i].start, historie[i].end, periodMode),
-                        map: Object.fromEntries(kerncijfers(historie[i]).map(r => [r.key, r.waarde])),
+                        ...(() => { const k = kerncijfers(historie[i]); return { map: Object.fromEntries(k.map(r => [r.key, r.waarde])), wie: Object.fromEntries(k.map(r => [r.key, r.wie])) } })(),
                       }))}
                     bezig={historieBezig}
                     nuKop={periodeKop(start, end, periodMode)}
@@ -2302,7 +2302,7 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
   const afgehandeld = gevoerd + noShows
   const deel = (a, b) => (b > 0 ? Math.round((a / b) * 100) : null)
 
-  return [
+  const rijen = [
     { key: 'nieuw',        label: 'Nieuwe leads',  waarde: nieuw,                          soort: 'aantal' },
     { key: 'followups',    label: 'Follow-ups',    waarde: n(activity?.followUps),         soort: 'aantal' },
     { key: 'reacties',     label: 'Reacties',      waarde: reacties,                       soort: 'aantal' },
@@ -2332,6 +2332,23 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
     { key: 'close',        label: 'Show→close',       waarde: deel(sales, gevoerd),          soort: 'procent' },
     { key: 'noshowpct',    label: 'No-show %',        waarde: deel(noShows, afgehandeld),    soort: 'procent', omgekeerd: true },
   ]
+  // Wie zit er achter elk getal? Voor de klik in de tabel (16 nov 2026).
+  const dag = (d) => { try { return d ? new Date(String(d).length === 10 ? `${d}T12:00:00` : d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : '' } catch { return '' } }
+  const euro = (b) => '€' + Math.round(Number(b) || 0).toLocaleString('nl-NL')
+  const schoon = (naam) => { const w = String(naam || 'Onbekend').trim().split(/\s+/); return w.length === 2 && w[0] === w[1] ? w[0] : w.join(' ') }
+  const leads = (stap) => (funnel?.[stap]?.leads || []).map(l => ({ naam: schoon(l.name), sub: [dag(l.at || l.movedAt || l.date), l.to].filter(Boolean).join(' · ') }))
+  const posten = (filter) => (funnel?.sale?.posten || []).filter(filter).map(x => ({ naam: schoon(x.naam), sub: [dag(x.datum), x.binnen ? 'betaald' : 'nog niet betaald'].filter(Boolean).join(' · '), rechts: euro(x.bedrag) }))
+  const klant = (k) => (cash?.klant?.namen?.[k] || []).map(x => (typeof x === 'string' ? { naam: x } : { naam: x.naam, sub: [dag(x.datum), x.pakket || x.reden].filter(Boolean).join(' · ') }))
+  const WIE = {
+    voorgesteld: () => leads('callProposed'), ingepland: () => leads('callScheduled'),
+    gepland: () => leads('callBooked'), gevoerd: () => leads('callHeld'),
+    sales: () => leads('sale'), noshows: () => leads('noShow'),
+    afgewezen: () => leads('callRejected'), saleverloren: () => leads('saleLost'), nietgeschikt: () => leads('notSuitable'),
+    omzet: () => posten(x => x.binnen), toegezegd: () => posten(x => !x.binnen), verkocht: () => posten(() => true),
+    binnen: () => (cash?.posten || []).map(x => ({ naam: schoon(x.naam), sub: [dag(x.datum), x.soort].filter(Boolean).join(' · '), rechts: euro(x.bedrag) })),
+    gestart: () => klant('gestart'), verlengd: () => klant('verlengd'), gestopt: () => klant('gestopt'), actief: () => klant('actief'),
+  }
+  return rijen.map(r => ({ ...r, wie: WIE[r.key] ? WIE[r.key]() : null }))
 }
 
 // Tabelweergave: elke stat op een regel, met een kolom per periode. De eerste
@@ -2339,6 +2356,15 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
 // horizontaal weg. Elke oudere kolom wordt vergeleken met NU: groen als het nu
 // beter is dan toen, rood als het slechter is.
 function StatTabel({ rijen, kolommen, bezig, nuKop }) {
+  // Klik op een getal: wie zit erachter? { titel, lijst }
+  const [wieOpen, setWieOpen] = useState(null)
+  const klikbaar = (lijst) => Array.isArray(lijst) && lijst.length > 0
+  const celKnop = (r, lijst, periode, kleur, inhoud) => (klikbaar(lijst) ? (
+    <button onClick={() => setWieOpen({ titel: `${r.label} · ${periode}`, lijst })} title="Klik om te zien wie dit zijn" style={{
+      background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: kleur, cursor: 'pointer',
+      textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.25)', textUnderlineOffset: 3,
+    }}>{inhoud}</button>
+  ) : inhoud)
   const toon = (r, v) => {
     if (v == null) return '—'
     if (r.soort === 'euro') return '€' + Number(v).toLocaleString('nl-NL')
@@ -2399,7 +2425,7 @@ function StatTabel({ rijen, kolommen, bezig, nuKop }) {
               <td style={{ ...cel, ...plak(0), textAlign: 'left', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>
                 {r.label}
               </td>
-              <td style={{ ...cel, ...plak(NAAM_B), color: '#fff' }}>{toon(r, r.waarde)}</td>
+              <td style={{ ...cel, ...plak(NAAM_B), color: '#fff' }}>{celKnop(r, r.wie, [nuKop?.label, nuKop?.sub].filter(Boolean).join(' · ') || 'nu', '#fff', toon(r, r.waarde))}</td>
               {kolommen.map(k => {
                 const v = k.map[r.key] ?? null
                 const beide = r.waarde != null && v != null
@@ -2408,7 +2434,7 @@ function StatTabel({ rijen, kolommen, bezig, nuKop }) {
                 const kleur = beter == null ? 'rgba(255,255,255,0.45)' : (beter ? '#10b981' : '#ef4444')
                 return (
                   <td key={k.id} style={{ ...cel, paddingLeft: 12, color: kleur }}>
-                    {toon(r, v)}
+                    {celKnop(r, k.wie?.[r.key], [k.label, k.sub].filter(Boolean).join(' · '), kleur, toon(r, v))}
                   </td>
                 )
               })}
@@ -2417,6 +2443,29 @@ function StatTabel({ rijen, kolommen, bezig, nuKop }) {
           ))}
         </tbody>
       </table>
+      {wieOpen && createPortal(
+        <div onClick={() => setWieOpen(null)} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.9rem 1.1rem', borderBottom: '1px solid rgba(255,255,255,0.14)' }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{wieOpen.titel}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{wieOpen.lijst.length}</span>
+              <button onClick={() => setWieOpen(null)} aria-label="Sluiten" style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.3rem 1.1rem 0.8rem' }}>
+              {wieOpen.lijst.map((x, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0.55rem 0', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.naam}</div>
+                    {x.sub && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{x.sub}</div>}
+                  </div>
+                  {x.rechts && <span style={{ flexShrink: 0, fontSize: '0.86rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{x.rechts}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

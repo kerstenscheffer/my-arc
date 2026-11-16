@@ -43,7 +43,11 @@ const START_OFFSETS = Array.from({ length: 241 }, (_, i) => i - 180)
 const PRIJZEN_PREPAID = Array.from({ length: 241 }, (_, i) => i * 25)   // €0–6000
 const PRIJZEN_MAAND = Array.from({ length: 301 }, (_, i) => i * 5)      // €0–1500
 
-export default function TrajectModal({ open, modus = 'verleng', client, coachId, onClose, onClientUpdate }) {
+// voorstel = { maanden, betaling, prijs }: vult de verlenging vooraf in (Einde
+// traject in het lead-systeem). betaald = false boekt hem als toegezegd: hij
+// staat dan bij "wacht op betaling" tot het geld binnen is. onGeboekt krijgt
+// een korte omschrijving van wat er is afgesproken.
+export default function TrajectModal({ open, modus = 'verleng', client, coachId, onClose, onClientUpdate, voorstel = null, betaald = true, onGeboekt = null }) {
   const [stap, setStap] = useState(1)
   const [startOffset, setStartOffset] = useState(0)
   const [maanden, setMaanden] = useState(4)
@@ -64,6 +68,11 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     setStartOffset(0); setMaanden(4); setWeken('12')
     setBetaling(client.payment_plan === 'monthly' ? 'monthly' : 'prepaid')
     setPrijs(client.payment_plan === 'monthly' ? 150 : 500)
+    if (voorstel) {
+      if (voorstel.maanden) setMaanden(voorstel.maanden)
+      if (voorstel.betaling) setBetaling(voorstel.betaling)
+      if (voorstel.prijs != null) setPrijs(voorstel.prijs)
+    }
     setVorige(null)
     const email = (client.email || '').trim()
     if (modus !== 'verleng' || !email) return
@@ -79,7 +88,8 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
       if (weg) return
       const s = sales?.[0]
       setVorige({ leadId: s?.lead_id || ids[0], pct: s?.partner_share_pct ?? null })
-      if (s?.order_value) {
+      // Met een voorstel blijven periode en bedrag staan zoals aangeleverd.
+      if (s?.order_value && !voorstel) {
         const soort = s.payment_type === 'monthly' ? 'monthly' : 'prepaid'
         setBetaling(soort)
         const bedrag = soort === 'monthly'
@@ -159,7 +169,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           // de verlenging niet mee in de partner-uitbetaling. Zonder gevonden
           // sale geldt het standaard-aandeel uit SaleForm (50%).
           partner_share_pct: vorige?.pct ?? STANDAARD_PARTNER_PCT,
-          payment_received: true,
+          payment_received: betaald !== false,
           sale_kind: 'coaching',
         })
         if (omzetFout) {
@@ -168,6 +178,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           return
         }
       }
+      if (!isStart) onGeboekt?.(`${maanden} mnd, ${betaling === 'monthly' ? `${maanden}x ${euro(prijs)}` : euro(totaalBedrag)}`)
       onClose?.()
     } catch (e) {
       console.error('Looptijd opslaan mislukt:', e)

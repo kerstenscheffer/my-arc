@@ -6,13 +6,14 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone, Eye, EyeOff } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone, Eye, EyeOff, Flag } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
 import RejectionReasonModal from './RejectionReasonModal'
 import SaleLostReasonModal from './SaleLostReasonModal'
 import DueCallsModal from './DueCallsModal'
+import EindeTrajectModal, { haalEindeTraject, vraagtNuActie } from './EindeTrajectModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
@@ -171,6 +172,9 @@ export default function KanbanBoard({
   // Leads met een uitgestelde sale → label 'Uitgesteld' op de kaart.
   const [uitgesteldLeads, setUitgesteldLeads] = useState(() => new Set())
   const [showDueCalls, setShowDueCalls] = useState(false)
+  // Klanten wiens traject afloopt of net afliep, zonder door/niet-door-keuze.
+  const [eindeTraject, setEindeTraject] = useState([])
+  const [showEindeTraject, setShowEindeTraject] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   // boardFilter shape: {
   //   sort: string,
@@ -1005,6 +1009,12 @@ export default function KanbanBoard({
         leadService.getUitgesteldeLeadIds().then(setUitgesteldLeads)
         leadService.getCallsZonderUitkomst().then(setGehoudenVragen)
         if (isInitialLoad && due.length) setShowDueCalls(true) // auto-open bij openen bord
+        // Einde traject: opent vanzelf als er iemand om een keuze vraagt en de
+        // call-pop-up niet al open gaat (anders liggen er twee over elkaar).
+        haalEindeTraject().then(lijst => {
+          setEindeTraject(lijst)
+          if (isInitialLoad && !due.length && lijst.some(vraagtNuActie)) setShowEindeTraject(true)
+        }).catch(() => {})
       } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
     finally { setLoading(false) }
@@ -2116,6 +2126,24 @@ export default function KanbanBoard({
               )}
             </button>
 
+            {/* Einde traject — door of niet door. De badge telt wie nu om een keuze vraagt. */}
+            <button
+              onClick={() => setShowEindeTraject(true)}
+              title="Einde traject: door of niet door"
+              style={{
+                position: 'relative',
+                width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none',
+                color: eindeTraject.some(vraagtNuActie) ? '#FFD700' : 'rgba(255,255,255,0.65)',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Flag size={16} />
+              {eindeTraject.filter(vraagtNuActie).length > 0 && (
+                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, background: '#ef4444', color: '#fff', borderRadius: 7, padding: '0 3px', fontSize: '0.52rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{eindeTraject.filter(vraagtNuActie).length}</span>
+              )}
+            </button>
+
             {/* De prioriteit-knop (vlam) staat nu in het filtervenster, samen
                 met de andere filters. */}
 
@@ -2873,6 +2901,16 @@ export default function KanbanBoard({
           onBetaling={handleBetalingBinnen}
           onTerugdraaien={handleSaleTerugdraaien}
           onClose={() => setShowDueCalls(false)}
+        />
+      )}
+
+      {showEindeTraject && (
+        <EindeTrajectModal
+          rijen={eindeTraject}
+          coachId={coachId}
+          isMobile={isMobile}
+          onClose={() => setShowEindeTraject(false)}
+          onGewijzigd={async () => setEindeTraject(await haalEindeTraject())}
         />
       )}
 
