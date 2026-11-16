@@ -222,8 +222,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       }
     } catch { /* de lijst blijft dan zoals hij was */ }
     if (laadVoor.current !== client.id) return
+    // Deload-schema's achteraan (16 nov 2026): bij een klant zonder actief plan
+    // opende de builder na "Start mesocyclus" het net gemaakte deload-schema,
+    // waardoor het leek alsof de klant in een deload begon.
+    schemas = [...schemas.filter(x => !x.deload_van), ...schemas.filter(x => x.deload_van)]
     setClientSchemas(schemas)
-    // Het actieve plan van de klant voorop; anders het nieuwste.
+    // Het actieve plan van de klant voorop; anders het eerste gewone plan.
     const actief = schemas.find(x => x.id === client.assigned_schema_id) || schemas[0]
     if (actief) { loadSchemaIntoBuilder(actief); return }
     // Geen plan: leeg beginnen, niet het plan van de vorige klant laten staan
