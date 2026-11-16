@@ -14,7 +14,7 @@
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Check, Loader2, FileDown, ChevronDown, Search, X } from 'lucide-react'
+import { Check, Loader2, FileDown, Search, X, ChevronsUpDown, Euro, ListChecks, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
@@ -61,6 +61,8 @@ const watNu = (r) => {
   return { groep: 'loopt', tekst: '' }
 }
 const dagenTekst = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} ${r.dagen === -1 ? 'dag' : 'dagen'} voorbij` : r.dagen === 0 ? 'Eindigt vandaag' : `Nog ${r.dagen} ${r.dagen === 1 ? 'dag' : 'dagen'}`)
+// Kort voor op de kaart: '11 d voorbij', 'nog 2 d'. De volle tekst staat in de pdf en de tooltip.
+const dagenKort = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} d voorbij` : r.dagen === 0 ? 'Vandaag' : `Nog ${r.dagen} d`)
 const GROEPEN = [['actie', 'Actie nodig'], ['loopt', 'Loopt'], ['klaar', 'Afgerond']]
 
 const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '') : '—')
@@ -136,7 +138,11 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
   const [pdfBezig, setPdfBezig] = useState(false)
   const [zoek, setZoek] = useState('')
+  const [openBorg, setOpenBorg] = useState(null) // client_id van wie de borg-regel open staat
   const [borgVraag, setBorgVraag] = useState(null) // { id, status } terwijl 'Zeker?' staat (4 s)
+
+  // De borg die al aan de klant hangt (challenge-sale, open en betaald). Dan hoef je hem niet te kiezen.
+  const bekendeBorg = (clientId) => { const id = instellingen.get(clientId)?.sale_id; return id && borgen.some(b => b.id === id) ? id : null }
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -388,7 +394,7 @@ export default function GinoDoorstap({ isMobile = false }) {
     }
     setBezig(r.client_id)
     try {
-      const borg = r.sale.borg_movement_id || borgKeuze[r.client_id] || null
+      const borg = r.sale.borg_movement_id || borgKeuze[r.client_id] || bekendeBorg(r.client_id)
       const { data, error } = await supabase.from('lead_movements').update({ payment_received: true, borg_movement_id: borg })
         .eq('id', r.sale.id).select('id').then(x => x, e => ({ error: e }))
       if (error) throw error
@@ -412,7 +418,7 @@ export default function GinoDoorstap({ isMobile = false }) {
       .then(x => x, () => ({ data: [] }))
     if (!data?.length) { await laad(); return }
     await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
-    const borg = borgKeuze[t.rij.client_id]
+    const borg = borgKeuze[t.rij.client_id] || bekendeBorg(t.rij.client_id)
     if (borg) {
       const { error } = await supabase.from('lead_movements').update({ borg_movement_id: borg }).eq('id', data[0].id)
         .then(x => x, e => ({ error: e }))
@@ -574,7 +580,9 @@ export default function GinoDoorstap({ isMobile = false }) {
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
       <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }
         @keyframes gd-draai { to { transform: rotate(360deg) } }
-        .gd-draai { animation: gd-draai 0.8s linear infinite }`}</style>
+        .gd-draai { animation: gd-draai 0.8s linear infinite }
+        .gd-balk > :first-child { border-left: none !important }
+        .gd-balk > :hover { color: #fff !important }`}</style>
       {/* Filter, zoekbalk en cijfers blijven boven staan; alleen de kaarten scrollen eronderdoor. */}
       <div style={{ position: 'sticky', top: 0, zIndex: 30, background: colors.bg, paddingTop: 4, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ paddingBottom: 8 }}>
@@ -654,8 +662,12 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             const e = eisen[r.client_id]
             const eindKleur = r.dagen != null && r.dagen < 0 ? colors.danger : colors.textSecondary
             // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
-            const borgSale = r.status === 'nee' ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === instellingen.get(r.client_id)?.sale_id) : null
-            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id) || r.status === 'nee'
+            const borgId = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id
+            const borgSale = borgId ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === borgId) : null
+            // Is de borg al verrekend, dan zegt het witte label het en valt er niets meer te kiezen.
+            const borgKlaar = ['behouden', 'terugbetaald'].includes(borgSale?.challenge_status)
+            const borgOpen = !borgKlaar && (r.status === 'nee' || openBorg === r.client_id)
+            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && !bekendeBorg(r.client_id)) || borgOpen
             return (
               <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
@@ -668,53 +680,28 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     <WeekBalk week={r.week} weken={r.weken} />
                   </button>
 
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.8rem' }}>
-                    {/* Naam, stand, bedrag, vinkje */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    {/* Naam, bedrag en de stand als woord. De knoppen staan in de balk eronder. */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
                       <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
-                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(bedrag)}</span> : null}
-                      {r.status === 'betaald' ? (
-                        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, color: G, fontSize: '0.75rem', fontWeight: 900 }}>
-                          <Check size={12} strokeWidth={3.2} /> Betaald
+                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: colors.textSecondary }}>{euro(bedrag)}</span> : null}
+                      {r.status !== 'betaald' && (
+                        <span style={{ flexShrink: 0, color: r.status ? colors.textPrimary : colors.textSecondary }}>
+                          {STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : '')}
                         </span>
-                      ) : (() => {
-                        // De stand als witte knop, zo breed als het woord. De select ligt er onzichtbaar overheen.
-                        const leeg = !r.status && !nodig
-                        const label = STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand')
-                        return (
-                          <span style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, height: 24, padding: '0 7px 0 10px', borderRadius: 7, fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap',
-                            background: leeg ? 'transparent' : colors.textPrimary, color: leeg ? colors.textSecondary : colors.bg, border: leeg ? '1px solid rgba(255,255,255,0.25)' : '1px solid transparent', opacity: bezig === r.client_id ? 0.5 : 1 }}>
-                            {label}
-                            <ChevronDown size={12} strokeWidth={3} />
-                            <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} title="Stand kiezen" value={r.status || ''} disabled={bezig === r.client_id}
-                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
-                              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
-                              <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
-                              {STATUS_KEUZE.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
-                              {r.gepauzeerd && <option value="hervat">Pauze eraf</option>}
-                            </select>
-                          </span>
-                        )
-                      })()}
-                      {r.status === 'ja_mondeling' && (() => {
-                        const zeker = bevestig === r.client_id
-                        const laadt = bezig === r.client_id
-                        return (
-                          <button type="button" disabled={laadt} onClick={() => betaald(r)}
-                            title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
-                            style={{
-                              flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, height: 24, minWidth: 24, padding: zeker || laadt ? '0 8px' : 0, borderRadius: 7, border: 'none', cursor: laadt ? 'default' : 'pointer',
-                              background: zeker || laadt ? G : 'transparent', color: zeker || laadt ? colors.bg : colors.textPrimary, boxShadow: zeker || laadt ? 'none' : 'inset 0 0 0 1px rgba(255,255,255,0.35)', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                            }}>
-                            {(zeker || laadt) && <span aria-live="polite">{laadt ? 'Bezig' : 'Zeker?'}</span>}
-                            {laadt ? <Loader2 size={13} strokeWidth={3.2} className="gd-draai" /> : <Check size={13} strokeWidth={3.2} />}
-                          </button>
+                      )}
+                      {/* Wit label zodra er geld verrekend is: verlenging betaald, borg behouden of terugbetaald. */}
+                      {(() => {
+                        const geldLabel = r.status === 'betaald' ? 'Betaald' : borgSale?.challenge_status === 'behouden' ? 'Behouden' : borgSale?.challenge_status === 'terugbetaald' ? 'Terugbetaald' : null
+                        return geldLabel && (
+                          <span style={{ flexShrink: 0, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 6, background: colors.textPrimary, color: colors.bg, fontSize: '0.68rem', fontWeight: 900 }}>{geldLabel}</span>
                         )
                       })()}
                     </div>
 
                     {/* Cijferregel zoals op de maaltijdkaart: waarde, klein label erachter. */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isMobile ? '2px 10px' : '2px 14px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isMobile ? '2px 9px' : '2px 11px', minWidth: 0 }}>
                       {/* Wat nu: jouw volgende stap, vooraan en in gewone taal. */}
                       {nu.tekst && (
                         <span style={{ whiteSpace: 'nowrap', fontWeight: 900, color: nu.groep === 'klaar' ? colors.textSecondary : colors.textPrimary }}>
@@ -724,7 +711,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       {/* Dagen in plaats van datums; de datums staan in de tooltip. */}
                       <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Klik: looptijd of verlenging aanpassen`}
                         style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', color: eindKleur }}>
-                        {dagenTekst(r) || <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}
+                        {dagenKort(r) || <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}
                       </button>
                       {metEisen && r.challenge && (
                         <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen"
@@ -742,13 +729,61 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                         </button>
                       )}
                       {(r.volgendeCall || r.eindcallNodig) && (
-                        <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || '')}
+                        <span title={`${r.volgendeCall ? `Eindcall ${callKort(r.volgendeCall.start)}. ` : ''}${r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || '')}`}
                           style={{ whiteSpace: 'nowrap', color: r.eindcallNodig ? colors.danger : colors.textSecondary }}>
-                          {r.volgendeCall ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : 'Geen'}
-                          <span style={klein}> eindcall</span>
+                          {r.volgendeCall ? `${dagKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : 'Geen'}
+                          <span style={klein}> call</span>
                         </span>
                       )}
                     </div>
+                  </div>
+                  {/* Knoppenbalk zoals onder een maaltijdkaart: alleen iconen, dunne lijntjes ertussen. */}
+                  {(() => {
+                    const zeker = bevestig === r.client_id
+                    const laadt = bezig === r.client_id
+                    const cel = { position: 'relative', flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: 0, background: 'none', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.06)', color: colors.textSecondary, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+                    const aan = { color: colors.textPrimary }
+                    return (
+                      <div className="gd-balk" style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)', opacity: laadt ? 0.5 : 1 }}>
+                        {r.status !== 'betaald' && (
+                          <span title="Stand kiezen" style={{ ...cel, borderLeft: 'none' }}>
+                            <ChevronsUpDown size={15} strokeWidth={2.4} />
+                            <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={laadt}
+                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
+                              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
+                              <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
+                              {STATUS_KEUZE.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
+                              {r.gepauzeerd && <option value="hervat">Pauze eraf</option>}
+                            </select>
+                          </span>
+                        )}
+                        {r.status === 'ja_mondeling' && (
+                          <button type="button" disabled={laadt} onClick={() => betaald(r)} title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
+                            style={{ ...cel, ...(zeker ? { color: G } : aan) }}>
+                            {laadt ? <Loader2 size={15} strokeWidth={2.6} className="gd-draai" /> : <Check size={16} strokeWidth={2.8} />}
+                            {zeker && <span aria-live="polite">Zeker?</span>}
+                          </button>
+                        )}
+                        {borgSale && (
+                          <button type="button" disabled={borgKlaar} onClick={() => setOpenBorg(o => (o === r.client_id ? null : r.client_id))} aria-label="Borg"
+                            title={borgKlaar ? `Borg ${euro(borgSale.order_value)} ${borgSale.challenge_status}` : `Borg ${euro(borgSale.order_value)}: terugbetaald of behouden`}
+                            style={{ ...cel, ...(borgSale.challenge_status === 'behouden' ? { color: G } : borgOpen ? aan : {}), ...(borgKlaar ? { cursor: 'default' } : {}) }}>
+                            <Euro size={15} strokeWidth={2.4} />
+                          </button>
+                        )}
+                        {metEisen && r.challenge && (
+                          <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen" aria-label="Eisen"
+                            style={{ ...cel, ...(openEisen === r.client_id ? aan : {}) }}>
+                            <ListChecks size={15} strokeWidth={2.4} />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Looptijd of verlenging aanpassen`} aria-label="Looptijd"
+                          style={r.status === 'betaald' ? { ...cel, borderLeft: 'none' } : cel}>
+                          <CalendarDays size={15} strokeWidth={2.4} />
+                        </button>
+                      </div>
+                    )
+                  })()}
                   </div>
                 </div>
 
@@ -777,11 +812,9 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       )
                     })()}
                     {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={e} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
-                    {r.status === 'nee' && (() => {
+                    {borgOpen && (() => {
                       if (!borgSale) return <span style={{ color: colors.textSecondary }}>Geen borg gekoppeld. Refund zet je in het lead-systeem op de sale.</span>
                       const bedragBorg = euro(borgSale.order_value)
-                      if (borgSale.challenge_status === 'terugbetaald') return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} terugbetaald</span>
-                      if (borgSale.challenge_status === 'behouden') return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} behouden</span>
                       if (borgSale.challenge_status !== 'open' || !borgSale.payment_received) return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} niet betaald</span>
                       const knopStijl = (status) => {
                         const zeker = borgVraag?.id === r.client_id && borgVraag.status === status
@@ -796,7 +829,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                         </div>
                       )
                     })()}
-                    {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
+                    {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && !bekendeBorg(r.client_id) && (
                       <select className="gd-stand" aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={{ ...dun, fontSize: '0.75rem', color: colors.textSecondary }}
                         onChange={ev => setBorgKeuze(k => ({ ...k, [r.client_id]: ev.target.value }))}>
                         <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>Geen borg gekoppeld</option>

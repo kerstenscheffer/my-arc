@@ -336,7 +336,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
 
   // ── Training en cardio: dezelfde fototegel als in de workout-week ──
   if ((isTraining || isCardio) && ruim) {
-    const klaar = isTraining ? !!block.meta?.afgerond : !!block.meta?.echt
+    // Realiteit: een sessie met gelogde sets telt als gedaan, net als in de
+    // workout-week (is_completed staat lang niet altijd aan).
+    const klaar = isTraining ? (!!block.meta?.afgerond || (!!block.meta?.echt && Number(block.meta?.exercise_count) > 0)) : !!block.meta?.echt
     const titel = isTraining ? (naam || 'Training') : (cardioSport || block.meta?.soort || naam || 'Cardio')
     const soortTraining = isCardio && cardioSport ? (block.sublabel || null) : null
     const details = isTraining ? [
@@ -353,9 +355,11 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
       }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.45 : 1 }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.88) 100%)' }} />
-        {klaar && hoogte >= 52 && (
-          <div aria-label="Gedaan" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <CircleCheck size={isMobile ? 22 : 24} strokeWidth={2.4} color="#10b981" style={{ filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.8))' }} />
+        {klaar && (
+          <div aria-label="Gedaan" style={hoogte >= 64
+            ? { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }
+            : { position: 'absolute', top: 4, right: 5, display: 'flex', pointerEvents: 'none' }}>
+            <CircleCheck size={hoogte >= 64 ? (isMobile ? 24 : 28) : 15} strokeWidth={2.4} color="#10b981" style={{ filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.8))' }} />
           </div>
         )}
         <div style={{ position: 'absolute', left: 6, right: 6, bottom: 4, textAlign: 'left' }}>
