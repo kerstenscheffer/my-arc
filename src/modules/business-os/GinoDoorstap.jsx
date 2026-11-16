@@ -585,7 +585,7 @@ export default function GinoDoorstap({ isMobile = false }) {
             { id: 'verkocht', label: 'Verkocht', waarde: euro(geld.verkocht), sub: `${geld.aantal} challenges`, regels: geld.lijsten.verkocht },
             { id: 'zeker', label: 'Zeker', waarde: euro(geld.zeker), kleur: G, regels: geld.lijsten.zeker },
             { id: 'toegezegd', label: 'Toegezegd', waarde: euro(geld.toegezegd), regels: geld.lijsten.toegezegd },
-            { id: 'onzeker', label: 'Onzeker', waarde: euro(geld.onzeker), sub: `${geld.onzekerAantal} borgen`, kleur: '#f59e0b', regels: geld.lijsten.onzeker },
+            { id: 'onzeker', label: 'Onzeker', waarde: euro(geld.onzeker), sub: `${geld.onzekerAantal} borgen`, regels: geld.lijsten.onzeker },
             { id: 'refund', label: 'Refunds', waarde: euro(geld.refund), regels: geld.lijsten.refund, leeg: 'Nog geen refunds geregistreerd' },
             doorstapGetal,
           ].map(k => <Getal key={k.id} {...k} open={openGetal === k.id} onKlik={() => setOpenGetal(o => (o === k.id ? null : k.id))} />)}
@@ -619,7 +619,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
               <div key={groep} style={{ marginBottom: 12 }}>
                 <button type="button" onClick={groep === 'klaar' ? () => setKlaarOpen(o => !o) : undefined} aria-expanded={groep === 'klaar' ? klaarOpen : undefined}
                   style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '2px 0 6px', background: 'none', border: 'none', fontFamily: 'inherit', cursor: groep === 'klaar' ? 'pointer' : 'default', color: colors.textPrimary }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: groep === 'actie' ? '#f59e0b' : colors.textPrimary }}>{groepLabel}</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: colors.textPrimary }}>{groepLabel}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>{lijst.length}{groep === 'klaar' ? (klaarOpen ? ' · verbergen' : ' · tonen') : ''}</span>
                 </button>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 7, alignItems: 'start' }}>
@@ -628,7 +628,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             const nu = watNu(r)
             const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
             const e = eisen[r.client_id]
-            const eindKleur = r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary
+            const eindKleur = r.dagen != null && r.dagen < 0 ? colors.danger : colors.textSecondary
             const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id)
             return (
               <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
@@ -646,28 +646,30 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     {/* Naam, stand, bedrag, vinkje */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
+                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(bedrag)}</span> : null}
                       {r.status === 'betaald' ? (
-                        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 9px', borderRadius: 7, background: 'rgba(16,185,129,0.14)', color: G, fontSize: '0.75rem', fontWeight: 900 }}>
+                        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, color: G, fontSize: '0.75rem', fontWeight: 900 }}>
                           <Check size={12} strokeWidth={3.2} /> Betaald
                         </span>
                       ) : (() => {
-                        // De stand als echte knop: omlijnd, in de kleur van de stand, met een pijltje.
-                        const kleur = r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : r.status === 'denkt_na' || nodig ? '#f59e0b' : colors.textPrimary
+                        // De stand als witte knop, zo breed als het woord. De select ligt er onzichtbaar overheen.
                         const leeg = !r.status && !nodig
+                        const label = STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand')
                         return (
-                          <span style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', height: 24, borderRadius: 7, border: `1px solid ${leeg ? 'rgba(255,255,255,0.25)' : kleur}`, opacity: bezig === r.client_id ? 0.5 : 1 }}>
+                          <span style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, height: 24, padding: '0 7px 0 10px', borderRadius: 7, fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap',
+                            background: leeg ? 'transparent' : colors.textPrimary, color: leeg ? colors.textSecondary : colors.bg, border: leeg ? '1px solid rgba(255,255,255,0.25)' : '1px solid transparent', opacity: bezig === r.client_id ? 0.5 : 1 }}>
+                            {label}
+                            <ChevronDown size={12} strokeWidth={3} />
                             <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} title="Stand kiezen" value={r.status || ''} disabled={bezig === r.client_id}
                               onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
-                              style={{ ...dun, height: 22, appearance: 'none', WebkitAppearance: 'none', padding: '0 22px 0 9px', fontSize: '0.75rem', fontWeight: 900, color: leeg ? colors.textSecondary : kleur }}>
-                              <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
-                              {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
-                              {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
+                              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
+                              <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
+                              {STATUS_KEUZE.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
+                              {r.gepauzeerd && <option value="hervat">Pauze eraf</option>}
                             </select>
-                            <ChevronDown size={12} strokeWidth={3} color={leeg ? colors.textSecondary : kleur} style={{ position: 'absolute', right: 6, pointerEvents: 'none' }} />
                           </span>
                         )
                       })()}
-                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(bedrag)}</span> : null}
                       {r.status === 'ja_mondeling' && (() => {
                         const zeker = bevestig === r.client_id
                         const laadt = bezig === r.client_id
@@ -676,7 +678,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                             title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
                             style={{
                               flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, height: 24, minWidth: 24, padding: zeker || laadt ? '0 8px' : 0, borderRadius: 7, border: 'none', cursor: laadt ? 'default' : 'pointer',
-                              background: zeker || laadt ? G : colors.textPrimary, color: colors.bg, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              background: zeker || laadt ? G : 'transparent', color: zeker || laadt ? colors.bg : colors.textPrimary, boxShadow: zeker || laadt ? 'none' : 'inset 0 0 0 1px rgba(255,255,255,0.35)', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}>
                             {(zeker || laadt) && <span aria-live="polite">{laadt ? 'Bezig' : 'Zeker?'}</span>}
                             {laadt ? <Loader2 size={13} strokeWidth={3.2} className="gd-draai" /> : <Check size={13} strokeWidth={3.2} />}
@@ -689,7 +691,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isMobile ? '2px 10px' : '2px 14px', minWidth: 0 }}>
                       {/* Wat nu: jouw volgende stap, vooraan en in gewone taal. */}
                       {nu.tekst && (
-                        <span style={{ whiteSpace: 'nowrap', fontWeight: 900, color: nu.groep === 'actie' ? '#f59e0b' : nu.groep === 'klaar' ? colors.textSecondary : colors.textPrimary }}>
+                        <span style={{ whiteSpace: 'nowrap', fontWeight: 900, color: nu.groep === 'klaar' ? colors.textSecondary : colors.textPrimary }}>
                           {nu.groep === 'actie' ? '→ ' : ''}{nu.tekst}
                         </span>
                       )}
@@ -700,7 +702,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       </button>
                       {metEisen && r.challenge && (
                         <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen"
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: e?.alles ? G : colors.textPrimary }}>
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: colors.textSecondary }}>
                           {e ? `${e.behaald}/${e.totaal}` : '…'}
                           {(() => {
                             // Handmatig of na afloop telt het oordeel, daarvoor de schatting. Op pauze staat de klok stil: geen teken.
@@ -715,7 +717,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       )}
                       {(r.volgendeCall || r.eindcallNodig) && (
                         <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || '')}
-                          style={{ whiteSpace: 'nowrap', color: r.eindcallNodig ? colors.danger : r.naamChecken ? '#f59e0b' : G }}>
+                          style={{ whiteSpace: 'nowrap', color: r.eindcallNodig ? colors.danger : colors.textSecondary }}>
                           {r.volgendeCall ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : 'Geen'}
                           <span style={klein}> eindcall</span>
                         </span>
