@@ -1189,7 +1189,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   )}
 
                   <StatTabel
-                    rijen={kerncijfers({ activity, funnel, reactionStats, cash }).filter(r => !keuze || keuze.includes(r.key))}
+                    rijen={(() => {
+                      // Een preset bepaalt ook de volgorde van de rijen.
+                      const alle = kerncijfers({ activity, funnel, reactionStats, cash })
+                      return keuze ? [...alle.filter(r => keuze.includes(r.key))].sort((a, b) => keuze.indexOf(a.key) - keuze.indexOf(b.key)) : alle
+                    })()}
                     kolommen={Object.keys(historie)
                       .map(Number)
                       .sort((a2, b2) => a2 - b2)
@@ -2309,7 +2313,13 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
     { key: 'sales',        label: 'Sales',         waarde: sales,                          soort: 'aantal' },
     { key: 'omzet',        label: 'Orderwaarde',   waarde: Math.round(n(funnel?.sale?.omzet)), soort: 'euro' },
     { key: 'toegezegd',    label: 'Toegezegd',     waarde: Math.round(n(funnel?.sale?.toegezegd)), soort: 'euro' },
-    { key: 'binnen',       label: 'Binnengekomen', waarde: Math.round(n(cash?.bedrag)),    soort: 'euro' },
+    { key: 'binnen',       label: 'Binnengekomen', waarde: cash?.bedrag == null ? null : Math.round(n(cash.bedrag)), soort: 'euro' },
+    // Weekrapport (16 nov 2026): alles wat je verkocht, betaald of nog niet,
+    // en de klantcijfers uit getRangeKlantStats.
+    { key: 'verkocht',     label: 'Omzet verkocht', waarde: Math.round(n(funnel?.sale?.omzet) + n(funnel?.sale?.toegezegd)), soort: 'euro' },
+    { key: 'verlengd',     label: 'Verlengd',       waarde: cash?.klant?.verlengd ?? null, soort: 'aantal' },
+    { key: 'gestopt',      label: 'Gestopt',        waarde: cash?.klant?.gestopt ?? null,  soort: 'aantal', omgekeerd: true },
+    { key: 'actief',       label: 'Actieve klanten nu', waarde: cash?.klant?.actief ?? null, soort: 'aantal' },
     { key: 'noshows',      label: 'No-shows',      waarde: noShows,                        soort: 'aantal', omgekeerd: true },
     { key: 'afgewezen',    label: 'Afgewezen',     waarde: n(funnel?.callRejected?.count), soort: 'aantal', omgekeerd: true },
     { key: 'saleverloren', label: 'Sale verloren', waarde: n(funnel?.saleLost?.count),     soort: 'aantal', omgekeerd: true },

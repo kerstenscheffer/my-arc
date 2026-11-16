@@ -2896,7 +2896,47 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     return { ok: !error, error: error?.message }
   }
 
+  // Klantcijfers voor het weekrapport (16 nov 2026): verlengd, gestopt en
+  // hoeveel klanten er nu een lopend traject hebben. Alleen lezen.
+  //   verlengd = doorstap op 'betaald' gezet in dit venster (Gino → Klanten)
+  //   gestopt  = accounts die in dit venster op slot gingen (traject verlopen)
+  //   actief   = lopend traject op dit moment, zonder de onbeperkte accounts
+  //              (eigen en gratis accounts); alleen in het venster van nu.
+  async getRangeKlantStats(startISO, endISO) {
+    try {
+      const sb = this.db.supabase
+      const nu = new Date()
+      const loopt = new Date(endISO) > nu && new Date(startISO) <= nu
+      const [v, g, a] = await Promise.all([
+        sb.from('client_doorstap').select('id', { count: 'exact', head: true })
+          .eq('status', 'betaald')
+          .gte('gezet_at', startISO).lt('gezet_at', endISO).then(r => r, () => ({ count: null })),
+        sb.from('clients').select('id', { count: 'exact', head: true })
+          .gte('account_locked_at', startISO).lt('account_locked_at', endISO).then(r => r, () => ({ count: null })),
+        loopt
+          ? sb.from('clients').select('id, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_onbeperkt')
+            .eq('status', 'active').is('account_locked_at', null).not('coaching_start_date', 'is', null).then(r => r, () => ({ data: null }))
+          : Promise.resolve({ data: null }),
+      ])
+      const vandaag = lokaleDag(nu.toISOString())
+      const actief = Array.isArray(a.data) ? a.data.filter(c => {
+        if (c.coaching_onbeperkt) return false
+        const start = String(c.coaching_start_date).slice(0, 10)
+        if (start > vandaag) return false
+        const eind = new Date(`${start}T12:00:00`)
+        eind.setDate(eind.getDate() + (Number(c.coaching_total_weeks) || 0) * 7 + (Number(c.coaching_paused_days_total) || 0))
+        return lokaleDag(eind.toISOString()) >= vandaag
+      }).length : null
+      return { verlengd: v.count ?? null, gestopt: g.count ?? null, actief }
+    } catch (e) {
+      console.warn('Klantcijfers laden mislukt:', e?.message)
+      return null
+    }
+  }
+
   async getRangeCashCollected(coachId, startISO, endISO) {
+    // Los van de betalingen: valt de RPC hieronder om, dan blijven deze staan.
+    const klant = await this.getRangeKlantStats(startISO, endISO)
     try {
       // Het venster is [start, end) — de RPC is inclusief aan beide kanten,
       // dus een dag eraf, anders telt de eerste dag van de volgende week mee.
@@ -2912,6 +2952,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // mee in Binnengekomen, niet in Verwacht.
       const regels = (data || []).filter(r => !r.komt_nog)
       return {
+        klant,
         bedrag: regels.reduce((som, r) => som + (Number(r.bedrag) || 0), 0),
         aantal: regels.length,
         // De losse betalingen, voor het uitlegvenster bij Binnengekomen.
@@ -2922,7 +2963,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       }
     } catch (e) {
       console.error('Binnengekomen bedrag laden mislukt:', e)
-      return null
+      return klant ? { klant } : null
     }
   }
 
