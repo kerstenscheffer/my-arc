@@ -4,6 +4,7 @@ import { Plus, RotateCcw, ChevronRight, Check, Zap } from 'lucide-react'
 import { isPower, POWER_UITLEG } from '../../../utils/power'
 import { corrigeerSpier } from '../../../../manual-workout-builder/spierGroepen'
 import ExerciseCard from './ExerciseCard'
+import { spiergroepVan } from '../../../bouwfase/bouwfaseData'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
 import { fotoKandidaten, getFallbackImage, fotoAchtergrond } from '../../../utils/oefeningFoto'
@@ -460,6 +461,8 @@ export default function ExerciseList({
                 openNu={openIndex === index}
                 onGeopend={() => setOpenIndex(null)}
                 onVolgende={() => naarVolgende(index)}
+                /* Laatste oefening van deze spiergroep vandaag: dan volgen de vragen over pomp en zwaarte (rir.js). */
+                laatsteVanSpier={!localExercises.slice(index + 1).some(e => e?.type !== 'cardio' && !isPower(e) && !e?.deload && !e?.probeer && spiergroepVan(e) === spiergroepVan(exercise))}
               />
             </div>
                 )

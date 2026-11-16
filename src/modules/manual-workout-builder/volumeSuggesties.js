@@ -9,6 +9,7 @@
 import { spierVan } from './spierGroepen'
 import { dekkingKoppen, kopVan, kopLabel, ONDERRUG_DIRECT, ONDERRUG_HEUP } from './koppen'
 import { minutenVoorOefeningen, MIN_PER_EXTRA_SET } from './trainingsTijd'
+import { setAdvies, spierpijnVan, POMP, WERKDRUK } from '../workout/bouwfase/rir'
 import {
   RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS, MIN_FREQUENTIE, FACTOR, ALLEEN_PLAFOND, GEEN_DOEL,
   SYNERGIST_GEWICHT, SYNERGISTEN_OP_NAAM, MAX_SETS_PER_TRAINING, MAX_SETS_PER_TRAINING_40PLUS, ZWAAR, ZWAAR_VANAF_PLEK, TREK, BOVEN_DRUK, HEUP, STIJGING_MIN, DALING_MIN, PLUS_PER_STAP, MAX_STAP, MIN_FRACTIE, LABEL_STATUS, LABEL_FASE,
@@ -180,45 +181,42 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90, f
       a.oordeel = 'geen'
       a.tekst = 'Geen weekdoel voor deze spiergroep.'
     } else if (ctx.rir && fase !== 'cut') {
-      // RIR-progressie (16 nov 2026, model van Israetel): spierpijn is de wijzer,
-      // prestatie de controle. Sets gaan hier nooit vanzelf omlaag: bij
-      // achteruitgang krijgt de coach een melding en beslist hij zelf.
+      // RIR-progressie (16 nov 2026, model van Israetel / RP): spierpijn is de
+      // wijzer, pomp en zwaarte verfijnen, prestatie is de controle. De regel zelf
+      // staat in rir.js (setAdvies). Bij achteruitgang gaat er niets vanzelf
+      // omlaag: de coach krijgt een melding en beslist.
       const metRir = (herstel[spier]?.oefeningen || []).filter(r => r.rir != null)
       const gemOver = metRir.length ? metRir.reduce((n, r) => n + Number(r.rir), 0) / metRir.length : null
       const zwaarder = gemOver != null && gemOver < ctx.rir.doel - 0.5
-      const opDoel = t === 'stijgt' || (gemOver != null && !zwaarder && t !== 'daalt')
       const over = (n) => String(Math.round(n * 10) / 10).replace('.', ',')
-      if (t === 'daalt') {
-        a.oordeel = 'let op'
-        a.tekst = 'Twee weken achteruit: sets blijven gelijk. Kijk naar slaap, voeding of een deload.'
-      } else if (nietHersteld && herstel[spier]?.tweeKeerNiet) {
-        // Eén keer niet hersteld: niets doen, het herstel trekt meestal bij. Twee
-        // keer achter elkaar: het volume is te hoog, één set eraf (Israetel).
-        a.oordeel = 'omlaag'
-        a.tekst = 'Twee keer achter elkaar niet hersteld: -1 set.'
-        a.actie = { soort: 'min', aantal: 1 }
-      } else if (nietHersteld) {
-        a.tekst = 'Nog spierpijn bij de volgende training: sets blijven deze keer gelijk. Gebeurt het nog een keer, dan gaat er een set af.'
-      } else if (zwaarder) {
-        a.tekst = `Zwaarder dan bedoeld (${over(gemOver)} over, doel ${ctx.rir.doel}): sets blijven gelijk tot het herstel bijtrekt.`
-        a.redenen.push('zwaarder dan bedoeld')
-      } else if (hv === 'nee' && opDoel) {
-        if (frac + PLUS_PER_STAP <= range[1]) {
+      const laatsteSpier = herstel[spier]?.spier?.[0] || null
+      const adv = setAdvies({
+        spierpijn: spierpijnVan(herstel[spier]?.herstel?.[0]),
+        pomp: laatsteSpier?.pomp ?? null, werkdruk: laatsteSpier?.werkdruk ?? null,
+        tweeKeerNiet: !!herstel[spier]?.tweeKeerNiet, daalt: t === 'daalt', zwaarder,
+        opDoel: t === 'stijgt' || (gemOver != null && !zwaarder && t !== 'daalt'),
+      })
+      a.tekst = adv.tekst
+      if (adv.letOp) a.oordeel = 'let op'
+      if (adv.delta > 0) {
+        const ruimte = Math.floor(range[1] - frac)
+        if (ruimte >= 1) {
+          const n = Math.min(adv.delta, ruimte, MAX_STAP)
           a.oordeel = 'omhoog'
-          a.tekst = 'Goed hersteld en op doel: +1 set.'
-          a.actie = { soort: 'plus', aantal: PLUS_PER_STAP }
+          if (n < adv.delta) a.tekst = a.tekst.replace(`+${adv.delta} sets`, `+${n} set`)
+          a.actie = { soort: 'plus', aantal: n }
         } else {
           a.oordeel = 'let op'
-          a.tekst = `Goed hersteld, maar al op de bovengrens van ${range[1]} sets: niet verder verhogen.`
+          a.tekst = `Ruimte voor meer, maar al op de bovengrens van ${range[1]} sets: niet verder verhogen.`
         }
-      } else if (hv === 'beetje') {
-        a.tekst = 'Net op tijd hersteld: sets blijven gelijk.'
-      } else if (hv === 'nee') {
-        a.tekst = 'Goed hersteld; nog geen prestatie om op te sturen. Sets blijven gelijk.'
-      } else {
-        a.tekst = 'Nog geen herstelantwoord deze week.'
+      } else if (adv.delta < 0) {
+        a.oordeel = 'omlaag'
+        a.actie = { soort: 'min', aantal: -adv.delta }
       }
+      if (zwaarder) a.redenen.push('zwaarder dan bedoeld')
       if (gemOver != null) a.redenen.push(`${over(gemOver)} over (doel ${ctx.rir.doel})`)
+      if (laatsteSpier?.pomp != null) a.redenen.push(`pomp ${POMP[laatsteSpier.pomp]?.label.toLowerCase()}`)
+      if (laatsteSpier?.werkdruk != null) a.redenen.push(`werk ${WERKDRUK[laatsteSpier.werkdruk]?.label.toLowerCase()}`)
     } else if (nietHersteld || (t === 'daalt' && fase !== 'cut')) {
       a.oordeel = 'omlaag'
       a.tekst = 'Te veel: deze week 1/3 minder sets voor deze spier.'

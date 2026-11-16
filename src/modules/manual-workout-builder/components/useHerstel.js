@@ -21,8 +21,8 @@ export function useHerstel(db, clientId, refreshKey = 0) {
     if (!clientId || !db?.supabase) { setPerSpier({}); return }
     const iso = isoVan(DAGEN_TERUG)
     const { data } = await db.supabase.from('training_feedback')
-      .select('id, datum, soort, oefening, spiergroep, score, gevoel, opmerking, rir')
-      .eq('client_id', clientId).gte('datum', isoVan(PIJN_DAGEN_TERUG)).in('soort', ['herstel', 'oefening'])
+      .select('id, datum, soort, oefening, spiergroep, score, gevoel, opmerking, rir, spierpijn, pomp, werkdruk')
+      .eq('client_id', clientId).gte('datum', isoVan(PIJN_DAGEN_TERUG)).in('soort', ['herstel', 'oefening', 'spier'])
       .order('datum', { ascending: false }).order('created_at', { ascending: false })
       .then(r => r, () => ({ data: [] }))
     const uit = {}
@@ -37,7 +37,7 @@ export function useHerstel(db, clientId, refreshKey = 0) {
       else for (const fijn of ONDER[r.spiergroep]) rijen.push({ ...r, spiergroep: fijn })
     }
     for (const r of rijen) {
-      const s = uit[r.spiergroep] || (uit[r.spiergroep] = { herstel: [], oefeningen: [], pijnReeks: [] })
+      const s = uit[r.spiergroep] || (uit[r.spiergroep] = { herstel: [], oefeningen: [], spier: [], pijnReeks: [] })
       if (r.soort === 'oefening' && r.oefening) {
         const k = r.oefening.trim().toLowerCase()
         ;((perOef[r.spiergroep] = perOef[r.spiergroep] || {})[k] = perOef[r.spiergroep][k] || []).push(r)
@@ -46,7 +46,8 @@ export function useHerstel(db, clientId, refreshKey = 0) {
       // week langskomt heeft binnen 7 dagen maar één antwoord.
       if (r.soort === 'herstel' && (s.herstelReeks = s.herstelReeks || []).length < 2) s.herstelReeks.push(r.gevoel)
       if (r.datum < iso) continue
-      if (r.soort === 'herstel') s.herstel.push(r); else s.oefeningen.push(r)
+      // 'spier' = pomp en zwaarte na de laatste oefening van die spiergroep (rir.js).
+      if (r.soort === 'herstel') s.herstel.push(r); else if (r.soort === 'spier') s.spier.push(r); else s.oefeningen.push(r)
     }
     for (const [spier, oefs] of Object.entries(perOef)) {
       for (const rijen of Object.values(oefs)) {

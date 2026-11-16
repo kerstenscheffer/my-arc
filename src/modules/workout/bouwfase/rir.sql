@@ -93,3 +93,24 @@ revoke all on function public.rir_achteruit_melding(date, boolean) from public, 
 
 select cron.unschedule('rir-achteruit') where exists (select 1 from cron.job where jobname = 'rir-achteruit');
 select cron.schedule('rir-achteruit', '15 2 * * *', 'select public.rir_achteruit_melding()');
+
+-- ── Uitgebreide vragen per spiergroep (16 nov 2026, model RP) ──
+-- Alleen voor klanten met RIR-progressie aan. De oude kolom `gevoel` blijft bij
+-- de herstelvraag gevuld (nee / beetje / ja), zodat alles wat daarop leest
+-- hetzelfde blijft werken; `spierpijn` is de fijnere versie ernaast.
+--   spierpijn  0 nooit gehad · 1 al lang weg · 2 net op tijd weg · 3 nog steeds   (soort 'herstel')
+--   pomp       0 weinig · 1 goed · 2 enorm                                        (soort 'spier')
+--   werkdruk   0 makkelijk · 1 goed · 2 op mijn grens · 3 te veel                 (soort 'spier')
+-- soort 'spier' = één rij per spiergroep per dag, na de laatste oefening van die spier.
+alter table public.training_feedback add column if not exists spierpijn smallint;
+alter table public.training_feedback add column if not exists pomp smallint;
+alter table public.training_feedback add column if not exists werkdruk smallint;
+alter table public.training_feedback drop constraint if exists training_feedback_soort_check;
+alter table public.training_feedback add constraint training_feedback_soort_check
+  check (soort = any (array['oefening', 'herstel', 'workout', 'spier']));
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'training_feedback_rp_check') then
+    alter table public.training_feedback add constraint training_feedback_rp_check check (
+      (spierpijn is null or spierpijn between 0 and 3) and (pomp is null or pomp between 0 and 2) and (werkdruk is null or werkdruk between 0 and 3));
+  end if;
+end $$;

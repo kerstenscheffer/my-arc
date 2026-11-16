@@ -79,15 +79,16 @@ export function faseTekst(stand) {
 
 // Feedback van één dag: { oefening: {naam: rij}, herstel: {spier: rij}, workout: rij|null }
 export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
-  const leeg = { oefening: {}, herstel: {}, workout: null }
+  const leeg = { oefening: {}, herstel: {}, spier: {}, workout: null }
   if (!sb || !clientId) return leeg
   const { data } = await sb.from('training_feedback')
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir')
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk')
     .eq('client_id', clientId).eq('datum', datum)
     .then(r => r, () => ({ data: [] }))
   for (const r of data || []) {
     if (r.soort === 'oefening' && r.oefening) leeg.oefening[r.oefening.toLowerCase()] = r
     else if (r.soort === 'herstel' && r.spiergroep) leeg.herstel[r.spiergroep] = r
+    else if (r.soort === 'spier' && r.spiergroep) leeg.spier[r.spiergroep] = r
     else if (r.soort === 'workout') leeg.workout = r
   }
   return leeg
@@ -98,7 +99,7 @@ export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
 export async function bewaarFeedback(sb, rij) {
   const { data, error } = await sb.from('training_feedback')
     .upsert({ datum: vandaagIso(), ...rij, updated_at: new Date().toISOString() }, { onConflict: 'client_id,datum,sleutel' })
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir').single()
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk').single()
   if (error) throw error
   window.dispatchEvent(new CustomEvent('myarc:training-feedback'))
   return data

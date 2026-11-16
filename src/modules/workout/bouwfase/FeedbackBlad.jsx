@@ -12,7 +12,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, Smile, Meh, Frown } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
 import { GEVOEL, HERSTEL, bewaarFeedback, spierWoord } from './bouwfaseData'
-import { RIR_KEUZES, rirLabel, rirTekst } from './rir'
+import { RIR_KEUZES, rirLabel, rirTekst, SPIERPIJN, POMP, WERKDRUK } from './rir'
 
 const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
 const scoreWoord = (n) => (n <= 3 ? 'slecht' : n <= 5 ? 'matig' : n <= 7 ? 'goed' : n <= 9 ? 'heel goed' : 'top')
@@ -45,6 +45,9 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   const [stap, setStap] = useState(1) // alleen bij een oefening: 1 = gevoel, 2 = uitvoering
   const [gekozen, setGekozen] = useState(false) // uitvoering gekozen → toelichting open
   const [rir, setRir] = useState(null)
+  const [pomp, setPomp] = useState(null)
+  // Uitgebreide vragen per spiergroep (model RP): alleen met RIR-progressie aan.
+  const rp = rirDoel != null
   const metRir = soort === 'oefening' && rirDoel != null
 
   useEffect(() => {
@@ -55,6 +58,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     setFout(null)
     setRir(bestaand?.rir ?? null)
     setStap(soort === 'oefening' && rirDoel != null ? 0 : 1)
+    setPomp(bestaand?.pomp ?? null)
     setGekozen(!!bestaand)
   }, [open, bestaand, soort, rirDoel])
 
@@ -69,8 +73,9 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         oefening: soort === 'oefening' ? oefening : null,
         // Oefening-rijen krijgen hun spiergroep mee: dan ziet de coach herstel en gevoel per spiergroep.
         spiergroep: soort === 'workout' ? null : (spiergroep || null),
-        score: soort === 'herstel' ? null : score,
-        gevoel: soort === 'workout' ? null : gevoel,
+        // Met RIR-progressie vervalt het cijfer per oefening: hoeveel je over had zegt meer.
+        score: soort === 'herstel' || soort === 'spier' || metRir ? null : score,
+        gevoel: soort === 'workout' || soort === 'spier' ? null : gevoel,
         opmerking: opmerking.trim() || null,
         ...(metRir ? { rir } : {}),
         ...extra,
@@ -83,8 +88,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     } finally { setBezig(false) }
   }
 
-  const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : 'Je training'
-  const sub = soort === 'oefening' ? `Oefening klaar · stap ${metRir ? stap + 1 : stap} van ${metRir ? 3 : 2}` : soort === 'herstel' ? 'Voor je begint' : 'Training afronden'
+  const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : soort === 'spier' ? `${spierWoord(spiergroep).charAt(0).toUpperCase()}${spierWoord(spiergroep).slice(1)} klaar` : 'Je training'
+  const sub = soort === 'oefening' ? `Oefening klaar · stap ${metRir ? (stap === 0 ? 1 : 2) : stap} van 2` : soort === 'herstel' ? 'Voor je begint' : soort === 'spier' ? 'Twee korte vragen' : 'Training afronden'
 
   return createPortal(
     <div onClick={onClose} style={{
@@ -109,7 +114,38 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
           }}><X size={18} strokeWidth={2.8} /></button>
         </div>
 
-        {soort === 'herstel' && (
+        {soort === 'herstel' && rp && (
+          <>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
+              Hoe was de spierpijn in je {spierWoord(spiergroep)} na de vorige training?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {SPIERPIJN.map(o => (
+                <button key={o.id} disabled={bezig} onClick={() => bewaar({ gevoel: o.gevoel, spierpijn: o.id })} style={{ ...chip(false), flex: 'none', minHeight: 50, textAlign: 'left', padding: '0 0.9rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: o.kleur, flexShrink: 0 }} />{o.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {soort === 'spier' && (
+          <>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 12 }}>Hoe was de pomp in je {spierWoord(spiergroep)}?</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+              {POMP.map(o => <button key={o.id} disabled={bezig} onClick={() => setPomp(o.id)} style={chip(pomp === o.id)}>{o.label}</button>)}
+            </div>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: pomp == null ? 'rgba(255,255,255,0.35)' : '#fff', textAlign: 'center', marginBottom: 12 }}>
+              Hoe zwaar was het werk voor je {spierWoord(spiergroep)}?
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, opacity: pomp == null ? 0.4 : 1 }}>
+              {WERKDRUK.map(o => <button key={o.id} disabled={bezig || pomp == null} onClick={() => bewaar({ pomp, werkdruk: o.id })} style={{ ...chip(false), minHeight: 48 }}>{o.label}</button>)}
+            </div>
+            {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginTop: 10 }}>{fout}</div>}
+          </>
+        )}
+
+        {soort === 'herstel' && !rp && (
           <>
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16 }}>
               Hoe goed {['chest', 'back', 'abs', 'shoulders'].includes(spiergroep) ? 'is' : 'zijn'} je {spierWoord(spiergroep)} hersteld?
@@ -128,7 +164,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
           </>
         )}
 
-        {soort !== 'herstel' && (
+        {soort !== 'herstel' && soort !== 'spier' && (
           <>
             {soort === 'workout' && oefeningen.length > 0 && (
               <div style={{ marginBottom: 16 }}>
@@ -155,7 +191,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   {RIR_KEUZES.map(n => (
-                    <button key={n} onClick={() => { setRir(n); setStap(1) }} style={{ ...chip(rir === n), minHeight: 56, fontSize: '1.1rem', ...(rir !== n && n === rirDoel ? { border: '1px solid #10b981', color: '#10b981' } : {}) }}>{rirLabel(n)}</button>
+                    <button key={n} onClick={() => { setRir(n); setStap(2); setGekozen(true) }} style={{ ...chip(rir === n), minHeight: 56, fontSize: '1.1rem', ...(rir !== n && n === rirDoel ? { border: '1px solid #10b981', color: '#10b981' } : {}) }}>{rirLabel(n)}</button>
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 10px' }}>

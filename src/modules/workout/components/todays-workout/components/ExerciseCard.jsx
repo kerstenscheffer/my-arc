@@ -15,7 +15,7 @@ import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseCard({
   exercise, index, isLogged, onLogsUpdate,
-  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder, openNu = false, onGeopend, onVolgende
+  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder, openNu = false, onGeopend, onVolgende, laatsteVanSpier = false
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
@@ -415,6 +415,7 @@ export default function ExerciseCard({
           /* Aantal sets aanpassen gebeurt daar; hier stonden de − en + maar
              als je een set overslaat of toevoegt ben je al in dat scherm. */
           onSetsWijzigen={zetSets}
+          laatsteVanSpier={laatsteVanSpier}
           onVolgendeOefening={onVolgende ? () => { handleLogComplete(); onVolgende() } : undefined}
         />
       )}

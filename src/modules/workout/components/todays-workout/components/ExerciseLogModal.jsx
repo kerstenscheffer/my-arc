@@ -22,7 +22,7 @@ import OpwarmPoort from './OpwarmPoort'
 import useBouwfase from '../../../bouwfase/useBouwfase'
 import { isPower, POWER_UITLEG, POWER_PCT, SNELHEDEN, snelheidVan, schat1RM, basisNaam } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
-import { rirDoel as rirDoelVan, rirTekst, rirVoorstel, rirLabel, repBereik, besteSet } from '../../../bouwfase/rir'
+import { rirDoel as rirDoelVan, rirTekst, rirVoorstelSets, rirLabel, repBereik } from '../../../bouwfase/rir'
 import { leesFeedbackVanDag, spiergroepVan, vandaagIso, bewaarFeedback } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
@@ -485,7 +485,7 @@ function youtubeThumb(url) {
 // een afgeronde training uit het weekrooster of de historie. Alles wat
 // 'vandaag' was, is dan die dag: de gelogde sets, 'vorige keer' (de keer
 // ervóór) en waar een nieuwe set naartoe gaat.
-export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, onVolgendeOefening, isMobile = window.innerWidth <= 768, datum = null }) {
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, onVolgendeOefening, isMobile = window.innerWidth <= 768, datum = null, laatsteVanSpier = false }) {
   const vandaag = datum || new Date().toISOString().split('T')[0]
   const [loggedSets, setLoggedSets] = useState([])
   // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
@@ -536,7 +536,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     return () => { weg = true }
   }, [power, client?.id, db, exercise.name])
   const bfAan = bouwfase.aan && !power && !rustig && (!datum || datum === vandaagIso())
-  const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
+  const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, spier: {}, workout: null })
   // RIR-progressie (16 nov 2026): het weekdoel "herhalingen over" en hoeveel
   // de klant de vorige keer op deze oefening over had (voor het voorstel).
   const rirDoel = bfAan ? rirDoelVan(bouwfase.fase, bouwfase.stand) : null
@@ -550,7 +550,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       .then(({ data }) => { if (!weg) setRirVorige(data?.[0] || null) }, () => {})
     return () => { weg = true }
   }, [rirDoel, client?.id, exercise?.name, db])
-  const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
+  const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel' | 'spier'
   const herstelGehad = useRef(false)
   const naFeedbackVerder = useRef(false)
   useEffect(() => {
@@ -564,6 +564,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     if (!rij) return
     setFbDag(d => rij.soort === 'herstel'
       ? { ...d, herstel: { ...d.herstel, [rij.spiergroep]: rij } }
+      : rij.soort === 'spier' ? { ...d, spier: { ...d.spier, [rij.spiergroep]: rij } }
       : { ...d, oefening: { ...d.oefening, [String(rij.oefening || '').toLowerCase()]: rij } })
   }
   const [opwarmVideo, setOpwarmVideo] = useState(null)
@@ -1005,6 +1006,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
 
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
+  // RIR-progressie: voorstel per set vanuit de vorige keer. Staat vooringevuld
+  // in het invoerscherm; wijkt de klant af van het gewicht, dan volgt de rest
+  // zijn eigen laatste set.
+  const rirPlan = rirDoel != null
+    ? rirVoorstelSets({ sets: previousPerformance?.sets, rirVorige: rirVorige?.rir, doel: rirDoel, bereik: repBereik(exercise.reps), stap: eenheid === 'lb' ? 2.26796 : 2.5 })
+    : null
+  const planSet = (i) => (rirPlan?.sets?.length ? rirPlan.sets[Math.min(i, rirPlan.sets.length - 1)] : null)
+  const volgendePlan = (() => {
+    const nu = planSet(loggedSets.length)
+    if (!nu || editingIndex !== null) return null
+    const vorigePlan = loggedSets.length ? planSet(loggedSets.length - 1) : null
+    return !lastSet || !vorigePlan || Number(lastSet.weight) === Number(vorigePlan.weight) ? nu : null
+  })()
 
   // Alleen een play-knop bij een video die ook echt speelt. In `exercises`
   // staat bij 241 van de 249 oefeningen alleen een YouTube-zóéklink als
@@ -1361,9 +1375,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             )}
             {/* RIR-progressie: het doel van deze week en een voorstel om het te halen. */}
             {rirDoel != null && (() => {
-              const stap = eenheid === 'lb' ? 2.26796 : 2.5
-              const vorigeSet = besteSet(previousPerformance?.sets)
-              const v = rirVoorstel({ vorige: vorigeSet, rirVorige: rirVorige?.rir, doel: rirDoel, bereik: repBereik(exercise.reps), stap })
+              const v = rirPlan
+              const vorigeSet = rirPlan?.beste
+              const zelfdeGewicht = v && v.sets.every(x => x.weight === v.sets[0].weight)
               const EHP = eenheidLabel(eenheid)
               const toonKg = (kg) => String(Math.round(vanKg(kg, eenheid) * 10) / 10).replace('.', ',')
               return (
@@ -1374,14 +1388,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                   <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>{rirTekst(rirDoel)}</div>
                   {v ? (
                     <div style={{ fontSize: isMobile ? '0.84rem' : '0.88rem', fontWeight: 800, color: '#10b981', lineHeight: 1.45, marginTop: 4 }}>
-                      Voorstel: {v.gewicht ? `${toonKg(v.gewicht)}${EHP} × ${v.reps}` : `${v.reps} herhalingen`}
+                      Voorstel: {zelfdeGewicht
+                        ? (v.sets[0].weight ? `${toonKg(v.sets[0].weight)}${EHP} × ${v.sets.map(x => x.reps).join(' · ')}` : `${v.sets.map(x => x.reps).join(' · ')} herhalingen`)
+                        : v.sets.map(x => `${toonKg(x.weight)} × ${x.reps}`).join(' · ')}
                       <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
                         {' '}· vorige keer {vorigeSet.weight ? `${toonKg(vorigeSet.weight)} × ${vorigeSet.reps}` : `${vorigeSet.reps}`} met {rirLabel(rirVorige.rir)} over
                       </span>
                     </div>
                   ) : (
                     <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, marginTop: 4 }}>
-                      Kies een gewicht waarmee je dat haalt. Na de oefening vraag ik hoeveel je over had; vanaf dan krijg je hier een voorstel.
+                      Kies een gewicht waarmee je dat haalt. Na de oefening vraag ik hoeveel je over had; vanaf dan staat hier een voorstel per set, al ingevuld.
                     </div>
                   )}
                   <div style={{ fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4, marginTop: 4 }}>
@@ -1653,8 +1669,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               <SetInputWizard
                 onComplete={handleSetComplete}
                 onCancel={() => { setShowWizard(false); setEditingIndex(null) }}
-                previousWeight={editingSet?.weight ?? lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? (power && max1RM ? Math.round(max1RM * 0.4 / 2.5) * 2.5 : 20)}
-                previousReps={editingSet?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || (power ? 3 : 10))}
+                previousWeight={editingSet?.weight ?? volgendePlan?.weight ?? lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? (power && max1RM ? Math.round(max1RM * 0.4 / 2.5) * 2.5 : 20)}
+                previousReps={editingSet?.reps ?? volgendePlan?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || (power ? 3 : 10))}
                 isMobile={isMobile}
                 editMode={editingIndex !== null}
                 snel={rustTimerAan && editingIndex === null}
@@ -1720,9 +1736,12 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           onOpgeslagen={fbOpgeslagen}
           onClose={() => {
             const wasHerstel = fbOpen === 'herstel'
+            const wasOefening = fbOpen === 'oefening'
             setFbOpen(null)
             // Na de herstelvraag gewoon door naar de set (of de opwarmvraag).
             if (wasHerstel) startSet()
+            // Laatste oefening van deze spiergroep: nog twee vragen over pomp en zwaarte.
+            else if (wasOefening && rirDoel != null && laatsteVanSpier && spier && !fbDag.spier?.[spier]) setFbOpen('spier')
             else if (naFeedbackVerder.current) { naFeedbackVerder.current = false; onVolgendeOefening?.() }
           }}
         />
