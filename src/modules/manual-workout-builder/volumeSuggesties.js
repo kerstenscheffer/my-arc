@@ -179,6 +179,40 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90, f
     } else if (!range) {
       a.oordeel = 'geen'
       a.tekst = 'Geen weekdoel voor deze spiergroep.'
+    } else if (ctx.rir && fase !== 'cut') {
+      // RIR-progressie (16 nov 2026, model van Israetel): spierpijn is de wijzer,
+      // prestatie de controle. Sets gaan hier nooit vanzelf omlaag: bij
+      // achteruitgang krijgt de coach een melding en beslist hij zelf.
+      const metRir = (herstel[spier]?.oefeningen || []).filter(r => r.rir != null)
+      const gemOver = metRir.length ? metRir.reduce((n, r) => n + Number(r.rir), 0) / metRir.length : null
+      const zwaarder = gemOver != null && gemOver < ctx.rir.doel - 0.5
+      const opDoel = t === 'stijgt' || (gemOver != null && !zwaarder && t !== 'daalt')
+      const over = (n) => String(Math.round(n * 10) / 10).replace('.', ',')
+      if (t === 'daalt') {
+        a.oordeel = 'let op'
+        a.tekst = 'Twee weken achteruit: sets blijven gelijk. Kijk naar slaap, voeding of een deload.'
+      } else if (nietHersteld) {
+        a.tekst = 'Nog spierpijn bij de volgende training: sets blijven gelijk.'
+      } else if (zwaarder) {
+        a.tekst = `Zwaarder dan bedoeld (${over(gemOver)} over, doel ${ctx.rir.doel}): sets blijven gelijk tot het herstel bijtrekt.`
+        a.redenen.push('zwaarder dan bedoeld')
+      } else if (hv === 'nee' && opDoel) {
+        if (frac + PLUS_PER_STAP <= range[1]) {
+          a.oordeel = 'omhoog'
+          a.tekst = 'Goed hersteld en op doel: +1 set.'
+          a.actie = { soort: 'plus', aantal: PLUS_PER_STAP }
+        } else {
+          a.oordeel = 'let op'
+          a.tekst = `Goed hersteld, maar al op de bovengrens van ${range[1]} sets: niet verder verhogen.`
+        }
+      } else if (hv === 'beetje') {
+        a.tekst = 'Net op tijd hersteld: sets blijven gelijk.'
+      } else if (hv === 'nee') {
+        a.tekst = 'Goed hersteld; nog geen prestatie om op te sturen. Sets blijven gelijk.'
+      } else {
+        a.tekst = 'Nog geen herstelantwoord deze week.'
+      }
+      if (gemOver != null) a.redenen.push(`${over(gemOver)} over (doel ${ctx.rir.doel})`)
     } else if (nietHersteld || (t === 'daalt' && fase !== 'cut')) {
       a.oordeel = 'omlaag'
       a.tekst = 'Te veel: deze week 1/3 minder sets voor deze spier.'

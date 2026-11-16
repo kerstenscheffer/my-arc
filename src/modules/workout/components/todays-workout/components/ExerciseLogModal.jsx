@@ -22,6 +22,7 @@ import OpwarmPoort from './OpwarmPoort'
 import useBouwfase from '../../../bouwfase/useBouwfase'
 import { isPower, POWER_UITLEG, POWER_PCT, SNELHEDEN, snelheidVan, schat1RM, basisNaam } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
+import { rirDoel as rirDoelVan, rirTekst, rirVoorstel, rirLabel, repBereik, besteSet } from '../../../bouwfase/rir'
 import { leesFeedbackVanDag, spiergroepVan, vandaagIso, bewaarFeedback } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
@@ -536,6 +537,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   }, [power, client?.id, db, exercise.name])
   const bfAan = bouwfase.aan && !power && !rustig && (!datum || datum === vandaagIso())
   const [fbDag, setFbDag] = useState({ oefening: {}, herstel: {}, workout: null })
+  // RIR-progressie (16 nov 2026): het weekdoel "herhalingen over" en hoeveel
+  // de klant de vorige keer op deze oefening over had (voor het voorstel).
+  const rirDoel = bfAan ? rirDoelVan(bouwfase.fase, bouwfase.stand) : null
+  const [rirVorige, setRirVorige] = useState(null) // { rir, datum } | null
+  useEffect(() => {
+    if (rirDoel == null || !client?.id || !exercise?.name) { setRirVorige(null); return undefined }
+    let weg = false
+    db.supabase.from('training_feedback').select('rir, datum')
+      .eq('client_id', client.id).eq('soort', 'oefening').eq('oefening', exercise.name)
+      .not('rir', 'is', null).lt('datum', vandaagIso()).order('datum', { ascending: false }).limit(1)
+      .then(({ data }) => { if (!weg) setRirVorige(data?.[0] || null) }, () => {})
+    return () => { weg = true }
+  }, [rirDoel, client?.id, exercise?.name, db])
   const [fbOpen, setFbOpen] = useState(null) // null | 'oefening' | 'herstel'
   const herstelGehad = useRef(false)
   const naFeedbackVerder = useRef(false)
@@ -1345,6 +1359,37 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 ))}
               </div>
             )}
+            {/* RIR-progressie: het doel van deze week en een voorstel om het te halen. */}
+            {rirDoel != null && (() => {
+              const stap = eenheid === 'lb' ? 2.26796 : 2.5
+              const vorigeSet = besteSet(previousPerformance?.sets)
+              const v = rirVoorstel({ vorige: vorigeSet, rirVorige: rirVorige?.rir, doel: rirDoel, bereik: repBereik(exercise.reps), stap })
+              const EHP = eenheidLabel(eenheid)
+              const toonKg = (kg) => String(Math.round(vanKg(kg, eenheid) * 10) / 10).replace('.', ',')
+              return (
+                <div style={{ margin: isMobile ? '0.8rem 0.9rem 0.2rem' : '1rem 1.25rem 0.3rem', padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                  <div style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+                    Week {bouwfase.stand.week} van {bouwfase.stand.weken}
+                  </div>
+                  <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>{rirTekst(rirDoel)}</div>
+                  {v ? (
+                    <div style={{ fontSize: isMobile ? '0.84rem' : '0.88rem', fontWeight: 800, color: '#10b981', lineHeight: 1.45, marginTop: 4 }}>
+                      Voorstel: {v.gewicht ? `${toonKg(v.gewicht)}${EHP} × ${v.reps}` : `${v.reps} herhalingen`}
+                      <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
+                        {' '}· vorige keer {vorigeSet.weight ? `${toonKg(vorigeSet.weight)} × ${vorigeSet.reps}` : `${vorigeSet.reps}`} met {rirLabel(rirVorige.rir)} over
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, marginTop: 4 }}>
+                      Kies een gewicht waarmee je dat haalt. Na de oefening vraag ik hoeveel je over had; vanaf dan krijg je hier een voorstel.
+                    </div>
+                  )}
+                  <div style={{ fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4, marginTop: 4 }}>
+                    Over = nette herhalingen die je nog had kunnen doen.
+                  </div>
+                </div>
+              )
+            })()}
             {/* ── VORIGE PRESTATIES ── */}
 
             {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
@@ -1670,7 +1715,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       {bfAan && (
         <FeedbackBlad
           open={!!fbOpen} soort={fbOpen || 'oefening'} client={client} db={db} fase={bouwfase.fase}
-          oefening={exercise.name} spiergroep={spier}
+          oefening={exercise.name} spiergroep={spier} rirDoel={rirDoel}
           bestaand={fbOpen === 'oefening' ? oefFeedback : null}
           onOpgeslagen={fbOpgeslagen}
           onClose={() => {

@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from 'react'
 import { KRACHT_WEKEN_TERUG } from '../volumeRegels'
+import { leesActieveFase, faseStand } from '../../workout/bouwfase/bouwfaseData'
+import { rirDoel } from '../../workout/bouwfase/rir'
 
 const e1rm = (s) => (Number(s?.weight) || 0) * (1 + (Number(s?.reps) || 0) / 30)
 
@@ -34,6 +36,9 @@ export function useVolumeContext(db, clientId, refreshKey = 0) {
         sb.from('workout_sessions').select('id, workout_date').eq('client_id', clientId)
           .gte('workout_date', van.toISOString().slice(0, 10)).then(r => r, () => leeg),
       ])
+      // RIR-progressie: staat hij aan, dan rekent volumeSuggesties met de regel van Israetel.
+      const mesoFase = await leesActieveFase(sb, clientId).then(f => f, () => null)
+      const doelRir = rirDoel(mesoFase, faseStand(mesoFase))
       let logs = []
       if (sessies.data?.length) {
         const datum = Object.fromEntries(sessies.data.map(s => [s.id, String(s.workout_date).slice(0, 10)]))
@@ -50,7 +55,7 @@ export function useVolumeContext(db, clientId, refreshKey = 0) {
       if (!leeftijd && c?.date_of_birth) leeftijd = Math.floor((Date.now() - new Date(c.date_of_birth).getTime()) / (365.25 * 864e5))
       const secMap = {}
       for (const b of bib.data || []) if (b.name && b.secundair_spieren?.length) secMap[b.name.trim().toLowerCase()] = b.secundair_spieren
-      if (!weg) setCtx({ status: status || 'intermediate', statusBekend: !!status, fase, faseBekend: !!doel, leeftijd, secMap, logs })
+      if (!weg) setCtx({ status: status || 'intermediate', statusBekend: !!status, fase, faseBekend: !!doel, leeftijd, secMap, logs, rir: doelRir != null ? { doel: doelRir } : null })
     })()
     return () => { weg = true }
   }, [clientId, db, refreshKey])

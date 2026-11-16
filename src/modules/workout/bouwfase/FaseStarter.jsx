@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { faseStand, leesActieveFase, vandaagIso } from './bouwfaseData'
+import { rirSchema, rirLabel } from './rir'
 import { berekenGemetenTdee, getMesoStatus, startMesocyclus, startDeload, eindDeload, neemTdeeOver, checkDeloadSignalen } from './mesocyclus'
 
 const knop = (vol, uit = false) => ({
@@ -102,8 +103,22 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
     })
   }
 
+  // RIR-progressie: aan/uit en het weekschema van deze fase (rir.js, rir.sql).
+  const zetRir = (velden) => doe('rir', async () => {
+    const { error } = await db.supabase.from('training_fases').update({ ...velden, updated_at: new Date().toISOString() }).eq('id', fase.id)
+    return { error: error?.message || null }
+  })
+
   if (fase === undefined) return null
   const stand = faseStand(fase)
+  const schema = fase ? rirSchema(fase.bouw_weken, fase.rir_schema) : []
+  // Tik op een week: één lager, na 0 terug naar 4+. Een schema dat omhoog gaat mag niet.
+  const tikWeek = (i) => {
+    const nieuw = [...schema]
+    nieuw[i] = nieuw[i] === 0 ? 4 : nieuw[i] - 1
+    if (nieuw.some((x, k) => k > 0 && x > nieuw[k - 1])) { setFout('Het doel mag per week gelijk blijven of zakken, niet omhoog.'); return }
+    zetRir({ rir_schema: nieuw })
+  }
   const meso = fase ? getMesoStatus(fase) : null
   const nieuweStijl = fase?.nummer != null
   const planNaam = plannen.find(p => p.id === fase?.schema_id)?.name
@@ -181,6 +196,28 @@ export default function FaseStarter({ db, client, schemaId, plannen = [], onGewi
           {inDeload
             ? `Deload loopt sinds ${kort(fase.deload_gestart_op)}${fase.deload_reden ? ` (${fase.deload_reden})` : ''}. Actief plan: ${deloadNaam || 'het deload-schema'}. Eindigt vanzelf na ${fase.deload_dagen} dagen.`
             : `Het deload-schema staat klaar${deloadNaam ? `: ${deloadNaam}` : ''}. Open het via de planlijst om oefeningen "Proberen" toe te voegen. De deload start vanzelf op ${meso ? kort(meso.deloadStart) : 'de geplande dag'}.`}
+        </div>
+      )}
+
+      {/* RIR-progressie: per week hoeveel herhalingen de klant over houdt. */}
+      {fase && !inDeload && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '0.55rem 0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>Herhalingen over</span>
+          <button onClick={() => zetRir({ rir_aan: !fase.rir_aan })} disabled={!!bezig} style={knop(!!fase.rir_aan, !!bezig)}>{fase.rir_aan ? 'Aan' : 'Uit'}</button>
+          {fase.rir_aan && schema.map((n, i) => {
+            const nu = stand?.soort === 'bouw' && stand.week === i + 1
+            return (
+              <button key={i} onClick={() => tikWeek(i)} disabled={!!bezig} title={`Week ${i + 1}: tik om te verlagen`} style={{
+                height: 32, minWidth: 46, padding: '0 0.5rem', borderRadius: 9, fontFamily: 'inherit', cursor: 'pointer', background: 'transparent',
+                border: `1px solid ${nu ? '#10b981' : 'rgba(255,255,255,0.2)'}`, color: '#fff', fontSize: '0.82rem', fontWeight: 900, whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: nu ? '#10b981' : 'rgba(255,255,255,0.45)', marginRight: 5 }}>W{i + 1}</span>{rirLabel(n)}
+              </button>
+            )
+          })}
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+            {fase.rir_aan ? 'De klant ziet het weekdoel per oefening en logt hoeveel hij over had.' : 'Zet aan om per week een doel mee te geven, van 3 over naar bijna falen.'}
+          </span>
         </div>
       )}
 

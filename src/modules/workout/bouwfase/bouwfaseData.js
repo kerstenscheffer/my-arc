@@ -37,7 +37,7 @@ export const spierWoord = (k) => String(spierLabel(k) || '').toLowerCase()
 export async function leesActieveFase(sb, clientId) {
   if (!sb || !clientId) return null
   const { data } = await sb.from('training_fases')
-    .select('id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, reflectie, created_at, schema_id, nummer, deload_schema_id, deload_gestart_op, afgerond_op, deload_reden, macros_voor_deload')
+    .select('rir_aan, rir_schema, id, client_id, start_datum, bouw_weken, deload_dagen, actief, notitie, reflectie, created_at, schema_id, nummer, deload_schema_id, deload_gestart_op, afgerond_op, deload_reden, macros_voor_deload')
     .eq('client_id', clientId).eq('actief', true)
     .order('start_datum', { ascending: false }).limit(1)
     .then(r => r, () => ({ data: null }))
@@ -82,7 +82,7 @@ export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
   const leeg = { oefening: {}, herstel: {}, workout: null }
   if (!sb || !clientId) return leeg
   const { data } = await sb.from('training_feedback')
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum')
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir')
     .eq('client_id', clientId).eq('datum', datum)
     .then(r => r, () => ({ data: [] }))
   for (const r of data || []) {
@@ -98,7 +98,7 @@ export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
 export async function bewaarFeedback(sb, rij) {
   const { data, error } = await sb.from('training_feedback')
     .upsert({ datum: vandaagIso(), ...rij, updated_at: new Date().toISOString() }, { onConflict: 'client_id,datum,sleutel' })
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum').single()
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir').single()
   if (error) throw error
   window.dispatchEvent(new CustomEvent('myarc:training-feedback'))
   return data

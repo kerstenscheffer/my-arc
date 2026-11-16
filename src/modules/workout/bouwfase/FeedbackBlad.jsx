@@ -12,6 +12,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, Smile, Meh, Frown } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
 import { GEVOEL, HERSTEL, bewaarFeedback, spierWoord } from './bouwfaseData'
+import { RIR_KEUZES, rirLabel, rirTekst } from './rir'
 
 const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
 const scoreWoord = (n) => (n <= 3 ? 'slecht' : n <= 5 ? 'matig' : n <= 7 ? 'goed' : n <= 9 ? 'heel goed' : 'top')
@@ -34,7 +35,8 @@ const chip = (aan) => ({
   border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen }) {
+// rirDoel: het weekdoel "herhalingen over" (rir.js). Gevuld = eerst de vraag hoeveel je over had.
+export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null }) {
   const [score, setScore] = useState(7)
   const [gevoel, setGevoel] = useState('goed')
   const [opmerking, setOpmerking] = useState('')
@@ -42,6 +44,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   const [fout, setFout] = useState(null)
   const [stap, setStap] = useState(1) // alleen bij een oefening: 1 = gevoel, 2 = uitvoering
   const [gekozen, setGekozen] = useState(false) // uitvoering gekozen → toelichting open
+  const [rir, setRir] = useState(null)
+  const metRir = soort === 'oefening' && rirDoel != null
 
   useEffect(() => {
     if (!open) return
@@ -49,9 +53,10 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     setGevoel(bestaand?.gevoel ?? 'goed')
     setOpmerking(bestaand?.opmerking ?? '')
     setFout(null)
-    setStap(1)
+    setRir(bestaand?.rir ?? null)
+    setStap(soort === 'oefening' && rirDoel != null ? 0 : 1)
     setGekozen(!!bestaand)
-  }, [open, bestaand])
+  }, [open, bestaand, soort, rirDoel])
 
   if (!open || !client?.id) return null
 
@@ -67,6 +72,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         score: soort === 'herstel' ? null : score,
         gevoel: soort === 'workout' ? null : gevoel,
         opmerking: opmerking.trim() || null,
+        ...(metRir ? { rir } : {}),
         ...extra,
       })
       onOpgeslagen?.(rij)
@@ -78,7 +84,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   }
 
   const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : 'Je training'
-  const sub = soort === 'oefening' ? `Oefening klaar · stap ${stap} van 2` : soort === 'herstel' ? 'Voor je begint' : 'Training afronden'
+  const sub = soort === 'oefening' ? `Oefening klaar · stap ${metRir ? stap + 1 : stap} van ${metRir ? 3 : 2}` : soort === 'herstel' ? 'Voor je begint' : 'Training afronden'
 
   return createPortal(
     <div onClick={onClose} style={{
@@ -140,6 +146,22 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
                   </div>
                 ))}
               </div>
+            )}
+            {metRir && stap === 0 && (
+              <>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 4 }}>Hoeveel herhalingen had je nog over?</div>
+                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 14 }}>
+                  Op je zwaarste set · doel deze week: {rirTekst(rirDoel).toLowerCase()}
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  {RIR_KEUZES.map(n => (
+                    <button key={n} onClick={() => { setRir(n); setStap(1) }} style={{ ...chip(rir === n), minHeight: 56, fontSize: '1.1rem', ...(rir !== n && n === rirDoel ? { border: '1px solid #10b981', color: '#10b981' } : {}) }}>{rirLabel(n)}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 10px' }}>
+                  <span>0 = er kon er geen meer bij</span><span>4+ = makkelijk</span>
+                </div>
+              </>
             )}
             {(soort === 'workout' || stap === 1) && (
               <>

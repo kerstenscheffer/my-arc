@@ -21,7 +21,7 @@ export function useHerstel(db, clientId, refreshKey = 0) {
     if (!clientId || !db?.supabase) { setPerSpier({}); return }
     const iso = isoVan(DAGEN_TERUG)
     const { data } = await db.supabase.from('training_feedback')
-      .select('id, datum, soort, oefening, spiergroep, score, gevoel, opmerking')
+      .select('id, datum, soort, oefening, spiergroep, score, gevoel, opmerking, rir')
       .eq('client_id', clientId).gte('datum', isoVan(PIJN_DAGEN_TERUG)).in('soort', ['herstel', 'oefening'])
       .order('datum', { ascending: false }).order('created_at', { ascending: false })
       .then(r => r, () => ({ data: [] }))
