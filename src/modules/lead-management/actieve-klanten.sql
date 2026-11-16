@@ -26,7 +26,7 @@ language sql stable security invoker set search_path = public as $$
     and coalesce(c.coaching_status, 'active') <> 'ended'
     and not c.niet_betalend
     and c.coaching_start_date is not null
-    and c.coaching_start_date <= (now() at time zone 'Europe/Amsterdam')::date
+    -- Een startdatum in de toekomst telt al mee: betaald, nog niet begonnen.
     and (coalesce(c.coaching_onbeperkt, false) or c.coaching_total_weeks is not null)
 $$;
 revoke all on function public.actieve_betalende_klanten() from public, anon;
@@ -67,3 +67,9 @@ grant execute on function public.klant_stand(timestamptz, timestamptz) to authen
 --   coalesce(gestopt_op, account_locked_at in NL-tijd)
 -- De live definitie is met die regel opnieuw gedraaid; zie de functie in de database.
 alter table public.clients add column if not exists gestopt_op date;
+
+-- 16 nov 2026 (later): klant_stand() geeft ook 'actief_toen' en 'actief_toen_namen':
+-- wie er actief was op de laatste dag van het venster. Telt vanaf de startdatum
+-- (of vanaf het aanmaken als de start nog moet komen) tot de stopdatum; zonder
+-- vastgelegde stopdatum bij een inactief of beëindigd account geldt updated_at
+-- als schatting. De live functie staat in de database.

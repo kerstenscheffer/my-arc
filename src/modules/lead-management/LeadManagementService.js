@@ -2903,8 +2903,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   //   verlengd = doorstap op 'betaald' gezet in dit venster (Gino → Klanten)
   //   gestopt  = account ging in dit venster op slot; wie nooit betaalde
   //              (clients.niet_betalend) telt niet mee
-  //   actief   = actieve_betalende_klanten() op dit moment; alleen in het
-  //              venster van nu, pauze telt mee
+  //   actief   = actieve_betalende_klanten() op dit moment; in oudere
+  //              vensters de teruggerekende stand op de laatste dag. Pauze telt mee
   async getRangeKlantStats(startISO, endISO) {
     try {
       const { data, error } = await this.db.supabase.rpc('klant_stand', { p_van: startISO, p_tot: endISO })
@@ -2914,9 +2914,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const lijst = (k) => (Array.isArray(data?.[k]) ? data[k] : [])
       return {
         gestart: lijst('gestart').length, verlengd: lijst('verlengd').length, gestopt: lijst('gestopt').length,
-        actief: loopt ? (data?.actief ?? null) : null,
+        // Lopende periode: de stand van nu. Oudere periodes: teruggerekend naar
+        // de laatste dag van die periode (actief_toen in de RPC).
+        actief: loopt ? (data?.actief ?? null) : (data?.actief_toen ?? null),
         // De namen erachter, voor wie wil zien wie het zijn.
-        namen: { gestart: lijst('gestart'), verlengd: lijst('verlengd'), gestopt: lijst('gestopt'), actief: loopt ? lijst('actief_namen') : [] },
+        namen: { gestart: lijst('gestart'), verlengd: lijst('verlengd'), gestopt: lijst('gestopt'), actief: lijst(loopt ? 'actief_namen' : 'actief_toen_namen') },
       }
     } catch (e) {
       console.warn('Klantcijfers laden mislukt:', e?.message)

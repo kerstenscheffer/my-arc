@@ -2320,7 +2320,7 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
     { key: 'gestart',      label: 'Klanten gestart', waarde: cash?.klant?.gestart ?? null, soort: 'aantal' },
     { key: 'verlengd',     label: 'Verlengd',       waarde: cash?.klant?.verlengd ?? null, soort: 'aantal' },
     { key: 'gestopt',      label: 'Gestopt',        waarde: cash?.klant?.gestopt ?? null,  soort: 'aantal', omgekeerd: true },
-    { key: 'actief',       label: 'Actieve klanten nu', waarde: cash?.klant?.actief ?? null, soort: 'aantal' },
+    { key: 'actief',       label: 'Actieve klanten', waarde: cash?.klant?.actief ?? null, soort: 'aantal' },
     { key: 'noshows',      label: 'No-shows',      waarde: noShows,                        soort: 'aantal', omgekeerd: true },
     { key: 'afgewezen',    label: 'Afgewezen',     waarde: n(funnel?.callRejected?.count), soort: 'aantal', omgekeerd: true },
     { key: 'saleverloren', label: 'Sale verloren', waarde: n(funnel?.saleLost?.count),     soort: 'aantal', omgekeerd: true },
