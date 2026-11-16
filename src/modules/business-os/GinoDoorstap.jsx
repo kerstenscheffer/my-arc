@@ -14,7 +14,7 @@
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Check, Loader2, FileDown } from 'lucide-react'
+import { Check, Loader2, FileDown, ChevronDown, Search, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
@@ -135,6 +135,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [looptijd, setLooptijd] = useState(null) // { id, start, weken } terwijl je hem aanpast
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
   const [pdfBezig, setPdfBezig] = useState(false)
+  const [zoek, setZoek] = useState('')
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -417,6 +418,8 @@ export default function GinoDoorstap({ isMobile = false }) {
     try { localStorage.setItem('myarc.doorstap.sorteer', nieuw ? 'op' : 'af') } catch { /* privémodus */ }
   }
   const metEisen = soortFilter !== 'coaching'
+  const zoekTerm = zoek.trim().toLowerCase()
+  const getoond = zoekTerm ? zichtbaar.filter(r => naamVan(r.klant).toLowerCase().includes(zoekTerm)) : zichtbaar
   // Door = echt betaald. Een mondeling ja telt pas als het geld binnen is.
   const telt = (id) => !instellingen.get(id)?.telt_niet_mee
   const zeiJa = zichtbaar.filter(r => r.status === 'betaald' && telt(r.client_id)).length
@@ -431,19 +434,34 @@ export default function GinoDoorstap({ isMobile = false }) {
   // besloten en telt niet mee. Gestopt = zei nee, of de challenge is beëindigd.
   const nee = zichtbaar.filter(x => x.status === 'nee' && telt(x.client_id))
   const beeindigd = soortFilter === 'coaching' ? [] : gestopt.filter(c => telt(c.id) && !nee.some(x => x.client_id === c.id))
-  const aantalGestopt = nee.length + beeindigd.length
+  // Alleen geld telt (16 nov 2026, Kersten): door = verlenging betaald, gestopt = borg
+  // echt terugbetaald. Wie nee zei of stopte zonder geregistreerde refund telt nog niet mee.
+  const saleVanKlant = new Map()
+  for (const [clientId, i] of instellingen) if (i.sale_id) saleVanKlant.set(clientId, i.sale_id)
+  const terugIds = new Set((saleRijen || []).filter(x => x.sale_kind === 'challenge' && x.challenge_status === 'terugbetaald').map(x => x.id))
+  const geldTerug = (clientId) => terugIds.has(saleVanKlant.get(clientId))
+  const gekoppeldeSales = new Set(saleVanKlant.values())
+  const naamSale = (x) => { const w = String(x.lead_name || 'Onbekend').trim().split(/\s+/); return w.length === 2 && w[0] === w[1] ? w[0] : w.join(' ') }
+  const terugRegels = soortFilter === 'coaching' ? [] : [
+    ...nee.filter(x => geldTerug(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Geld terug' })),
+    ...beeindigd.filter(c => geldTerug(c.id)).map(c => ({ id: c.id, naam: naamVan(c), sub: 'Geld terug' })),
+    // Refund op een sale die aan geen klant hangt: telt ook, het geld is terug.
+    ...(saleRijen || []).filter(x => terugIds.has(x.id) && !gekoppeldeSales.has(x.id)).map(x => ({ id: x.id, naam: naamSale(x), sub: 'Geld terug' })),
+  ]
+  const aantalGestopt = terugRegels.length
   const beslist = zeiJa + aantalGestopt
   const doorstapRegels = [
-    ...zichtbaar.filter(x => x.status === 'betaald' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Door' })),
-    ...nee.map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Gestopt' })),
-    ...beeindigd.map(c => ({ id: c.id, naam: naamVan(c), sub: 'Gestopt' })),
+    ...zichtbaar.filter(x => x.status === 'betaald' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Door, betaald' })),
+    ...terugRegels,
+    ...nee.filter(x => !geldTerug(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gestopt, geen refund' })),
+    ...beeindigd.filter(c => !geldTerug(c.id)).map(c => ({ id: c.id, naam: naamVan(c), sub: 'Telt niet: gestopt, geen refund' })),
     ...zichtbaar.filter(x => x.status === 'ja_mondeling' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: nog niet betaald' })),
     ...zichtbaar.filter(x => x.status === 'denkt_na' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: denkt na' })),
     ...zichtbaar.filter(gesprekNodig).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gesprek' })),
   ]
   const doorstapGetal = {
     id: 'doorstap', label: 'Doorstap', waarde: beslist ? `${Math.round((zeiJa / beslist) * 100)}%` : '—',
-    sub: `${zeiJa} door · ${aantalGestopt} gestopt${gesprekken ? ` · ${gesprekken} gesprek open` : ''}`, regels: doorstapRegels,
+    sub: `${zeiJa} betaald · ${aantalGestopt} geld terug${gesprekken ? ` · ${gesprekken} gesprek open` : ''}`, regels: doorstapRegels,
   }
   // Coaching: geen borg, dus hier telt wie er loopt, wie bijna klaar is en wat er nog open staat.
   const openBedrag = zichtbaar.filter(x => x.sale)
@@ -549,6 +567,17 @@ export default function GinoDoorstap({ isMobile = false }) {
         }}>
           {pdfBezig ? <Loader2 size={13} strokeWidth={3} className="gd-draai" /> : <FileDown size={14} strokeWidth={2.6} />} {pdfBezig ? 'Bezig' : 'Pdf'}
         </button>
+        {/* Zoeken op naam: filtert alleen de kaarten, de cijfers bovenaan blijven van iedereen. */}
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, marginLeft: 10, padding: '0 8px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.25)', verticalAlign: 'top' }}>
+          <Search size={13} strokeWidth={2.8} color={colors.textSecondary} />
+          <input className="gd-stand" type="search" value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek klant" aria-label="Zoek klant"
+            style={{ width: isMobile ? 110 : 170, height: 24, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontWeight: 800, WebkitAppearance: 'none' }} />
+          {zoek && (
+            <button type="button" onClick={() => setZoek('')} aria-label="Zoekveld leegmaken" style={{ display: 'inline-flex', padding: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary }}>
+              <X size={13} strokeWidth={3} />
+            </button>
+          )}
+        </label>
       </div>
       {soortFilter === 'challenge' ? geld && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(120px, 1fr))', gap: isMobile ? '10px 8px' : '12px 18px', paddingBottom: 14 }}>
@@ -575,17 +604,17 @@ export default function GinoDoorstap({ isMobile = false }) {
           het bedrag en het vinkje, en eronder traject, eisen en eindcall als
           cijfers met een klein label. Alles wat je kon aanklikken kan nog. */}
       {zichtbaar.length > 0 && (
-        <div style={{ maxWidth: 760 }}>
+        <div>
           <button type="button" onClick={wisselSorteer} title={eindOplopend ? 'Eerstvolgend einde bovenaan. Klik: omdraaien' : 'Laatste einde bovenaan. Klik: omdraaien'}
             style={{ padding: '0 0 6px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
 Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           </button>
           {GROEPEN.map(([groep, groepLabel]) => {
             // Actie nodig op belang (wie het eerst iets van je nodig heeft), de rest op einddatum.
-            const inGroep = zichtbaar.filter(x => watNu(x).groep === groep)
+            const inGroep = getoond.filter(x => watNu(x).groep === groep)
             const lijst = groep === 'actie' ? [...inGroep].sort((a, b) => volgorde(a) - volgorde(b) || (a.dagen ?? 999) - (b.dagen ?? 999)) : inGroep
             if (!lijst.length) return null
-            const dicht = groep === 'klaar' && !klaarOpen
+            const dicht = groep === 'klaar' && !klaarOpen && !zoekTerm
             return (
               <div key={groep} style={{ marginBottom: 12 }}>
                 <button type="button" onClick={groep === 'klaar' ? () => setKlaarOpen(o => !o) : undefined} aria-expanded={groep === 'klaar' ? klaarOpen : undefined}
@@ -593,6 +622,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                   <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: groep === 'actie' ? '#f59e0b' : colors.textPrimary }}>{groepLabel}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>{lijst.length}{groep === 'klaar' ? (klaarOpen ? ' · verbergen' : ' · tonen') : ''}</span>
                 </button>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 7, alignItems: 'start' }}>
                 {!dicht && lijst.map((r) => {
             const nodig = gesprekNodig(r)
             const nu = watNu(r)
@@ -601,7 +631,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             const eindKleur = r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary
             const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id)
             return (
-              <div key={r.client_id} style={{ marginBottom: 7, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+              <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
                   {/* Tegel: de week van het traject. Klik = start en aantal weken aanpassen. */}
                   <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt}
@@ -617,16 +647,26 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
                       {r.status === 'betaald' ? (
-                        <span style={{ flexShrink: 0, color: G }}>Betaald</span>
-                      ) : (
-                        <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={bezig === r.client_id}
-                          onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
-                          style={{ ...dun, flexShrink: 0, appearance: 'none', WebkitAppearance: 'none', padding: 0, textAlign: 'right', textAlignLast: 'right', color: r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : nodig ? '#f59e0b' : colors.textPrimary }}>
-                          <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
-                          {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
-                          {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
-                        </select>
-                      )}
+                        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 9px', borderRadius: 7, background: 'rgba(16,185,129,0.14)', color: G, fontSize: '0.75rem', fontWeight: 900 }}>
+                          <Check size={12} strokeWidth={3.2} /> Betaald
+                        </span>
+                      ) : (() => {
+                        // De stand als echte knop: omlijnd, in de kleur van de stand, met een pijltje.
+                        const kleur = r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : r.status === 'denkt_na' || nodig ? '#f59e0b' : colors.textPrimary
+                        const leeg = !r.status && !nodig
+                        return (
+                          <span style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', height: 24, borderRadius: 7, border: `1px solid ${leeg ? 'rgba(255,255,255,0.25)' : kleur}`, opacity: bezig === r.client_id ? 0.5 : 1 }}>
+                            <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} title="Stand kiezen" value={r.status || ''} disabled={bezig === r.client_id}
+                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
+                              style={{ ...dun, height: 22, appearance: 'none', WebkitAppearance: 'none', padding: '0 22px 0 9px', fontSize: '0.75rem', fontWeight: 900, color: leeg ? colors.textSecondary : kleur }}>
+                              <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
+                              {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
+                              {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
+                            </select>
+                            <ChevronDown size={12} strokeWidth={3} color={leeg ? colors.textSecondary : kleur} style={{ position: 'absolute', right: 6, pointerEvents: 'none' }} />
+                          </span>
+                        )
+                      })()}
                       {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(bedrag)}</span> : null}
                       {r.status === 'ja_mondeling' && (() => {
                         const zeker = bevestig === r.client_id
@@ -723,9 +763,11 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
               </div>
             )
                 })}
+                </div>
               </div>
             )
           })}
+          {zoekTerm && !getoond.length && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.textSecondary }}>Niemand gevonden met "{zoek.trim()}".</div>}
         </div>
       )}
 
