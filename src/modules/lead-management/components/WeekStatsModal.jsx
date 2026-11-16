@@ -2317,6 +2317,7 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
     // Weekrapport (16 nov 2026): alles wat je verkocht, betaald of nog niet,
     // en de klantcijfers uit getRangeKlantStats.
     { key: 'verkocht',     label: 'Omzet verkocht', waarde: Math.round(n(funnel?.sale?.omzet) + n(funnel?.sale?.toegezegd)), soort: 'euro' },
+    { key: 'gestart',      label: 'Klanten gestart', waarde: cash?.klant?.gestart ?? null, soort: 'aantal' },
     { key: 'verlengd',     label: 'Verlengd',       waarde: cash?.klant?.verlengd ?? null, soort: 'aantal' },
     { key: 'gestopt',      label: 'Gestopt',        waarde: cash?.klant?.gestopt ?? null,  soort: 'aantal', omgekeerd: true },
     { key: 'actief',       label: 'Actieve klanten nu', waarde: cash?.klant?.actief ?? null, soort: 'aantal' },

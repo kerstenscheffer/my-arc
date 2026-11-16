@@ -13,7 +13,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   Clock, Play, Pause, Square, Settings, Check, X, AlertCircle,
-  Calendar, Hourglass, CalendarPlus, Lock, LockOpen,
+  Calendar, Hourglass, CalendarPlus, Lock, LockOpen, Euro,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 
@@ -86,6 +86,20 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     } catch (err) {
       console.error('Save coaching period failed:', err)
       alert('Opslaan mislukt')
+    } finally { setBusy(false) }
+  }
+
+  // Telt deze klant mee als betalend? Eén vinkje op de klant (clients.niet_betalend),
+  // waar actieve_betalende_klanten() en dus alle klanttellers op rekenen (16 nov 2026).
+  const wisselBetalend = async () => {
+    setBusy(true)
+    try {
+      const payload = { niet_betalend: !client.niet_betalend }
+      const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
+      if (error) throw error
+      onClientUpdate?.(payload)
+    } catch (err) {
+      console.error('Betalend wisselen mislukt:', err); alert('Opslaan mislukt')
     } finally { setBusy(false) }
   }
 
@@ -303,6 +317,13 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
 
+  const betalendRij = (
+    <button onClick={wisselBetalend} disabled={busy} style={menuRij()}>
+      <Euro size={16} color={client.niet_betalend ? 'rgba(255,255,255,0.45)' : '#10b981'} />
+      {client.niet_betalend ? 'Telt niet als betalend · zet aan' : 'Telt als betalende klant · zet uit'}
+    </button>
+  )
+
   // Geen einddatum: alleen wat dan nog zin heeft.
   if (onbeperkt) {
     return (
@@ -312,6 +333,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
           {client.coaching_start_date && <> · sinds {formatDate(client.coaching_start_date)}</>}
         </div>
         <button onClick={() => setEditing(true)} style={menuRij()}><Settings size={16} /> Looptijd instellen</button>
+        {betalendRij}
         <button onClick={wisselSlot} disabled={busy} style={menuRij(opSlot ? '#ef4444' : undefined)}>
           {opSlot ? <><LockOpen size={16} /> Account ontgrendelen</> : <><Lock size={16} /> Account op slot</>}
         </button>
@@ -341,6 +363,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
           {status !== 'paused' && (
             <button onClick={maakOnbeperkt} disabled={busy} style={menuRij()}><Clock size={16} /> Onbeperkt maken</button>
           )}
+          {betalendRij}
           <button onClick={wisselSlot} disabled={busy} style={menuRij(opSlot ? '#ef4444' : undefined)}>
             {opSlot ? <><LockOpen size={16} /> Account ontgrendelen</> : <><Lock size={16} /> Account op slot</>}
           </button>

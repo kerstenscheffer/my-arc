@@ -2896,38 +2896,28 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     return { ok: !error, error: error?.message }
   }
 
-  // Klantcijfers voor het weekrapport (16 nov 2026): verlengd, gestopt en
-  // hoeveel klanten er nu een lopend traject hebben. Alleen lezen.
+  // Klantcijfers per venster, uit één bron: de RPC klant_stand (16 nov 2026,
+  // SQL in actieve-klanten.sql). Alle schermen die klanten tellen horen die
+  // aan te roepen in plaats van zelf te filteren.
+  //   gestart  = traject begon in dit venster
   //   verlengd = doorstap op 'betaald' gezet in dit venster (Gino → Klanten)
-  //   gestopt  = accounts die in dit venster op slot gingen (traject verlopen)
-  //   actief   = lopend traject op dit moment, zonder de onbeperkte accounts
-  //              (eigen en gratis accounts); alleen in het venster van nu.
+  //   gestopt  = account ging in dit venster op slot; wie nooit betaalde
+  //              (clients.niet_betalend) telt niet mee
+  //   actief   = actieve_betalende_klanten() op dit moment; alleen in het
+  //              venster van nu, pauze telt mee
   async getRangeKlantStats(startISO, endISO) {
     try {
-      const sb = this.db.supabase
+      const { data, error } = await this.db.supabase.rpc('klant_stand', { p_van: startISO, p_tot: endISO })
+      if (error) throw error
       const nu = new Date()
       const loopt = new Date(endISO) > nu && new Date(startISO) <= nu
-      const [v, g, a] = await Promise.all([
-        sb.from('client_doorstap').select('id', { count: 'exact', head: true })
-          .eq('status', 'betaald')
-          .gte('gezet_at', startISO).lt('gezet_at', endISO).then(r => r, () => ({ count: null })),
-        sb.from('clients').select('id', { count: 'exact', head: true })
-          .gte('account_locked_at', startISO).lt('account_locked_at', endISO).then(r => r, () => ({ count: null })),
-        loopt
-          ? sb.from('clients').select('id, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_onbeperkt')
-            .eq('status', 'active').is('account_locked_at', null).not('coaching_start_date', 'is', null).then(r => r, () => ({ data: null }))
-          : Promise.resolve({ data: null }),
-      ])
-      const vandaag = lokaleDag(nu.toISOString())
-      const actief = Array.isArray(a.data) ? a.data.filter(c => {
-        if (c.coaching_onbeperkt) return false
-        const start = String(c.coaching_start_date).slice(0, 10)
-        if (start > vandaag) return false
-        const eind = new Date(`${start}T12:00:00`)
-        eind.setDate(eind.getDate() + (Number(c.coaching_total_weeks) || 0) * 7 + (Number(c.coaching_paused_days_total) || 0))
-        return lokaleDag(eind.toISOString()) >= vandaag
-      }).length : null
-      return { verlengd: v.count ?? null, gestopt: g.count ?? null, actief }
+      const lijst = (k) => (Array.isArray(data?.[k]) ? data[k] : [])
+      return {
+        gestart: lijst('gestart').length, verlengd: lijst('verlengd').length, gestopt: lijst('gestopt').length,
+        actief: loopt ? (data?.actief ?? null) : null,
+        // De namen erachter, voor wie wil zien wie het zijn.
+        namen: { gestart: lijst('gestart'), verlengd: lijst('verlengd'), gestopt: lijst('gestopt'), actief: loopt ? lijst('actief_namen') : [] },
+      }
     } catch (e) {
       console.warn('Klantcijfers laden mislukt:', e?.message)
       return null
