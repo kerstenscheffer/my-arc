@@ -191,8 +191,14 @@ export function volumeAdvies({ days = [], ctx = {}, herstel = {}, budget = 90, f
       if (t === 'daalt') {
         a.oordeel = 'let op'
         a.tekst = 'Twee weken achteruit: sets blijven gelijk. Kijk naar slaap, voeding of een deload.'
+      } else if (nietHersteld && herstel[spier]?.tweeKeerNiet) {
+        // Eén keer niet hersteld: niets doen, het herstel trekt meestal bij. Twee
+        // keer achter elkaar: het volume is te hoog, één set eraf (Israetel).
+        a.oordeel = 'omlaag'
+        a.tekst = 'Twee keer achter elkaar niet hersteld: -1 set.'
+        a.actie = { soort: 'min', aantal: 1 }
       } else if (nietHersteld) {
-        a.tekst = 'Nog spierpijn bij de volgende training: sets blijven gelijk.'
+        a.tekst = 'Nog spierpijn bij de volgende training: sets blijven deze keer gelijk. Gebeurt het nog een keer, dan gaat er een set af.'
       } else if (zwaarder) {
         a.tekst = `Zwaarder dan bedoeld (${over(gemOver)} over, doel ${ctx.rir.doel}): sets blijven gelijk tot het herstel bijtrekt.`
         a.redenen.push('zwaarder dan bedoeld')

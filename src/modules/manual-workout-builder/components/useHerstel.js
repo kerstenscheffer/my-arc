@@ -42,6 +42,9 @@ export function useHerstel(db, clientId, refreshKey = 0) {
         const k = r.oefening.trim().toLowerCase()
         ;((perOef[r.spiergroep] = perOef[r.spiergroep] || {})[k] = perOef[r.spiergroep][k] || []).push(r)
       }
+      // De laatste twee herstelantwoorden over de hele periode: een spier die 1x per
+      // week langskomt heeft binnen 7 dagen maar één antwoord.
+      if (r.soort === 'herstel' && (s.herstelReeks = s.herstelReeks || []).length < 2) s.herstelReeks.push(r.gevoel)
       if (r.datum < iso) continue
       if (r.soort === 'herstel') s.herstel.push(r); else s.oefeningen.push(r)
     }
@@ -54,6 +57,7 @@ export function useHerstel(db, clientId, refreshKey = 0) {
       const laatste = s.herstel[0]?.gevoel
       // Pijn 2x achter elkaar = rood; één keer pijn = oranje (in de gaten houden).
       const pijnEens = s.oefeningen.some(r => r.gevoel === 'pijn')
+      s.tweeKeerNiet = (s.herstelReeks || []).length === 2 && s.herstelReeks.every(g => g === 'ja')
       s.stand = s.pijnReeks.length || laatste === 'ja' ? 'rood' : pijnEens || laatste === 'beetje' ? 'oranje' : laatste === 'nee' ? 'groen' : null
     }
     setPerSpier(uit)
