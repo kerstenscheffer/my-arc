@@ -136,6 +136,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
   const [pdfBezig, setPdfBezig] = useState(false)
   const [zoek, setZoek] = useState('')
+  const [borgVraag, setBorgVraag] = useState(null) // { id, status } terwijl 'Zeker?' staat (4 s)
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -340,6 +341,26 @@ export default function GinoDoorstap({ isMobile = false }) {
   }
 
   useEffect(() => () => clearTimeout(bevestigKlok.current), [])
+
+  // De borg afronden bij wie stopt (16 nov 2026): terugbetaald of behouden. Dezelfde ene
+  // kolom als het lead-systeem (setChallengeStatus). Klik 1 = 'Zeker?', klik 2 = opslaan.
+  // Terugbetaald valt uit omzet en uitbetaling; behouden telt vanaf nu mee (trigger).
+  const rondBorgAf = async (r, sale, status) => {
+    if (bezig) return
+    if (borgVraag?.id !== r.client_id || borgVraag?.status !== status) {
+      clearTimeout(bevestigKlok.current)
+      setBorgVraag({ id: r.client_id, status })
+      bevestigKlok.current = setTimeout(() => setBorgVraag(null), 4000)
+      return
+    }
+    clearTimeout(bevestigKlok.current)
+    setBorgVraag(null); setBezig(r.client_id); rijFoutWeg(r.client_id)
+    const { data, error } = await supabase.from('lead_movements').update({ challenge_status: status })
+      .eq('id', sale.id).eq('challenge_status', 'open').select('id').then(x => x, e => ({ error: e }))
+    if (error || !data?.length) rijMislukt(r.client_id, error, 'Borg afronden mislukt')
+    else await laad()
+    setBezig(null)
+  }
 
   // Klik 1 = 'Zeker?' (4 seconden), klik 2 binnen die tijd = opslaan. Bewust een klok en
   // geen onBlur: Safari geeft een knop bij klikken geen focus, dus daar klopte dat niet.
@@ -554,6 +575,8 @@ export default function GinoDoorstap({ isMobile = false }) {
       <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }
         @keyframes gd-draai { to { transform: rotate(360deg) } }
         .gd-draai { animation: gd-draai 0.8s linear infinite }`}</style>
+      {/* Filter, zoekbalk en cijfers blijven boven staan; alleen de kaarten scrollen eronderdoor. */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: colors.bg, paddingTop: 4, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ paddingBottom: 8 }}>
         <select className="gd-stand" aria-label="Soort traject" value={soortFilter} onChange={e => kiesSoort(e.target.value)} style={{
           height: 26, padding: 0, background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', outline: 'none',
@@ -595,6 +618,7 @@ export default function GinoDoorstap({ isMobile = false }) {
           {coachingGetallen.map(k => <Getal key={k.id} {...k} open={openGetal === k.id} onKlik={() => setOpenGetal(o => (o === k.id ? null : k.id))} />)}
         </div>
       )}
+      </div>
 
       {fout && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.danger, marginBottom: 8 }}>{fout}</div>}
       {zichtbaar.length === 0 && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.textSecondary }}>Niemand in deze lijst.</div>}
@@ -629,7 +653,9 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
             const e = eisen[r.client_id]
             const eindKleur = r.dagen != null && r.dagen < 0 ? colors.danger : colors.textSecondary
-            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id)
+            // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
+            const borgSale = r.status === 'nee' ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === instellingen.get(r.client_id)?.sale_id) : null
+            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id) || r.status === 'nee'
             return (
               <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
@@ -751,6 +777,25 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       )
                     })()}
                     {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={e} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
+                    {r.status === 'nee' && (() => {
+                      if (!borgSale) return <span style={{ color: colors.textSecondary }}>Geen borg gekoppeld. Refund zet je in het lead-systeem op de sale.</span>
+                      const bedragBorg = euro(borgSale.order_value)
+                      if (borgSale.challenge_status === 'terugbetaald') return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} terugbetaald</span>
+                      if (borgSale.challenge_status === 'behouden') return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} behouden</span>
+                      if (borgSale.challenge_status !== 'open' || !borgSale.payment_received) return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} niet betaald</span>
+                      const knopStijl = (status) => {
+                        const zeker = borgVraag?.id === r.client_id && borgVraag.status === status
+                        return { height: 24, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, background: zeker ? G : colors.textPrimary, color: colors.bg }
+                      }
+                      const tekst = (status, gewoon) => (borgVraag?.id === r.client_id && borgVraag.status === status ? 'Zeker?' : gewoon)
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span>Borg {bedragBorg}</span>
+                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'terugbetaald')} title="Het geld is teruggestort: valt uit omzet en uitbetaling" style={knopStijl('terugbetaald')}>{tekst('terugbetaald', 'Terugbetaald')}</button>
+                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'behouden')} title="Geen geld terug: de borg telt vanaf nu mee in omzet en uitbetaling" style={knopStijl('behouden')}>{tekst('behouden', 'Behouden')}</button>
+                        </div>
+                      )
+                    })()}
                     {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
                       <select className="gd-stand" aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={{ ...dun, fontSize: '0.75rem', color: colors.textSecondary }}
                         onChange={ev => setBorgKeuze(k => ({ ...k, [r.client_id]: ev.target.value }))}>

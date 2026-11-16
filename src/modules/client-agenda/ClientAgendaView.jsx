@@ -5,7 +5,7 @@
 // lezen, zodat de coach in één blik ziet hoe de week eruit ziet.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat, Scale, ClipboardCheck, HeartPulse } from 'lucide-react'
+import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat, Scale, ClipboardCheck, HeartPulse, Footprints, CircleCheck } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
@@ -13,8 +13,12 @@ import usePaginaTerug from '../../client/usePaginaTerug'
 import { LijstSkelet } from '../../client/PaginaSkeletten'
 import RealiteitBlad from './RealiteitBlad'
 import { resolveFoodImage, foodImageFallback } from '../meal-plan/foodImageFallback'
-import { workoutFoto } from '../../client/components/workoutFoto'
 import { balkVak, balkVakActief, balkIconKnop, balkScheiding } from './werkbalkStijl'
+import { getWorkoutImage } from '../workout/components/week-schedule/workoutImage'
+import { cardioFoto } from '../workout/utils/workoutFoto'
+import StappenService, { STANDAARD_DOEL } from '../steps/StappenService'
+import { STAPPEN_EVENT } from '../steps/stappenSync'
+import { kcalKleur } from '../meal-plan/utils/kcalKleur'
 
 const COLORS = {
   bg: '#0a0a0a',
@@ -71,8 +75,13 @@ const VERZET_STAPPEN = [
 // pixels per uur. Het rooster scrollt binnen zijn eigen vlak, de dagkoppen
 // blijven bovenaan staan.
 const GRID_MIN_HOOGTE = { desktop: 900, mobiel: 900 }
-const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
-const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
+// De kop is drie regels, dezelfde opbouw als de workout-week: dag (vandaag
+// als witte pil), stappen van de dag, voeding van de dag (16 nov 2026).
+const KOP_DAG = { desktop: 26, mobiel: 24 }
+const KOP_STAPPEN = 18
+const KOP_VOEDING = 28
+const kopDag = (isMobile) => (isMobile ? KOP_DAG.mobiel : KOP_DAG.desktop)
+const kopHoogte = (isMobile) => kopDag(isMobile) + KOP_STAPPEN + KOP_VOEDING + 1
 const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
 const MINUTES_VISIBLE = (HOUR_END - HOUR_START) * 60
 
@@ -198,7 +207,8 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   // Ondergrens per soort, in pixels. Een maaltijd van een kwartier is op
   // ware grootte een streepje; hij krijgt de ruimte van een half uur.
   const pxPerMin = gridMinHoogte(isMobile) / MINUTES_VISIBLE
-  const minHoogte = isMaaltijd ? 30 : isTraining ? 46 : 22
+  const isCardio = block.type === 'cardio' || (block.type === 'custom' && /^Cardio\s*·\s*/.test(String(block.label || '')))
+  const minHoogte = isMaaltijd ? 30 : isTraining ? 46 : isCardio ? 40 : 22
   const hoogte = Math.max(minHoogte, (block.end - block.start) * pxPerMin)
   const ruim = hoogte >= 30
   const slotOpFoto = hoogte >= 52
@@ -324,49 +334,52 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     )
   }
 
-  // ── Training: foto als achtergrond, naam eroverheen ──
-  if (isTraining && ruim) {
-    const details = [
+  // ── Training en cardio: dezelfde fototegel als in de workout-week ──
+  if ((isTraining || isCardio) && ruim) {
+    const klaar = isTraining ? !!block.meta?.afgerond : !!block.meta?.echt
+    const titel = isTraining ? (naam || 'Training') : (cardioSport || block.meta?.soort || naam || 'Cardio')
+    const soortTraining = isCardio && cardioSport ? (block.sublabel || null) : null
+    const details = isTraining ? [
       block.meta?.exercise_count > 0 ? `${block.meta.exercise_count} oefeningen` : null,
       block.meta?.estimated_time || null,
-      (!block.meta?.exercise_count && block.meta?.split) ? block.meta.split : null,
-    ].filter(Boolean)
+    ].filter(Boolean) : [`${block.end - block.start} min`]
+    const foto = isTraining ? getWorkoutImage({ name: titel }) : cardioFoto(titel)
+    const Soort = isTraining ? Dumbbell : HeartPulse
+    const vrij = !isSelected && !isGhost
     return (
-      <div {...gedrag} style={{ ...buiten, display: 'block' }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: `url(${workoutFoto(naam || soort)})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.85) 100%)',
-        }} />
-        <div style={{
-          position: 'relative', height: '100%',
-          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          padding: isMobile ? '5px 8px' : '7px 10px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{
-              flex: 1, minWidth: 0,
-              fontSize: isMobile ? '0.84rem' : '0.92rem', fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.02em', lineHeight: 1.15,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
-            }}>
-              {naam || 'Training'}
-            </span>
-            <span style={{ ...kaartKnopStijl, color: 'rgba(255,255,255,0.6)' }}>{tijdTekst}</span>
+      <div {...gedrag} style={{
+        ...buiten, display: 'block',
+        ...(vrij ? { border: '1px solid rgba(255,255,255,0.08)', borderLeft: '1px solid rgba(255,255,255,0.08)', boxShadow: klaar ? 'inset 0 -2px 0 rgba(16,185,129,0.8)' : undefined } : {}),
+      }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.45 : 1 }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.88) 100%)' }} />
+        {klaar && hoogte >= 52 && (
+          <div aria-label="Gedaan" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <CircleCheck size={isMobile ? 22 : 24} strokeWidth={2.4} color="#10b981" style={{ filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.8))' }} />
           </div>
-          <span style={{
-            fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
-            textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 2,
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            Training{details.length > 0 ? ` · ${details.join(' · ')}` : ''}
-          </span>
+        )}
+        <div style={{ position: 'absolute', left: 6, right: 6, bottom: 4, textAlign: 'left' }}>
+          {hoogte >= 40 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.46rem' : '0.52rem', fontWeight: 900, color: klaar ? '#10b981' : 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+              <Soort size={9} strokeWidth={2.8} />{isTraining ? 'Training' : 'Cardio'}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.74rem' : '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.15, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {titel}
+            </span>
+            {hoogte < 60 && <span style={{ ...kaartKnopStijl, color: 'rgba(255,255,255,0.7)' }}>{tijdTekst}</span>}
+          </div>
+          {soortTraining && hoogte >= 72 && (
+            <div style={{ fontSize: isMobile ? '0.54rem' : '0.58rem', fontWeight: 800, color: '#06b6d4', textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {soortTraining}
+            </div>
+          )}
+          {hoogte >= 60 && (
+            <div style={{ fontSize: isMobile ? '0.54rem' : '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 6px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {[tijdTekst, ...details].join(' · ')}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -393,6 +406,56 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   )
 }
 
+// Stappen van de dag: dezelfde band als op de tegels van de workout-week,
+// van grijs naar groen naarmate er meer stappen staan.
+function StappenRegel({ stappen, doel }) {
+  const n = Number(stappen?.steps) || 0
+  const kort = (x) => (x >= 10000 ? `${Math.round(x / 1000)}k` : x >= 1000 ? `${(x / 1000).toFixed(1).replace('.', ',').replace(',0', '')}k` : String(x))
+  const tekst = !stappen ? '' : n === 0 ? (stappen.toekomst ? '' : '0') : kort(n)
+  const deel = Math.min(1, n / Math.max(1, doel))
+  const groen = Math.min(1, n / 10000)
+  const meng = (van, naar) => Math.round(van + (naar - van) * groen)
+  const kleur = n > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)'
+  const vulling = `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * groen).toFixed(2)})`
+  return (
+    <div title={stappen ? `${n.toLocaleString('nl-NL')} stappen · doel ${doel.toLocaleString('nl-NL')}` : undefined}
+      style={{ position: 'relative', height: KOP_STAPPEN, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(deel * 100)}%`, background: vulling, transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
+      <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, color: kleur, lineHeight: 1, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+        <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />
+        <span>{tekst || '·'}{stappen?.isVandaag && doel > 0 && <span style={{ opacity: 0.6 }}> / {kort(doel)}</span>}</span>
+      </div>
+    </div>
+  )
+}
+
+// Voeding van de dag: kcal en eiwit van de maaltijden in deze kolom (gepland,
+// of gegeten in Realiteit), met een balkje tegen het dagdoel. Zelfde kleur
+// als de weekstrook in Coach Inzicht.
+function VoedingRegel({ blocks, doel, isMobile, echt }) {
+  const maaltijden = (blocks || []).filter(b => b.type === 'meal' && !b.meta?.placeholder)
+  const kcal = Math.round(maaltijden.reduce((t, b) => t + (Number(b.meta?.kcal) || 0), 0))
+  const eiwit = Math.round(maaltijden.reduce((t, b) => t + (Number(b.meta?.protein) || 0), 0))
+  const kleur = kcal > 0 ? kcalKleur(kcal, doel, '#fff') : 'rgba(255,255,255,0.3)'
+  const deel = doel > 0 ? Math.min(1, kcal / doel) : 0
+  return (
+    <div title={kcal > 0 ? `${echt ? 'Gegeten' : 'Gepland'}: ${kcal.toLocaleString('nl-NL')} kcal, ${eiwit} g eiwit${doel > 0 ? ` · doel ${doel.toLocaleString('nl-NL')}` : ''}` : undefined}
+      style={{ position: 'relative', height: KOP_VOEDING, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0 4px 3px', boxSizing: 'border-box', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+      <span style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: 900, color: kleur, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+        {kcal > 0 ? kcal.toLocaleString('nl-NL') : '–'}
+      </span>
+      {kcal > 0 && (
+        <span style={{ fontSize: isMobile ? '0.58rem' : '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>E {eiwit}g</span>
+      )}
+      {doel > 0 && (
+        <span style={{ position: 'absolute', left: 4, right: 4, bottom: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <span style={{ display: 'block', height: '100%', width: `${Math.round(deel * 100)}%`, background: kleur, opacity: 0.85 }} />
+        </span>
+      )}
+    </div>
+  )
+}
+
 const dagPijl = {
   width: 22, height: 22, padding: 0, flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -409,6 +472,7 @@ function DayColumn({
   // naast de datum naar de vorige of volgende dag. Met zeven kolommen naast
   // elkaar heeft dat geen betekenis.
   onVorigeDag, onVolgendeDag,
+  stappen = null, stappenDoel = STANDAARD_DOEL, kcalDoel = 0, echt = false,
 }) {
   return (
     <div
@@ -420,85 +484,61 @@ function DayColumn({
         background: isDropTarget ? 'rgba(255,255,255,0.04)' : 'transparent',
         transition: 'background 0.12s ease',
       }}>
-      {/* Header */}
+      {/* Kop: dag, stappen, voeding. Blijft staan terwijl het rooster scrollt. */}
       <div style={{
         height: kopHoogte(isMobile),
-        padding: isMobile ? '0 0.3rem' : '0 0.4rem',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
         borderBottom: `1px solid ${COLORS.border}`,
-        // Blijft staan terwijl het rooster eronder scrollt; dekkend, anders
-        // schemeren de blokken er doorheen.
         background: '#070707',
         position: 'sticky', top: 0, zIndex: 6, flexShrink: 0, boxSizing: 'border-box',
+        display: 'flex', flexDirection: 'column',
       }}>
-        {/* Eén regel: WOENSDAG 2 SEPT. Stond als drie regels onder elkaar —
-            dagnaam, datum, aantal items — wat de kop hoger maakte dan de
-            informatie rechtvaardigt. Het aantal items zie je al doordat de
-            blokken eronder staan. */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 5, flexWrap: 'nowrap', whiteSpace: 'nowrap',
-        }}>
-          {onVorigeDag && (
-            <button onClick={(e) => { e.stopPropagation(); onVorigeDag() }} title="Vorige dag"
-              style={dagPijl}>
-              <ChevronLeft size={13} strokeWidth={2.6} />
-            </button>
-          )}
-          <span style={{
-            fontSize: isMobile ? '0.62rem' : '0.72rem',
-            fontWeight: 900,
-            color: '#fff',
-            opacity: isToday ? 1 : 0.55,
-            letterSpacing: '-0.01em',
-            textTransform: 'uppercase',
+        <div style={{ height: kopDag(isMobile), flexShrink: 0, padding: 2, boxSizing: 'border-box', position: 'relative' }}>
+          <div style={{
+            height: '100%', borderRadius: 7,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden',
+            background: isToday ? '#fff' : 'transparent',
+            color: isToday ? '#000' : 'rgba(255,255,255,0.7)',
+            fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
           }}>
-            {isMobile ? DAY_LABELS_NL[day] : DAY_LABELS_NL_LONG[day]}
-          </span>
-          {dateForHeader && (
-            <span style={{
-              fontSize: isMobile ? '0.62rem' : '0.72rem',
-              fontWeight: 900,
-              color: '#fff',
-              opacity: isToday ? 1 : 0.75,
-              letterSpacing: '-0.01em',
-              textTransform: 'uppercase',
-            }}>
-              {dateForHeader.getDate()} {dateForHeader.toLocaleDateString('nl-NL', { month: 'short' }).replace('.', '')}
-            </span>
-          )}
-          {/* Sterretje blijft: het meldt dat een blok voor deze dag afwijkt
-              van het vaste weekpatroon, en dat zie je nergens anders. */}
-          {blocks.some(b => b.meta?.isOverridden) && (
-            <span style={{ color: '#fff', fontWeight: 900, fontSize: '0.72rem' }}>★</span>
-          )}
-          {onVolgendeDag && (
-            <button onClick={(e) => { e.stopPropagation(); onVolgendeDag() }} title="Volgende dag"
-              style={dagPijl}>
-              <ChevronRight size={13} strokeWidth={2.6} />
+            {onVorigeDag && (
+              <button onClick={(e) => { e.stopPropagation(); onVorigeDag() }} title="Vorige dag"
+                style={{ ...dagPijl, color: 'inherit' }}>
+                <ChevronLeft size={13} strokeWidth={2.6} />
+              </button>
+            )}
+            <span>{onVorigeDag ? DAY_LABELS_NL_LONG[day] : DAY_LABELS_NL[day]}</span>
+            {dateForHeader && (
+              <span style={{ fontWeight: 800, opacity: isToday ? 0.75 : 0.6, letterSpacing: 0 }}>
+                {dateForHeader.getDate()}{onVorigeDag ? ` ${dateForHeader.toLocaleDateString('nl-NL', { month: 'short' }).replace('.', '')}` : ''}
+              </span>
+            )}
+            {/* Sterretje: een blok wijkt deze dag af van het vaste weekpatroon. */}
+            {blocks.some(b => b.meta?.isOverridden) && <span style={{ fontWeight: 900 }}>★</span>}
+            {onVolgendeDag && (
+              <button onClick={(e) => { e.stopPropagation(); onVolgendeDag() }} title="Volgende dag"
+                style={{ ...dagPijl, color: 'inherit' }}>
+                <ChevronRight size={13} strokeWidth={2.6} />
+              </button>
+            )}
+          </div>
+          {onAddClick && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddClick(day) }}
+              title="Voeg blok toe"
+              style={{
+                position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)',
+                width: 18, height: 18, padding: 0,
+                background: 'transparent', border: 'none',
+                color: isToday ? '#000' : 'rgba(255,255,255,0.55)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Plus size={12} strokeWidth={3} />
             </button>
           )}
         </div>
-        {onAddClick && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddClick(day) }}
-            title="Voeg blok toe"
-            style={{
-              position: 'absolute',
-              top: 2, right: 2,
-              width: 18, height: 18,
-              padding: 0,
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 0,
-              color: COLORS.text50,
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Plus size={11} strokeWidth={2.5} />
-          </button>
-        )}
+        <StappenRegel stappen={stappen} doel={stappenDoel} />
+        <VoedingRegel blocks={blocks} doel={kcalDoel} isMobile={isMobile} echt={echt} />
       </div>
       {/* Block-area */}
       <div
@@ -569,12 +609,17 @@ function TimeAxis({ isMobile }) {
       display: 'flex', flexDirection: 'column',
     }}>
       <div style={{
-        padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
         borderBottom: `1px solid ${COLORS.border}`,
         background: '#070707',
         height: kopHoogte(isMobile),
         position: 'sticky', top: 0, zIndex: 6, flexShrink: 0, boxSizing: 'border-box',
-      }} />
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', paddingRight: 7,
+        color: 'rgba(255,255,255,0.4)',
+      }}>
+        <div style={{ height: kopDag(isMobile), flexShrink: 0 }} />
+        <div style={{ height: KOP_STAPPEN, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Footprints size={11} strokeWidth={2.6} /></div>
+        <div style={{ height: KOP_VOEDING, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Utensils size={11} strokeWidth={2.6} /></div>
+      </div>
       <div style={{
         position: 'relative',
         flex: 1, minHeight: gridMinHoogte(isMobile),
@@ -1310,6 +1355,25 @@ export default function ClientAgendaView({
     return () => { weg = true }
   }, [weergave, service, client?.id, weekAnchor, refreshKey])
   const isRealiteit = weergave === 'realiteit'
+  // Stappen van de getoonde week, voor de regel in de kop van elke dag.
+  const [stappenWeek, setStappenWeek] = useState([])
+  const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
+  const weekIso = toIsoDate(weekAnchor)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    const laad = async () => {
+      try {
+        const [dagen, doel] = await Promise.all([StappenService.haalWeek(db, client.id, new Date(weekAnchor)), StappenService.haalDoel(db, client.id)])
+        if (weg) return
+        setStappenWeek(dagen || []); setStappenDoel(doel || STANDAARD_DOEL)
+      } catch (e) { console.error('stappen voor agenda laden mislukt:', e) }
+    }
+    laad()
+    window.addEventListener(STAPPEN_EVENT, laad)
+    return () => { weg = true; window.removeEventListener(STAPPEN_EVENT, laad) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id, db, weekIso])
 
   const reload = async () => {
     if (!service || !client?.id) return
@@ -2448,6 +2512,10 @@ export default function ClientAgendaView({
               gridRef={(el) => { gridRefs.current[day] = el }}
               dateForHeader={dForHeader}
               isToday={isToday}
+              stappen={stappenWeek.length === 7 ? stappenWeek[DAYS.indexOf(day)] : null}
+              stappenDoel={stappenDoel}
+              kcalDoel={Math.round(Number(client?.target_calories) || 0)}
+              echt={isRealiteit}
             />
           )
         })}
