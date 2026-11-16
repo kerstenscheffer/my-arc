@@ -200,8 +200,27 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     }
     // Geen actief plan gezet, wel plannen op naam van de klant: die tonen.
     if (!schemas.length && db.getClientWorkoutPlans) {
-      try { schemas = (await db.getClientWorkoutPlans(client.id)) || [] } catch { schemas = [] }
+      // getClientWorkoutPlans geeft { plans, activeId } terug, geen lijst (16 nov
+      // 2026: de builder crashte met "schemas.find is not a function" bij een
+      // klant zonder actief plan maar met plannen op zijn naam).
+      try {
+        const r = await db.getClientWorkoutPlans(client.id)
+        schemas = Array.isArray(r) ? r : (r?.plans || [])
+      } catch { schemas = [] }
     }
+    // Ook de andere plannen op naam van de klant (16 nov 2026): het thuisplan
+    // voor een andere sportschool en het deload-schema van de mesocyclus staan
+    // niet actief, maar moeten hier wel te openen zijn. Het actieve blijft voorop.
+    try {
+      const { data: eigen } = await db.supabase.from('workout_schemas').select('*')
+        .eq('client_id', client.id).neq('is_template', true).order('created_at', { ascending: false })
+        .then(r => r, () => ({ data: [] }))
+      const al = new Set(schemas.map(x => x.id))
+      for (const p of eigen || []) {
+        if (al.has(p.id) || p.is_archived) continue
+        schemas.push({ ...p, _label: p.deload_van ? p.name : `${p.name || 'Plan'} (niet actief)` })
+      }
+    } catch { /* de lijst blijft dan zoals hij was */ }
     if (laadVoor.current !== client.id) return
     setClientSchemas(schemas)
     // Het actieve plan van de klant voorop; anders het nieuwste.
