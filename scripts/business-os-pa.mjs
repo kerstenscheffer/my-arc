@@ -202,7 +202,7 @@ const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit', ...GEHEIMEN_NIET_LEZEN]
 // CHAT_ENV: geen CLAUDE.md en geen auto-memory meeladen (~14k tokens en ~1 s
 // per bericht, gemeten 30 okt). De cwd blijft, dus Read/Grep en pa-db werken;
 // CLAUDE.md lezen kan de chat nog zelf met Read.
-const CHAT_MODEL = process.env.PA_CHAT_MODEL || 'sonnet'
+const CHAT_MODEL = process.env.PA_CHAT_MODEL || 'claude-fable-5-2'
 const CHAT_ENV = { CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' }
 const CHAT_LICHT = [
   '--model', CHAT_MODEL,
@@ -217,7 +217,7 @@ const CHAT_LICHT = [
 // Business OS-regels komen erachter) en per gesprek een sessie die hervat
 // wordt, zodat hij onthoudt wat hij al opzocht. Wel dezelfde rechten als Snel
 // plus internet: alleen lezen, wijzigen via voorstellen.
-const SLIM_MODEL = process.env.PA_SLIM_MODEL || 'opus'
+const SLIM_MODEL = process.env.PA_SLIM_MODEL || 'claude-fable-5-2'
 const SLIM_TOEGESTAAN = [...CHAT_TOEGESTAAN, 'WebSearch', 'WebFetch']
 const SLIM_ARGS = [
   '--model', SLIM_MODEL,
@@ -595,7 +595,7 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
     '-p', `${INSTRUCTIE}${ctx ? INSTRUCTIE_VRAGEN : ''}${regels}\n\nOpdracht:\n${opdracht}`,
     // Partial messages: ook denkwerk geeft tekens van leven aan de waakhond.
     '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-    '--model', 'opus', '--effort', 'high',
+    '--model', SLIM_MODEL, '--effort', 'high',
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
     '--disallowedTools', (ctx ? VERBODEN_MET_VRAGEN : VERBODEN).join(','),
