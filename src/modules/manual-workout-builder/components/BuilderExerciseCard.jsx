@@ -37,6 +37,8 @@ const EQUIPMENT_OPTIONS = [
 
 export default function BuilderExerciseCard({
   exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo, onSwap, geselecteerd = false,
+  // Weekdoel "herhalingen over" van de lopende mesocyclus (rir.js); null = niet tonen.
+  rirDoel = null,
   // Zelfde vorm als de maaltijdkaart in de Plan Analyzer: foto links met het
   // nummer, naam en sets rechts, en een knoppenrij eronder.
   kaartStijl = false,
@@ -112,7 +114,7 @@ export default function BuilderExerciseCard({
               {exercise.probeer && <span style={{ flexShrink: 0, fontSize: '0.52rem', fontWeight: 900, color: '#000', background: '#fff', padding: '2px 6px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>Proberen</span>}
             </div>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
-              {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}</>}
+              {isCardio ? statText : <><b style={{ color: '#fff', fontWeight: 800 }}>{exercise.sets ?? 2}</b> × {exercise.reps ?? '8-12'} · {exercise.rust ?? exercise.rest ?? '2 min'}{rirDoel != null && !exercise.power && !exercise.deload && !exercise.probeer ? ` · RIR ${rirDoel >= 4 ? '4+' : rirDoel}` : ''}</>}
             </div>
           </div>
           <div {...greep} data-greep title="Slepen om te verplaatsen" style={{ ...greep?.style, width: 20, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)' }}>
@@ -204,7 +206,7 @@ export default function BuilderExerciseCard({
               {isCardio ? (
                 <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{statText}</span>
               ) : (<>
-                {[{ v: exercise.sets ?? 2, l: 'sets' }, { v: exercise.reps ?? '8-12', l: 'reps' }, { v: exercise.rust ?? exercise.rest ?? '2 min', l: 'rust' }].map(x => (
+                {[{ v: exercise.sets ?? 2, l: 'sets' }, { v: exercise.reps ?? '8-12', l: 'reps' }, { v: exercise.rust ?? exercise.rest ?? '2 min', l: 'rust' }, ...(rirDoel != null && !exercise.power && !exercise.deload && !exercise.probeer ? [{ v: rirDoel >= 4 ? '4+' : rirDoel, l: 'rir' }] : [])].map(x => (
                   <span key={x.l} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
                     <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{x.v}</span>
                     <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{x.l}</span>

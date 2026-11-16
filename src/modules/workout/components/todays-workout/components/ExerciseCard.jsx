@@ -15,7 +15,7 @@ import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseCard({
   exercise, index, isLogged, onLogsUpdate,
-  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder, openNu = false, onGeopend, onVolgende, laatsteVanSpier = false
+  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder, openNu = false, onGeopend, onVolgende, laatsteVanSpier = false, rirDoel = null
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
@@ -356,6 +356,13 @@ export default function ExerciseCard({
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
                     <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{localExercise.reps}</span>
                     <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>reps</span>
+                  </div>
+                )}
+                {/* Weekdoel van de mesocyclus: zoveel herhalingen over houden. */}
+                {rirDoel != null && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: '#10b981' }}>{rirDoel >= 4 ? '4+' : rirDoel}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>rir</span>
                   </div>
                 )}
               </div>

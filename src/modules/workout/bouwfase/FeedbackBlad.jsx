@@ -36,7 +36,7 @@ const chip = (aan) => ({
 })
 
 // rirDoel: het weekdoel "herhalingen over" (rir.js). Gevuld = eerst de vraag hoeveel je over had.
-export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null }) {
+export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null, rirGelogd = null }) {
   const [score, setScore] = useState(7)
   const [gevoel, setGevoel] = useState('goed')
   const [opmerking, setOpmerking] = useState('')
@@ -56,11 +56,12 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     setGevoel(bestaand?.gevoel ?? 'goed')
     setOpmerking(bestaand?.opmerking ?? '')
     setFout(null)
-    setRir(bestaand?.rir ?? null)
-    setStap(soort === 'oefening' && rirDoel != null ? 0 : 1)
+    // Per set al ingevuld in het invoerscherm (rirGelogd): dan vragen we het hier niet opnieuw.
+    setRir(rirGelogd ?? bestaand?.rir ?? null)
+    setStap(soort === 'oefening' && rirDoel != null ? (rirGelogd != null ? 2 : 0) : 1)
     setPomp(bestaand?.pomp ?? null)
-    setGekozen(!!bestaand)
-  }, [open, bestaand, soort, rirDoel])
+    setGekozen(!!bestaand || (soort === 'oefening' && rirDoel != null && rirGelogd != null))
+  }, [open, bestaand, soort, rirDoel, rirGelogd])
 
   if (!open || !client?.id) return null
 
@@ -89,7 +90,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   }
 
   const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : soort === 'spier' ? `${spierWoord(spiergroep).charAt(0).toUpperCase()}${spierWoord(spiergroep).slice(1)} klaar` : 'Je training'
-  const sub = soort === 'oefening' ? `Oefening klaar · stap ${metRir ? (stap === 0 ? 1 : 2) : stap} van 2` : soort === 'herstel' ? 'Voor je begint' : soort === 'spier' ? 'Twee korte vragen' : 'Training afronden'
+  const sub = soort === 'oefening' ? (metRir && rirGelogd != null ? 'Oefening klaar' : `Oefening klaar · stap ${metRir ? (stap === 0 ? 1 : 2) : stap} van 2`) : soort === 'herstel' ? 'Voor je begint' : soort === 'spier' ? 'Twee korte vragen' : 'Training afronden'
 
   return createPortal(
     <div onClick={onClose} style={{
@@ -117,11 +118,11 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         {soort === 'herstel' && rp && (
           <>
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
-              Hoe was de spierpijn in je {spierWoord(spiergroep)} na de vorige training?
+              Hoe {['chest', 'back', 'abs', 'shoulders', 'core'].includes(spiergroep) ? 'is' : 'zijn'} je {spierWoord(spiergroep)} hersteld?
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {SPIERPIJN.map(o => (
-                <button key={o.id} disabled={bezig} onClick={() => bewaar({ gevoel: o.gevoel, spierpijn: o.id })} style={{ ...chip(false), flex: 'none', minHeight: 50, textAlign: 'left', padding: '0 0.9rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button key={o.id} disabled={bezig} onClick={() => bewaar({ gevoel: o.gevoel, spierpijn: o.id })} style={{ ...chip(false), flex: 'none', minHeight: 54, textAlign: 'left', padding: '0.55rem 0.9rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: o.kleur, flexShrink: 0 }} />{o.label}
                 </button>
               ))}

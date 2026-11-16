@@ -1519,6 +1519,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </div>
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.6rem 0', scrollbarWidth: 'thin' }}>
                   <DayBuilder
+                rirDoel={volumeCtx?.rir?.doel ?? null}
                     key={dag.id} day={dag} dayNumber={i + 1} isActive zonderKop compact
                     onActivate={() => setActiveDay(dag.id)}
                     onUpdate={(updates) => updateDay(dag.id, updates)}
@@ -1717,6 +1718,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             )}
             {actieveDag ? (
               <DayBuilder
+                rirDoel={volumeCtx?.rir?.doel ?? null}
                 key={actieveDag.id} day={actieveDag} dayNumber={actieveIndex + 1} isActive zonderKop
                 onActivate={() => setActiveDay(actieveDag.id)}
                 onUpdate={(updates) => updateDay(actieveDag.id, updates)}

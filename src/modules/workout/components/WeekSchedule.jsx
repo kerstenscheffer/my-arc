@@ -24,6 +24,9 @@ import StappenInzichtModal from '../../steps/StappenInzichtModal'
 import { Footprints, BarChart3 } from 'lucide-react'
 import useBouwfase from '../bouwfase/useBouwfase'
 import { faseStand, faseTekst } from '../bouwfase/bouwfaseData'
+import { rirDoel as rirDoelVan, rirTekst } from '../bouwfase/rir'
+import MesoOverzicht from '../bouwfase/MesoOverzicht'
+import { CalendarRange } from 'lucide-react'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -118,7 +121,10 @@ export default function WeekSchedule({
     if (deload) return { tekst: `Deload · ${deload.dagen} dagen`, kort: `Deload ${deload.dagen} dagen`, kleur: '#f59e0b' }
     const stand = standen[(new Date().getDay() + 6) % 7]
     const bouw = stand?.soort === 'bouw' ? stand : standen.find(x => x?.soort === 'bouw')
-    return bouw ? { tekst: faseTekst(bouw), kort: `Bouwfase W${bouw.week}/W${bouw.weken}`, kleur: '#fff' } : null
+    // Met RIR-progressie aan: het weekdoel erachter ("Bouwfase W2/W6 · RIR 2").
+    const rir = bouw ? rirDoelVan(bouwfase, bouw) : null
+    const rirStuk = rir != null ? ` · RIR ${rir >= 4 ? '4+' : rir}` : ''
+    return bouw ? { tekst: `${faseTekst(bouw)}${rir != null ? ` · ${rirTekst(rir).toLowerCase()}` : ''}`, kort: `Bouwfase W${bouw.week}/W${bouw.weken}${rirStuk}`, kleur: '#fff' } : null
   })()
   const [faseInfo, setFaseInfo] = useState(false)
   const isToekomst = weekOffset > 0
@@ -881,10 +887,15 @@ export default function WeekSchedule({
         const cardioPerDag = cardioPerDagVan(dayDates)
         return (
           <>
+            {/* Builder: de faseregel opent het overzicht van de hele mesocyclus. */}
             {faseRegel && zonderKop && (
-              <div style={{ padding: isMobile ? '0 1rem 0.4rem' : '0 1.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: faseRegel.kleur }}>
-                {faseRegel.tekst}
-              </div>
+              <button type="button" onClick={() => setFaseInfo(true)} title="Hele mesocyclus bekijken" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7, margin: isMobile ? '0 1rem 0.4rem' : '0 1.25rem 0.5rem', padding: '0.3rem 0.6rem', borderRadius: 8,
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: faseRegel.kleur,
+              }}>
+                <CalendarRange size={14} strokeWidth={2.6} /> {faseRegel.tekst}
+              </button>
             )}
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
             {/* Telefoon: de week van rand tot rand (13 nov 2026, Kersten). */}
@@ -1109,7 +1120,7 @@ export default function WeekSchedule({
       {/* Uitleg bij de fase: wat het is en waar de klant nu staat. */}
       {faseInfo && bouwfase && createPortal(
         <div onClick={() => setFaseInfo(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 780, maxHeight: '94dvh', overflowY: 'auto', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 0.8rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: '0.8rem' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{faseRegel?.tekst || 'Bouwfase'}</div>
@@ -1121,6 +1132,10 @@ export default function WeekSchedule({
                 <X size={18} strokeWidth={2.6} />
               </button>
             </div>
+            {/* De hele mesocyclus per week; tik op een week om hem in de weekstrook te openen. */}
+            <MesoOverzicht db={db} clientId={clientId} fase={bouwfase} schema={schema} rooster={tempSchedule} isMobile={isMobile}
+              onKiesWeek={onWeekOffsetChange ? (offset) => { onWeekOffsetChange(offset); setFaseInfo(false) } : null} />
+            <div style={{ height: 8 }} />
             {[
               'Je traint een aantal weken hetzelfde schema en bouwt elke week op.',
               'Bij je training vraagt de app hoe je hersteld bent en hoe zwaar het voelde.',

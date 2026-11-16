@@ -85,10 +85,10 @@ export function rirOordeel(rir, doel) {
 // Alleen voor klanten met RIR-progressie aan; zie rir.sql voor de kolommen.
 // `gevoel` is de oude driedeling die naast `spierpijn` gevuld blijft.
 export const SPIERPIJN = [
-  { id: 0, label: 'Nooit spierpijn gehad', gevoel: 'nee', kleur: '#10b981' },
-  { id: 1, label: 'Al een tijd weg', gevoel: 'nee', kleur: '#10b981' },
-  { id: 2, label: 'Net op tijd weg', gevoel: 'beetje', kleur: '#f59e0b' },
-  { id: 3, label: 'Nog steeds spierpijn', gevoel: 'ja', kleur: '#ef4444' },
+  { id: 0, label: 'Geen spierpijn gehad van de vorige training', gevoel: 'nee', kleur: '#10b981' },
+  { id: 1, label: 'Spierpijn van de vorige training is al een tijdje weg', gevoel: 'nee', kleur: '#10b981' },
+  { id: 2, label: 'Spierpijn van de vorige training is net op tijd weg', gevoel: 'beetje', kleur: '#f59e0b' },
+  { id: 3, label: 'Ik heb nog steeds spierpijn van de vorige training', gevoel: 'ja', kleur: '#ef4444' },
 ]
 export const POMP = [{ id: 0, label: 'Weinig' }, { id: 1, label: 'Goed' }, { id: 2, label: 'Enorm' }]
 export const WERKDRUK = [{ id: 0, label: 'Makkelijk' }, { id: 1, label: 'Goed' }, { id: 2, label: 'Op mijn grens' }, { id: 3, label: 'Te veel' }]

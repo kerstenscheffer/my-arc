@@ -8,7 +8,7 @@ import { voorstelDag } from '../dagTitel'
 import { minutenVoorOefeningen } from '../trainingsTijd'
 import { setsPerSpierDag, spierLabel, spierVan } from '../spierGroepen'
 
-export default function DayBuilder({
+export default function DayBuilder({ rirDoel = null,
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
   onAddExercise, onUpdateExercise, onDeleteExercise, isMobile, db, client,
   // Indeling als de Plan Analyzer (26 okt 2026): de kop (naam, spiergroep,
@@ -192,6 +192,7 @@ export default function DayBuilder({
               </div>
             )}
             <BuilderExerciseCard
+              rirDoel={rirDoel}
               exercise={exercise} index={index} isMobile={isMobile} db={db} client={client}
               geselecteerd={!!selectie?.has(`${day.id}|${exercise.id}`)}
               greep={sleep.greep(index)}
@@ -406,6 +407,7 @@ export default function DayBuilder({
             {day.exercises.map((exercise, index) => (
               <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
                 <BuilderExerciseCard
+              rirDoel={rirDoel}
                   exercise={exercise}
                   index={index}
                   isMobile={isMobile}

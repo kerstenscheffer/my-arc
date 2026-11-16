@@ -5,6 +5,8 @@ import { isPower, POWER_UITLEG } from '../../../utils/power'
 import { corrigeerSpier } from '../../../../manual-workout-builder/spierGroepen'
 import ExerciseCard from './ExerciseCard'
 import { spiergroepVan } from '../../../bouwfase/bouwfaseData'
+import useBouwfase from '../../../bouwfase/useBouwfase'
+import { rirDoel as rirDoelVan } from '../../../bouwfase/rir'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
 import { fotoKandidaten, getFallbackImage, fotoAchtergrond } from '../../../utils/oefeningFoto'
@@ -39,6 +41,9 @@ export default function ExerciseList({
   client, schema, db, workoutDayKey, weekdag, dagenMetTraining
 }) {
   const isMobile = window.innerWidth <= 768
+  // Weekdoel "herhalingen over" (RIR) van de lopende mesocyclus, voor op de kaarten.
+  const bouwfase = useBouwfase(client, db)
+  const weekRir = rirDoelVan(bouwfase.fase, bouwfase.stand)
   const [visibleExercises, setVisibleExercises] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [localExercises, setLocalExercises] = useState(exercises || [])
@@ -462,6 +467,7 @@ export default function ExerciseList({
                 onGeopend={() => setOpenIndex(null)}
                 onVolgende={() => naarVolgende(index)}
                 /* Laatste oefening van deze spiergroep vandaag: dan volgen de vragen over pomp en zwaarte (rir.js). */
+                rirDoel={exercise?.type === 'cardio' || isPower(exercise) || exercise?.deload || exercise?.probeer ? null : weekRir}
                 laatsteVanSpier={!localExercises.slice(index + 1).some(e => e?.type !== 'cardio' && !isPower(e) && !e?.deload && !e?.probeer && spiergroepVan(e) === spiergroepVan(exercise))}
               />
             </div>

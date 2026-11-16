@@ -22,7 +22,7 @@ import OpwarmPoort from './OpwarmPoort'
 import useBouwfase from '../../../bouwfase/useBouwfase'
 import { isPower, POWER_UITLEG, POWER_PCT, SNELHEDEN, snelheidVan, schat1RM, basisNaam } from '../../../utils/power'
 import FeedbackBlad from '../../../bouwfase/FeedbackBlad'
-import { rirDoel as rirDoelVan, rirTekst, rirVoorstelSets, rirLabel, repBereik } from '../../../bouwfase/rir'
+import { rirDoel as rirDoelVan, rirTekst, rirVoorstelSets, rirLabel, repBereik, besteSet, RIR_KEUZES } from '../../../bouwfase/rir'
 import { leesFeedbackVanDag, spiergroepVan, vandaagIso, bewaarFeedback } from '../../../bouwfase/bouwfaseData'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
@@ -140,7 +140,7 @@ function SetsKiezer({ waarde, gelogd, onKies }) {
 // De wizard rekent in de eenheid van de sportschool waar je staat: je draait
 // aan het wiel in lb en er gaan kilo's naar buiten. Alles wat deze component
 // verlaat via onComplete is kilo, zodat er nooit een pond in de database komt.
-function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false, eenheid = 'kg', power = false }) {
+function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false, eenheid = 'kg', power = false, rirDoel = null }) {
   const EH = eenheidLabel(eenheid)
   const toon = (kilo) => vanKg(kilo, eenheid)
   const [step, setStep] = useState(1)
@@ -152,8 +152,13 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
   const [dropWeight, setDropWeight] = useState(Math.max(0, toon(previousWeight) - (eenheid === 'lb' ? 20 : 10)))
   const [dropReps, setDropReps] = useState(0)
   const [dropStep, setDropStep] = useState(1)
+  // RIR-progressie: na de herhalingen één tik "hoeveel had je nog over" per set.
+  const metRir = rirDoel != null && !power && !editMode
+  const [rir, setRir] = useState(null)
+  const rirVeld = rir != null ? { rir } : {}
 
   const stepTitles = {
+    rir: 'Hoeveel had je nog over?',
     1: editMode ? 'Gewicht aanpassen' : (eenheid === 'lb' ? 'Hoeveel pond?' : 'Hoeveel kilo?'),
     2: editMode ? 'Reps aanpassen' : 'Hoeveel reps?',
     3: power ? 'Hoe snel ging het?' : 'Partials?',
@@ -163,15 +168,16 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
   // Power: gewicht, herhalingen, en dan hoe snel het ging. Geen partials of
   // dropsets: die horen bij uitputting, niet bij explosief werk.
-  const totalSteps = power ? 3 : snel ? 2 : (hasDropset ? 5 : 4)
-  const displayStep = step <= 4 ? Math.min(step, totalSteps) : totalSteps
+  const totalSteps = (power ? 3 : snel ? 2 : (hasDropset ? 5 : 4)) + (metRir ? 1 : 0)
+  const stapNr = step === 'rir' ? 3 : step >= 3 && metRir ? step + 1 : step
+  const displayStep = Math.min(stapNr, totalSteps)
 
   const handleFinish = () => {
-    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: hasDropset ? [{ weight: naarKg(dropWeight, eenheid), reps: dropReps }] : [] })
+    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: hasDropset ? [{ weight: naarKg(dropWeight, eenheid), reps: dropReps }] : [], ...rirVeld })
   }
 
   function handleFinishWithoutDrop() {
-    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: [] })
+    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: [], ...rirVeld })
   }
 
   const InfoTip = ({ text }) => (
@@ -184,7 +190,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
     <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', zIndex: 10001, display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease' }}>
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {editMode ? 'SET AANPASSEN' : power ? `STAP ${Math.min(step, 3)}/3` : snel ? `STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
+          {editMode ? 'SET AANPASSEN' : `STAP ${displayStep}/${totalSteps}`}
         </div>
         <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '0.35rem 0.75rem', touchAction: 'manipulation' }}>
           Annuleren
@@ -197,7 +203,30 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
         </h3>
 
         {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />}
-        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : power ? setStep(3) : snel ? handleFinishWithoutDrop() : setStep(3)} />}
+        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : power ? setStep(3) : metRir ? setStep('rir') : snel ? handleFinishWithoutDrop() : setStep(3)} />}
+
+        {step === 'rir' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>{EH}</span> × {reps}</div>
+            <InfoTip text={`Nette herhalingen die je nog had kunnen doen. Doel deze week: ${rirDoel >= 4 ? '4+' : rirDoel} over.`} />
+            <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+              {RIR_KEUZES.map(n => (
+                <button key={n} onClick={() => {
+                  setRir(n)
+                  // Met de rusttimer aan is dit de laatste stap; anders door naar partials.
+                  if (snel) onComplete({ weight: naarKg(weight, eenheid), reps, partials: 0, dropsets: [], rir: n })
+                  else setStep(3)
+                }} style={{
+                  flex: 1, minHeight: 64, borderRadius: 14, fontFamily: 'inherit', fontSize: isMobile ? '1.25rem' : '1.35rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation',
+                  background: n === rirDoel ? '#fff' : 'transparent', color: n === rirDoel ? '#0a0a0a' : '#fff', border: `1px solid ${n === rirDoel ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+                }}>{rirLabel(n)}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
+              <span>0 = er kon er geen meer bij</span><span>4+ = makkelijk</span>
+            </div>
+          </div>
+        )}
 
         {step === 3 && !editMode && power && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
@@ -361,6 +390,9 @@ function LoggedSetRow({ set, index, eerder = [], actief = 0, onAddDropset, onEdi
               <div style={{ fontSize: '0.72rem', color: snelheidVan(set.snelheid).kleur, fontWeight: 800, marginTop: 1 }}>
                 {snelheidVan(set.snelheid).label}
               </div>
+            )}
+            {set.rir != null && (
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, marginTop: 1 }}>{rirLabel(set.rir)} over</div>
             )}
             {set.dropsets?.length > 0 && (
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
@@ -799,7 +831,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
         const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).eq('exercise_name', exercise.name).order('created_at', { ascending: true })
         if (progress?.length > 0) {
           const existingSets = []
-          progress.forEach(p => { if (p.sets && Array.isArray(p.sets)) p.sets.forEach(s => existingSets.push({ weight: s.weight || 0, reps: s.reps || 0, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}) })) })
+          progress.forEach(p => { if (p.sets && Array.isArray(p.sets)) p.sets.forEach(s => existingSets.push({ weight: s.weight || 0, reps: s.reps || 0, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}), ...(s.rir != null ? { rir: s.rir } : {}) })) })
           setLoggedSets(existingSets)
           const lastNote = progress[progress.length - 1]?.notes
           if (lastNote) setExerciseNote(lastNote)
@@ -812,7 +844,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const handleSetComplete = async (setData) => {
     // Bij het aanpassen van een set wordt de snelheid niet opnieuw gevraagd: die blijft staan.
     const snelheid = setData.snelheid || (editingIndex !== null ? loggedSets[editingIndex]?.snelheid : null)
-    const newSet = { weight: setData.weight, reps: setData.reps, partials: setData.partials || 0, dropsets: setData.dropsets || [], ...(snelheid ? { snelheid } : {}) }
+    // Hoeveel er over was: bij een correctie blijft het eerdere antwoord staan.
+    const rirSet = setData.rir ?? (editingIndex !== null ? loggedSets[editingIndex]?.rir : null)
+    const newSet = { weight: setData.weight, reps: setData.reps, partials: setData.partials || 0, dropsets: setData.dropsets || [], ...(snelheid ? { snelheid } : {}), ...(rirSet != null ? { rir: rirSet } : {}) }
     let newSets
 
     if (editingIndex !== null) {
@@ -920,7 +954,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     if (!client?.id || !db) return
     setSaving(true)
     try {
-      const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}) }))
+      const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [], ...(s.snelheid ? { snelheid: s.snelheid } : {}), ...(s.rir != null ? { rir: s.rir } : {}) }))
       const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, notitie || null, vandaag)
 
       console.log('💾 progress id:', progress?.id, '| attachment:', attachmentUsed, '| settings:', machineSettings)
@@ -1009,8 +1043,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // RIR-progressie: voorstel per set vanuit de vorige keer. Staat vooringevuld
   // in het invoerscherm; wijkt de klant af van het gewicht, dan volgt de rest
   // zijn eigen laatste set.
+  const rirVorigeWaarde = besteSet(previousPerformance?.sets)?.rir ?? rirVorige?.rir ?? null
+  // Wat vandaag per set is ingevuld, als één getal voor de coach (gemiddelde).
+  const rirVandaag = (() => {
+    const l = loggedSets.map(x => x?.rir).filter(x => x != null)
+    return l.length ? Math.round(l.reduce((a, b) => a + Number(b), 0) / l.length) : null
+  })()
   const rirPlan = rirDoel != null
-    ? rirVoorstelSets({ sets: previousPerformance?.sets, rirVorige: rirVorige?.rir, doel: rirDoel, bereik: repBereik(exercise.reps), stap: eenheid === 'lb' ? 2.26796 : 2.5 })
+    ? rirVoorstelSets({ sets: previousPerformance?.sets, rirVorige: rirVorigeWaarde, doel: rirDoel, bereik: repBereik(exercise.reps), stap: eenheid === 'lb' ? 2.26796 : 2.5 })
     : null
   const planSet = (i) => (rirPlan?.sets?.length ? rirPlan.sets[Math.min(i, rirPlan.sets.length - 1)] : null)
   const volgendePlan = (() => {
@@ -1383,7 +1423,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               return (
                 <div style={{ margin: isMobile ? '0.8rem 0.9rem 0.2rem' : '1rem 1.25rem 0.3rem', padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
                   <div style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-                    Week {bouwfase.stand.week} van {bouwfase.stand.weken}
+                    Week {bouwfase.stand.week} van {bouwfase.stand.weken} · RIR {rirLabel(rirDoel)}
                   </div>
                   <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>{rirTekst(rirDoel)}</div>
                   {v ? (
@@ -1392,16 +1432,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                         ? (v.sets[0].weight ? `${toonKg(v.sets[0].weight)}${EHP} × ${v.sets.map(x => x.reps).join(' · ')}` : `${v.sets.map(x => x.reps).join(' · ')} herhalingen`)
                         : v.sets.map(x => `${toonKg(x.weight)} × ${x.reps}`).join(' · ')}
                       <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
-                        {' '}· vorige keer {vorigeSet.weight ? `${toonKg(vorigeSet.weight)} × ${vorigeSet.reps}` : `${vorigeSet.reps}`} met {rirLabel(rirVorige.rir)} over
+                        {' '}· vorige keer {vorigeSet.weight ? `${toonKg(vorigeSet.weight)} × ${vorigeSet.reps}` : `${vorigeSet.reps}`} met {rirLabel(rirVorigeWaarde)} over
                       </span>
                     </div>
                   ) : (
                     <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, marginTop: 4 }}>
-                      Kies een gewicht waarmee je dat haalt. Na de oefening vraag ik hoeveel je over had; vanaf dan staat hier een voorstel per set, al ingevuld.
+                      Kies een gewicht waarmee je dat haalt. Na elke set vraag ik hoeveel je over had; vanaf de volgende keer staat hier een voorstel per set, al ingevuld.
                     </div>
                   )}
                   <div style={{ fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4, marginTop: 4 }}>
-                    Over = nette herhalingen die je nog had kunnen doen.
+                    RIR = reps in reserve: nette herhalingen die je nog had kunnen doen.
                   </div>
                 </div>
               )
@@ -1676,6 +1716,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 snel={rustTimerAan && editingIndex === null}
                 eenheid={eenheid}
                 power={power}
+                rirDoel={rirDoel}
               />
             )}
 
@@ -1731,7 +1772,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       {bfAan && (
         <FeedbackBlad
           open={!!fbOpen} soort={fbOpen || 'oefening'} client={client} db={db} fase={bouwfase.fase}
-          oefening={exercise.name} spiergroep={spier} rirDoel={rirDoel}
+          oefening={exercise.name} spiergroep={spier} rirDoel={rirDoel} rirGelogd={rirVandaag}
           bestaand={fbOpen === 'oefening' ? oefFeedback : null}
           onOpgeslagen={fbOpgeslagen}
           onClose={() => {
