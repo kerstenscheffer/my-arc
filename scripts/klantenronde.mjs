@@ -3,7 +3,7 @@
 // Klanten-ochtendronde (6 nov 2026). Elke ochtend ma t/m za zet Gino in het
 // Klanten-paneel (CheckinRonde.jsx) per klant een status (groep), wat er
 // speelt, hoe Kersten kan helpen en een voorbereiding voor calls van vandaag.
-// Op ma/wo/za ook conceptappjes. Alles landt in checkin_ronde_items, een
+// Op maandag (check-in ronde) ook conceptappjes. Alles landt in checkin_ronde_items, een
 // coach-tabel: er gaat NOOIT iets naar een klant. Gino levert de rijen als
 // actie { soort: "ronde_vul", items: [...] }; vulRonde() controleert en schrijft.
 
@@ -81,9 +81,8 @@ export async function vulRonde(sb, coachId, actie) {
 }
 
 const DAG_WERK = {
-  1: `Maandag: schrijf alleen een bericht voor klanten die hun check-in NA zaterdag invulden (checkin_date zondag of maandag) en voor wie nog niets invulde sinds vrijdag. Die laatste: een kort, vriendelijk duwtje om hem in te vullen. De rest geen bericht.`,
-  3: `Woensdag (check-in bericht): schrijf een bericht voor iedere klant die niet gepauzeerd is, in de vaste opbouw (skill Check-in ronde, stap 4). Er is woensdag geen nieuwe check-in: haal stap 2 van het bericht uit de check-in van vrijdag/zaterdag (hoe gaat dat plan nu?) en het compliment uit de data van deze week.`,
-  6: `Zaterdag (diepe check-in): schrijf een bericht voor iedere klant die niet gepauzeerd is, op basis van de check-in van vrijdag/zaterdag (skill Check-in ronde, stap 4). Nog geen check-in: een kort duwtje.`,
+  // Check-in ronde op maandag (Kersten 16 nov 2026). Wo en za: alleen status, geen berichten.
+  1: `Maandag (check-in ronde): schrijf een bericht voor iedere klant die niet gepauzeerd is, in de vaste opbouw (skill Check-in ronde, stap 4), op basis van de check-in van vrijdag t/m zondag (checkin_date vr, za of zo; deadline voor klanten is zondag 12:00; een late check-in van vanochtend telt ook). Geen check-in in die periode: een kort, vriendelijk duwtje om hem alsnog in te vullen.`,
 }
 
 // Opdracht voor de ronde. dag = getDay() in NL-tijd (0 = zondag).
