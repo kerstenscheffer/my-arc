@@ -8,14 +8,17 @@
 
 alter table public.clients add column if not exists niet_betalend boolean not null default false;
 
+-- De einddatum telt niet mee: wie afliep zonder beslissing, of met een geboekte
+-- verlenging waarvan de weken niet zijn opgehoogd, blijft actief tot de coach
+-- 'Nee' kiest in Einde traject (aangepast 16 nov 2026, later op de dag).
 create or replace function public.actieve_betalende_klanten()
 returns table (client_id uuid, naam text, start date, eind date, onbeperkt boolean)
 language sql stable security invoker set search_path = public as $$
   select c.id,
          trim(regexp_replace(coalesce(c.first_name,'') || ' ' || coalesce(c.last_name,''), '\s+', ' ', 'g')),
          c.coaching_start_date,
-         case when coalesce(c.coaching_onbeperkt, false) then null
-              else c.coaching_start_date + (coalesce(c.coaching_total_weeks, 0) * 7 + coalesce(c.coaching_paused_days_total, 0)) end,
+         case when coalesce(c.coaching_onbeperkt, false) or c.coaching_total_weeks is null then null
+              else c.coaching_start_date + (c.coaching_total_weeks * 7 + coalesce(c.coaching_paused_days_total, 0)) end,
          coalesce(c.coaching_onbeperkt, false)
   from clients c
   where c.status = 'active'
@@ -24,8 +27,7 @@ language sql stable security invoker set search_path = public as $$
     and not c.niet_betalend
     and c.coaching_start_date is not null
     and c.coaching_start_date <= (now() at time zone 'Europe/Amsterdam')::date
-    and (coalesce(c.coaching_onbeperkt, false)
-         or c.coaching_start_date + (coalesce(c.coaching_total_weeks, 0) * 7 + coalesce(c.coaching_paused_days_total, 0)) >= (now() at time zone 'Europe/Amsterdam')::date)
+    and (coalesce(c.coaching_onbeperkt, false) or c.coaching_total_weeks is not null)
 $$;
 revoke all on function public.actieve_betalende_klanten() from public, anon;
 grant execute on function public.actieve_betalende_klanten() to authenticated, service_role;
@@ -58,3 +60,10 @@ returns jsonb language sql stable security invoker set search_path = public as $
 $$;
 revoke all on function public.klant_stand(timestamptz, timestamptz) from public, anon;
 grant execute on function public.klant_stand(timestamptz, timestamptz) to authenticated, service_role;
+
+-- 16 nov 2026 (later): clients.gestopt_op = de echte stopdatum als die afwijkt van
+-- het moment dat het account op slot ging (Nitish stopte in juli, ging later pas
+-- op inactief). klant_stand() rekent 'gestopt' sindsdien op
+--   coalesce(gestopt_op, account_locked_at in NL-tijd)
+-- De live definitie is met die regel opnieuw gedraaid; zie de functie in de database.
+alter table public.clients add column if not exists gestopt_op date;

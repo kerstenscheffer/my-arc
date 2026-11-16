@@ -28,6 +28,8 @@ import { rekenGeld } from './challengeGeld'
 const STATUS_KEUZE = [
   ['ja_mondeling', 'Ja'],
   ['denkt_na', 'Denkt na'],
+  // Gezet in het lead-systeem (Einde traject), met een datum erbij.
+  ['call', 'Call ingepland'],
   ['nee', 'Nee'],
 ]
 const CHALLENGE_WEKEN = 6
@@ -42,6 +44,24 @@ const euro = (n) => `€${Math.round(Number(n) || 0).toLocaleString('nl-NL')}`
 // Bovenaan wat nu telt: eerst wie iets van jou nodig heeft.
 const gesprekNodig = (r) => !r.status && !r.gepauzeerd && !r.onbeperkt && (r.challenge ? (r.week || 0) >= GESPREK_VANAF_WEEK : r.dagen != null && r.dagen <= 14)
 const volgorde = (r) => (r.eindcallNodig ? 0 : r.status === 'ja_mondeling' ? 1 : r.status === 'denkt_na' ? 2 : gesprekNodig(r) ? 3 : !r.status ? 4 : r.status === 'betaald' ? 5 : 6)
+// Wat moet de coach nu doen bij deze klant, en in welke groep hoort de kaart
+// (16 nov 2026)? 'actie' = jij bent aan zet, 'loopt' = niets te doen, 'klaar'
+// = afgerond. De volgorde van de regels is de volgorde van belang.
+const watNu = (r) => {
+  if (r.status === 'betaald') return { groep: 'klaar', tekst: 'Door, betaald' }
+  if (r.status === 'nee') return { groep: 'klaar', tekst: 'Gestopt' }
+  if (r.status === 'ja_mondeling') return { groep: 'actie', tekst: 'Betaling ophalen' }
+  if (r.eindcallNodig) return { groep: 'actie', tekst: 'Eindcall plannen' }
+  if (r.status === 'denkt_na') return { groep: 'actie', tekst: 'Opvolgen: denkt na' }
+  if (gesprekNodig(r)) return { groep: 'actie', tekst: 'Doorstapgesprek voeren' }
+  if (!r.status && !r.gepauzeerd && !r.onbeperkt && r.dagen != null && r.dagen < 0) return { groep: 'actie', tekst: 'Traject voorbij: beslissen' }
+  if (r.gepauzeerd) return { groep: 'loopt', tekst: 'Op pauze' }
+  if (r.status === 'call') return { groep: 'loopt', tekst: 'Call ingepland' }
+  return { groep: 'loopt', tekst: '' }
+}
+const dagenTekst = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} ${r.dagen === -1 ? 'dag' : 'dagen'} voorbij` : r.dagen === 0 ? 'Eindigt vandaag' : `Nog ${r.dagen} ${r.dagen === 1 ? 'dag' : 'dagen'}`)
+const GROEPEN = [['actie', 'Actie nodig'], ['loopt', 'Loopt'], ['klaar', 'Afgerond']]
+
 const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '') : '—')
 const callKort = (iso) => {
   const d = new Date(iso)
@@ -112,6 +132,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [gestopt, setGestopt] = useState([]) // challenge-klanten van wie het traject is beëindigd
   const [soortFilter, setSoortFilter] = useState(leesFilter)
   const [looptijd, setLooptijd] = useState(null) // { id, start, weken } terwijl je hem aanpast
+  const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -445,31 +466,16 @@ export default function GinoDoorstap({ isMobile = false }) {
       return !!e?.voorbij && borgOordeel(e, instellingen.get(id))?.geschikt === false
     },
   })
-  const kolommen = metEisen ? '148px 104px 50px 46px 118px 70px 40px 26px' : '148px 104px 50px 118px 70px 40px 26px'
+  // Klein label achter een cijfer op de kaart, zoals KCAL / E / K / V op een maaltijdkaart.
+  const klein = { fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textSecondary }
   const dun = { background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none', maxWidth: '100%' }
 
   return (
     <div style={{ marginBottom: 24 }}>
       {/* CoachHub zet elke select op 16px (tegen inzoomen op de iPhone). Op de computer hoeft dat niet. */}
-      {/* Telefoon: eerst naam, stand, bedrag en vinkje; daaronder traject, week, eisen en eindcall. */}
       <style>{`@media (min-width: 769px) { select.gd-stand, input.gd-stand { font-size: 0.78rem !important } }
         @keyframes gd-draai { to { transform: rotate(360deg) } }
-        .gd-draai { animation: gd-draai 0.8s linear infinite }
-        .gd-rij { display: flex !important; flex-wrap: wrap; column-gap: 6px; row-gap: 2px }
-        .gd-rij > * { min-width: 0 }
-        .gd-rij > :nth-child(1) { order: 1; flex: 1 1 calc(100% - 180px) }
-        .gd-rij > :nth-child(2) { order: 5; flex: 0 0 112px }
-        .gd-rij > :nth-child(3) { order: 6; flex: 0 0 44px }
-        .gd-rij > :nth-child(4) { order: 8; flex: 1 1 0; text-align: right }
-        .gd-rij > :nth-child(5) { order: 2; flex: 0 0 92px; text-align: right }
-        .gd-rij > :nth-child(6) { order: 3; flex: 0 0 40px }
-        .gd-rij > :nth-child(7) { order: 4; flex: 0 0 24px }
-        .gd-met > :nth-child(4) { order: 7; flex: 0 0 44px; text-align: left }
-        .gd-met > :nth-child(5) { order: 8; flex: 1 1 0; text-align: right }
-        .gd-met > :nth-child(6) { order: 2; flex: 0 0 92px; text-align: right }
-        .gd-met > :nth-child(7) { order: 3; flex: 0 0 40px }
-        .gd-met > :nth-child(8) { order: 4; flex: 0 0 24px }
-        .gd-rij select.gd-stand { width: 100%; text-align: right; text-align-last: right; transform: scale(0.82); transform-origin: right center }`}</style>
+        .gd-draai { animation: gd-draai 0.8s linear infinite }`}</style>
       <div style={{ paddingBottom: 8 }}>
         <select className="gd-stand" aria-label="Soort traject" value={soortFilter} onChange={e => kiesSoort(e.target.value)} style={{
           height: 26, padding: 0, background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', outline: 'none',
@@ -497,114 +503,162 @@ export default function GinoDoorstap({ isMobile = false }) {
       {fout && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.danger, marginBottom: 8 }}>{fout}</div>}
       {zichtbaar.length === 0 && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.textSecondary }}>Niemand in deze lijst.</div>}
 
+      {/* Eén kaart per klant, in de vorm van een maaltijdkaart (16 nov 2026,
+          Kersten): links een tegel met de week, rechts de naam met de stand,
+          het bedrag en het vinkje, en eronder traject, eisen en eindcall als
+          cijfers met een klein label. Alles wat je kon aanklikken kan nog. */}
       {zichtbaar.length > 0 && (
-        <div style={{ overflowX: isMobile ? 'visible' : 'auto' }}>
-          <div style={{ width: isMobile ? '100%' : 'max-content' }}>
-            <div style={{ display: isMobile ? 'none' : 'grid', gridTemplateColumns: kolommen, gap: 8, padding: '0 0 4px', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
-              <span /><button type="button" onClick={wisselSorteer} title={eindOplopend ? 'Eerstvolgend einde bovenaan. Klik: omdraaien' : 'Laatste einde bovenaan. Klik: omdraaien'} style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>Traject {eindOplopend ? '↑' : '↓'}</button><span />{metEisen && <span>Eisen</span>}<span>Eindcall</span><span /><span /><span />
-            </div>
-            {zichtbaar.map((r) => {
-              const nodig = gesprekNodig(r)
-              const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
-              return (
-                <div key={r.client_id}>
-                  <div className={isMobile ? (metEisen ? 'gd-rij gd-met' : 'gd-rij') : undefined} style={{ ...(isMobile ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto auto', gridAutoFlow: 'row', columnGap: 8, rowGap: 2, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.08)' } : { display: 'grid', gridTemplateColumns: kolommen, gap: 8, minHeight: 25 }), alignItems: 'center', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
-                    <span title={r.pakket || undefined} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
-                    <button type="button" onClick={() => openTraject(r)} title={`${r.dagen != null ? (r.dagen < 0 ? `${-r.dagen} dagen voorbij` : `Nog ${r.dagen} dagen`) : ''}. Klik: looptijd of verlenging aanpassen`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', whiteSpace: 'nowrap', color: r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary }}>{r.onbeperkt ? '∞' : <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}</button>
-                    <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt} onClick={() => setLooptijd(o => (o?.id === r.client_id ? null : { id: r.client_id, start: r.klant.coaching_start_date || '', weken: r.klant.coaching_total_weeks || 6 }))} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
-                      <WeekBalk week={r.week} weken={r.weken} />
-                    </button>
-                    {metEisen && (r.challenge ? (
-                    <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left', fontVariantNumeric: 'tabular-nums', color: eisen[r.client_id]?.alles ? G : colors.textPrimary }}>
-                      {eisen[r.client_id] ? `${eisen[r.client_id].behaald}/${eisen[r.client_id].totaal}` : '…'}
-                      {(() => {
-                        // Handmatig of na afloop telt het oordeel, daarvoor de schatting. Op pauze staat de klok stil: geen teken.
-                        const e = eisen[r.client_id]
-                        if (!e || r.gepauzeerd) return null
-                        const o = borgOordeel(e, instellingen.get(r.client_id))
-                        const ok = o ? o.geschikt : e.prognose?.ok
-                        if (ok == null) return null
-                        return <span title={o ? o.tekst : ok ? 'Lijkt het te halen' : (e.prognose.kanNog ? 'Loopt achter op schema' : 'Kan het niet meer halen')} style={{ color: ok ? G : colors.danger }}> {ok ? '✓' : '✕'}</span>
-                      })()}
-                    </button>
-                    ) : <span style={{ color: colors.textSecondary }}>—</span>)}
-                    <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || (r.gepauzeerd ? 'Pauze' : r.status === 'betaald' ? 'Hoeft niet' : 'Nog niet nodig'))} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: r.eindcallNodig ? colors.danger : r.volgendeCall ? (r.naamChecken ? '#f59e0b' : G) : colors.textSecondary }}>
-                      {r.volgendeCall ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : r.eindcallNodig ? 'Geen' : ''}
-                    </span>
-                    {r.status === 'betaald' ? (
-                      <span style={{ color: G }}>Betaald</span>
-                    ) : (
-                      <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={bezig === r.client_id}
-                        onChange={e => (e.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, e.target.value, r.pakket))}
-                        style={{ ...dun, appearance: 'none', WebkitAppearance: 'none', padding: 0, color: r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : nodig ? '#f59e0b' : colors.textPrimary }}>
-                        <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : '·'}</option>
-                        {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
-                        {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
-                      </select>
-                    )}
-                    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bedrag ? colors.textPrimary : colors.textSecondary }}>{bedrag ? euro(bedrag) : ''}</span>
-                    <span style={{ textAlign: 'right', position: 'relative' }}>
+        <div style={{ maxWidth: 760 }}>
+          <button type="button" onClick={wisselSorteer} title={eindOplopend ? 'Eerstvolgend einde bovenaan. Klik: omdraaien' : 'Laatste einde bovenaan. Klik: omdraaien'}
+            style={{ padding: '0 0 6px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
+Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
+          </button>
+          {GROEPEN.map(([groep, groepLabel]) => {
+            // Actie nodig op belang (wie het eerst iets van je nodig heeft), de rest op einddatum.
+            const inGroep = zichtbaar.filter(x => watNu(x).groep === groep)
+            const lijst = groep === 'actie' ? [...inGroep].sort((a, b) => volgorde(a) - volgorde(b) || (a.dagen ?? 999) - (b.dagen ?? 999)) : inGroep
+            if (!lijst.length) return null
+            const dicht = groep === 'klaar' && !klaarOpen
+            return (
+              <div key={groep} style={{ marginBottom: 12 }}>
+                <button type="button" onClick={groep === 'klaar' ? () => setKlaarOpen(o => !o) : undefined} aria-expanded={groep === 'klaar' ? klaarOpen : undefined}
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '2px 0 6px', background: 'none', border: 'none', fontFamily: 'inherit', cursor: groep === 'klaar' ? 'pointer' : 'default', color: colors.textPrimary }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: groep === 'actie' ? '#f59e0b' : colors.textPrimary }}>{groepLabel}</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>{lijst.length}{groep === 'klaar' ? (klaarOpen ? ' · verbergen' : ' · tonen') : ''}</span>
+                </button>
+                {!dicht && lijst.map((r) => {
+            const nodig = gesprekNodig(r)
+            const nu = watNu(r)
+            const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
+            const e = eisen[r.client_id]
+            const eindKleur = r.dagen == null ? colors.textSecondary : r.dagen < 0 ? colors.danger : r.dagen <= 7 ? '#f59e0b' : colors.textPrimary
+            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id)
+            return (
+              <div key={r.client_id} style={{ marginBottom: 7, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+                <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
+                  {/* Tegel: de week van het traject. Klik = start en aantal weken aanpassen. */}
+                  <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt}
+                    onClick={() => setLooptijd(o => (o?.id === r.client_id ? null : { id: r.client_id, start: r.klant.coaching_start_date || '', weken: r.klant.coaching_total_weeks || 6 }))}
+                    style={{ width: isMobile ? 60 : 68, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'rgba(255,255,255,0.05)', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', cursor: r.onbeperkt ? 'default' : 'pointer' }}>
+                    <span style={{ fontSize: '1.05rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{r.onbeperkt ? '∞' : r.week ? `${r.week}/${r.weken}` : '—'}</span>
+                    <span style={{ fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textSecondary }}>{r.gepauzeerd ? 'Pauze' : 'Week'}</span>
+                    <WeekBalk week={r.week} weken={r.weken} />
+                  </button>
+
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.8rem' }}>
+                    {/* Naam, stand, bedrag, vinkje */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
+                      {r.status === 'betaald' ? (
+                        <span style={{ flexShrink: 0, color: G }}>Betaald</span>
+                      ) : (
+                        <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={bezig === r.client_id}
+                          onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
+                          style={{ ...dun, flexShrink: 0, appearance: 'none', WebkitAppearance: 'none', padding: 0, textAlign: 'right', textAlignLast: 'right', color: r.status === 'ja_mondeling' ? G : r.status === 'nee' ? colors.danger : nodig ? '#f59e0b' : colors.textPrimary }}>
+                          <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
+                          {STATUS_KEUZE.map(([id, label]) => <option key={id} value={id} style={{ background: '#0a0a0a', color: '#fff' }}>{label}</option>)}
+                          {r.gepauzeerd && <option value="hervat" style={{ background: '#0a0a0a', color: '#fff' }}>Pauze eraf</option>}
+                        </select>
+                      )}
+                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(bedrag)}</span> : null}
                       {r.status === 'ja_mondeling' && (() => {
                         const zeker = bevestig === r.client_id
                         const laadt = bezig === r.client_id
                         return (
-                          <>
-                            {(zeker || laadt) && (
-                              // Over het bedrag heen, zodat de kolommen niet verspringen.
-                              <span aria-live="polite" style={{ position: 'absolute', right: 'calc(100% + 2px)', top: '50%', transform: 'translateY(-50%)', padding: '0 4px', background: colors.bg, whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 900, color: G }}>
-                                {laadt ? 'Bezig' : 'Zeker?'}
-                              </span>
-                            )}
-                            <button type="button" disabled={laadt} onClick={() => betaald(r)}
-                              title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, padding: 0, borderRadius: 6, border: 'none', cursor: laadt ? 'default' : 'pointer',
-                                background: zeker || laadt ? G : colors.textPrimary, color: colors.bg, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                              }}>
-                              {laadt ? <Loader2 size={13} strokeWidth={3.2} className="gd-draai" /> : <Check size={13} strokeWidth={3.2} />}
-                            </button>
-                          </>
+                          <button type="button" disabled={laadt} onClick={() => betaald(r)}
+                            title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
+                            style={{
+                              flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, height: 24, minWidth: 24, padding: zeker || laadt ? '0 8px' : 0, borderRadius: 7, border: 'none', cursor: laadt ? 'default' : 'pointer',
+                              background: zeker || laadt ? G : colors.textPrimary, color: colors.bg, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}>
+                            {(zeker || laadt) && <span aria-live="polite">{laadt ? 'Bezig' : 'Zeker?'}</span>}
+                            {laadt ? <Loader2 size={13} strokeWidth={3.2} className="gd-draai" /> : <Check size={13} strokeWidth={3.2} />}
+                          </button>
                         )
                       })()}
-                    </span>
+                    </div>
+
+                    {/* Cijferregel zoals op de maaltijdkaart: waarde, klein label erachter. */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isMobile ? '2px 10px' : '2px 14px', minWidth: 0 }}>
+                      {/* Wat nu: jouw volgende stap, vooraan en in gewone taal. */}
+                      {nu.tekst && (
+                        <span style={{ whiteSpace: 'nowrap', fontWeight: 900, color: nu.groep === 'actie' ? '#f59e0b' : nu.groep === 'klaar' ? colors.textSecondary : colors.textPrimary }}>
+                          {nu.groep === 'actie' ? '→ ' : ''}{nu.tekst}
+                        </span>
+                      )}
+                      {/* Dagen in plaats van datums; de datums staan in de tooltip. */}
+                      <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Klik: looptijd of verlenging aanpassen`}
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', color: eindKleur }}>
+                        {dagenTekst(r) || <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}
+                      </button>
+                      {metEisen && r.challenge && (
+                        <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen"
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: e?.alles ? G : colors.textPrimary }}>
+                          {e ? `${e.behaald}/${e.totaal}` : '…'}
+                          {(() => {
+                            // Handmatig of na afloop telt het oordeel, daarvoor de schatting. Op pauze staat de klok stil: geen teken.
+                            if (!e || r.gepauzeerd) return null
+                            const o = borgOordeel(e, instellingen.get(r.client_id))
+                            const ok = o ? o.geschikt : e.prognose?.ok
+                            if (ok == null) return null
+                            return <span title={o ? o.tekst : ok ? 'Lijkt het te halen' : (e.prognose.kanNog ? 'Loopt achter op schema' : 'Kan het niet meer halen')} style={{ color: ok ? G : colors.danger }}> {ok ? '✓' : '✕'}</span>
+                          })()}
+                          <span style={klein}> eisen</span>
+                        </button>
+                      )}
+                      {(r.volgendeCall || r.eindcallNodig) && (
+                        <span title={r.eindcallNodig ? (r.volgendeCall ? `Te laat: uiterlijk 3 dagen voor het einde. ${r.volgendeCall.titel || ''}` : 'Geen eindcall ingepland') : (r.volgendeCall?.titel || '')}
+                          style={{ whiteSpace: 'nowrap', color: r.eindcallNodig ? colors.danger : r.naamChecken ? '#f59e0b' : G }}>
+                          {r.volgendeCall ? `${callKort(r.volgendeCall.start)}${r.naamChecken ? ' ?' : ''}` : 'Geen'}
+                          <span style={klein}> eindcall</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {rijFout[r.client_id] && (
-                    <div role="alert" style={{ padding: '0 0 5px', fontSize: '0.75rem', fontWeight: 800, color: colors.danger }}>{rijFout[r.client_id]}</div>
-                  )}
-                  {looptijd?.id === r.client_id && (() => {
-                    const w = Number(looptijd.weken)
-                    const nieuwEind = looptijd.start && w >= 1 ? new Date(new Date(`${looptijd.start}T12:00:00`).getTime() + (w * 7 + (Number(r.klant.coaching_paused_days_total) || 0)) * 864e5).toLocaleDateString('sv-SE') : null
-                    const invoer = { height: 26, padding: '0 6px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: colors.textPrimary, fontFamily: 'inherit', fontWeight: 800 }
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0 0 6px', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>Start
-                          <input className="gd-stand" type="date" value={looptijd.start} onChange={e => setLooptijd(o => ({ ...o, start: e.target.value }))} style={invoer} />
-                        </label>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>Weken
-                          <input className="gd-stand" type="number" min="1" max="104" value={looptijd.weken} onChange={e => setLooptijd(o => ({ ...o, weken: e.target.value }))} style={{ ...invoer, width: 58 }} />
-                        </label>
-                        <span style={{ color: colors.textSecondary }}>Einde {dagKort(nieuwEind)}</span>
-                        <button type="button" disabled={bezig === r.client_id} onClick={bewaarLooptijd} style={{ height: 26, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', background: colors.textPrimary, color: colors.bg, fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900 }}>Opslaan</button>
-                        <button type="button" onClick={() => setLooptijd(null)} style={{ height: 26, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 800 }}>Annuleer</button>
-                      </div>
-                    )
-                  })()}
-                  {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={eisen[r.client_id]} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
-                  {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
-                    <div style={{ padding: '0 0 5px' }}>
+                </div>
+
+                {/* Wat openklapt: foutmelding, looptijd, de eisen, de borg. */}
+                {open && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '6px 0.6rem' : '6px 0.8rem' }}>
+                    {rijFout[r.client_id] && (
+                      <div role="alert" style={{ padding: '0 0 5px', fontSize: '0.75rem', fontWeight: 800, color: colors.danger }}>{rijFout[r.client_id]}</div>
+                    )}
+                    {looptijd?.id === r.client_id && (() => {
+                      const w = Number(looptijd.weken)
+                      const nieuwEind = looptijd.start && w >= 1 ? new Date(new Date(`${looptijd.start}T12:00:00`).getTime() + (w * 7 + (Number(r.klant.coaching_paused_days_total) || 0)) * 864e5).toLocaleDateString('sv-SE') : null
+                      const invoer = { height: 26, padding: '0 6px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: colors.textPrimary, fontFamily: 'inherit', fontWeight: 800 }
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0 0 6px' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>Start
+                            <input className="gd-stand" type="date" value={looptijd.start} onChange={ev => setLooptijd(o => ({ ...o, start: ev.target.value }))} style={invoer} />
+                          </label>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>Weken
+                            <input className="gd-stand" type="number" min="1" max="104" value={looptijd.weken} onChange={ev => setLooptijd(o => ({ ...o, weken: ev.target.value }))} style={{ ...invoer, width: 58 }} />
+                          </label>
+                          <span style={{ color: colors.textSecondary }}>Einde {dagKort(nieuwEind)}</span>
+                          <button type="button" disabled={bezig === r.client_id} onClick={bewaarLooptijd} style={{ height: 26, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', background: colors.textPrimary, color: colors.bg, fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900 }}>Opslaan</button>
+                          <button type="button" onClick={() => setLooptijd(null)} style={{ height: 26, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 800 }}>Annuleer</button>
+                        </div>
+                      )
+                    })()}
+                    {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={e} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
+                    {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && (
                       <select className="gd-stand" aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={{ ...dun, fontSize: '0.75rem', color: colors.textSecondary }}
-                        onChange={e => setBorgKeuze(k => ({ ...k, [r.client_id]: e.target.value }))}>
+                        onChange={ev => setBorgKeuze(k => ({ ...k, [r.client_id]: ev.target.value }))}>
                         <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>Geen borg gekoppeld</option>
                         {borgen.filter(b => b.id === borgKeuze[r.client_id] || !bezet.has(b.id)).map(b => (
                           <option key={b.id} value={b.id} style={{ background: '#0a0a0a', color: '#fff' }}>Borg {b.lead_name} {euro(b.order_value)}</option>
                         ))}
                       </select>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+                })}
+              </div>
+            )
+          })}
         </div>
       )}
 
