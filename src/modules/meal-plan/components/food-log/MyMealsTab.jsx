@@ -2,7 +2,7 @@
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import { vergeetMaaltijd } from '../../AIMealPlanService'
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package, Search } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package, Search } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
 import MealCard from '../day-schedule/MealCard'
 import Keuze from '../Keuze'
@@ -517,7 +517,40 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   const handleRemove = (index) => {
     const updated = [...meal.ingredients_list]
     updated.splice(index, 1)
+    setBewerk(null)
     setMeal({ ...meal, ingredients_list: updated })
+  }
+
+  // Hoeveelheid van een ingrediënt achteraf aanpassen (16 nov 2026, Kersten):
+  // eerder kon je een regel alleen weghalen en opnieuw zoeken. De macro's
+  // schalen mee vanaf de stand bij het openen, zodat tussentijds typen
+  // ("1", "15", "150") geen afrondingsfouten opstapelt.
+  const [bewerk, setBewerk] = useState(null) // { idx, basis, tekst }
+  const openBewerk = (idx) => {
+    const basis = meal.ingredients_list?.[idx]
+    const hoeveel = parseFloat(alsRegel(basis).amount)
+    if (!basis || !(hoeveel > 0)) return
+    setBewerk(bewerk?.idx === idx ? null : { idx, basis, tekst: String(hoeveel) })
+  }
+  const zetHoeveelheid = (tekst) => {
+    if (!bewerk) return
+    setBewerk({ ...bewerk, tekst })
+    const nieuw = parseFloat(String(tekst).replace(',', '.'))
+    if (!(nieuw > 0)) return
+    const { basis, idx } = bewerk
+    const oud = parseFloat(alsRegel(basis).amount)
+    const f = nieuw / oud
+    const schaal = (v) => (v == null || v === '' || isNaN(parseFloat(v)) ? v : Math.round(parseFloat(v) * f * 10) / 10)
+    const regel = { ...basis }
+    for (const k of ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'saturated_fat', 'salt']) if (k in regel) regel[k] = schaal(regel[k])
+    // De vorm van de regel blijft zoals hij was (amount of amount_gram).
+    if ('amount_gram' in basis && !('amount' in basis)) regel.amount_gram = nieuw
+    else regel.amount = nieuw
+    setMeal(prev => {
+      const lijst = [...(prev.ingredients_list || [])]
+      lijst[idx] = regel
+      return { ...prev, ingredients_list: lijst }
+    })
   }
 
   // Upload pending photo (if any) and return the URL to persist.
@@ -749,9 +782,12 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
 
         {/* Ingrediënten als dezelfde kaart als overal: gram rechts, weghalen
             als enige knop. */}
-        {regels.map((ing, idx) => (
+        {regels.map((ing, idx) => {
+          const eenheid = ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? 'g' : ` ${ing.unit}`
+          const aanpasbaar = parseFloat(ing.amount) > 0
+          return (
+          <React.Fragment key={`${ing.name}-${idx}`}>
           <MealCard
-            key={`${ing.name}-${idx}`}
             meal={{
               name: ing.name,
               image_url: resolveFoodImage(ing),
@@ -759,14 +795,38 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
               carbs: ing.carbs, fat: ing.fat,
             }}
             momentLabel=""
-            rechts={`${ing.amount ?? '?'}${ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? 'g' : ` ${ing.unit}`}`}
+            rechts={`${ing.amount ?? '?'}${eenheid}`}
             isMobile={isMobile}
-            acties={[{
-              icon: <Trash2 size={11} />, label: 'Weghalen',
-              onClick: () => handleRemove(idx), kleur: 'rgba(239,68,68,0.85)',
-            }]}
+            onTik={aanpasbaar ? () => openBewerk(idx) : undefined}
+            acties={[
+              ...(aanpasbaar ? [{ icon: <Pencil size={11} />, label: 'Aanpassen', onClick: () => openBewerk(idx) }] : []),
+              { icon: <Trash2 size={11} />, label: 'Weghalen', onClick: () => handleRemove(idx), kleur: 'rgba(239,68,68,0.85)' },
+            ]}
           />
-        ))}
+          {bewerk?.idx === idx && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.85rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>Hoeveel</span>
+              <input
+                type="text" inputMode="decimal" autoFocus value={bewerk.tekst}
+                onChange={(e) => zetHoeveelheid(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => { if (e.key === 'Enter') setBewerk(null) }}
+                style={{
+                  flex: 1, minWidth: 0, height: 42, padding: '0 0.75rem', borderRadius: 10,
+                  background: 'transparent', border: '1.5px solid rgba(255,255,255,0.3)', outline: 'none',
+                  color: '#fff', fontSize: '16px', fontWeight: 900, fontFamily: 'inherit',
+                }}
+              />
+              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: 'rgba(255,255,255,0.6)' }}>{eenheid.trim()}</span>
+              <button onClick={() => setBewerk(null)} style={{
+                height: 42, padding: '0 1rem', borderRadius: 10, border: 'none', background: '#fff', color: '#0a0a0a',
+                fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation',
+              }}>Klaar</button>
+            </div>
+          )}
+          </React.Fragment>
+          )
+        })}
 
         <div style={{ padding: isMobile ? '0.5rem 0.9rem 1rem' : '0.6rem 1.25rem 1.25rem' }}>
           <button onClick={onRequestAddIngredient} style={{
