@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, Smile, Meh, Frown } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
-import { GEVOEL, HERSTEL, bewaarFeedback, spierWoord } from './bouwfaseData'
+import { GEVOEL, bewaarFeedback, spierWoord } from './bouwfaseData'
 import { RIR_KEUZES, rirLabel, rirTekst, SPIERPIJN, POMP, WERKDRUK } from './rir'
 
 const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
@@ -47,7 +47,6 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   const [rir, setRir] = useState(null)
   const [pomp, setPomp] = useState(null)
   // Uitgebreide vragen per spiergroep (model RP): alleen met RIR-progressie aan.
-  const rp = rirDoel != null
   const metRir = soort === 'oefening' && rirDoel != null
 
   useEffect(() => {
@@ -115,7 +114,9 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
           }}><X size={18} strokeWidth={2.8} /></button>
         </div>
 
-        {soort === 'herstel' && rp && (
+        {/* Altijd de vier spierpijn-keuzes (17 nov 2026, Kersten), ook zonder RIR. 'gevoel' gaat mee
+            voor de oude regels en oude app-versies. */}
+        {soort === 'herstel' && (
           <>
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
               Hoe {['chest', 'back', 'abs', 'shoulders', 'core'].includes(spiergroep) ? 'is' : 'zijn'} je {spierWoord(spiergroep)} hersteld?
@@ -143,25 +144,6 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
               {WERKDRUK.map(o => <button key={o.id} disabled={bezig || pomp == null} onClick={() => bewaar({ pomp, werkdruk: o.id })} style={{ ...chip(false), minHeight: 48 }}>{o.label}</button>)}
             </div>
             {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginTop: 10 }}>{fout}</div>}
-          </>
-        )}
-
-        {soort === 'herstel' && !rp && (
-          <>
-            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16 }}>
-              Hoe goed {['chest', 'back', 'abs', 'shoulders'].includes(spiergroep) ? 'is' : 'zijn'} je {spierWoord(spiergroep)} hersteld?
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {HERSTEL.map(h => {
-                const Smiley = SMILEY[h.id]
-                return (
-                  <button key={h.id} disabled={bezig} onClick={() => bewaar({ gevoel: h.id })} style={{ ...chip(false), minHeight: 92, color: h.kleur, borderColor: `${h.kleur}66`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Smiley size={32} strokeWidth={2.2} />
-                    {h.label}
-                  </button>
-                )
-              })}
-            </div>
           </>
         )}
 
