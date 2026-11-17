@@ -85,7 +85,8 @@ const pickTip = () => {
 // ============================================
 // `knoppenSlot`: plek rechts in de datumregel waar de agenda zijn knoppen neerzet.
 // `gewichtSlot`: plek achter de datum waar de agenda het gewicht van die dag neerzet.
-function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = null, gewichtSlot = null }) {
+// `weergaveSlot`: plek achter de begroeting voor de schakelaar agenda / lijst.
+function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = null, gewichtSlot = null, weergaveSlot = null }) {
   const isMobile = useIsMobile()
 
   const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -131,7 +132,10 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
           <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
         </div>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch', paddingRight: isMobile ? '0.4rem' : '0.9rem' }}>
-          <StappenPil client={client} db={db} isMobile={isMobile} kaal />
+          {/* Rechtsboven: de schakelaar agenda / lijst (gevuld door de agenda
+              zelf). De stappen met doel stonden hier; die zie je nu in de
+              agenda (17 nov 2026, Kersten). */}
+          {weergaveSlot && <span ref={weergaveSlot} style={{ display: 'inline-flex', alignItems: 'center' }} />}
         </div>
       </div>
       <div style={{
@@ -163,14 +167,16 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
         <div style={{
           fontSize: isMobile ? '1.15rem' : '1.6rem',
           fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.15,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
-          {getGreeting()}, {firstName}
+          <span>{getGreeting()}, {firstName}</span>
         </div>
         <div style={{
           marginTop: 5, position: 'relative',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          fontSize: isMobile ? '0.72rem' : '0.78rem',
-          fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em',
+          // De datum even groot als de begroeting erboven (17 nov 2026, Kersten).
+          fontSize: isMobile ? '1.15rem' : '1.6rem',
+          fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.02em', lineHeight: 1.15,
         }}>
           {onVerzet && (
             <button onClick={() => onVerzet(-1)} aria-label="Vorige dag" style={dagPijlKnop}>
@@ -178,7 +184,7 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
             </button>
           )}
           {/* Kort: "DI 17", met daarachter het gewicht van die dag (tik = wegen). */}
-          <span title={`${dayName} ${dateLabel}`} style={{ color: isVandaag === false ? '#fff' : 'rgba(255,255,255,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span title={`${dayName} ${dateLabel}`} style={{ color: isVandaag === false ? '#fff' : 'rgba(255,255,255,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
             {dayName.slice(0, 2)} {getoond.getDate()}
           </span>
           {gewichtSlot && <span ref={gewichtSlot} style={{ display: 'inline-flex', alignItems: 'center' }} />}
@@ -654,6 +660,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
   // Plek in de datumregel voor de knoppen van de agenda (alleen in de agendaweergave).
   const [agendaKnoppen, setAgendaKnoppen] = useState(null)
   const [agendaGewicht, setAgendaGewicht] = useState(null)
+  const [agendaSchakelaar, setAgendaSchakelaar] = useState(null)
   // Welke weergave de agenda toont ('lijst' of 'rooster'); bepaalt de ruimte onderaan.
   const [agendaWeergave, setAgendaWeergave] = useState('lijst')
   const verzetAgendaDag = (richting) => {
@@ -675,6 +682,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
         onVerzet={verzetAgendaDag}
         knoppenSlot={setAgendaKnoppen}
         gewichtSlot={setAgendaGewicht}
+        weergaveSlot={setAgendaSchakelaar}
       />
 
       {/* ── De dag als agenda ─────────────────────────────────────────────
@@ -694,6 +702,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
             onVerzetDag={verzetAgendaDag}
             knoppenSlot={agendaKnoppen}
             gewichtSlot={agendaGewicht}
+            weergaveSlot={agendaSchakelaar}
             onWeergave={setAgendaWeergave}
             zijMarge={isMobile ? 16 : 24}
             toonKop={false}

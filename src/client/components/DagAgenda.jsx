@@ -125,6 +125,9 @@ export default function DagAgenda({
   knoppenSlot = null,
   // Plek achter de datum op de pagina: het gewicht van die dag, tik = wegen.
   gewichtSlot = null,
+  // Plek achter de begroeting: de schakelaar agenda / lijst. Staat die er, dan
+  // vervalt de losse wisselknop in het rijtje iconen.
+  weergaveSlot = null,
   // Meldt de ouder welke weergave open staat ('lijst' | 'rooster').
   onWeergave = null,
 }) {
@@ -820,15 +823,33 @@ export default function DagAgenda({
       {/* Kaal rijtje iconen rechts: wisselen tussen lijst en rooster, je
           dagindeling, en (alleen in het rooster) op het hele scherm. De grote
           schakelaar was drukker dan de dag eronder. */}
+      {/* Achter de begroeting: schakelaar tussen de agenda (op tijd) en de lijst. */}
+      {weergaveSlot && domPortal(
+        <span role="group" aria-label="Weergave" style={{ display: 'inline-flex', padding: 2, borderRadius: 10, background: 'rgba(255,255,255,0.08)' }}>
+          {[{ id: 'rooster', icoon: CalendarClock, naam: 'Agenda' }, { id: 'lijst', icoon: List, naam: 'Lijst' }].map(({ id, icoon, naam }) => {
+            const Icoon = icoon
+            const aan = weergave === id
+            return (
+              <button key={id} onClick={() => setWeergave(id)} aria-pressed={aan} aria-label={naam} title={naam}
+                style={{ width: 32, height: 28, padding: 0, borderRadius: 8, border: 'none', background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <Icoon size={15} strokeWidth={2.6} />
+              </button>
+            )
+          })}
+        </span>, weergaveSlot)}
       {/* Achter de datum: "89,7 kg" met een weegschaal; opent het weegvenster. */}
       {gewichtSlot && slaapDagIso && domPortal(
         <button onClick={() => { if (slaapDagIso <= toIsoDate(nu)) setWegenBlad(true) }} aria-label={gewogenOp != null ? `Gewogen: ${gewogenOp} kg. Aanpassen` : 'Gewicht invullen'} title={gewogenOp != null ? 'Gewicht aanpassen' : 'Gewicht invullen'}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6, padding: '2px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 900, color: gewogenOp != null ? '#fff' : 'rgba(255,255,255,0.5)', cursor: slaapDagIso <= toIsoDate(nu) ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6, padding: '2px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 900, color: gewogenOp != null ? '#fff' : 'rgba(255,255,255,0.5)', cursor: slaapDagIso <= toIsoDate(nu) ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            // Nog niet gewogen (en de dag is er al): zacht oplichten, als uitnodiging om te tikken.
+            animation: gewogenOp == null && slaapDagIso <= toIsoDate(nu) ? 'dagGloedWit 1.8s ease-in-out infinite' : 'none' }}>
+          <style>{`@keyframes dagGloedWit { 0%, 100% { color: rgba(255,255,255,0.5); text-shadow: none; filter: none; } 50% { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.8); filter: drop-shadow(0 0 4px rgba(255,255,255,0.7)); } }`}</style>
           {gewogenOp != null ? String(Math.round(Number(gewogenOp) * 10) / 10).replace('.', ',') : '--'} kg
-          <Scale size={13} strokeWidth={2.6} />
+          <Scale size={16} strokeWidth={2.6} />
         </button>, gewichtSlot)}
       {(() => {
         const knoppen = (<>
+        {!weergaveSlot && (
         <button
           onClick={() => setWeergave(weergave === 'lijst' ? 'rooster' : 'lijst')}
           title={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
@@ -837,6 +858,7 @@ export default function DagAgenda({
         >
           {weergave === 'lijst' ? <CalendarClock size={16} strokeWidth={2.6} /> : <List size={16} strokeWidth={2.6} />}
         </button>
+        )}
         <button
           onClick={() => setDagindeling(true)}
           title="Mijn dagindeling"
@@ -1070,7 +1092,7 @@ export default function DagAgenda({
               onWater={dagIso && dagIso <= toIsoDate(nu) ? waterErbij : null}
               onVoeding={onOpen ? () => onOpen({ type: 'meal', day: dag }) : null}
               onVerzet={(b, start) => setVerzetVraag({ blok: b, start })}
-              onSlaap={() => {
+              onSlaap={!(slaapDagIso && slaapDagIso <= toIsoDate(nu)) ? null : () => {
                 // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
                 const b = blokken.find(x => x.type === 'sleep' && x.meta?.wrapHalf !== 'late')
                 const sl = b ? slaapVan(b) : null
