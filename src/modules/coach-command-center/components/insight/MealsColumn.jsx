@@ -245,10 +245,9 @@ function bouwDagen(rijen, wissels) {
 
 const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
 
-export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db, coachId, onGeneratePlan }) {
+export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db }) {
   const [view, setView] = useState('days')
   const [selectedDay, setSelectedDay] = useState(null)
-  const [showGenerateModal, setShowGenerateModal] = useState(false)
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
   // 'aangepast' | 'supplementen' | 'documenten' | null. In beeld blijven de dagen.
   const [venster, setVenster] = useState(null)
@@ -563,23 +562,10 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           {/* In de kolomkop: welk plan, met Plan Analyzer, Genereer en het
               Inzicht-scherm van de klant (zie KolomKop). */}
           <KolomKopInhoud>
-            <span style={{ ...kopInfoStijl, flex: 1 }} title={mealData.plan ? (mealData.plan.name || 'Voedingsplan') : 'Nog geen plan'}>
-              <span style={{ color: mealData.plan?.isActive ? colors.success : 'rgba(255,255,255,0.5)', fontWeight: 900 }}>
-                {mealData.plan ? (mealData.plan.isActive ? 'Actief' : 'Concept') : 'Geen plan'}
-              </span>
-              {mealData.plan && <> · <span style={{ color: '#fff', fontWeight: 800 }}>{mealData.plan.name || 'Voedingsplan'}</span></>}
-              {laden && ' · laden…'}
-            </span>
-            {onNavigatePlan && db && (
-              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...kopKnopStijl, padding: 0, width: 28, justifyContent: 'center' }}>
-                <Zap size={14} strokeWidth={2.6} />
-              </button>
-            )}
+            {/* Vult de ruimte, zodat de knoppen rechts blijven staan. */}
+            <span style={{ flex: 1 }} />
             {[
               ['water', 'Water: doel en deze week', Droplet],
-              ['aangepast', 'Door de klant aangepast in het plan', History],
-              ['supplementen', 'Supplementen', Pill],
-              ['documenten', 'Documenten', FileText],
             ].map(([id, titel, Icoon]) => (
               <button key={id} onClick={() => setVenster(id)} title={titel} aria-label={titel}
                 style={{ ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }}>
@@ -620,32 +606,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
       <BladModal open={venster === 'water'} titel="Water" onClose={() => setVenster(null)} zIndex={12000}>
         <div className="ci-venster"><WaterDoel client={client} db={db} isMobile={isMobile} /></div>
       </BladModal>
-      <BladModal open={venster === 'aangepast'} titel="Aangepast door klant" onClose={() => setVenster(null)} zIndex={12000}>
-        <div className="ci-venster"><KlantPlanTerugzetten db={db} client={client} soort="meal" isMobile={isMobile} altijdOpen /></div>
-      </BladModal>
-      <BladModal open={venster === 'supplementen'} titel="Supplementen" onClose={() => setVenster(null)} zIndex={12000}>
-        <div className="ci-venster">{db && client?.id && <SupplementTrouw db={db} client={client} isMobile={isMobile} />}</div>
-      </BladModal>
-      <BladModal open={venster === 'documenten'} titel="Documenten" onClose={() => setVenster(null)} zIndex={12000}>
-        <div className="ci-venster">{db && client?.id && (
-          <ClientDocumentsSection db={db} clientId={client.id} coachId={coachId} isMobile={isMobile} isClientView={false} />
-        )}</div>
-      </BladModal>
-
-      {showGenerateModal && (
-        <GeneratePlanModal
-          client={client}
-          db={db}
-          coachId={coachId}
-          isMobile={isMobile}
-          onClose={() => setShowGenerateModal(false)}
-          onSuccess={(newPlanId) => {
-            setShowGenerateModal(false)
-            if (onGeneratePlan) onGeneratePlan(newPlanId)
-            else if (onNavigatePlan) { onNavigatePlan(client.id, newPlanId); onClose() }
-          }}
-        />
-      )}
     </>
   )
 }

@@ -22,12 +22,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays, RefreshCw, Info } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays, RefreshCw, Info, Pill } from 'lucide-react'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { maaltijdenVoorDag } from '../utils/maaltijdenVoorDag'
 import { getOverrides } from '../DayTemplateService'
 import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import { kcalKleur } from '../utils/kcalKleur'
+import { BRONNEN, bronVan } from '../utils/logBron'
 import { schrijfIngredientenUit, eenheidKort } from '../utils/ingredientenUitschrijven'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 
@@ -142,7 +143,7 @@ export default function MealDaySummaryModal({
     const tot = plusDagen(vanSleutel(bereik.tot), 1)
     db.supabase.from('consumed_meals')
       .select(ingebed
-        ? 'id, meal_name, meal_type, calories, protein, carbs, fat, consumed_at, image_url, amount, per_unit, ingredients, meal_id, notes'
+        ? 'id, meal_name, meal_type, calories, protein, carbs, fat, consumed_at, image_url, amount, per_unit, ingredients, meal_id, notes, source'
         : 'id, meal_name, meal_type, calories, protein, carbs, fat, consumed_at, image_url')
       .eq('client_id', clientId)
       .gte('consumed_at', van.toISOString())
@@ -161,9 +162,52 @@ export default function MealDaySummaryModal({
     return () => { weg = true }
   }, [isOpen, db, clientId, bereik, ingebed])
 
+  // Coach Inzicht: welke logs kwamen uit "vooruit gepland" (geplande_maaltijden
+  // met gelogd_id)? Die krijgen het label Ingepland.
+  const [ingepland, setIngepland] = useState(() => new Set())
+  useEffect(() => {
+    if (!ingebed || !isOpen || !db?.supabase || !clientId) return
+    let weg = false
+    db.supabase.from('geplande_maaltijden').select('gelogd_id')
+      .eq('client_id', clientId).not('gelogd_id', 'is', null)
+      .gte('datum', bereik.van).lte('datum', bereik.tot)
+      .then(({ data }) => { if (!weg) setIngepland(new Set((data || []).map(r => r.gelogd_id))) }, () => {})
+    return () => { weg = true }
+  }, [ingebed, isOpen, db, clientId, bereik])
+
+  // Coach Inzicht: afgevinkte supplementen per dag, in dezelfde lijst als de
+  // gelogde maaltijden.
+  const [supps, setSupps] = useState({}) // { 'YYYY-MM-DD': [{ naam, tijd }] }
+  useEffect(() => {
+    if (!ingebed || !isOpen || !db?.supabase || !clientId) return
+    let weg = false
+    db.supabase.from('supplement_logs')
+      .select('id, supplement_id, supplement_name, log_date, taken_at, created_at')
+      .eq('client_id', clientId).gte('log_date', bereik.van).lte('log_date', bereik.tot)
+      .then(({ data }) => {
+        if (weg) return
+        const uit = {}
+        ;(data || []).forEach(r => {
+          const k = String(r.log_date).slice(0, 10)
+          ;(uit[k] = uit[k] || []).push({ id: r.id, naam: r.supplement_name || 'Supplement', tijd: r.taken_at || r.created_at || null })
+        })
+        setSupps(uit)
+      }, () => {})
+    return () => { weg = true }
+  }, [ingebed, isOpen, db, clientId, bereik])
+
   // Coach Inzicht: een gelogde maaltijd openklappen om te zien wat er precies
   // gegeten is (hoeveelheid, macro's, ingrediënten met gram).
   const [info, setInfo] = useState(null) // { id, ingredienten: null | [], bron }
+  // Coach Inzicht: de lijst met gelogde maaltijden in- of uitgeklapt; de keuze
+  // blijft bewaard in deze browser.
+  const [lijstDicht, setLijstDicht] = useState(() => {
+    try { return localStorage.getItem('ci_voeding_gelogd_dicht') === '1' } catch { return false }
+  })
+  const wisselLijst = () => setLijstDicht(d => {
+    try { localStorage.setItem('ci_voeding_gelogd_dicht', d ? '0' : '1') } catch { /* privévenster */ }
+    return !d
+  })
   const openInfo = async (m) => {
     if (info?.id === m.id) { setInfo(null); return }
     setInfo({ id: m.id, ingredienten: null, bron: null })
@@ -244,6 +288,7 @@ export default function MealDaySummaryModal({
   const vandaagSleutel = sleutel(new Date())
   const gekozenSleutel = sleutel(gekozen)
   const maaltijden = perDag?.[gekozenSleutel] || []
+  const suppDag = ingebed ? (supps[gekozenSleutel] || []) : []
   const dag = totaal(maaltijden)
   const gekozenGepland = gepland[sleutel(gekozen)] || null
   // Een dag in de toekomst heeft nog geen logs: dan tellen de geplande
@@ -442,20 +487,64 @@ export default function MealDaySummaryModal({
               </>)}
 
               {/* ── 2. Wat je hebt gelogd ── */}
-              {!toekomst && !(ingebed && maaltijden.length === 0) && kopje('Gelogd', maaltijden.length ? `${maaltijden.length} ${maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` : null, ingebed)}
-              {toekomst ? null : maaltijden.length === 0 ? (
+              {!toekomst && !ingebed && kopje('Gelogd', maaltijden.length ? `${maaltijden.length} ${maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` : null)}
+              {/* Coach Inzicht: de gelogde maaltijden als stapeltje kaarten dat
+                  openklapt, zoals 'gedaan' op de homepagina van de klant. */}
+              {!toekomst && ingebed && (maaltijden.length > 0 || suppDag.length > 0) && (
+                <button onClick={wisselLijst} aria-expanded={!lijstDicht}
+                  aria-label={`${maaltijden.length} gelogd, ${lijstDicht ? 'bekijken' : 'inklappen'}`}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, margin: '0.7rem 0 0', padding: '4px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <style>{`@keyframes ciDeckUit { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }`}</style>
+                  <span style={{ display: 'flex', alignItems: 'center', paddingLeft: 2 }}>
+                    {maaltijden.slice(0, 8).map((m, i) => {
+                      const rot = ((i * 37) % 9) - 4
+                      return (
+                        <span key={m.id || i} style={{
+                          width: 28, height: 36, marginLeft: i ? -12 : 0, borderRadius: 6, flexShrink: 0,
+                          border: '2px solid #0e0e0e', boxShadow: '0 3px 8px rgba(0,0,0,0.5)',
+                          background: `url(${m.image_url || foodImageFallback(m.meal_name || 'Maaltijd', m.meal_type, 120)}) center/cover, #1c1c1c`,
+                          transform: `rotate(${rot}deg)`, zIndex: i,
+                        }} />
+                      )
+                    })}
+                    {suppDag.length > 0 && (
+                      <span style={{ width: 28, height: 36, marginLeft: maaltijden.length ? -12 : 0, borderRadius: 6, flexShrink: 0, border: '2px solid #0e0e0e', boxShadow: '0 3px 8px rgba(0,0,0,0.5)', background: '#1c1c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(3deg)', zIndex: 9 }}>
+                        <Pill size={13} strokeWidth={2.6} color={GROEN} />
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: GROEN, whiteSpace: 'nowrap' }}>
+                    {maaltijden.length} gelogd{suppDag.length > 0 ? ` · ${suppDag.length} ${suppDag.length === 1 ? 'supplement' : 'supplementen'}` : ''}
+                  </span>
+                  <ChevronRight size={15} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto', flexShrink: 0, transform: lijstDicht ? 'none' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
+                </button>
+              )}
+              {toekomst || (ingebed && (lijstDicht || suppDag.length > 0) && (maaltijden.length > 0 || suppDag.length > 0) && (lijstDicht || maaltijden.length === 0)) ? null : maaltijden.length === 0 ? (
                 <div style={{ marginTop: ingebed ? '0.6rem' : 0, fontSize: ingebed ? '0.76rem' : '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Op deze dag is niets gelogd.</div>
               ) : maaltijden.map((m, i) => {
                 const naam = m.meal_name || 'Maaltijd'
                 const foto = m.image_url || foodImageFallback(naam, m.meal_type, 120)
                 return (
-                  <div key={m.id || i} style={{ borderTop: i ? `1px solid ${LIJN}` : 'none' }}>
+                  <div key={m.id || i} style={{ borderTop: i ? `1px solid ${LIJN}` : 'none', animation: ingebed ? 'ciDeckUit 0.25s ease' : 'none' }}>
                   <div onClick={ingebed ? () => openInfo(m) : undefined} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', cursor: ingebed ? 'pointer' : 'default' }}>
                     <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>
                       <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
                         {new Date(m.consumed_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+                        {ingebed && (() => {
+                          // Waar de log vandaan komt: plan, barcode, zoeken, ingepland…
+                          const bron = bronVan(m)
+                          const isIngepland = ingepland.has(m.id)
+                          const uitPlan = bron === 'plan'
+                          if (bron === 'onbekend' && !isIngepland) return null
+                          return (
+                            <span title={isIngepland ? 'Vooraf ingepland en daarna als gegeten afgevinkt' : BRONNEN[bron]?.uitleg}
+                              style={{ marginLeft: 6, fontSize: '0.6rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: uitPlan || isIngepland ? GROEN : 'rgba(255,255,255,0.75)' }}>
+                              · {isIngepland ? 'Ingepland' : BRONNEN[bron]?.tekst}
+                            </span>
+                          )
+                        })()}
                       </span>
                     </span>
                     <span style={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
@@ -495,6 +584,23 @@ export default function MealDaySummaryModal({
                 )
               })}
 
+              {/* Afgevinkte supplementen: één rij onder de maaltijden. */}
+              {ingebed && !toekomst && !lijstDicht && suppDag.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderTop: maaltijden.length ? `1px solid ${LIJN}` : 'none', animation: 'ciDeckUit 0.25s ease' }}>
+                  <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 10, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Pill size={18} strokeWidth={2.4} color={GROEN} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={suppDag.map(x => x.naam).join(' · ')}>{suppDag.map(x => x.naam).join(' · ')}</span>
+                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
+                      {suppDag[0].tijd ? new Date(suppDag[0].tijd).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      <span style={{ marginLeft: suppDag[0].tijd ? 6 : 0, fontSize: '0.6rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: GROEN }}>{suppDag[0].tijd ? '· ' : ''}Supplementen</span>
+                    </span>
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: '0.86rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{suppDag.length}×</span>
+                </div>
+              )}
+
               {/* ── 3. De week ── */}
               {/* Coach Inzicht: geen regel 'Week van …'; de weekpijlen staan
                   links van ma en rechts van zo, met de datum naast de dag. */}
@@ -506,7 +612,32 @@ export default function MealDaySummaryModal({
                 <button onClick={() => kies(plusDagen(gekozen, 7))} aria-label="Volgende week" style={{ ...pijl, width: 28, height: 28 }}><ChevronRight size={16} strokeWidth={3} /></button>
                 {doel.kcal > 0 && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{opDoel}/{gelogdeDagen.length || 0} op doel</span>}
               </div>
-              <div style={{ position: 'relative', height: ingebed ? 84 : 120, display: 'flex', alignItems: 'flex-end', gap: 6, ...(ingebed ? { margin: '0.9rem 26px 0' } : {}) }}>
+              {/* Coach Inzicht: de dagenstrook boven de tegels, zelfde vorm als bij
+                  Training: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
+              {ingebed && (
+                <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px' }}>
+                  {week.map((w, i) => {
+                    const aan = w.k === gekozenSleutel
+                    const wPijl = { ...pijl, width: 18, height: 26, flexShrink: 0, color: aan ? '#000' : '#fff' }
+                    return (
+                      <div key={w.k} onClick={() => kies(w.d)} style={{
+                        flex: 1, minWidth: 0, minHeight: 26, borderRadius: 7, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: aan ? '#fff' : 'transparent', color: aan ? '#000' : 'rgba(255,255,255,0.7)',
+                        fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
+                        whiteSpace: 'nowrap', overflow: 'hidden',
+                      }}>
+                        {i === 0 && <button onClick={(e) => { e.stopPropagation(); kies(plusDagen(gekozen, -7)) }} aria-label="Vorige week" title="Vorige week" style={wPijl}><ChevronLeft size={16} strokeWidth={3} /></button>}
+                        <span style={{ flex: i === 0 || i === 6 ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
+                          {NL_DAY_SHORT[i]}<span style={{ fontWeight: 800, opacity: aan ? 0.75 : 0.6, letterSpacing: 0 }}>{w.d.getDate()}</span>
+                        </span>
+                        {i === 6 && <button onClick={(e) => { e.stopPropagation(); kies(plusDagen(gekozen, 7)) }} aria-label="Volgende week" title="Volgende week" style={wPijl}><ChevronRight size={16} strokeWidth={3} /></button>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div style={{ position: 'relative', height: ingebed ? 84 : 120, display: 'flex', alignItems: 'flex-end', gap: 6 }}>
                 {doel.kcal > 0 && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doel.kcal / staafMax) * 100}%`, borderTop: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none', zIndex: 1 }} />
                 )}
@@ -534,14 +665,22 @@ export default function MealDaySummaryModal({
                         outline: aan ? '2px solid #fff' : 'none', outlineOffset: -2,
                         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                       }}>
-                      {foto && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: w.gelogd ? 0.5 : 0.25 }} />}
-                      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 100%)' }} />
+                      {/* De foto ís de staaf: hij vult van onderen tot de hoogte
+                          van de kcal, donker, met kcal en eiwit er dik overheen. */}
                       {kcal > 0 && (
                         <span style={{
-                          position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (kcal / staafMax) * 100)}%`,
-                          background: w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.5)',
-                          opacity: w.gelogd ? 0.6 : 0.35, transition: 'height 0.3s ease',
-                        }} />
+                          position: 'absolute', left: 0, right: 5, bottom: 0, height: `${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}%`,
+                          overflow: 'hidden', borderRadius: '6px 0 0 0', background: 'rgba(255,255,255,0.1)', transition: 'height 0.3s ease',
+                        }}>
+                          {foto && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: w.gelogd ? 0.4 : 0.2 }} />}
+                          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)' }} />
+                          {/* Kleur van de kcal tegen het doel: dunne lijn bovenop de staaf. */}
+                          {w.gelogd && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: kcalKleur(w.kcal, doel.kcal, '#fff') }} />}
+                          <span style={{ position: 'absolute', left: 2, right: 2, bottom: 4, textAlign: 'center', lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                            <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 900, letterSpacing: '-0.02em', color: w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
+                            {w.gelogd && <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, color: '#fff' }}>E {fmt(w.eiwit)}g</span>}
+                          </span>
+                        </span>
                       )}
                       {/* Water: strook langs de rechterkant, van onderen gevuld. */}
                       <span style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 5, background: 'rgba(0,0,0,0.55)' }}>
@@ -564,15 +703,13 @@ export default function MealDaySummaryModal({
                   )
                 })}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: ingebed ? 3 : 6 }}>
-                {ingebed && <button onClick={() => kies(plusDagen(gekozen, -7))} aria-label="Vorige week" title="Vorige week" style={{ ...pijl, width: 20, height: 22, flexShrink: 0 }}><ChevronLeft size={15} strokeWidth={3} /></button>}
+              {!ingebed && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                 {week.map((w, i) => (
-                  <span key={w.k} style={{ flex: 1, textAlign: 'center', fontSize: '0.62rem', fontWeight: 900, color: w.k === gekozenSleutel ? '#fff' : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                    {NL_DAY_SHORT[i]}{ingebed && <span style={{ fontWeight: 800, opacity: 0.7, letterSpacing: 0 }}> {w.d.getDate()}</span>}
-                  </span>
+                  <span key={w.k} style={{ flex: 1, textAlign: 'center', fontSize: '0.62rem', fontWeight: 900, color: w.k === gekozenSleutel ? '#fff' : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{NL_DAY_SHORT[i]}</span>
                 ))}
-                {ingebed && <button onClick={() => kies(plusDagen(gekozen, 7))} aria-label="Volgende week" title="Volgende week" style={{ ...pijl, width: 20, height: 22, flexShrink: 0 }}><ChevronRight size={15} strokeWidth={3} /></button>}
               </div>
+              )}
               <div style={{ display: 'flex', gap: 18, marginTop: ingebed ? '0.6rem' : '0.9rem' }}>
                 <div>
                   <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{weekGem ? fmt(weekGem.kcal) : '–'}</div>
