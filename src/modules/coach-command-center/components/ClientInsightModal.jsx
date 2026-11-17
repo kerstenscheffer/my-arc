@@ -555,7 +555,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                           }}>
                             {/* Elk vak dezelfde kopbalk; de sectie zet er zijn
                                 belangrijkste info en knoppen in (KolomKopInhoud). */}
-                            <KolomKop icon={sec.icon} titel={sec.label}
+                            <KolomKop icon={sec.icon} titel={sec.label} zonderBalk={sec.id === 'meals'}
                               onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
                               {renderSectie(sec.id, false)}
                             </KolomKop>

@@ -9,8 +9,6 @@
 // hier ook.
 
 import React, { useEffect, useState } from 'react'
-import { KolomKopInhoud } from './KolomKop'
-import { kopKnopStijl } from './kolomKopStijl'
 import {
   UtensilsCrossed, ChevronRight, ChevronLeft, ArrowLeft, Zap, ExternalLink, Droplet, Info,
   ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays, Pill, FileText,
@@ -563,27 +561,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0 }}>
-          {/* In de kolomkop: welk plan, met Plan Analyzer, Genereer en het
-              Inzicht-scherm van de klant (zie KolomKop). */}
-          <KolomKopInhoud>
-            {/* Vult de ruimte, zodat de knoppen rechts blijven staan. */}
-            <span style={{ flex: 1 }} />
-            {[
-              ['water', 'Water: doel en deze week', Droplet],
-            ].map(([id, titel, Icoon]) => (
-              <button key={id} onClick={() => setVenster(id)} title={titel} aria-label={titel}
-                style={{ ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }}>
-                {React.createElement(Icoon, { size: 15 })}
-              </button>
-            ))}
-            {/* 'Plan' als laatste, zoals bij Training en Gewicht. */}
-            {onNavigatePlan && (
-              <button onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
-                title="Openen in de Plan Analyzer" style={kopKnopStijl}>
-                <ExternalLink size={11} /> Plan
-              </button>
-            )}
-          </KolomKopInhoud>
+          {/* Geen kop meer (17 nov 2026, Kersten): Plan staat in de dagenregel, water achter het waterbalkje. */}
 
           </div>
           {/* Het Inzicht-scherm van de klant (dag, week, maand) staat hier vast
@@ -593,6 +571,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               isOpen ingebed
               waterDoelL={waterDoelL}
               onWaterKlik={() => setVenster('water')}
+              onPlan={onNavigatePlan ? () => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() } : null}
               onClose={() => {}}
               db={db}
               clientId={client.id}

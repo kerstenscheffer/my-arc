@@ -16,8 +16,10 @@ import { KOP_HOOGTE } from './kolomKopStijl'
 
 const KopVak = createContext(null)
 
-export function KolomKop({ icon: Icoon, titel, onVerberg, children }) {
+export function KolomKop({ icon: Icoon, titel, onVerberg, children, zonderBalk = false }) {
   const [vak, setVak] = useState(null)
+  // Zonder balk: de kolom gebruikt de hele kaart en regelt zijn eigen knoppen (Voeding).
+  if (zonderBalk) return <div style={{ height: '100%', minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>{children}</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{

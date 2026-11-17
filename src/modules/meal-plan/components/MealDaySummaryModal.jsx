@@ -22,7 +22,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays, RefreshCw, Info, Pill } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays, RefreshCw, Info, Pill, ExternalLink } from 'lucide-react'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { maaltijdenVoorDag } from '../utils/maaltijdenVoorDag'
 import { getOverrides } from '../DayTemplateService'
@@ -103,6 +103,8 @@ export default function MealDaySummaryModal({
   waterDoelL = 3,
   // Klik op het waterbalkje (alleen ingebed): de coach opent het venster met het doel.
   onWaterKlik = null,
+  // Plan openen (alleen ingebed): knop rechts in de dagenregel, de kaart heeft geen eigen kop meer.
+  onPlan = null,
   // Vooruit plannen (alleen op de maaltijdpagina van de klant).
   activePlan = null,
   workoutSchedule = null,
@@ -389,7 +391,7 @@ export default function MealDaySummaryModal({
 
   // De dag zelf (cijfers, gepland, gelogd). Bij de klant bovenaan; in Coach
   // Inzicht onder de weekstrook, omdat je daar de dag kiest.
-  const dagBlok = (
+  const dagCijfersBlok = (
     <>
               {/* ── 1. De dag ── */}
               {/* Coach Inzicht: kcal en de drie macro's op één regel. */}
@@ -473,6 +475,10 @@ export default function MealDaySummaryModal({
               )}
 
               </>)}
+    </>
+  )
+  const dagGeplandBlok = (
+    <>
 
               {/* ── Gepland (vandaag en later) ── */}
               {gekozenGepland && sleutel(gekozen) >= vandaagSleutel && (<>
@@ -504,6 +510,10 @@ export default function MealDaySummaryModal({
                   )
                 })}
               </>)}
+    </>
+  )
+  const dagKopBlok = (
+    <>
 
               {/* ── 2. Wat je hebt gelogd ── */}
               {!toekomst && !ingebed && kopje('Gelogd', maaltijden.length ? `${maaltijden.length} ${maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` : null)}
@@ -557,6 +567,10 @@ export default function MealDaySummaryModal({
               </div>
               )}
               {ingebed && statOpen && <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, textAlign: 'right' }}>{statOpen.uitleg}</div>}
+    </>
+  )
+  const dagLijstBlok = (
+    <>
               {toekomst || (ingebed && (lijstDicht || maaltijden.length === 0)) ? null : maaltijden.length === 0 ? (
                 <div style={{ marginTop: ingebed ? '0.6rem' : 0, fontSize: ingebed ? '0.76rem' : '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Op deze dag is niets gelogd.</div>
               ) : maaltijden.map((m, i) => {
@@ -691,7 +705,7 @@ export default function MealDaySummaryModal({
             <div style={{ padding: '2.5rem 0', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Laden…</div>
           ) : (
             <>
-              {!ingebed && dagBlok}
+              {!ingebed && <>{dagCijfersBlok}{dagGeplandBlok}{dagKopBlok}{dagLijstBlok}</>}
 
               {/* ── 3. De week ── */}
               {/* Coach Inzicht: geen regel 'Week van …'; de weekpijlen staan
@@ -706,8 +720,9 @@ export default function MealDaySummaryModal({
               </div>
               {/* Coach Inzicht: de dagenstrook boven de tegels, zelfde vorm als bij
                   Training: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
+              <div style={ingebed ? { position: 'sticky', top: '-0.4rem', zIndex: 5, background: '#0e0e0e', margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` } : undefined}>
               {ingebed && (
-                <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px' }}>
+                <div style={{ display: 'flex', gap: 6, margin: '0.3rem 0 5px' }}>
                   {week.map((w, i) => {
                     const aan = w.k === gekozenSleutel
                     const wPijl = { ...pijl, width: 18, height: 26, flexShrink: 0, color: aan ? '#000' : '#fff' }
@@ -720,9 +735,23 @@ export default function MealDaySummaryModal({
                         whiteSpace: 'nowrap', overflow: 'hidden',
                       }}>
                         {i === 0 && <button onClick={(e) => { e.stopPropagation(); kies(plusDagen(gekozen, -7)) }} aria-label="Vorige week" title="Vorige week" style={wPijl}><ChevronLeft size={16} strokeWidth={3} /></button>}
+                        {/* De maand: klein venster met de kalender, in het maandagvak (17 nov 2026). */}
+                        {i === 0 && (
+                          <button type="button" aria-haspopup="dialog" aria-expanded={!!maandPop} aria-label="Maand kiezen" title={`${NL_MONTHS[maand.m]} ${maand.y}${reeks > 0 ? ` · ${reeks} ${reeks === 1 ? 'dag' : 'dagen'} op rij gelogd` : ''}`}
+                            onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMaandPop(o => (o ? null : { x: r.left, y: r.bottom + 2, boven: r.top })) }}
+                            style={{ ...wPijl, width: 20 }}>
+                            <CalendarDays size={14} strokeWidth={2.6} />
+                          </button>
+                        )}
                         <span style={{ flex: i === 0 || i === 6 ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
                           {NL_DAY_SHORT[i]}<span style={{ fontWeight: 800, opacity: aan ? 0.75 : 0.6, letterSpacing: 0 }}>{w.d.getDate()}</span>
                         </span>
+                        {/* Plan openen, in het zondagvak. */}
+                        {i === 6 && onPlan && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); onPlan() }} aria-label="Plan openen" title="Openen in de Plan Analyzer" style={{ ...wPijl, width: 20 }}>
+                            <ExternalLink size={13} strokeWidth={2.6} />
+                          </button>
+                        )}
                         {i === 6 && <button onClick={(e) => { e.stopPropagation(); kies(plusDagen(gekozen, 7)) }} aria-label="Volgende week" title="Volgende week" style={wPijl}><ChevronRight size={16} strokeWidth={3} /></button>}
                       </div>
                     )
@@ -795,7 +824,11 @@ export default function MealDaySummaryModal({
                   )
                 })}
               </div>
-              {ingebed && <div style={{ marginTop: '0.8rem' }}>{dagBlok}</div>}
+              {/* Coach Inzicht: tot hier staat alles vast (dagen, tegels, cijfers, weekstats);
+                  gepland en gelogd scrollen eronderdoor. */}
+              {ingebed && <div style={{ marginTop: '0.8rem' }}>{dagCijfersBlok}{dagKopBlok}</div>}
+              </div>
+              {ingebed && <>{dagGeplandBlok}{dagLijstBlok}</>}
               {!ingebed && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                 {week.map((w, i) => (
@@ -874,27 +907,22 @@ export default function MealDaySummaryModal({
                 )
                 if (!ingebed) return <>{kopje('Maand', reeksTekst, false)}{kalender}</>
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0.8rem 0 0.2rem' }}>
-                    <button type="button" aria-haspopup="dialog" aria-expanded={!!maandPop}
-                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMaandPop(o => (o ? null : { x: r.left, y: r.bottom, boven: r.top })) }}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer', textTransform: 'capitalize' }}>
-                      <CalendarDays size={14} strokeWidth={2.6} /> {NL_MONTHS[maand.m]} {maand.y}
-                    </button>
-                    {reeksTekst && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800 }}>{reeksTekst}</span>}
+                  <>
                     {maandPop && createPortal(
                       <>
                         <div onClick={() => setMaandPop(null)} style={{ position: 'fixed', inset: 0, zIndex: 12500 }} />
                         <div role="dialog" aria-label="Maand" style={(() => {
-                          const B = 268, H = 300
+                          const B = 268, H = 326
                           const links = Math.max(8, Math.min(maandPop.x, window.innerWidth - B - 8))
                           // Past hij er niet onder, dan boven de knop.
                           const top = maandPop.y + 6 + H > window.innerHeight ? Math.max(8, maandPop.boven - H - 6) : maandPop.y + 6
                           return { position: 'fixed', left: links, top, width: B, zIndex: 12501, padding: 12, borderRadius: 14, background: '#111', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.7)', boxSizing: 'border-box' }
                         })()}>
                           {kalender}
+                          {reeksTekst && <div style={{ marginTop: 8, textAlign: 'center', fontSize: '0.72rem', fontWeight: 800 }}>{reeksTekst}</div>}
                         </div>
                       </>, document.body)}
-                  </div>
+                  </>
                 )
               })()}
 
