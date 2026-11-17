@@ -654,6 +654,8 @@ export default function ClientHome({ client, db, setCurrentView }) {
   // Plek in de datumregel voor de knoppen van de agenda (alleen in de agendaweergave).
   const [agendaKnoppen, setAgendaKnoppen] = useState(null)
   const [agendaGewicht, setAgendaGewicht] = useState(null)
+  // Welke weergave de agenda toont ('lijst' of 'rooster'); bepaalt de ruimte onderaan.
+  const [agendaWeergave, setAgendaWeergave] = useState('lijst')
   const verzetAgendaDag = (richting) => {
     setDagStand(prev => (richting === 0 ? vandaagStand() : verzetDag(prev, richting)))
   }
@@ -663,7 +665,8 @@ export default function ClientHome({ client, db, setCurrentView }) {
   // meteen. Er zat hier een kunstmatige 300 ms wachttijd (9 okt 2026).
 
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
+    // In de agendaweergave minder lege ruimte onderaan: net genoeg voor de zwevende balk.
+    <div style={{ minHeight: agendaWeergave === 'rooster' ? 0 : '100vh', paddingBottom: agendaWeergave === 'rooster' ? 0 : (isMobile ? '9rem' : '6rem'), background: '#0a0a0a' }}>
       <WelcomeSection
         client={client}
         db={db}
@@ -691,6 +694,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
             onVerzetDag={verzetAgendaDag}
             knoppenSlot={agendaKnoppen}
             gewichtSlot={agendaGewicht}
+            onWeergave={setAgendaWeergave}
             zijMarge={isMobile ? 16 : 24}
             toonKop={false}
             toonMacros={false}
@@ -706,13 +710,15 @@ export default function ClientHome({ client, db, setCurrentView }) {
 
       {/* Belangrijke video van de coach, onder de agenda. Verdwijnt zodra je
           'm hebt afgespeeld of afgevinkt. */}
-      <div style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
+      {/* Lege secties (geen video, geen call) nemen ook geen marge in. */}
+      <style>{'.home-sectie:empty{display:none}'}</style>
+      <div className="home-sectie" style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
         <BelangrijkeVideo client={client} pagina="home" isMobile={isMobile} />
       </div>
 
       {/* Wat er nog los boven de acties staat: de eerstvolgende call. */}
       <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '2.75rem' : '3.5rem' }}>
+        <div className="home-sectie" style={{ marginTop: isMobile ? '2.75rem' : '3.5rem' }}>
           <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
         </div>
       </FadeOnScroll>

@@ -125,6 +125,8 @@ export default function DagAgenda({
   knoppenSlot = null,
   // Plek achter de datum op de pagina: het gewicht van die dag, tik = wegen.
   gewichtSlot = null,
+  // Meldt de ouder welke weergave open staat ('lijst' | 'rooster').
+  onWeergave = null,
 }) {
   const service = useMemo(() => new ClientAgendaService(db?.supabase || db), [db])
   const [eigenWeekAnker, setEigenWeekAnker] = useState(() => getMondayOf(new Date()))
@@ -147,6 +149,41 @@ export default function DagAgenda({
   // beantwoordt "wat moet ik vandaag" zonder scrollen. Het rooster laat zien
   // hoe de dag verdeeld is, en dat is pas nuttig op een heel scherm.
   const [weergave, setWeergave] = useState('lijst')
+  // Hoe hoog de agendaweergave mag zijn: van zijn bovenkant tot net boven de
+  // zwevende menubalk. Opnieuw gemeten als het scherm van maat verandert.
+  const wortelRef = useRef(null)
+  const [pasHoogte, setPasHoogte] = useState(0)
+  useEffect(() => {
+    if (weergave !== 'rooster') return
+    // Het vlak dat scrolt is niet altijd het venster (meekijken, zwevend
+    // paneel): meet daarom tegen de dichtstbijzijnde scrollende ouder.
+    const scrollOuder = (el) => {
+      for (let p = el?.parentElement; p; p = p.parentElement) {
+        const o = getComputedStyle(p).overflowY
+        if ((o === 'auto' || o === 'scroll') && p !== document.body && p !== document.documentElement) return p
+      }
+      return null
+    }
+    const meet = () => {
+      const el = wortelRef.current
+      if (!el) return
+      const ouder = scrollOuder(el)
+      const r = el.getBoundingClientRect()
+      const boven = ouder ? r.top - ouder.getBoundingClientRect().top + ouder.scrollTop : r.top + (window.scrollY || 0)
+      const zicht = ouder ? ouder.clientHeight : window.innerHeight
+      const onder = 124 // het dashboard houdt onderaan 120px vrij voor de zwevende balk
+      setPasHoogte(Math.max(360, Math.round(zicht - boven - onder)))
+    }
+    meet()
+    const t = setTimeout(meet, 250) // na het laden kan de kop erboven nog van hoogte veranderen
+    window.addEventListener('resize', meet)
+    const ouder = scrollOuder(wortelRef.current)
+    const ro = ouder && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(meet) : null
+    if (ro) ro.observe(ouder)
+    return () => { clearTimeout(t); window.removeEventListener('resize', meet); if (ro) ro.disconnect() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weergave])
+  useEffect(() => { onWeergave?.(weergave) }, [weergave]) // eslint-disable-line react-hooks/exhaustive-deps
   const [volledig, setVolledig] = useState(false)
   // Welk blok staat er in de tijd-sheet, en een teller om de week opnieuw op
   // te halen zodra er iets verzet is.
@@ -688,12 +725,14 @@ export default function DagAgenda({
   }
 
   const inhoud = (
-    <div style={{
+    <div ref={wortelRef} style={{
       display: 'flex', flexDirection: 'column', minHeight: 0,
       // De lijst groeit mee met de dag; het rooster krijgt een vaste hoogte en
       // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
       // De agendaweergave mag hoger dan de lijst: daar staat de hele dag op tijd.
-      height: volledig ? '100%' : (weergave === 'rooster' ? (Number(hoogte) > 0 ? Number(hoogte) + 200 : (hoogte || '100%')) : 'auto'),
+      // Agendaweergave: precies tot boven de menubalk, zodat de pagina zelf niet
+      // meer scrolt en er geen lege zwarte ruimte onder komt.
+      height: volledig ? '100%' : (weergave === 'rooster' ? (pasHoogte || (Number(hoogte) > 0 ? Number(hoogte) + 200 : (hoogte || '100%'))) : 'auto'),
     }}>
       {/* Kop: pijltjes om de dag heen. Staan die elders op de pagina, dan
           slaat de agenda zijn eigen kop over. */}

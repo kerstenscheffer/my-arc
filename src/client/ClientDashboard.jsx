@@ -452,7 +452,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
 
   return (
     <div style={{ 
-      minHeight: '100vh',
+      // In een meekijk-paneel is 100vh hoger dan het paneel zelf en gaf dat
+      // scrollbare lege ruimte onderaan; daar volgt de hoogte de inhoud.
+      minHeight: ingebed ? '100%' : '100vh',
       background: '#0a0a0a',
       position: 'relative'
     }}>

@@ -26,7 +26,7 @@ const BAND = 50 // slaapband + stappenband, elk hoog genoeg voor de ring
 const BAND_HOOG = 24
 // De balken van voeding en water beginnen iets boven de onderrand, zodat een
 // lage stand met zijn ring niet onder in beeld wegvalt.
-const BALK_BODEM = 56
+const BALK_BODEM = 0
 // Ruimte links in de dag voor de uren, die nu in de tegel zelf staan.
 const UREN_BREED = 40
 // Rechts, tegen de schermrand: de voedingsbalk en daarnaast de waterbalk.
@@ -342,7 +342,7 @@ export default function DagTijdlijn({
         </div>
         </div>
         {/* Voeding: één brede balk, kcal tegen het doel, met kcal en eiwit bovenin de vulling. */}
-        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 4, overflow: 'hidden' }}>
+        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(kDeel * 100)}%`, background: kKleur, opacity: 0.55, transition: 'height 0.3s ease' }} />
           {/* Ring met bestek precies op de rand van de vulling (zelfde vorm als
               het flesje bij water); tik = naar je voeding. De stand staat eronder,
@@ -377,7 +377,7 @@ export default function DagTijdlijn({
           const balkHoogte = tijdHoogte - BALK_BODEM
           const vul = Math.round(wDeel * balkHoogte)
           return (
-            <div title={water ? `Water ${l(ml)} / ${l(doel)} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: 0, width: WATER_BREED, background: 'transparent', zIndex: 4, overflow: 'hidden' }}>
+            <div title={water ? `Water ${l(ml)} / ${l(doel)} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: 0, width: WATER_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(wDeel * 100)}%`, background: '#38bdf8', opacity: 0.55, transition: 'height 0.3s ease' }} />
               {/* Het flesje staat precies op de rand van de vulling: half erin,
                   half erboven. De stand staat eronder, of erboven als de balk
