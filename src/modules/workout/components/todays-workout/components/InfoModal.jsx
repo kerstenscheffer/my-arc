@@ -1,4 +1,5 @@
 // src/modules/workout/components/todays-workout/components/InfoModal.jsx
+import { bibNaam } from '../../../utils/variatie'
 import { X, Play, Info, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
@@ -40,7 +41,7 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab, z
     setLoading(true)
     try {
       // Fetch BOTH coach video and fallback so we can label them differently.
-      const details = await ExerciseService.getExerciseDetails(exercise.name)
+      const details = await ExerciseService.getExerciseDetails(bibNaam(exercise))
       const coachUrl = details?.video_url || null
       const fbUrl = details?.fallback_video_url || null
       const chosen = coachUrl || fbUrl

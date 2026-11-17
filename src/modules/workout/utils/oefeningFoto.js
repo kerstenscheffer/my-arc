@@ -17,6 +17,7 @@
 // een blauw PNG-plaatje ("service unavailable"). De browser toont dat gewoon,
 // onError vuurt niet, dus doorschuiven werkt niet — weglaten is de enige weg.
 
+import { bibNaam } from './variatie'
 import ExerciseService from '../../../services/ExerciseService'
 
 export const isKapotteFotoHost = (url) => /(^|[/.])(ibb\.co|imgbb\.com)([/:?]|$)/i.test(String(url || ''))
@@ -68,7 +69,7 @@ export const fotoAchtergrond = (urls) =>
 const U = (id) => `https://images.unsplash.com/${id}?w=400&h=400&fit=crop&q=80&crop=center`
 
 export const getFallbackImage = (exercise) => {
-  const name = (exercise?.name || '').toLowerCase()
+  const name = bibNaam(exercise).toLowerCase()
   const muscles = (exercise?.primairSpieren || exercise?.muscleGroup || '').toLowerCase()
   const c = `${name} ${muscles}`
   const heeft = (...w) => w.some(x => c.includes(x))
@@ -93,7 +94,7 @@ export const getFallbackImage = (exercise) => {
  * @param {string} [clientId] nodig om custom_exercises te kunnen raadplegen
  */
 export async function laadOefeningFoto(db, exercise, clientId = null) {
-  const naam = exercise?.name
+  const naam = bibNaam(exercise)
   if (!naam) return getFallbackImage(exercise)
   try {
     const eigen = fotoKandidaten(exercise)[0]

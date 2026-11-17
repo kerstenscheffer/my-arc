@@ -3,6 +3,7 @@
 // client-workout-kaart (thumbnail_url → YouTube-thumb → custom_exercises →
 // exercises-tabel → ExerciseService → keyword-fallback), zodat de builder-
 // kaarten dezelfde foto's tonen als de klant ziet.
+import { bibNaam } from '../../workout/utils/variatie'
 import { useState, useEffect } from 'react'
 import ExerciseService from '../../../services/ExerciseService'
 import { fotoKandidaten } from '../../workout/utils/oefeningFoto'
@@ -41,7 +42,7 @@ export default function useExerciseImage(exercise, db, client) {
         if ((exercise?.type === 'custom' || exercise?._isCustom) && client?.id && db?.supabase) {
           const { data } = await db.supabase
             .from('custom_exercises').select('image_url')
-            .eq('client_id', client.id).eq('name', exercise.name).maybeSingle()
+            .eq('client_id', client.id).eq('name', bibNaam(exercise)).maybeSingle()
           if (data?.image_url) lijst.push(data.image_url)
         }
 
@@ -49,13 +50,13 @@ export default function useExerciseImage(exercise, db, client) {
         if (db?.supabase && exercise?.name) {
           const { data: ex } = await db.supabase
             .from('exercises').select('thumbnail_url, video_url, fallback_video_url, image_url')
-            .eq('name', exercise.name).maybeSingle()
+            .eq('name', bibNaam(exercise)).maybeSingle()
           if (ex?.video_url || ex?.fallback_video_url) foundVideo = true
           lijst.push(...fotoKandidaten(ex))
         }
 
         if (!lijst.length) {
-          const url = await ExerciseService.getExerciseImage(exercise?.name)
+          const url = await ExerciseService.getExerciseImage(bibNaam(exercise))
           if (url) lijst.push(url)
         }
       } catch { /* stockfoto hieronder */ }

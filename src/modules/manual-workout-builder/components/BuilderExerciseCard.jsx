@@ -11,6 +11,7 @@ import useExerciseImage from '../hooks/useExerciseImage'
 import OefeningThumb from '../../workout/components/OefeningThumb'
 import { LABEL as SPIER_LABEL, KEUZE as SPIER_KEUZE, spierVan } from '../spierGroepen'
 import { KOPPEN, kopVan } from '../koppen'
+import { bibNaam, metVariatie } from '../../workout/utils/variatie'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
 const _equipCache = { data: null, promise: null }
@@ -138,7 +139,7 @@ export default function BuilderExerciseCard({
         </div>
         {logsModal}
         {editing && (
-          <ExerciseEditModal
+          <ExerciseEditModal db={db}
             exercise={exercise} isCardio={isCardio} isMobile={isMobile}
             hasVid={hasVid} onField={onField} onVideo={onVideo}
             coachEquip={coachEquip}
@@ -234,7 +235,7 @@ export default function BuilderExerciseCard({
 
         {logsModal}
         {editing && (
-          <ExerciseEditModal
+          <ExerciseEditModal db={db}
             exercise={exercise} isCardio={isCardio} isMobile={isMobile}
             hasVid={hasVid} onField={onField} onVideo={onVideo}
             coachEquip={coachEquip}
@@ -322,7 +323,7 @@ export default function BuilderExerciseCard({
       </div>
 
       {editing && (
-        <ExerciseEditModal
+        <ExerciseEditModal db={db}
           exercise={exercise} isCardio={isCardio} isMobile={isMobile}
           hasVid={hasVid} onField={onField} onVideo={onVideo}
           coachEquip={coachEquip}
@@ -341,7 +342,7 @@ export default function BuilderExerciseCard({
 // hieronder gebruikte 'm, maar hij stond niet in scope → ReferenceError zodra
 // je een oefening opende. Default op [] zodat de datalist ook werkt voordat de
 // lijst geladen is.
-function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVideo, onClose, coachEquip = [] }) {
+function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVideo, onClose, coachEquip = [], db = null }) {
   const modalHost = useModalHost()
   const [cardioMenu, setCardioMenu] = useState(false)
   const label = { fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 5, display: 'block' }
@@ -395,7 +396,8 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ flex: 1.6, minWidth: 0 }}>
                   <label style={label}>Naam</label>
-                  <input value={exercise.name ?? ''} onChange={(e) => onField('name', e.target.value)} placeholder="Naam van de oefening" style={input} />
+                  {/* Met een variatie typ je hier de basisoefening; de volledige naam volgt vanzelf. */}
+                  <input value={exercise.variatie ? bibNaam(exercise) : (exercise.name ?? '')} onChange={(e) => (exercise.variatie ? onField({ basis: e.target.value, name: metVariatie(e.target.value, exercise.variatie) }) : onField('name', e.target.value))} placeholder="Naam van de oefening" style={input} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <label style={label}>Spiergroep</label>
@@ -417,6 +419,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                   </select>
                 </div>
               )}
+              {!isCardio && <VariatieKeuze db={db} exercise={exercise} onField={onField} label={label} />}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.6rem' }}>
                 <div><label style={label}>Sets</label><input type="number" min={1} max={30} value={exercise.sets ?? 3} onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
                 <div><label style={label}>Reps</label><input value={exercise.reps ?? '10'} onChange={(e) => onField('reps', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
@@ -490,5 +493,47 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
       </div>
     </div>,
     modalHost
+  )
+}
+
+// Variaties binnen één oefening (voeten hoog, smalle grip): de oefening in de
+// bibliotheek blijft dezelfde, het plan en het logboek krijgen de volledige
+// naam. De lijst per oefening staat in oefening_variaties en groeit als je er
+// hier een bijtypt.
+function VariatieKeuze({ db, exercise, onField, label }) {
+  const basis = bibNaam(exercise).trim()
+  const [lijst, setLijst] = useState([])
+  const [nieuw, setNieuw] = useState('')
+  useEffect(() => {
+    if (!basis || !db?.supabase) { setLijst([]); return undefined }
+    let weg = false
+    db.supabase.from('oefening_variaties').select('naam').ilike('oefening', basis.replace(/[%_,()]/g, ' ')).order('created_at', { ascending: true })
+      .then(({ data }) => { if (!weg) setLijst((data || []).map(r => r.naam)) }, () => { if (!weg) setLijst([]) })
+    return () => { weg = true }
+  }, [basis, db])
+  if (!basis) return null
+  const kies = (v) => onField(v ? { basis, variatie: v, name: metVariatie(basis, v) } : { basis: null, variatie: null, name: basis })
+  const voegToe = async () => {
+    const v = nieuw.trim()
+    if (!v) return
+    setNieuw('')
+    if (!lijst.some(x => x.toLowerCase() === v.toLowerCase())) {
+      setLijst(l => [...l, v])
+      await db.supabase.from('oefening_variaties').insert({ oefening: basis, naam: v }).then(r => r, () => null)
+    }
+    kies(v)
+  }
+  const alle = exercise.variatie && !lijst.some(x => x.toLowerCase() === String(exercise.variatie).toLowerCase()) ? [...lijst, exercise.variatie] : lijst
+  const chip = (aan) => ({ minHeight: 34, padding: '0 0.7rem', borderRadius: 8, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', background: aan ? '#fff' : 'transparent', color: aan ? '#000' : '#fff', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.18)'}`, touchAction: 'manipulation' })
+  return (
+    <div>
+      <label style={label}>Variatie</label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <button type="button" onClick={() => kies(null)} style={chip(!exercise.variatie)}>Standaard</button>
+        {alle.map(v => <button key={v} type="button" onClick={() => kies(v)} style={chip(String(exercise.variatie || '').toLowerCase() === v.toLowerCase())}>{v}</button>)}
+        <input value={nieuw} onChange={(e) => setNieuw(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); voegToe() } }} onBlur={voegToe}
+          placeholder="+ nieuwe variatie" style={{ flex: 1, minWidth: 130, minHeight: 34, boxSizing: 'border-box', padding: '0 0.6rem', borderRadius: 8, background: 'transparent', border: '1px dashed rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }} />
+      </div>
+    </div>
   )
 }

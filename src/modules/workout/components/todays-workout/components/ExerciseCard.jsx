@@ -1,4 +1,5 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
+import { bibNaam } from '../../../utils/variatie'
 import { useState, useEffect } from 'react'
 import { oefeningInfo, laatsteFeedback } from '../../../utils/oefeningBatch'
 import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Trash2 } from 'lucide-react'
@@ -77,7 +78,7 @@ export default function ExerciseCard({
           .from('custom_exercises')
           .select('image_url')
           .eq('client_id', client.id)
-          .eq('name', exercise.name)
+          .eq('name', bibNaam(exercise))
           .maybeSingle()
         if (data?.image_url) lijst.push(data.image_url)
       }
@@ -85,7 +86,7 @@ export default function ExerciseCard({
       // Standaard oefening — gebundeld met de andere kaarten tot één query
       // (oefeningBatch). De video zelf zit alleen in het log-scherm.
       try {
-        const ex = await oefeningInfo(db, exercise.name)
+        const ex = await oefeningInfo(db, bibNaam(exercise))
         // Onthoud de fallback URL op het localExercise; het log-scherm speelt
         // 'm af als de coach nog geen eigen video heeft.
         if (ex?.fallback_video_url && !exercise.video_url) {
@@ -95,7 +96,7 @@ export default function ExerciseCard({
       } catch { /* volgende bron */ }
 
       if (!lijst.length) {
-        const url = await ExerciseService.getExerciseImage(exercise.name)
+        const url = await ExerciseService.getExerciseImage(bibNaam(exercise))
         if (url) lijst.push(url)
       }
     } catch { /* stockfoto hieronder */ }

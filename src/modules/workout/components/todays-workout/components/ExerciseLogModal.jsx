@@ -1,4 +1,5 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
+import { bibNaam } from '../../../utils/variatie'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
@@ -682,7 +683,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
 
   useEffect(() => {
     let weg = false
-    ExerciseService.getExerciseDetails(exercise.name)
+    ExerciseService.getExerciseDetails(bibNaam(exercise))
       .then(d => { if (!weg) setMedia(d || {}) })
       .catch(e => console.error('Oefening-media laden mislukt:', e))
     return () => { weg = true }

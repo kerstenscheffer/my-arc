@@ -842,6 +842,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           ...(ex.power ? { power: true } : {}), // power-oefening: eigen blok en eigen log bij de klant
           // Mesocyclus: `deload` = gehalveerd in het deload-schema, `probeer` = nieuw om te proberen.
           ...(ex.deload ? { deload: true } : {}), ...(ex.probeer ? { probeer: true } : {}),
+          // Variatie binnen één oefening: basis = de oefening in de bibliotheek, name = basis + variatie.
+          ...(ex.variatie ? { basis: ex.basis || ex.name, variatie: ex.variatie } : {}),
         }))
       }
     })
