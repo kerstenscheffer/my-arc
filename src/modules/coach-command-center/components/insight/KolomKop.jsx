@@ -23,8 +23,9 @@ export function KolomKop({ icon: Icoon, titel, onVerberg, children }) {
       <div style={{
         flexShrink: 0, height: KOP_HOOGTE, boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '0 0.4rem 0 0.75rem',
-        background: 'rgba(10,10,10,0.97)', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '0 0.5rem 0 0.9rem',
+        // Geen eigen vlak of lijn: de kop hoort bij de zwevende kaart.
+        background: 'transparent',
       }}>
         {Icoon && <Icoon size={14} color="#fff" strokeWidth={2.4} style={{ flexShrink: 0 }} />}
         <span style={{ flexShrink: 0, fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{titel}</span>

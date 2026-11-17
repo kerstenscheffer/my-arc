@@ -160,6 +160,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Gewicht + Training staan gestapeld in één kolom en tellen dus als één.
   // Per stapel de vakken van boven naar beneden; een vak kan meerdere
   // secties naast elkaar bevatten.
+  const VAK_RUIMTE = 10
+  const VAK_KAART = { background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, boxShadow: '0 14px 40px rgba(0,0,0,0.55)' }
   const STAPELS = [[['workout'], ['weight']], [['meals'], ['logboek', 'checkin']]]
   const aantalKolommen = (() => {
     const isOpen = (id) => openSecties.includes(id)
@@ -257,7 +259,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           // elkaar pasten. De inhoud zelf staat nu gecentreerd met een
           // maximumbreedte; de container blijft vol zodat de achtergrond dat is.
           width: '100%',
-          background: '#0a0a0a', overflow: 'hidden', position: 'relative',
+          // Donkerder dan de vakken: die zweven er als kaarten boven (17 nov 2026).
+          background: '#050505', overflow: 'hidden', position: 'relative',
           // iPhone Dynamic Island / notch beschermt anders de header met
           // de X-knop → onbereikbaar voor jou. Safe-area-inset op de
           // container voorkomt dit zonder UI te verschuiven op desktop.
@@ -271,8 +274,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             <div
               style={{
                 flexShrink: 0,
-                background: 'rgba(10,10,10,0.98)',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                background: 'transparent',
                 zIndex: 15,
               }}
             >
@@ -510,8 +512,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               <div style={{
                 flex: 1, minWidth: 0, maxWidth: middenBreedte,
                 display: 'flex', overflowX: 'auto', overflowY: 'hidden',
-                borderLeft: '1px solid rgba(255,255,255,0.05)',
-                borderRight: '1px solid rgba(255,255,255,0.05)',
+                // Eén geheel van zwevende kaarten: overal dezelfde tussenruimte,
+                // geen scheidslijnen meer tussen de vakken.
+                gap: VAK_RUIMTE, padding: `2px ${VAK_RUIMTE}px ${VAK_RUIMTE}px`, boxSizing: 'border-box',
               }}>
               {openSecties.length === 0 ? (
                 <div style={{
@@ -535,23 +538,20 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   if (sec.id !== st[0].find(isOpen)) return
                   kolommen.push(st.map(vak => vak.filter(isOpen).map(id => SECTIES.find(x => x.id === id))))
                 })
-                return kolommen.map((kolom, i) => (
+                return kolommen.map((kolom) => (
                   <div key={kolom[0][0].id} style={{
                     flex: '1 1 0',
                     minWidth: kolommen.length > 1 ? 300 : 0,
                     overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column',
-                    borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                    display: 'flex', flexDirection: 'column', gap: VAK_RUIMTE,
                   }}>
-                    {kolom.map((vak, j) => (
+                    {kolom.map((vak) => (
                       <div key={vak[0].id} style={{
-                        flex: '1 1 0', minHeight: 0, overflow: 'hidden', display: 'flex',
-                        borderTop: j > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                        flex: '1 1 0', minHeight: 0, display: 'flex', gap: VAK_RUIMTE,
                       }}>
-                        {vak.map((sec, k) => (
+                        {vak.map((sec) => (
                           <div key={sec.id} style={{
-                            flex: '1 1 0', minWidth: 0, overflow: 'hidden',
-                            borderLeft: k > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                            flex: '1 1 0', minWidth: 0, overflow: 'hidden', ...VAK_KAART,
                           }}>
                             {/* Elk vak dezelfde kopbalk; de sectie zet er zijn
                                 belangrijkste info en knoppen in (KolomKopInhoud). */}
