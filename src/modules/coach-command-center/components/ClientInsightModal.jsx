@@ -76,7 +76,14 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Desktop: welke secties naast elkaar staan. De kopregel vinkt ze aan en uit,
   // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
   // een leeg paneel is geen bruikbare toestand.
-  const [openSecties, setOpenSecties] = useState(['weight', 'workout', 'meals', 'logboek'])
+  // Gewicht staat niet meer als kaart op de pagina: de wekenstrook zit in de
+  // bovenbalk en de rest opent als venster (17 nov 2026).
+  // Ook het logboek is geen kaart meer: het opent als sleepbaar venster dat
+  // open kan blijven staan boven de week.
+  const [openSecties, setOpenSecties] = useState(['workout', 'meals'])
+  const [showLogboek, setShowLogboek] = useState(false)
+  const [gewichtSlot, setGewichtSlot] = useState(null) // plek in de bovenbalk voor de wekenstrook
+  const [showGewicht, setShowGewicht] = useState(false)
   // De looptijd stond altijd open als balkenrij onder de kop. Dat is een blok
   // dat je één keer per maand nodig hebt en de rest van de tijd meekijkt, dus
   // nu dicht tenzij je erom vraagt.
@@ -94,6 +101,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Check-ins staan niet meer als vak in beeld (17 nov 2026, Kersten): een knop in de
   // kopregel opent ze in een venster, met een bolletje zolang er een ongeziene ligt.
   const [showCheckins, setShowCheckins] = useState(false)
+  // Gegevens en Journey openen als venster in plaats van als kaart op de pagina (17 nov 2026).
+  const [popSectie, setPopSectie] = useState(null) // 'data' | 'journey' | null
   const [checkinNieuw, setCheckinNieuw] = useState(0)
   // Ongeziene check-ins van deze klant, voor het bolletje op de knop. Het venster
   // zet ze op gezien (CheckinsColumn) en meldt dat met 'myarc:checkin-gezien'.
@@ -204,6 +213,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     ? new Date(`${String(laatsteWeging.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
 
+  const VENSTER_SECTIES = ['logboek', 'data', 'checkin', 'journey']
   const SECTIES = [
     { id: 'logboek', label: 'Logboek',  icon: BookOpen },
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
@@ -327,16 +337,22 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       aangezette sectie komt er als kolom bij. */}
                   {/* Als iconen: korter dan de woorden, de naam staat in de
                       tooltip. Aan = wit op een licht vlak, uit = gedimd. */}
+                  {/* De wekenstrook van Gewicht, met de knop naar het venster
+                      (gevuld vanuit WeightColumn, zie het venster onderaan). */}
+                  <div ref={setGewichtSlot} style={{ flex: '0 1 460px', minWidth: 0 }} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                    {SECTIES.map((sec) => {
+                    {/* Logboek, Gewicht, Training en Voeding staan vast op de pagina en
+                        hebben geen schakelaar meer; wat overblijft opent een venster. */}
+                    {SECTIES.filter(sec => VENSTER_SECTIES.includes(sec.id)).map((sec) => {
                       const isCheckin = sec.id === 'checkin'
-                      const aan = isCheckin ? showCheckins : openSecties.includes(sec.id)
+                      const isLogboek = sec.id === 'logboek'
+                      const aan = isCheckin ? showCheckins : isLogboek ? showLogboek : popSectie === sec.id
                       const Icoon = sec.icon
                       return (
                         <button
                           key={sec.id}
-                          onClick={() => (isCheckin ? setShowCheckins(true) : toggleSectie(sec.id))}
-                          title={isCheckin ? (checkinNieuw ? `Check-ins: ${checkinNieuw} nieuw` : 'Check-ins bekijken') : aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
+                          onClick={() => (isCheckin ? setShowCheckins(true) : isLogboek ? setShowLogboek(v => !v) : setPopSectie(sec.id))}
+                          title={isCheckin ? (checkinNieuw ? `Check-ins: ${checkinNieuw} nieuw` : 'Check-ins bekijken') : isLogboek ? (showLogboek ? 'Logboek sluiten' : 'Logboek openen (sleepbaar venster)') : `${sec.label} bekijken`}
                           aria-label={sec.label}
                           aria-pressed={aan}
                           style={{
@@ -572,7 +588,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 const kaart = (sec, groei = 1) => (
                   <div key={sec.id} style={{ flex: `${groei} 1 0`, minWidth: 0, overflow: 'hidden', ...VAK_KAART }}>
                     <KolomKop icon={sec.icon} titel={sec.label} zonderBalk={sec.id === 'meals'}
-                      onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                      onVerberg={null}>
                       {renderSectie(sec.id, false)}
                     </KolomKop>
                   </div>
@@ -585,7 +601,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   const weekSec = SECTIES.find(x => x.id === 'workout')
                   return (
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: VAK_RUIMTE }}>
-                      <div style={{ flex: rest.length ? '1.6 1 0' : '1 1 0', minHeight: 0, overflow: 'hidden', ...VAK_KAART }}>
+                      {/* Geen kaart eromheen: de week staat los op de pagina (17 nov 2026). */}
+                      <div style={{ flex: rest.length ? '1.6 1 0' : '1 1 0', minHeight: 0, overflow: 'hidden' }}>
                         <KolomKop icon={weekSec.icon} titel="Week" onVerberg={null} zonderBalk>
                           {renderSectie('workout', false, (gedeeld) => renderSectie('meals', false, gedeeld))}
                         </KolomKop>
@@ -626,7 +643,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                             {/* Elk vak dezelfde kopbalk; de sectie zet er zijn
                                 belangrijkste info en knoppen in (KolomKopInhoud). */}
                             <KolomKop icon={sec.icon} titel={sec.label} zonderBalk={sec.id === 'meals'}
-                              onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                              onVerberg={null}>
                               {renderSectie(sec.id, false)}
                             </KolomKop>
                           </div>
@@ -789,6 +806,62 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <CheckinsColumn client={effectiveClient} db={db} isMobile={false} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ GEGEVENS / JOURNEY (venster) ═══ */}
+      {popSectie && effectiveClient && !isMobile && (() => {
+        const sec = SECTIES.find(x => x.id === popSectie)
+        const Icoon = sec.icon
+        return (
+          <div onClick={(e) => { if (e.target === e.currentTarget) setPopSectie(null) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div role="dialog" aria-label={sec.label} style={{ width: '100%', maxWidth: popSectie === 'journey' ? 900 : 620, height: 'min(86vh, 860px)', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 24px 60px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.4rem 1rem' }}>
+                <Icoon size={15} color="#fff" strokeWidth={2.4} />
+                <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{sec.label}</span>
+                <button onClick={() => setPopSectie(null)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {renderSectie(popSectie, false)}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ═══ LOGBOEK (sleepbaar venster, blijft open boven de week) ═══ */}
+      {showLogboek && effectiveClient && !isMobile && (
+        <CoachingLogModal client={effectiveClient} db={db} coachId={coachId} isMobile={false} onClose={() => setShowLogboek(false)} />
+      )}
+
+      {/* ═══ GEWICHT (venster) ═══ */}
+      {/* Blijft altijd gemonteerd, ook dicht: van hieruit komt de wekenstrook
+          in de bovenbalk, en de fase hoeft dan maar één keer te laden. */}
+      {effectiveClient && !isMobile && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setShowGewicht(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: showGewicht ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-label="Gewicht" style={{ position: 'relative', width: '100%', maxWidth: 1200, height: 'min(90vh, 900px)', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 24px 60px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.2rem 1rem' }}>
+              <Scale size={15} color="#fff" strokeWidth={2.4} />
+              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Gewicht</span>
+              <button onClick={() => setShowGewicht(false)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <WeightColumn
+                client={effectiveClient} weightData={weightData} circumData={circumData}
+                photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
+                onOpenGallery={() => setShowGallery(true)}
+                fotosNaast
+                db={db} onClientUpdate={handleClientUpdate}
+                strookSlot={gewichtSlot} onOpenVenster={() => setShowGewicht(true)}
+              />
             </div>
           </div>
         </div>

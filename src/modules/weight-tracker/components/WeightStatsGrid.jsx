@@ -25,7 +25,7 @@ const PERIODES = [
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
 // `toonGrafiek` uit: de coach-kant heeft zijn eigen band-grafiek en zet dit
 // verloop achter een knop. De klant-kant laat hem gewoon staan.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null, zonderDoelRegel = false }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null, zonderDoelRegel = false , alleenStrook = false}) {
   const [showWeekly, setShowWeekly] = useState(false)
   const [uitlegOpen, setUitlegOpen] = useState(false)
   // De cijferregel (huidig, gemiddelde, tempo fase, boven plan, sinds fase) is
@@ -462,6 +462,30 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     return Math.ceil((((doel - jaarStart) / 86400000) + 1) / 7)
   })()
 
+  // Coach Inzicht: alleen de wekenstrook, voor in de bovenbalk (17 nov 2026).
+  if (alleenStrook) {
+    if (weken.length === 0) return null
+    return (
+      <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
+        <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex' }}>
+          <WekenStrook weken={weken} isMobile={isMobile} uitleg={null} compact />
+        </div>
+        <GrootBlok
+          titel={startDateLabel ? `Sinds ${startDateLabel}` : (fase ? 'Sinds fase' : 'Sinds start')}
+          waarde={totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—'}
+          eenheid="kg"
+          kleur={totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)'}
+          onder={startDateLabel ? `vanaf ${startDateLabel}` : 'geen start'}
+          isMobile={isMobile}
+          basis="0 0 auto"
+          laatste
+          vast
+          compact
+        />
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* ═══ HET WEEKTEMPO — het getal waar je op zaterdag naar kijkt, en het
@@ -781,7 +805,16 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 // achterlopen.
 function GrootBlok(props) {
   // Geen regel onder het getal: de datum staat waar nodig in de titel.
-  const { titel, waarde, eenheid, kleur, isMobile, basis, actie, laatste, vast } = props
+  const { titel, waarde, eenheid, kleur, isMobile, basis, actie, laatste, vast, compact } = props
+  // Compact (bovenbalk Coach Inzicht): klein label boven een klein getal.
+  if (compact) return (
+    <div style={{ flex: basis, minWidth: 0, padding: '2px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+      <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', lineHeight: 1.1 }}>{titel}</span>
+      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: kleur, lineHeight: 1.05, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+        {waarde}<span style={{ fontSize: '0.6em', fontWeight: 800, opacity: 0.55, marginLeft: 2 }}>{eenheid}</span>
+      </span>
+    </div>
+  )
   return (
     <div style={{
       flex: basis, minWidth: 0,
@@ -834,7 +867,7 @@ function weekBereik(zaterdag) {
 // verticaal, dus zonder dit kun je met een gewone muis niets. Op een telefoon
 // doet de browser het zelf en laten we hem met rust.
 function WekenStrook(props) {
-  const { weken, isMobile, uitleg } = props
+  const { weken, isMobile, uitleg, compact } = props
   const baan = useRef(null)
   const sleep = useRef(null)
   // Waar de slider staat: { deel: 0..1 van de baan die zichtbaar is,
@@ -914,6 +947,14 @@ function WekenStrook(props) {
           een selector, en die kan niet inline. */}
       <style>{'.weken-strook::-webkit-scrollbar{display:none}'}</style>
       {weken.map((w, i) => (
+        compact ? (
+          <div key={w.sleutel} style={{ flex: '0 0 auto', padding: '2px 9px', scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1, opacity: i > 1 ? 0.7 : 1 }}>
+            <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', lineHeight: 1.1 }}>{w.kop}</span>
+            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: w.kleur, lineHeight: 1.05, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+              {w.waarde != null ? `${w.waarde > 0 ? '+' : ''}${w.waarde}` : '—'}
+            </span>
+          </div>
+        ) :
         <div key={w.sleutel} style={{
           flex: '0 0 auto', width: isMobile ? 128 : 152,
           scrollSnapAlign: 'start',
@@ -947,7 +988,7 @@ function WekenStrook(props) {
     {/* Vervaging aan de kant waar nog tegels staan: je ziet ze onder de rand
         doorlopen. Links pas zodra je gescrold hebt. */}
     {schuift && stand.pos < 0.98 && (
-      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 44, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
+      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 44, pointerEvents: 'none', background: compact ? 'linear-gradient(90deg, rgba(5,5,5,0) 0%, rgba(5,5,5,1) 100%)' : 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
     )}
     {schuift && stand.pos > 0.02 && (
       <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 28, pointerEvents: 'none', background: 'linear-gradient(270deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />

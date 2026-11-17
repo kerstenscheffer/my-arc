@@ -4,7 +4,8 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }
 // ============================================
 import React from 'react'
-import { Ruler, Camera, ExternalLink, Target, Table2, X } from 'lucide-react'
+import { Ruler, Camera, ExternalLink, Target, Table2, X, LineChart } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl } from './kolomKopStijl'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
@@ -27,9 +28,11 @@ function Venster({ titel, icoon, breed = 520, isMobile, onSluit, children }) {
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [onSluit])
-  return (
+  // Via een portal: het venster moet ook zichtbaar zijn als de kaart Gewicht
+  // zelf dicht staat (Doelen & macro's opent ook vanaf de kcal bij Voeding).
+  return createPortal(
     <div onClick={onSluit} style={{
-      position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.8)',
+      position: 'fixed', inset: 0, zIndex: 11500, background: 'rgba(0,0,0,0.8)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0.5rem' : '1rem',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
@@ -49,11 +52,12 @@ function Venster({ titel, icoon, breed = 520, isMobile, onSluit, children }) {
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate, fotosNaast = false }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate, fotosNaast = false, strookSlot = null, onOpenVenster = null }) {
   const history = weightData?.history || []
   // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
   // "sinds start" telt.
@@ -71,6 +75,14 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // kijken. Pas als de band zegt dat er iets moet veranderen klap je 'm open.
   // Welk venster open staat: 'doelen' | 'tabel' | 'omtrek' | null.
   const [venster, setVenster] = React.useState(null)
+  // 'Doelen & macro's' openen van buitenaf (de kcal bij Voeding). Alleen het
+  // exemplaar dat ook de bovenbalk vult luistert, anders openen er twee.
+  React.useEffect(() => {
+    if (!strookSlot) return
+    const open = () => setVenster('doelen')
+    window.addEventListener('myarc:ci-doelen', open)
+    return () => window.removeEventListener('myarc:ci-doelen', open)
+  }, [strookSlot])
   // Het voorstel uit de band: hoeveel kcal erbij of eraf. Wordt getoond boven
   // het macro-paneel, en pas toegepast als je erop drukt.
   const [voorstel, setVoorstel] = React.useState(null)
@@ -99,6 +111,27 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* De wekenstrook in de bovenbalk van Coach Inzicht, met de knop naar dit
+          venster. Hier gemaakt omdat de fase en de wegingen hier bekend zijn. */}
+      {strookSlot && createPortal(
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+          {(history.length > 0 || actieveFase) && (
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <WeightStatsGrid
+                stats={weightData?.stats || {}} client={client}
+                fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
+                history={history} isMobile={false} coachingPlan={coachingPlan}
+                fase={actieveFase} volleBreedte toonGrafiek={false} alleenStrook
+              />
+            </div>
+          )}
+          <button onClick={onOpenVenster || undefined} title="Gewicht: grafiek, doel en wegingen" aria-label="Gewicht openen"
+            style={{ flexShrink: 0, width: 36, height: 36, padding: 0, borderRadius: 10, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LineChart size={18} strokeWidth={2.4} />
+          </button>
+        </div>,
+        strookSlot
+      )}
       {/* De kop 'Gewicht & Body' stond boven een kolom waar alles al over
           gewicht gaat, en het doelgewicht ernaast stuurde niets — dat is nu de
           horizon in de band. Allebei weg: de fase-regel is de eerste regel. */}

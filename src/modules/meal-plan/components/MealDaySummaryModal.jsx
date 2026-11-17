@@ -51,12 +51,12 @@ const plusDagen = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n);
 // Hoe ligt de inname tegen het doel? Tot 100 kcal ernaast (nog groen) = op doel.
 // Op het verschil in kcal, met een vloeiende overgang: zie utils/kcalKleur.js.
 
-function MacroBalk({ label, waarde, doel, compact = false, eenheid = 'g', kleur = '#fff' }) {
+function MacroBalk({ label, waarde, doel, compact = false, eenheid = 'g', kleur = '#fff', onKlik = null, hint = '' }) {
   const pct = doel > 0 ? Math.min(100, (waarde / doel) * 100) : 0
   // Coach Inzicht: label direct boven het getal, dunne balk er strak onder.
   if (compact) return (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.1 }}>{label}</div>
+    <div onClick={onKlik || undefined} title={onKlik ? hint : undefined} style={{ flex: 1, minWidth: 0, cursor: onKlik ? 'pointer' : 'default' }}>
+      <div style={{ fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.1 }}>{label}{onKlik && <ChevronRight size={10} strokeWidth={3} style={{ marginLeft: 3, verticalAlign: '-1px' }} />}</div>
       <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {fmt(waarde)}<span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{doel > 0 ? ` / ${fmt(doel)}${eenheid}` : eenheid}</span>
       </div>
@@ -105,6 +105,8 @@ export default function MealDaySummaryModal({
   // kiest de dag; dit onderdeel toont dan alleen de dag zelf en meldt de
   // weekcijfers terug. { gekozen, setGekozen, meldWeek }
   gedeeld = null,
+  // Coach Inzicht: klik op de kcal opent Doelen & macro's.
+  onDoelen = null,
   // Klik op het waterbalkje (alleen ingebed): de coach opent het venster met het doel.
   onWaterKlik = null,
   // Plan openen (alleen ingebed): knop rechts in de dagenregel, de kaart heeft geen eigen kop meer.
@@ -438,7 +440,7 @@ export default function MealDaySummaryModal({
                 const c = toonPlan ? dagCijfers : dag
                 return (
                   <div style={{ display: 'flex', gap: 14 }}>
-                    <MacroBalk compact label={toonPlan ? 'Kcal gepland' : 'Kcal'} waarde={c.kcal} doel={doel.kcal} eenheid="" kleur={toonPlan ? 'rgba(255,255,255,0.45)' : maaltijden.length ? kcalKleur(dag.kcal, doel.kcal, '#fff') : '#fff'} />
+                    <MacroBalk compact label={toonPlan ? 'Kcal gepland' : 'Kcal'} waarde={c.kcal} doel={doel.kcal} eenheid="" kleur={toonPlan ? 'rgba(255,255,255,0.45)' : maaltijden.length ? kcalKleur(dag.kcal, doel.kcal, '#fff') : '#fff'} onKlik={onDoelen} hint="Doelen & macro's aanpassen" />
                     <MacroBalk compact label="Eiwit" waarde={c.eiwit} doel={doel.eiwit} />
                     <MacroBalk compact label="Koolh." waarde={c.koolh} doel={doel.koolh} />
                     <MacroBalk compact label="Vet" waarde={c.vet} doel={doel.vet} />

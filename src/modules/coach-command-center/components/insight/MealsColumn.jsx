@@ -572,6 +572,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             <MealDaySummaryModal
               isOpen ingebed
               gedeeld={gedeeld}
+              onDoelen={isMobile ? null : () => window.dispatchEvent(new CustomEvent('myarc:ci-doelen'))}
               waterDoelL={waterDoelL}
               onWaterKlik={() => setVenster('water')}
               onPlan={onNavigatePlan ? () => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() } : null}

@@ -64,11 +64,13 @@ const gemTijd = (tijden, naMiddernachtIsLaat) => {
 }
 const uurTekst = (u) => `${String(u).replace('.', ',')} uur`
 
-export default function SlaapInsight({ db, client, isMobile }) {
+// startNacht: de nacht die meteen gekozen is (iso van de ochtend); lijstOpenStart: de lijst met
+// alle nachten en wat de klant erbij schreef staat al open (het slaapvenster in Training).
+export default function SlaapInsight({ db, client, isMobile, startNacht = null, lijstOpenStart = false }) {
   const [nachten, setNachten] = useState([])
   const [laden, setLaden] = useState(true)
-  const [gekozen, setGekozen] = useState(null) // iso van de aangetikte nacht
-  const [lijstOpen, setLijstOpen] = useState(false)
+  const [gekozen, setGekozen] = useState(startNacht) // iso van de aangetikte nacht
+  const [lijstOpen, setLijstOpen] = useState(lijstOpenStart)
 
   const laad = useCallback(async () => {
     if (!client?.id || !db?.supabase) { setLaden(false); return }
@@ -125,7 +127,8 @@ export default function SlaapInsight({ db, client, isMobile }) {
   if (laden) return null
 
   const gelogd = nachten.filter(n => n.uren != null)
-  if (gelogd.length === 0) return null
+  // In het slaapvenster (lijstOpenStart) zeggen we het als er niets is; in een kolom blijft het blok weg.
+  if (gelogd.length === 0) return lijstOpenStart ? <div style={{ padding: '1.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Geen slaap gelogd in de laatste {NACHTEN} nachten.</div> : null
 
   const gemUren = Math.round((gelogd.reduce((s, n) => s + n.uren, 0) / gelogd.length) * 10) / 10
   const metCijfer = gelogd.filter(n => n.cijfer != null)

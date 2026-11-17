@@ -9,8 +9,10 @@
 // klant (WeekSchedule) en in de Workout Builder (KlantWeekrooster) blijft wat
 // het was: plannen en schuiven doe je daar, hier kijk je alleen.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import SlaapInsight from './SlaapInsight'
+import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink, X } from 'lucide-react'
 import WorkoutServiceNew from '../../../workout/services/WorkoutServiceNew'
 import CardioService from '../../../workout/services/CardioService'
 import StappenService, { STANDAARD_DOEL } from '../../../steps/StappenService'
@@ -85,6 +87,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
   const [gewicht, setGewicht] = useState({}) // { 'YYYY-MM-DD': kg } — de weging van die dag
   const [slaap, setSlaap] = useState({}) // { 'YYYY-MM-DD': uren } — de nacht die op die dag eindigt
+  const [slaapVenster, setSlaapVenster] = useState(null) // dag (iso) waarvan de slaapband is aangeklikt
 
   // Eén keer per klant: plan, vaste indeling, stappendoel en de cardiologs
   // van het laatste halfjaar.
@@ -144,6 +147,38 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     return !d
   })
   const [statInfo, setStatInfo] = useState(null)
+
+  // Agendaatje: standaard 06:00 tot 22:00 in beeld; met het muiswiel (of
+  // vegen) schuif je naar de nacht ervoor of erna. Alle dagen schuiven samen.
+  const VENSTER_MIN = 16 * 60
+  const [asStart, setAsStart] = useState(6 * 60)
+  const rijRef = useRef(null)
+  useEffect(() => {
+    const el = rijRef.current
+    if (!el || !voeding) return
+    const max = 24 * 60 - VENSTER_MIN
+    const schuif = (dMin, e) => {
+      setAsStart(v => {
+        const nieuw = Math.max(0, Math.min(max, v + dMin))
+        // Alleen de pagina tegenhouden als de agenda zelf nog kan schuiven.
+        if (nieuw !== v && e.cancelable) e.preventDefault()
+        return nieuw
+      })
+    }
+    const wiel = (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) schuif(e.deltaY * 1.2, e) }
+    let vinger = null
+    const start = (e) => { vinger = e.touches[0]?.clientY ?? null }
+    const veeg = (e) => {
+      const y = e.touches[0]?.clientY
+      if (vinger == null || y == null) return
+      schuif((vinger - y) * 2.2, e); vinger = y
+    }
+    el.addEventListener('wheel', wiel, { passive: false })
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', veeg, { passive: false })
+    return () => { el.removeEventListener('wheel', wiel); el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', veeg) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!voeding])
 
   // Gecombineerde week: `voeding(gedeeld)` geeft de voeding van de gekozen dag
   // terug en meldt per dag kcal, eiwit en water, voor de balken in de tegels.
@@ -247,14 +282,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
       return regels
   }
-  // De tijdas loopt van het vroegste tot het laatste dat deze week staat,
-  // minstens van 07:00 tot 21:00.
   const TEGEL_HOOGTE = 468, BAND = 38 // slaapband + stappenband
-  const alleMin = voeding ? week.flatMap(w => regelsVan(w, voedingWeek.dagen[w.k] || null).map(r => r.min).filter(m => m != null)) : []
-  const asStart = Math.floor(Math.min(7 * 60, ...alleMin) / 60) * 60
-  const asEind = Math.min(24 * 60, Math.ceil((Math.max(21 * 60, ...alleMin) + 60) / 60) * 60)
-  const pxPerMin = (TEGEL_HOOGTE - BAND - 6) / (asEind - asStart)
-  const asUren = Array.from({ length: Math.floor((asEind - asStart) / 120) + 1 }, (_, i) => asStart + i * 120)
+  const pxPerMin = (TEGEL_HOOGTE - BAND - 6) / VENSTER_MIN
+  // Uurlabels om de twee uur, over de hele dag; wat buiten beeld valt wordt niet getekend.
+  const asUren = Array.from({ length: 13 }, (_, i) => i * 120).filter(u => u >= asStart - 10 && u <= asStart + VENSTER_MIN)
   const AS_BREED = 30
 
   const pijl = {
@@ -312,7 +343,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
 
       {/* Een tegel per dag: donkere foto van de training, naam en sets er dik
           overheen, de stappen als strook langs de rechterkant. */}
-      <div style={{ height: voeding ? TEGEL_HOOGTE : 84, display: 'flex', gap: 6 }}>
+      <div ref={rijRef} style={{ height: voeding ? TEGEL_HOOGTE : 84, display: 'flex', gap: 6, overscrollBehavior: 'contain' }}>
         {voeding && (
           <span style={{ position: 'relative', width: AS_BREED, flexShrink: 0 }}>
             {asUren.map(u => (
@@ -342,7 +373,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
               style={{
                 position: 'relative', flex: 1, minWidth: 0, height: '100%', padding: 0, overflow: 'hidden', borderRadius: 8,
                 // Gecombineerde week: bijna zwart met een haarlijn per twee uur, geen grijs vlak.
-                background: voeding ? `repeating-linear-gradient(to bottom, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${120 * pxPerMin}px) 0 ${BAND}px / 100% 100% no-repeat, #070707` : 'rgba(255,255,255,0.05)',
+                background: voeding ? `repeating-linear-gradient(to bottom, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${120 * pxPerMin}px) 0 ${BAND - (asStart % 120) * pxPerMin}px / 100% 200% no-repeat, #070707` : 'rgba(255,255,255,0.05)',
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 outline: aan ? '2px solid #fff' : 'none', outlineOffset: -2,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -372,7 +403,11 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                 return (
                   <>
                     {/* Slaap van de nacht ervoor: paarse band, vol bij acht uur. */}
-                    <span style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+                    {/* Klik = het slaapvenster: de nachten, bedtijden en wat de klant erbij schreef. */}
+                    <span role="button" tabIndex={0} aria-label="Slaap bekijken" title="Slaap bekijken"
+                      onClick={(e) => { e.stopPropagation(); setSlaapVenster(w.k) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSlaapVenster(w.k) } }}
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden', cursor: 'pointer', zIndex: 2 }}>
                       <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(Math.min(1, (slaap[w.k] || 0) / SLAAP_DOEL) * 100)}%`, background: 'rgba(168,85,247,0.4)' }} />
                       <span style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: slaap[w.k] > 0 ? '#d8b4fe' : 'rgba(255,255,255,0.4)' }}>
                         <Moon size={10} strokeWidth={2.6} color={slaap[w.k] > 0 ? PAARS : 'currentColor'} />{slaap[w.k] > 0 ? `${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')}u` : '·'}
@@ -402,10 +437,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                       const regels = regelsVan(w, v)
                       if (!regels.length) return <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: BALKEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Rust</span>
                       // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
-                      let onder = 0
+                      let onder = -Infinity
                       const geplaatst = regels.map(r => {
                         const hoogte = r.groot ? 50 : 24
-                        const top = Math.max(r.min == null ? 0 : (r.min - asStart) * pxPerMin, onder)
+                        const top = Math.max(((r.min ?? 6 * 60) - asStart) * pxPerMin, onder) // zonder tijd: op 06:00
                         onder = top + hoogte + 2
                         return { ...r, top, hoogte }
                       })
@@ -566,6 +601,23 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       </div>
       {voeding && <div style={{ marginTop: '0.8rem', minWidth: 0 }}>{voeding(gedeeld)}</div>}
       </div>
+      {/* Slaapvenster: veertien nachten, gemiddelden, horloge en wat de klant bij een nacht schreef. */}
+      {slaapVenster && createPortal(
+        <div onClick={(e) => { if (e.target === e.currentTarget) setSlaapVenster(null) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-label="Slaap" style={{ width: '100%', maxWidth: 460, maxHeight: '82vh', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.3rem 1rem' }}>
+              <Moon size={15} color="#fff" strokeWidth={2.4} />
+              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Slaap</span>
+              <button onClick={() => setSlaapVenster(null)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }}>
+              <SlaapInsight key={slaapVenster} db={db} client={client} isMobile={isMobile} startNacht={slaapVenster} lijstOpenStart />
+            </div>
+          </div>
+        </div>, document.body)}
     </div>
   )
 }
