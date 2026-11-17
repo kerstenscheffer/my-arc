@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import SlaapInsight from './SlaapInsight'
-import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink, X, AlertTriangle, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink, X, AlertTriangle, CalendarDays, RotateCcw, Briefcase } from 'lucide-react'
 import WorkoutServiceNew from '../../../workout/services/WorkoutServiceNew'
 import CardioService from '../../../workout/services/CardioService'
 import StappenService, { STANDAARD_DOEL } from '../../../steps/StappenService'
@@ -238,6 +238,17 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       zIndex: mee ? 5 : undefined, opacity: mee ? 0.95 : undefined,
     }
   }
+  // Dit blok heeft voor deze dag een eenmalige tijd: knopje om terug te gaan naar de vaste tijd.
+  const terugKnop = (r, klein = false) => (
+    <span role="button" tabIndex={0} title="Eenmalige tijd voor deze dag. Klik om terug te gaan naar de vaste tijd." aria-label="Terug naar de vaste tijd"
+      onPointerDown={(e) => { e.stopPropagation(); gesleept.current = true }}
+      onClick={(e) => { e.stopPropagation(); zetTerug(r) }}
+      style={klein
+        ? { order: 9, flexShrink: 0, width: 18, height: 18, borderRadius: 9, background: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+        : { position: 'absolute', top: 3, right: 3, zIndex: 2, width: 18, height: 18, borderRadius: 9, background: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+      <RotateCcw size={11} strokeWidth={3} />
+    </span>
+  )
   const beginSleep = (e, r) => {
     if (!r.blok?.editable || planBezig) return
     e.stopPropagation()
@@ -259,6 +270,16 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     }
     window.addEventListener('pointermove', beweeg); window.addEventListener('pointerup', los)
   }
+  // Een eenmalige tijd weghalen: het blok valt terug op zijn vaste tijd.
+  const zetTerug = async (r) => {
+    if (!r?.blok || !agendaService || planBezig) return
+    setPlanBezig(true)
+    try { await agendaService.deleteOverride({ clientId, dateIso: r.dagK, recurringId: recurringIdFor(r.blok) }) }
+    catch (err) { console.error('eenmalige tijd weghalen mislukt:', err); setPlanFout('Terugzetten lukte niet.'); setTimeout(() => setPlanFout(null), 5000) }
+    setPlanBezig(false)
+    setPlanVersie(v => v + 1)
+    window.dispatchEvent(new CustomEvent('myarc:ci-agenda-herlaad'))
+  }
   // Eenmalig = alleen die datum (override); standaard = het vaste patroon.
   const voerVerplaatsingUit = async (standaard) => {
     if (!vraag || !agendaService) return
@@ -272,7 +293,14 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       const duur = Math.max(5, (b.end || 0) - (b.start || 0))
       const nieuw = Math.max(0, Math.min(24 * 60 - duur, (b.start || 0) + vraag.delta))
       try {
-        if (standaard) await agendaService.shiftBlock({ block: { ...b, clientId }, newStartMin: nieuw, toDay: null, mealPlanId })
+        if (standaard) {
+          await agendaService.shiftBlock({ block: { ...b, clientId }, newStartMin: nieuw, toDay: null, mealPlanId })
+          // Standaard = voortaan: een eerdere eenmalige tijd voor dit blok (vandaag
+          // of later) zou de nieuwe vaste tijd op die dag anders blijven overschrijven.
+          await db.supabase.from('client_agenda_overrides').delete()
+            .eq('client_id', clientId).eq('recurring_id', recurringIdFor(b)).gte('override_date', vandaagSleutel)
+            .then(r => r, () => null)
+        }
         else await agendaService.upsertOverride({ clientId, dateIso: r.dagK, recurringId: recurringIdFor(b), startMin: nieuw, endMin: nieuw + duur })
       } catch (err) { console.error('blok verplaatsen mislukt:', err); mislukt++ }
     }
@@ -289,6 +317,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   // vegen) schuif je naar de nacht ervoor of erna. Alle dagen schuiven samen.
   const VENSTER_MIN = 16 * 60
   const [asStart, setAsStart] = useState(6 * 60)
+  // Hoe laat het nu is (minuten sinds middernacht), voor de witte lijn in de tegel van vandaag.
+  const nuVan = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() }
+  const [nuMin, setNuMin] = useState(nuVan)
+  useEffect(() => { const t = setInterval(() => setNuMin(nuVan()), 60000); return () => clearInterval(t) }, [])
   const rijRef = useRef(null)
   const asRef = useRef(6 * 60)
   useEffect(() => {
@@ -424,9 +456,14 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         ? agendaBlokken.filter(isCardioBlok).map(b => { const soort = String(b.label).replace(/^Cardio\s*·\s*/, ''); return { id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, cardio: true, min: b.start, naam: soort, sub: nogTeDoen ? `${b.end - b.start} min` : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(soort) } })
         : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
       // Maaltijden: gelogd, of (dag zonder logs) wat er gepland staat in de agenda.
-      ...(!v?.gelogd && agendaBlokken && nogTeDoen
-        ? agendaBlokken.filter(b => b.type === 'meal' && !b.meta?.placeholder && (b.sublabel || Number(b.meta?.kcal) > 0)).map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: false, min: b.start, naam: b.sublabel || b.label || 'Maaltijd', kcal: Number(b.meta?.kcal) || 0, gelogd: false, foto: b.meta?.image_url || foodImageFallback(b.sublabel || b.label || 'Maaltijd', b.meta?.slot, 80) }))
-        : (v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
+      // Is er al iets gelogd (17 nov 2026), dan blijft staan wat er nog moet komen: geplande
+      // maaltijden die later zijn dan nu en niet onder dezelfde naam gelogd zijn.
+      ...(v?.gelogd ? (v.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false })) : []),
+      ...(agendaBlokken && nogTeDoen
+        ? agendaBlokken.filter(b => b.type === 'meal' && !b.meta?.placeholder && (b.sublabel || Number(b.meta?.kcal) > 0))
+          .filter(b => !v?.gelogd || ((w.toekomst || b.start > nuMin) && !(v.items || []).some(m => String(m.naam || '').trim().toLowerCase() === String(b.sublabel || b.label || '').trim().toLowerCase())))
+          .map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: false, min: b.start, naam: b.sublabel || b.label || 'Maaltijd', kcal: Number(b.meta?.kcal) || 0, gelogd: false, foto: b.meta?.image_url || foodImageFallback(b.sublabel || b.label || 'Maaltijd', b.meta?.slot, 80) }))
+        : (v?.gelogd ? [] : (v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false })))),
     ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
     // De signalen van de dag horen bij de (eerste) gedane training.
     const eerste = regels.find(r => r.groot && !r.cardio && r.gedaan) || regels.find(r => r.groot && !r.cardio)
@@ -590,6 +627,28 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                       )}
                     </span>
                     {balk(0, 4, v ? deel(v.waterMl, v.waterDoel) : 0, '#38bdf8')}
+                    {/* Werk en slaap uit de intake: zachte vlakken achter de rest, alleen
+                        om te zien hoe de dag eruitziet. */}
+                    <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: BALKEN, overflow: 'hidden', pointerEvents: 'none' }}>
+                      {(planWeek[weekSleutel]?.blocksByDay?.[AGENDA_DAGEN[w.i]] || []).filter(b => b.type === 'work' || b.type === 'sleep').map(b => {
+                        const slaapt = b.type === 'sleep'
+                        const boven = (b.start - asStart) * pxPerMin
+                        const hoog = Math.max(0, (b.end - b.start) * pxPerMin)
+                        return (
+                          <span key={b.id} style={{
+                            position: 'absolute', left: 0, right: 0, top: boven, height: hoog,
+                            background: slaapt ? 'rgba(168,85,247,0.07)' : 'rgba(255,255,255,0.035)',
+                          }}>
+                            {hoog >= 14 && (
+                              <span style={{ position: 'absolute', top: Math.max(3, -boven + 3), right: 4, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? 'rgba(216,180,254,0.5)' : 'rgba(255,255,255,0.3)' }}>
+                                {slaapt ? <Moon size={9} strokeWidth={2.6} /> : <Briefcase size={9} strokeWidth={2.6} />}
+                                {slaapt ? 'Slaap' : (b.label || 'Werk')}
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })}
+                    </span>
                     {/* Het agendaatje van de dag: training, cardio en maaltijden
                         onder elkaar op tijd. */}
                     {(() => {
@@ -613,6 +672,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                               <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: r.gedaan ? 0.5 : 0.22 }} />
                               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                               {r.gedaan && <CircleCheck size={14} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
+                              {r.blok?.meta?.isOverridden && terugKnop(r)}
                               {/* Iets om naar te kijken: gekleurde rand en een teller linksboven. */}
                               {r.signalen?.length > 0 && (
                                 <>
@@ -634,6 +694,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                             </span>
                           ) : (
                             <span key={r.id} {...sleepProps(r)} title={`${klok(r.min)} ${r.naam} · ${fmt(r.kcal)} kcal${r.gelogd ? '' : ' (gepland)'}`} style={{ ...sleepStijl(r), position: 'absolute', left: 0, right: 0, top: r.top, height: 24, display: 'flex', alignItems: 'center', gap: 4, opacity: r.gelogd ? 1 : 0.5 }}>
+                              {r.blok?.meta?.isOverridden && terugKnop(r, true)}
                               <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 5, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }} />
                               <span style={{ flex: 1, minWidth: 0, lineHeight: 1.1 }}>
                                 <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.naam}</span>
@@ -644,6 +705,12 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                         </span>
                       )
                     })()}
+                    {/* Vandaag: een witte lijn op de tijd van nu. */}
+                    {w.k === vandaagSleutel && nuMin >= asStart && nuMin <= asStart + VENSTER_MIN && (
+                      <span aria-hidden="true" title={`Nu: ${klok(nuMin)}`} style={{ position: 'absolute', left: 0, right: 0, top: BAND + (nuMin - asStart) * pxPerMin, height: 2, marginTop: -1, background: '#fff', boxShadow: '0 0 6px rgba(255,255,255,0.6)', zIndex: 3, pointerEvents: 'none' }}>
+                        <span style={{ position: 'absolute', left: 0, top: -3, width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
+                      </span>
+                    )}
                   </>
                 )
               })()}

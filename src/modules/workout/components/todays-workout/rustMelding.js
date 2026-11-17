@@ -15,7 +15,13 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
 const MELDING_ID = 7301 // vast: er loopt maar één rustklok tegelijk
-const KANAAL = 'rusttimer'
+// Eigen kanaal met de boksbel als geluid. Android laat het geluid van een
+// bestaand kanaal niet meer wijzigen, dus een nieuw id (het oude 'rusttimer'
+// had het standaardgeluid). Bestand: android/app/src/main/res/raw/rustbel.wav
+// en ios/App/App/rustbel.wav (17 nov 2026). Ontbreekt het in een oudere build,
+// dan valt het toestel terug op het standaard meldingsgeluid.
+const KANAAL = 'rusttimer_bel'
+const GELUID = 'rustbel.wav'
 
 let plugin = null // null = nog niet gekeken, false = niet beschikbaar
 const meldingen = () => {
@@ -41,7 +47,7 @@ const maakKanaal = (p) => {
   if (Capacitor.getPlatform() !== 'android') return
   p.createChannel({
     id: KANAAL, name: 'Rusttimer', description: 'Rust voorbij tussen twee sets',
-    importance: 4, visibility: 1, vibration: true,
+    importance: 4, visibility: 1, vibration: true, sound: GELUID,
   }).catch(() => {})
 }
 
@@ -82,6 +88,7 @@ const plan = () => {
       schedule: { at: new Date(k.eind), allowWhileIdle: true },
       ...(Capacitor.getPlatform() === 'android' ? { channelId: KANAAL } : {}),
       autoCancel: true,
+      sound: GELUID, // iOS; Android pakt het geluid van het kanaal
     }],
   }).catch(() => {})
 }

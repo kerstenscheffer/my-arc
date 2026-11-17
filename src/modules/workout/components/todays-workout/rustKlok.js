@@ -10,6 +10,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import belUrl from './boksbel.wav'
 import { koppelRustMelding, vraagRustMeldingToestemming } from './rustMelding'
+import { koppelRustLive } from './rustLive'
 
 const SLEUTEL = 'myarc.rust.klok'
 // Hoe lang hij na nul doortelt: zo zie je de echte tijd tussen twee sets, maar
@@ -150,6 +151,9 @@ const abonneer = (l) => {
   return () => luisteraars.delete(l)
 }
 
+// De klok op het vergrendelscherm (rustLive.js), los van de geluidsknop.
+koppelRustLive(() => stand, abonneer)
+
 // Tik op de zwevende balk = terug naar de oefening waar de klok bij hoort
 // (12 nov 2026, Kersten). De kaart van die oefening opent zijn eigen
 // log-scherm; staat die kaart niet op het scherm (weekoverzicht), dan meldt
@@ -171,7 +175,7 @@ const kleineOefening = (ex) => {
   return { name: ex.name, sets: ex.sets, reps: ex.reps }
 }
 
-export const startRustKlok = ({ oefening, sec, bron = 'standaard', exercise = null }) => { ontgrendelGeluid(); if (isTimerGeluidAan()) vraagRustMeldingToestemming(); zet({
+export const startRustKlok = ({ oefening, sec, bron = 'standaard', exercise = null }) => { ontgrendelGeluid(); vraagRustMeldingToestemming(); zet({
   oefening, bron, oef: kleineOefening(exercise), totaal: sec, eind: Date.now() + sec * 1000,
   pauzeOver: null, aangepast: false, klaar: false, gestart: Date.now(),
 }) }

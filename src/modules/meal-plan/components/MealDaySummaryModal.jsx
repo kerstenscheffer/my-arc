@@ -496,6 +496,13 @@ export default function MealDaySummaryModal({
                 const c = toonPlan ? dagCijfers : dag
                 return (
                   <div style={{ display: 'flex', gap: 14 }}>
+                    {/* Naar de Plan Analyzer met het plan van deze klant (17 nov 2026, Kersten). */}
+                    {onPlan && (
+                      <button type="button" onClick={onPlan} aria-label="Plan openen in de Plan Analyzer" title="Voedingsplan openen in de Plan Analyzer"
+                        style={{ flexShrink: 0, alignSelf: 'center', width: 32, height: 32, padding: 0, borderRadius: 8, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ExternalLink size={15} strokeWidth={2.6} />
+                      </button>
+                    )}
                     <MacroBalk compact label={toonPlan ? 'Kcal gepland' : 'Kcal'} waarde={c.kcal} doel={doel.kcal} eenheid="" kleur={toonPlan ? 'rgba(255,255,255,0.45)' : maaltijden.length ? kcalKleur(dag.kcal, doel.kcal, '#fff') : '#fff'} onKlik={onDoelen} hint="Doelen & macro's aanpassen" />
                     <MacroBalk compact label="Eiwit" waarde={c.eiwit} doel={doel.eiwit} />
                     <MacroBalk compact label="Koolh." waarde={c.koolh} doel={doel.koolh} />

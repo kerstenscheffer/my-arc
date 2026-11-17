@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		16C6850133EEE930ABC90864 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0E647BE7C10EBA62156C830D /* Foundation.framework */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -15,11 +16,48 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		75439C0C0AFC60CFB46AD8B0 /* RustTimerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD905345688FBF51B2FE15E9 /* RustTimerPlugin.swift */; };
+		77DB9B0FFDE8FAEB890E7E3A /* RustTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFCB2C2413D9E9B348C6A476 /* RustTimerAttributes.swift */; };
+		7D86FA9AD436C4FB4A2F30EA /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 01E02B7C518E04DF4286D35F /* WidgetKit.framework */; };
+		B4D5A10E6DAD05787DD46840 /* RustTimerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B089C165E8CD21CB21DF5B /* RustTimerWidget.swift */; };
+		B4F7E379B3DFA56A76F18ADF /* RustTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFCB2C2413D9E9B348C6A476 /* RustTimerAttributes.swift */; };
+		B585D46626D323ECE820F976 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E09FB7B696292C6A02C5AF9A /* MainViewController.swift */; };
+		CEC1FDCCAC06EA706E1A7302 /* RustTimerWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 469573F36494C2D2DAABEF63 /* RustTimerWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DC413993084284FEC7D88239 /* rustbel.wav in Resources */ = {isa = PBXBuildFile; fileRef = B7A2092449AF0CB02036A668 /* rustbel.wav */; };
+		EE6EF93B053F80AE2795EC0B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 79FD8C164F2890E798B66B19 /* SwiftUI.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		F40200CBA808B8D8577B2716 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 725B96BA8FE9C6AC4D3D9F81;
+			remoteInfo = RustTimerWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		6CD6C35733F524981A092907 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CEC1FDCCAC06EA706E1A7302 /* RustTimerWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		01E02B7C518E04DF4286D35F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
+		0E647BE7C10EBA62156C830D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		4189A8919B006E7F187D1BDA /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		41EFAC55305D8D2F00AE1E08 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		469573F36494C2D2DAABEF63 /* RustTimerWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RustTimerWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -28,7 +66,13 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		79FD8C164F2890E798B66B19 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		A1B089C165E8CD21CB21DF5B /* RustTimerWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustTimerWidget.swift; sourceTree = "<group>"; };
+		B7A2092449AF0CB02036A668 /* rustbel.wav */ = {isa = PBXFileReference; includeInIndex = 1; path = rustbel.wav; sourceTree = "<group>"; };
+		BFCB2C2413D9E9B348C6A476 /* RustTimerAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustTimerAttributes.swift; sourceTree = "<group>"; };
+		E09FB7B696292C6A02C5AF9A /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		FD905345688FBF51B2FE15E9 /* RustTimerPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustTimerPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,15 +84,55 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		68DC6BBA57E1B54A283562F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16C6850133EEE930ABC90864 /* Foundation.framework in Frameworks */,
+				7D86FA9AD436C4FB4A2F30EA /* WidgetKit.framework in Frameworks */,
+				EE6EF93B053F80AE2795EC0B /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		03B05D4A2965D341D88DB367 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				44E4A725676AEDAB5B926B20 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		0E633DBB7745CDFCB19470B0 /* RustTimerWidget */ = {
+			isa = PBXGroup;
+			children = (
+				A1B089C165E8CD21CB21DF5B /* RustTimerWidget.swift */,
+				4189A8919B006E7F187D1BDA /* Info.plist */,
+			);
+			name = RustTimerWidget;
+			path = RustTimerWidget;
+			sourceTree = "<group>";
+		};
+		44E4A725676AEDAB5B926B20 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0E647BE7C10EBA62156C830D /* Foundation.framework */,
+				01E02B7C518E04DF4286D35F /* WidgetKit.framework */,
+				79FD8C164F2890E798B66B19 /* SwiftUI.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				03B05D4A2965D341D88DB367 /* Frameworks */,
+				0E633DBB7745CDFCB19470B0 /* RustTimerWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -56,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				469573F36494C2D2DAABEF63 /* RustTimerWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -72,6 +157,10 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				BFCB2C2413D9E9B348C6A476 /* RustTimerAttributes.swift */,
+				FD905345688FBF51B2FE15E9 /* RustTimerPlugin.swift */,
+				E09FB7B696292C6A02C5AF9A /* MainViewController.swift */,
+				B7A2092449AF0CB02036A668 /* rustbel.wav */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -86,10 +175,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				6CD6C35733F524981A092907 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8779EC6B24BFA5AF1EDD6836 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -98,6 +189,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		725B96BA8FE9C6AC4D3D9F81 /* RustTimerWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DA04ECCA68B78443ECB0CFA /* Build configuration list for PBXNativeTarget "RustTimerWidget" */;
+			buildPhases = (
+				F42F71BF936271C0302B5586 /* Sources */,
+				68DC6BBA57E1B54A283562F6 /* Frameworks */,
+				D863B83F69D1041A8E13E1E9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RustTimerWidget;
+			productName = RustTimerWidget;
+			productReference = 469573F36494C2D2DAABEF63 /* RustTimerWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -133,6 +241,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				725B96BA8FE9C6AC4D3D9F81 /* RustTimerWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -148,6 +257,14 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				DC413993084284FEC7D88239 /* rustbel.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D863B83F69D1041A8E13E1E9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,10 +276,31 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				B4F7E379B3DFA56A76F18ADF /* RustTimerAttributes.swift in Sources */,
+				75439C0C0AFC60CFB46AD8B0 /* RustTimerPlugin.swift in Sources */,
+				B585D46626D323ECE820F976 /* MainViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F42F71BF936271C0302B5586 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4D5A10E6DAD05787DD46840 /* RustTimerWidget.swift in Sources */,
+				77DB9B0FFDE8FAEB890E7E3A /* RustTimerAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8779EC6B24BFA5AF1EDD6836 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RustTimerWidget;
+			target = 725B96BA8FE9C6AC4D3D9F81 /* RustTimerWidget */;
+			targetProxy = F40200CBA808B8D8577B2716 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -184,6 +322,33 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		0D6B27AA24BB0B6A7840FBD8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 772QNXA957;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RustTimerWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.myarcfitness.app.RustTimerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -351,9 +516,44 @@
 			};
 			name = Release;
 		};
+		8134BEF0CA791D8AF974AB09 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 772QNXA957;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RustTimerWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.myarcfitness.app.RustTimerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1DA04ECCA68B78443ECB0CFA /* Build configuration list for PBXNativeTarget "RustTimerWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0D6B27AA24BB0B6A7840FBD8 /* Release */,
+				8134BEF0CA791D8AF974AB09 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
