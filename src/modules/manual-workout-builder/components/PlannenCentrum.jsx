@@ -14,14 +14,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BadgeCheck, Pencil, Check, ChevronDown, Dumbbell, ExternalLink, Search, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BadgeCheck, Pencil, Mars, Venus, UserPlus, Check, ChevronDown, Dumbbell, ExternalLink, Search, X } from 'lucide-react'
 import { PRIVE } from '../../coach-command-center/utils/privacyModus'
 import { planFoto } from '../../workout/components/planFoto'
 import { sweetspotRun, leesInstelling, zetInstelling, leesRuns } from '../sweetspotRun'
 import { spierLabel } from '../spierGroepen'
 
-const PLAN_KOLOMMEN = 'id, name, days_per_week, is_template, is_public, is_archived, is_canoniek, client_id, client_name, original_schema_id, deload_van, user_id, created_at, updated_at'
+const PLAN_KOLOMMEN = 'id, name, days_per_week, is_template, is_public, is_archived, is_canoniek, doelgroep, client_id, client_name, original_schema_id, deload_van, user_id, created_at, updated_at'
 const GROEN = '#10b981'
+const BLAUW = '#3b82f6'
+// Voor wie de template bedoeld is (17 nov 2026): blauw = man, roze = vrouw, leeg = beide.
+const GROEP = { man: { label: 'Man', kleur: '#3b82f6', Icoon: Mars }, vrouw: { label: 'Vrouw', kleur: '#ec4899', Icoon: Venus } }
+const VOLGENDE_GROEP = { '': 'man', man: 'vrouw', vrouw: null }
 const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
 
 const dagenGeleden = (iso) => {
@@ -48,6 +52,11 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
   const [zoek, setZoek] = useState('')
   const [alleKlanten, setAlleKlanten] = useState(false)
   const [metArchief, setMetArchief] = useState(false)
+  // Toewijzen vanaf de kaart: welke template open staat, het zoekveld en wat net gelukt is.
+  const [toewijs, setToewijs] = useState(null)
+  const [toewijsZoek, setToewijsZoek] = useState('')
+  const [toegewezen, setToegewezen] = useState({}) // `${planId}|${klantId}` → 'actief' | 'erbij'
+  const [groepFilter, setGroepFilter] = useState('alle') // alle | man | vrouw; een template zonder groep hoort bij beide
   const [openKlant, setOpenKlant] = useState(client?.id || null)
   const [openPlan, setOpenPlan] = useState(null)
   const [dagen, setDagen] = useState({})            // plan-id → dagen
@@ -158,6 +167,7 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
   const templates = plannen.filter(p => p.is_template)
   const zichtTemplates = templates
     .filter(p => metArchief || !p.is_archived)
+    .filter(p => groepFilter === 'alle' || !p.doelgroep || p.doelgroep === groepFilter)
     .filter(p => !q || String(p.name || '').toLowerCase().includes(q))
   const overig = plannen.filter(p => !p.is_template && !p.client_id && !klanten.some(k => k.assigned_schema_id === p.id))
     .filter(p => !q || String(p.name || '').toLowerCase().includes(q))
@@ -212,6 +222,28 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
     finally { setBezig(null) }
   }
 
+  const wijsToe = async (p, k, actief) => {
+    if (bezig) return
+    setBezig(`${p.id}|${k.id}`); setFout(null)
+    try {
+      const res = await db.assignTemplateToClient(p.id, k.id, actief)
+      if (!res?.success) throw new Error(res?.error || 'Toewijzen mislukt')
+      setToegewezen(t => ({ ...t, [`${p.id}|${k.id}`]: res.activated ? 'actief' : 'erbij' }))
+      await klaar()
+    } catch (e) { setFout(e?.message || 'Toewijzen mislukt') }
+    finally { setBezig(null) }
+  }
+  const zetGroep = async (p) => {
+    if (bezig) return
+    const nieuw = VOLGENDE_GROEP[p.doelgroep || '']
+    setBezig(p.id)
+    try {
+      const { error } = await db.supabase.from('workout_schemas').update({ doelgroep: nieuw }).eq('id', p.id)
+      if (error) throw error
+      setPlannen(l => l.map(x => (x.id === p.id ? { ...x, doelgroep: nieuw } : x)))
+    } catch (e) { setFout(e?.message || 'Opslaan mislukt') }
+    finally { setBezig(null) }
+  }
   const zetCanoniek = async (p, aan) => {
     if (bezig) return
     setBezig(p.id)
@@ -348,6 +380,13 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
               <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 800, color: doel ? '#fff' : 'rgba(255,255,255,0.5)' }}>
                 {doel ? <>Kiezen zet een kopie bij <span className={PRIVE}>{naam(doel)}</span> en maakt die actief.</> : 'Kies bij Klanten eerst voor wie je een template wilt kiezen.'}
               </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['alle', 'Alle', null], ['man', 'Man', GROEP.man], ['vrouw', 'Vrouw', GROEP.vrouw]].map(([id, label, g]) => (
+                  <button key={id} onClick={() => setGroepFilter(id)} aria-pressed={groepFilter === id} style={{ ...kaal, minHeight: 30, padding: '0 0.6rem', ...(groepFilter === id ? { border: `1px solid ${g?.kleur || '#fff'}`, color: g?.kleur || '#fff' } : { color: 'rgba(255,255,255,0.6)' }) }}>
+                    {g && <g.Icoon size={13} strokeWidth={2.6} color={g.kleur} />}{label}
+                  </button>
+                ))}
+              </div>
               <button onClick={() => setMetArchief(v => !v)} style={{ ...kaal, minHeight: 30, border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)' }}>
                 {metArchief ? 'Archief verbergen' : `Archief tonen (${templates.filter(p => p.is_archived).length})`}
               </button>
@@ -360,27 +399,17 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
                   {g.lijst.map(p => {
                     const bij = templateGebruik[p.id] || []
                     const open = openPlan === p.id
-                    const glas = { ...icoonKnop, width: 36, height: 36, background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }
+                    const UIT = 'rgba(255,255,255,0.4)'
+                    const kaalIcoon = { ...icoonKnop, width: 36, height: 34, color: 'rgba(255,255,255,0.8)' }
                     return (
                       <div key={p.id} style={{ borderRadius: 14, overflow: 'hidden', background: '#141414', opacity: p.is_archived ? 0.55 : 1 }}>
-                        <div style={{ position: 'relative', height: 150 }}>
+                        <div style={{ position: 'relative', height: 104 }}>
                           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${planFoto(p)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.94) 100%)' }} />
-                          <span style={{ position: 'absolute', top: 10, left: 12, fontSize: '0.72rem', fontWeight: 900, color: bij.length > 0 ? GROEN : '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                          <span style={{ position: 'absolute', top: 10, left: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 900, color: bij.length > 0 ? GROEN : '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                            {GROEP[p.doelgroep] && (() => { const g = GROEP[p.doelgroep]; return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: g.kleur }}><g.Icoon size={13} strokeWidth={3} />{g.label}</span> })()}
                             {p.is_archived ? 'Archief' : bij.length > 0 ? `Actief bij ${bij.length}` : kopieen[p.id] ? 'Nergens actief' : 'Nooit gebruikt'}
                           </span>
-                          <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 6 }}>
-                            {onBewerk && !p.is_archived && <button onClick={() => onBewerk(p)} title="Template aanpassen" aria-label="Template aanpassen" style={glas}><Pencil size={15} /></button>}
-                            {!p.is_archived && (
-                              <button onClick={() => zetCanoniek(p, !p.is_canoniek)} disabled={!!bezig} title={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} aria-label={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} style={{ ...glas, ...(p.is_canoniek ? { background: GROEN, border: `1px solid ${GROEN}` } : {}) }}>
-                                <BadgeCheck size={17} strokeWidth={2.4} />
-                              </button>
-                            )}
-                            <button onClick={() => archiveer(p, !p.is_archived)} disabled={!!bezig} title={p.is_archived ? 'Terugzetten' : 'Archiveren'} aria-label={p.is_archived ? 'Terugzetten' : 'Archiveren'} style={glas}>
-                              {p.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                            </button>
-                            <button onClick={() => klapPlan(p.id)} title="Bekijk plan" aria-label="Bekijk plan" style={glas}>{pijl(open)}</button>
-                          </div>
                           <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, display: 'flex', alignItems: 'flex-end', gap: 8 }}>
                             <div style={{ flex: 1, minWidth: 0, textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}>
                               <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.12, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.name || 'Template'}</div>
@@ -391,6 +420,63 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
                             {doel && !p.is_archived && <button onClick={() => kiesTemplate(p)} disabled={!!bezig} style={{ ...wit, opacity: bezig ? 0.5 : 1 }}>{bezig === p.id ? '…' : 'Kies'}</button>}
                           </div>
                         </div>
+                        {/* Zwarte balk onder de foto: kale iconen, geen vakjes eromheen. */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, height: 34, padding: '0 6px', background: '#000' }}>
+                          {!p.is_archived && (() => {
+                            const g = GROEP[p.doelgroep]
+                            const Icoon = g?.Icoon || Mars
+                            return (
+                              <button onClick={() => zetGroep(p)} disabled={!!bezig} title={g ? `Voor: ${g.label} (tik om te wisselen)` : 'Voor man en vrouw (tik om te kiezen)'} aria-label="Voor man of vrouw" style={{ ...kaalIcoon, color: g ? g.kleur : UIT }}>
+                                <Icoon size={17} strokeWidth={2.6} />
+                              </button>
+                            )
+                          })()}
+                          {!p.is_archived && (
+                            <button onClick={() => zetCanoniek(p, !p.is_canoniek)} disabled={!!bezig} title={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} aria-label={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} style={{ ...kaalIcoon, color: p.is_canoniek ? BLAUW : UIT }}>
+                              <BadgeCheck size={18} strokeWidth={2.4} />
+                            </button>
+                          )}
+                          {!p.is_archived && (
+                            <button onClick={() => { setToewijs(toewijs === p.id ? null : p.id); setToewijsZoek('') }} aria-pressed={toewijs === p.id} title="Toewijzen aan een klant" aria-label="Toewijzen aan een klant" style={{ ...kaalIcoon, width: 'auto', padding: '0 8px', gap: 5, marginRight: 'auto', color: '#fff', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900 }}>
+                              <UserPlus size={16} /> Toewijzen
+                            </button>
+                          )}
+                          {onBewerk && !p.is_archived && <button onClick={() => onBewerk(p)} title="Template aanpassen" aria-label="Template aanpassen" style={kaalIcoon}><Pencil size={16} /></button>}
+                          <button onClick={() => archiveer(p, !p.is_archived)} disabled={!!bezig} title={p.is_archived ? 'Terugzetten' : 'Archiveren'} aria-label={p.is_archived ? 'Terugzetten' : 'Archiveren'} style={kaalIcoon}>
+                            {p.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                          </button>
+                          <button onClick={() => klapPlan(p.id)} title="Bekijk plan" aria-label="Bekijk plan" style={kaalIcoon}>{pijl(open)}</button>
+                        </div>
+                        {toewijs === p.id && (() => {
+                          const tz = toewijsZoek.trim().toLowerCase()
+                          const lijst = klantRijen.filter(x => (tz ? naam(x.k).toLowerCase().includes(tz) : isActieveKlant(x.k))).slice(0, tz ? 12 : 60)
+                          return (
+                            <div style={{ padding: '0.6rem 0.8rem 0.7rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                              <input autoFocus value={toewijsZoek} onChange={e => setToewijsZoek(e.target.value)} placeholder="Zoek klant…" style={{ width: '100%', boxSizing: 'border-box', minHeight: 36, padding: '0 0.7rem', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.84rem', fontWeight: 700 }} />
+                              <div style={{ maxHeight: 230, overflowY: 'auto', marginTop: 6 }}>
+                                {lijst.length === 0 && <div style={{ ...grijs, padding: '0.5rem 0' }}>Geen klant gevonden.</div>}
+                                {lijst.map(x => {
+                                  const sleutel = `${p.id}|${x.k.id}`
+                                  const klaarMet = toegewezen[sleutel]
+                                  return (
+                                    <div key={x.k.id} style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 40 }}>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div className={PRIVE} style={{ fontSize: '0.8rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam(x.k)}</div>
+                                        <div style={{ ...grijs, fontSize: '0.66rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.actief ? `nu: ${x.actief.name}` : 'geen actief plan'}</div>
+                                      </div>
+                                      {klaarMet
+                                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', fontWeight: 900, color: GROEN }}><Check size={13} strokeWidth={3} /> {klaarMet === 'actief' ? 'Actief gezet' : 'Erbij gezet'}</span>
+                                        : <>
+                                          <button onClick={() => wijsToe(p, x.k, false)} disabled={!!bezig} title="Kopie in de plannen van de klant; zijn actieve plan blijft" style={{ ...kaal, minHeight: 30, padding: '0 0.55rem', fontSize: '0.7rem', opacity: bezig ? 0.5 : 1 }}>Erbij</button>
+                                          <button onClick={() => wijsToe(p, x.k, true)} disabled={!!bezig} title="Kopie maken en meteen actief zetten" style={{ ...wit, minHeight: 30, padding: '0 0.55rem', fontSize: '0.7rem', opacity: bezig ? 0.5 : 1 }}>{bezig === sleutel ? '…' : 'Actief'}</button>
+                                        </>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {open && (
                           <div style={{ padding: '0.2rem 0.8rem 0.2rem' }}>
                             {bij.length > 0 && <div className={PRIVE} style={{ fontSize: '0.76rem', fontWeight: 800, color: '#fff', paddingTop: 8 }}>{bij.map(k => naam(k)).join(', ')}</div>}
