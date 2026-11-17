@@ -324,6 +324,19 @@ function plusPlan(perDag, spier, aantal, maxSessie, budget, pijn = new Set(), ma
   return samenvoegen(wijz)
 }
 
+// Eén set erbij voor één spier, met dezelfde grenzen als de knop in de builder
+// (tijd, max per sessie, max per training, geen pijn-oefening). Voor de sweet
+// spot finder (sweetspot.js). geenPlus: dag-ids waar niets bij mag.
+export function plusEen({ days = [], ctx = {}, spier, budget = 90, pijn = [], geenPlus = new Set() }) {
+  const status = RANGE[ctx.status] ? ctx.status : 'intermediate'
+  const plus40 = Number(ctx.leeftijd) >= LEEFTIJD_40PLUS
+  const maxSessie = plus40 ? Math.min(MAX_PER_SESSIE[status], MAX_PER_SESSIE_40PLUS) : MAX_PER_SESSIE[status]
+  const maxTraining = maxSetsPerTraining({ ...ctx, status })
+  const uniek = [...new Map(days.map(d => [d.id, d])).values()].filter(d => !geenPlus.has(d.id))
+  const perDag = uniek.map(d => ({ dag: d, sets: fractioneleSets(d.exercises || [], ctx.secMap || {}), min: minutenVoorOefeningen(d.exercises || []), totaal: setsVanTraining(d.exercises || []) }))
+  return plusPlan(perDag, spier, 1, maxSessie, budget, new Set(pijn.map(sleutel)), maxTraining)[0] || null
+}
+
 // Sets eraf: telkens van de oefening met de meeste sets, nooit onder 1.
 function minPlan(days, spier, aantal) {
   const oefs = days.flatMap(d => (d.exercises || []).filter(ex => ex.type !== 'cardio' && spierVan(ex) === spier)
