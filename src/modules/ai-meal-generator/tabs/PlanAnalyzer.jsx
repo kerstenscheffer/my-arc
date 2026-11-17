@@ -28,7 +28,7 @@ import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
-import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import VoedingPlannenCentrum from './plan-analyzer/VoedingPlannenCentrum'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 // Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
 import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
@@ -1452,7 +1452,7 @@ export default function PlanAnalyzer({
       try {
         const { data, error } = await db.supabase
           .from('client_meal_plans')
-          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false, pre_workout_meal: preWorkoutUitSjabloon }])
+          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false, pre_workout_meal: preWorkoutUitSjabloon, ...(extra?.template_id ? { template_id: extra.template_id } : {}) }])
           .select('id').single()
         if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
         setSelectedConceptId(data.id)
@@ -1860,12 +1860,14 @@ export default function PlanAnalyzer({
             onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
         )}
         {showPlanLibrary && (
-          <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
+          <VoedingPlannenCentrum db={db} coachId={coachId} isMobile={m}
             weekData={weekData} planMeta={planMeta}
             preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
             clientName={clientRecord?.first_name || ''}
             doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
             onLoad={handleLoadSavedPlan}
+            client={clientRecord || selectedClient || null}
+            onOpenKlant={onSelectClient ? (k) => { setShowPlanLibrary(false); onSelectClient((clients || []).find(c => c.id === k.id) || k) } : null}
             onClose={() => setShowPlanLibrary(false)} />
         )}
       </div>
@@ -1938,6 +1940,7 @@ export default function PlanAnalyzer({
     { id: 'dagen',  icon: <CalendarDays size={16} />, label: 'Dagsjablonen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
     { id: 'week',   icon: <Grid3X3 size={16} />, label: 'Weekagenda', active: viewMode === 'week', onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
     { id: 'swaps',  icon: <Repeat size={16} />, label: 'Swaps', active: dockedSection === 'swaps', onClick: () => toggleDock('swaps') },
+    { id: 'templates', icon: <Bookmark size={16} />, label: 'Templates', active: false, onClick: () => setShowPlanLibrary(true) },
     { id: 'library', icon: <List size={16} />, label: 'Plannen', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
     { id: 'supp',   icon: <Pill size={16} />, label: 'Supplementen', active: dockedSection === 'supp', onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
   ].filter(Boolean)
@@ -2735,12 +2738,14 @@ export default function PlanAnalyzer({
       {/* Los template-opslag modal — bereikbaar via "bewaren als template" in de
           plannen-beheerder. Bewust apart gehouden van het opslaan-in-plan-pad. */}
       {showPlanLibrary && (
-        <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
+        <VoedingPlannenCentrum db={db} coachId={coachId} isMobile={m}
           weekData={weekData} planMeta={planMeta}
           preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
           clientName={clientRecord?.first_name || ''}
           doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
           onLoad={handleLoadSavedPlan}
+          client={clientRecord || selectedClient || null}
+          onOpenKlant={onSelectClient ? (k) => { setShowPlanLibrary(false); onSelectClient((clients || []).find(c => c.id === k.id) || k) } : null}
           onClose={() => setShowPlanLibrary(false)} />
       )}
 
