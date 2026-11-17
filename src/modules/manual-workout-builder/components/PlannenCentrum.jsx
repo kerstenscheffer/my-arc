@@ -14,11 +14,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, Check, ChevronDown, Dumbbell, ExternalLink, Search, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BadgeCheck, Pencil, Check, ChevronDown, Dumbbell, ExternalLink, Search, X } from 'lucide-react'
 import { PRIVE } from '../../coach-command-center/utils/privacyModus'
 import { planFoto } from '../../workout/components/planFoto'
 
-const PLAN_KOLOMMEN = 'id, name, days_per_week, is_template, is_public, is_archived, client_id, client_name, original_schema_id, deload_van, user_id, created_at, updated_at'
+const PLAN_KOLOMMEN = 'id, name, days_per_week, is_template, is_public, is_archived, is_canoniek, client_id, client_name, original_schema_id, deload_van, user_id, created_at, updated_at'
 const GROEN = '#10b981'
 const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
 
@@ -35,7 +35,7 @@ const dagLijst = (ws) => (!ws || typeof ws !== 'object' ? [] : Object.keys(ws).s
   return { key: k, naam: d.name || k, focus: d.focus || '', oefeningen: exs.map(e => e.name).filter(Boolean) }
 }))
 
-export default function PlannenCentrum({ db, isMobile = false, client = null, onClose, onOpenKlant = null, onGewijzigd = null }) {
+export default function PlannenCentrum({ db, isMobile = false, client = null, onClose, onOpenKlant = null, onGewijzigd = null, onBewerk = null }) {
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState(null)
   const [plannen, setPlannen] = useState([])
@@ -142,8 +142,10 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
     ((templateGebruik[b.id]?.length || 0) - (templateGebruik[a.id]?.length || 0)) || ((kopieen[b.id] || 0) - (kopieen[a.id] || 0))
     || ((b.days_per_week || 0) - (a.days_per_week || 0)) || String(a.name || '').localeCompare(String(b.name || '')))
   const groepen = [
-    { id: 'gebruikt', titel: 'Meest gebruikt', lijst: opGebruik.filter(p => !p.is_archived && kopieen[p.id]) },
-    { id: 'nooit', titel: 'Nooit gebruikt', lijst: opGebruik.filter(p => !p.is_archived && !kopieen[p.id]) },
+    // Canoniek: de basisplannen die je met vertrouwen toewijst, op dagen per week.
+    { id: 'canoniek', titel: 'Canoniek', lijst: opGebruik.filter(p => !p.is_archived && p.is_canoniek).sort((a, b) => (a.days_per_week || 0) - (b.days_per_week || 0)) },
+    { id: 'gebruikt', titel: 'Meest gebruikt', lijst: opGebruik.filter(p => !p.is_archived && !p.is_canoniek && kopieen[p.id]) },
+    { id: 'nooit', titel: 'Nooit gebruikt', lijst: opGebruik.filter(p => !p.is_archived && !p.is_canoniek && !kopieen[p.id]) },
     { id: 'archief', titel: 'Archief', lijst: opGebruik.filter(p => p.is_archived) },
   ].filter(g => g.lijst.length > 0)
 
@@ -183,6 +185,17 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
       setPlannen(l => l.map(x => (x.id === p.id ? { ...x, is_archived: aan } : x)))
       onGewijzigd?.()
     } catch (e) { setFout(e?.message || 'Archiveren mislukt') }
+    finally { setBezig(null) }
+  }
+
+  const zetCanoniek = async (p, aan) => {
+    if (bezig) return
+    setBezig(p.id)
+    try {
+      const { error } = await db.supabase.from('workout_schemas').update({ is_canoniek: aan }).eq('id', p.id)
+      if (error) throw error
+      setPlannen(l => l.map(x => (x.id === p.id ? { ...x, is_canoniek: aan } : x)))
+    } catch (e) { setFout(e?.message || 'Opslaan mislukt') }
     finally { setBezig(null) }
   }
 
@@ -332,6 +345,12 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
                             {p.is_archived ? 'Archief' : bij.length > 0 ? `Actief bij ${bij.length}` : kopieen[p.id] ? 'Nergens actief' : 'Nooit gebruikt'}
                           </span>
                           <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 6 }}>
+                            {onBewerk && !p.is_archived && <button onClick={() => onBewerk(p)} title="Template aanpassen" aria-label="Template aanpassen" style={glas}><Pencil size={15} /></button>}
+                            {!p.is_archived && (
+                              <button onClick={() => zetCanoniek(p, !p.is_canoniek)} disabled={!!bezig} title={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} aria-label={p.is_canoniek ? 'Niet meer canoniek' : 'Maak canoniek'} style={{ ...glas, ...(p.is_canoniek ? { background: GROEN, border: `1px solid ${GROEN}` } : {}) }}>
+                                <BadgeCheck size={17} strokeWidth={2.4} />
+                              </button>
+                            )}
                             <button onClick={() => archiveer(p, !p.is_archived)} disabled={!!bezig} title={p.is_archived ? 'Terugzetten' : 'Archiveren'} aria-label={p.is_archived ? 'Terugzetten' : 'Archiveren'} style={glas}>
                               {p.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                             </button>

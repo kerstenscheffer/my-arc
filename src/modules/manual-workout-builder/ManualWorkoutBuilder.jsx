@@ -1906,6 +1906,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <PlannenCentrum db={db} isMobile={isMobile} client={effectiveClient || null}
           onClose={() => setShowPlanSwitch(false)}
           onOpenKlant={(k) => { setShowPlanSwitch(false); const vol = (clients || []).find(c => c.id === k.id) || k; handleSelectLocalClient(vol) }}
+          onBewerk={async (p) => {
+            // De template zelf openen (niet de kopieën bij klanten): eerst de volledige rij ophalen.
+            const { data } = await db.supabase.from('workout_schemas').select('*').eq('id', p.id).eq('is_template', true).single().then(x => x, () => ({ data: null }))
+            if (!data) return
+            setShowPlanSwitch(false); startBewerk('plan', data)
+          }}
           onGewijzigd={() => { loadTemplates(); if (effectiveClient) herlaadKlant() }} />
       )}
 
