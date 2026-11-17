@@ -25,6 +25,8 @@ const LIJN = 'rgba(255,255,255,0.08)'
 const GROEN = '#10b981'
 // Breedte van de balken rechts in een tegel (kcal, eiwit, water) in de gecombineerde week.
 const BALKEN = 42
+// Een kolom onder de agenda: scrolt zelf, zonder zichtbare balk.
+const KOLOM_SCROLL = { minWidth: 0, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '1rem' }
 // Slaapdoel voor de paarse band bovenin de tegel.
 const SLAAP_DOEL = 8
 const PAARS = '#a855f7'
@@ -153,17 +155,19 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const VENSTER_MIN = 16 * 60
   const [asStart, setAsStart] = useState(6 * 60)
   const rijRef = useRef(null)
+  const asRef = useRef(6 * 60)
   useEffect(() => {
     const el = rijRef.current
     if (!el || !voeding) return
     const max = 24 * 60 - VENSTER_MIN
+    // De stand staat ook in een ref: de pagina tegenhouden moet tijdens de
+    // gebeurtenis zelf, niet pas als React de state bijwerkt.
     const schuif = (dMin, e) => {
-      setAsStart(v => {
-        const nieuw = Math.max(0, Math.min(max, v + dMin))
-        // Alleen de pagina tegenhouden als de agenda zelf nog kan schuiven.
-        if (nieuw !== v && e.cancelable) e.preventDefault()
-        return nieuw
-      })
+      const nieuw = Math.max(0, Math.min(max, asRef.current + dMin))
+      if (nieuw === asRef.current) return // aan het eind: de pagina mag verder scrollen
+      if (e.cancelable) e.preventDefault()
+      asRef.current = nieuw
+      setAsStart(nieuw)
     }
     const wiel = (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) schuif(e.deltaY * 1.2, e) }
     let vinger = null
@@ -303,11 +307,12 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     : dag.cardio[0] ? [Number(dag.cardio[0].duration_minutes) > 0 ? `${dag.cardio[0].duration_minutes} min` : null].filter(Boolean) : []
 
   return (
-    <div style={{ padding: isMobile ? '0.4rem 1rem 1rem' : '0.4rem 1.25rem 1rem' }}>
+    // Gecombineerde week: de agenda staat vast, alleen de twee lijsten eronder scrollen.
+    <div style={{ padding: isMobile ? '0.4rem 1rem 1rem' : '0.4rem 1.25rem 1rem', ...(voeding ? { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', paddingBottom: 0, boxSizing: 'border-box' } : {}) }}>
       <style>{`@keyframes ciDeckUit { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }`}</style>
 
       {/* Dagenstrook: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
-      <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px' }}>
+      <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px', flexShrink: 0 }}>
         {/* Boven de tijdas: het trainingsplan openen in de builder. */}
         {voeding && (
           <button onClick={acties?.plan || undefined} disabled={!acties?.plan} title={acties?.plan ? `Trainingsplan openen in de builder${acties.planNaam ? ` (${acties.planNaam})` : ''}` : undefined} aria-label="Trainingsplan openen"
@@ -343,7 +348,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
 
       {/* Een tegel per dag: donkere foto van de training, naam en sets er dik
           overheen, de stappen als strook langs de rechterkant. */}
-      <div ref={rijRef} style={{ height: voeding ? TEGEL_HOOGTE : 84, display: 'flex', gap: 6, overscrollBehavior: 'contain' }}>
+      <div ref={rijRef} style={{ height: voeding ? TEGEL_HOOGTE : 84, display: 'flex', gap: 6, overscrollBehavior: 'contain', flexShrink: 0 }}>
         {voeding && (
           <span style={{ position: 'relative', width: AS_BREED, flexShrink: 0 }}>
             {asUren.map(u => (
@@ -500,8 +505,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       </div>
 
       {/* Gecombineerde week: links training, rechts voeding van dezelfde dag. */}
-      <div style={voeding ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 32, alignItems: 'start' } : undefined}>
-      <div>
+      <div style={voeding ? { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)', gap: 32 } : undefined}>
+      <div style={voeding ? KOLOM_SCROLL : undefined}>
+      {/* Cijfers en kopregel blijven staan; de kaarten scrollen eronderdoor. */}
+      <div style={voeding ? { position: 'sticky', top: 0, zIndex: 3, background: '#050505', paddingBottom: 6 } : undefined}>
       {/* De gekozen dag: stappen, sets, oefeningen en cardio tegen het plan. */}
       <div style={{ display: 'flex', gap: 14, marginTop: '0.8rem' }}>
         <Balk label="Stappen" waarde={dag.stappen} doel={stappenDoel} kleur={deelKleur(dag.stappen, stappenDoel)} onKlik={acties?.stappen} hint="Stappendoel instellen" />
@@ -561,6 +568,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         </div>
       )}
 
+      </div>
       {/* Uitgeklapt: de sessies en de cardio van de dag. Een sessie opent in
           het venster met de oefeningen en de progressie. */}
       {!dicht && dag.sessies.map((w, i) => {
@@ -599,22 +607,22 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         )
       })}
       </div>
-      {voeding && <div style={{ marginTop: '0.8rem', minWidth: 0 }}>{voeding(gedeeld)}</div>}
+      {voeding && <div style={{ ...KOLOM_SCROLL, paddingTop: '0.8rem' }}>{voeding(gedeeld)}</div>}
       </div>
       {/* Slaapvenster: veertien nachten, gemiddelden, horloge en wat de klant bij een nacht schreef. */}
       {slaapVenster && createPortal(
         <div onClick={(e) => { if (e.target === e.currentTarget) setSlaapVenster(null) }}
           style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div role="dialog" aria-label="Slaap" style={{ width: '100%', maxWidth: 460, maxHeight: '82vh', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
+          <div role="dialog" aria-label="Slaap" style={{ width: '100%', maxWidth: 460, maxHeight: '82vh', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(168,85,247,0.35)', borderRadius: 18, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.3rem 1rem' }}>
-              <Moon size={15} color="#fff" strokeWidth={2.4} />
+              <Moon size={15} color={PAARS} strokeWidth={2.4} />
               <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Slaap</span>
               <button onClick={() => setSlaapVenster(null)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }}>
-              <SlaapInsight key={slaapVenster} db={db} client={client} isMobile={isMobile} startNacht={slaapVenster} lijstOpenStart />
+              <SlaapInsight key={slaapVenster} db={db} client={client} isMobile={isMobile} startNacht={slaapVenster} lijstOpenStart paars />
             </div>
           </div>
         </div>, document.body)}

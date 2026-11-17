@@ -9,6 +9,8 @@ import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
 import TrainingWeekInzicht from './TrainingWeekInzicht'
+import { leesFeedbackVanDag, GEVOEL, spierWoord } from '../../../workout/bouwfase/bouwfaseData'
+import { rirLabel, POMP, WERKDRUK, spierpijnVan } from '../../../workout/bouwfase/rir'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
@@ -443,7 +445,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <div className="ci-venster"><PlanWijzigingen db={db} client={client} isMobile={isMobile} altijdOpen /><KlantPlanTerugzetten db={db} client={client} soort="workout" isMobile={isMobile} altijdOpen /></div>
         </BladModal>
 
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={voeding ? { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' } : { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio
               en stappen per dag, met pijlen naar eerdere weken. */}
           {!alleenSessies && <>
@@ -465,7 +467,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             naamVoorSessie={naamVoorSessie}
             tijdVan={logTijd}
             toonSessie={(w) => {
-              const sessie = { ...w, workout_naam: naamVoorSessie(w) || w.workout_naam || null, _wissels: wisselsVoorSessie(w) }
+              const sessie = { ...w, client_id: w.client_id || client?.id || null, workout_naam: naamVoorSessie(w) || w.workout_naam || null, _wissels: wisselsVoorSessie(w) }
               const exs = []
               Object.entries(exerciseProgress).forEach(([name, entries]) => {
                 const match = entries.find(e => e.sessionId === w.id)
@@ -476,6 +478,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                 : exs
               return (
                 <SessieOefeningen ingebed db={db} isMobile={isMobile} selectedSession={sessie} exs={lijst}
+                  historie={(naam) => exerciseProgress[naam] || []}
                   onBack={() => {}}
                   onKies={(naam) => { setSelectedSession(sessie); setSelectedExercise(naam); setView('progress') }} />
               )
@@ -627,7 +630,20 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
 
 // `ingebed`: alleen de notitie en de oefeningkaarten, zonder kop of eigen
 // scrollvlak (voor de kaart Training in Coach Inzicht).
-function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, ingebed = false }) {
+// `historie(naam)`: eerdere sessies van die oefening; dan staat in de kaart een
+// kleine tabel met de sets per datum in plaats van alleen deze sessie.
+function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, ingebed = false, historie = null }) {
+  // De herstel- en gevoelsvragen van die dag (training_feedback), alleen in de
+  // ingebedde kaarten: per oefening onder de titel, per spiergroep erboven.
+  const [feedback, setFeedback] = useState(null)
+  const fbKlant = selectedSession?.client_id || null
+  const fbDag = String(selectedSession?.workout_date || '').slice(0, 10)
+  useEffect(() => {
+    if (!ingebed || !db?.supabase || !fbKlant || !fbDag) return
+    let weg = false
+    leesFeedbackVanDag(db.supabase, fbKlant, fbDag).then(f => { if (!weg) setFeedback(f) }, () => {})
+    return () => { weg = true }
+  }, [ingebed, db, fbKlant, fbDag])
   const fotoVan = useOefeningFotos(db, exs.map(e => e.name).filter(Boolean))
   const photoSize = isMobile ? 62 : 72
   const duur = useSessieDuur(db, selectedSession)
@@ -705,6 +721,42 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
         )}
 
         <div style={ingebed ? {} : { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
+          {/* Herstel per spiergroep en het cijfer van de workout, één regel per antwoord. */}
+          {ingebed && feedback && (() => {
+            const SPIERPIJN_KORT = ['geen spierpijn', 'spierpijn al weg', 'spierpijn net op tijd weg', 'nog spierpijn']
+            const SPIERPIJN_KLEUR = ['#10b981', '#10b981', '#f59e0b', '#ef4444']
+            const groepen = [...new Set([...Object.keys(feedback.herstel || {}), ...Object.keys(feedback.spier || {})])]
+            const w = feedback.workout
+            if (!groepen.length && !w) return null
+            const hoofd = (x) => x.charAt(0).toUpperCase() + x.slice(1)
+            return (
+              <div style={{ margin: '0 0 0.5rem', display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+                {w && (w.score != null || w.opmerking) && (
+                  <div>
+                    <b style={{ color: '#fff', fontWeight: 900 }}>Workout</b>
+                    {w.score != null && <span style={{ fontWeight: 900, color: w.score >= 7 ? '#10b981' : w.score >= 5 ? '#f59e0b' : '#ef4444' }}> {w.score}/10</span>}
+                    {w.opmerking && <span style={{ fontStyle: 'italic' }}> · {w.opmerking}</span>}
+                  </div>
+                )}
+                {groepen.map(g => {
+                  const sp = spierpijnVan(feedback.herstel?.[g])
+                  const sr = feedback.spier?.[g]
+                  const pomp = POMP.find(x => x.id === sr?.pomp)?.label
+                  const druk = WERKDRUK.find(x => x.id === sr?.werkdruk)
+                  const opm = feedback.herstel?.[g]?.opmerking || sr?.opmerking
+                  return (
+                    <div key={g}>
+                      <b style={{ color: '#fff', fontWeight: 900 }}>{hoofd(spierWoord(g) || g)}</b>
+                      {sp != null && <span style={{ fontWeight: 900, color: SPIERPIJN_KLEUR[sp] }}> · {SPIERPIJN_KORT[sp]}</span>}
+                      {pomp && <span> · pomp {pomp.toLowerCase()}</span>}
+                      {druk && <span style={{ color: druk.id >= 3 ? '#ef4444' : undefined }}> · werkdruk {druk.label.toLowerCase()}</span>}
+                      {opm && <span style={{ fontStyle: 'italic' }}> · {opm}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
           {exs.length > 0 ? exs.map((ex, idx) => (
             <div key={idx} style={{ ...KAART, ...(ingebed ? { margin: '0 0 0.45rem' } : {}), display: 'flex', alignItems: 'stretch' }}>
               {/* Foto links met het nummer linksboven, zoals de oefeningkaart van de klant. */}
@@ -730,13 +782,33 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
                     </span>
                   )}
                 </div>
+                {/* Wat de klant na deze oefening invulde: cijfer, uitvoering, herhalingen over, pomp. */}
+                {ingebed && (() => {
+                  const f = feedback?.oefening?.[String(ex.name || '').trim().toLowerCase()]
+                  if (!f) return null
+                  const gevoel = f.gevoel && f.gevoel !== 'goed' ? GEVOEL.find(x => x.id === f.gevoel)?.label : null
+                  const pomp = POMP.find(x => x.id === f.pomp)?.label
+                  const delen = [
+                    f.score != null ? <span key="s" style={{ fontWeight: 900, color: f.score >= 7 ? '#10b981' : f.score >= 5 ? '#f59e0b' : '#ef4444' }}>{f.score}/10</span> : null,
+                    f.rir != null ? <span key="r" style={{ color: '#fff', fontWeight: 900 }}>{rirLabel(f.rir)} over</span> : null,
+                    gevoel ? <span key="g" style={{ fontWeight: 900, color: f.gevoel === 'pijn' ? '#ef4444' : '#f59e0b' }}>{gevoel}</span> : null,
+                    pomp ? <span key="p">pomp {pomp.toLowerCase()}</span> : null,
+                  ].filter(Boolean)
+                  if (!delen.length && !f.opmerking) return null
+                  return (
+                    <div style={{ marginTop: 2, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.35 }}>
+                      {delen.map((d, n) => <React.Fragment key={n}>{n > 0 && ' · '}{d}</React.Fragment>)}
+                      {f.opmerking && <span style={{ fontStyle: 'italic' }}>{delen.length ? ' · ' : ''}{f.opmerking}</span>}
+                    </div>
+                  )
+                })()}
                 {selectedSession._wissels?.[String(ex.name || '').trim().toLowerCase()] && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b' }}>
                     <ArrowLeftRight size={11} strokeWidth={2.6} />
                     Gewisseld door klant · was {selectedSession._wissels[String(ex.name || '').trim().toLowerCase()]}
                   </div>
                 )}
-                {ex.sets?.length > 0 ? (
+                {historie && ex.sets?.length > 0 ? null : ex.sets?.length > 0 ? (
                   <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', marginTop: 3, flexWrap: 'wrap' }}>
                     {ex.sets.map((st, si) => <SetDisplay key={si} s={st} />)}
                   </div>
@@ -750,6 +822,39 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
                   </div>
                 )}
               </div>
+              {/* Rechts van de titel: de sets per datum, deze sessie vooraan. Vier
+                  datums tegelijk in beeld, de rest door te schuiven. */}
+              {historie && ex.sets?.length > 0 && (() => {
+                const dezeDag = String(selectedSession.workout_date || '').slice(0, 10)
+                const eerder = (historie(ex.name) || [])
+                  .filter(e => e.sessionId !== selectedSession.id && String(e.date || '').slice(0, 10) <= dezeDag && e.sets?.length > 0)
+                  .sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 11)
+                const kolommen = [{ ...ex, date: selectedSession.workout_date, nu: true }, ...eerder]
+                const rijen = Math.max(...kolommen.map(k => k.sets.length))
+                const kg = (n) => String(Math.round((Number(n) || 0) * 10) / 10).replace('.', ',')
+                const datum = (d) => { const x = new Date(`${String(d || '').slice(0, 10)}T00:00:00`); return Number.isNaN(x.getTime()) ? '' : x.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '') }
+                const KOL = 66, LABEL = 20
+                return (
+                  <div style={{ flexShrink: 0, alignSelf: 'center', display: 'flex', width: LABEL + KOL * Math.min(4, kolommen.length), margin: '0.35rem 0.4rem 0.35rem 0', fontSize: '0.66rem', fontWeight: 800, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ width: LABEL, flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.56rem' }}>&nbsp;</div>
+                      {Array.from({ length: rijen }, (_, ri) => <div key={ri} style={{ fontSize: '0.54rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', lineHeight: `${0.66 * 1.4}rem` }}>S{ri + 1}</div>)}
+                    </div>
+                    <div className="ci-sets-baan" style={{ flex: 1, minWidth: 0, display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      <style>{'.ci-sets-baan::-webkit-scrollbar{display:none}'}</style>
+                      {kolommen.map((k, ki) => (
+                        <div key={ki} style={{ flex: `0 0 ${KOL}px`, scrollSnapAlign: 'start', whiteSpace: 'nowrap', color: k.nu ? '#fff' : 'rgba(255,255,255,0.45)' }}>
+                          <div style={{ fontSize: '0.56rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: k.nu ? '#fff' : 'rgba(255,255,255,0.4)' }}>{datum(k.date)}</div>
+                          {Array.from({ length: rijen }, (_, ri) => {
+                            const st = k.sets[ri]
+                            return <div key={ri}>{st ? <>{kg(st.weight)}<span style={{ fontSize: '0.8em', opacity: 0.6 }}>kg</span>×{st.reps || 0}</> : <span style={{ opacity: 0.4 }}>–</span>}</div>
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
               {/* Rechts: beste gewicht als vaste waarde, en de knop naar de progressie. */}
               <button
                 onClick={() => onKies(ex.name)}

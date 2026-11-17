@@ -8,6 +8,7 @@ import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
 import ClientDataColumn from './insight/ClientDataColumn'
 import CheckinsColumn from './insight/CheckinsColumn'
+import DoelVenster from './insight/DoelVenster'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
@@ -101,6 +102,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Check-ins staan niet meer als vak in beeld (17 nov 2026, Kersten): een knop in de
   // kopregel opent ze in een venster, met een bolletje zolang er een ongeziene ligt.
   const [showCheckins, setShowCheckins] = useState(false)
+  const [showDoel, setShowDoel] = useState(false)
   // Gegevens en Journey openen als venster in plaats van als kaart op de pagina (17 nov 2026).
   const [popSectie, setPopSectie] = useState(null) // 'data' | 'journey' | null
   const [checkinNieuw, setCheckinNieuw] = useState(0)
@@ -318,9 +320,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 maxWidth: middenBreedte, margin: '0 auto',
                 padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
               }}>
-                  <span className={PRIVE} style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
+                  {/* Klik op de naam: het doel uit de intake, het waarom en de aangeklikte lichamen. */}
+                  <button type="button" onClick={() => setShowDoel(true)} title="Doel en waarom bekijken" className={PRIVE}
+                    style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
-                  </span>
+                  </button>
                   {huidigGewicht != null && (
                     <span className={PRIVE} style={{
                       flexShrink: 0, fontSize: '0.72rem', fontWeight: 800,
@@ -790,6 +794,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
         </div>
+      )}
+
+      {showDoel && effectiveClient && (
+        <DoelVenster client={effectiveClient} db={db} onSluit={() => setShowDoel(false)} />
       )}
 
       {/* ═══ CHECK-INS (venster) ═══ */}

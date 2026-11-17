@@ -23,10 +23,12 @@ import { Moon, ChevronDown } from 'lucide-react'
 
 const NACHTEN = 14
 
-const kleurVoorCijfer = (q) => {
+// paars: de slaapkleur van de trainingsweek (het slaapvenster). Goed = vol paars,
+// matig = gedimd paars; alleen een slechte nacht blijft rood.
+const kleurVoorCijfer = (q, paars = false) => {
   if (q == null) return 'rgba(255,255,255,0.35)'
-  if (q >= 7) return '#10b981'
-  if (q >= 5) return '#f59e0b'
+  if (q >= 7) return paars ? '#a855f7' : '#10b981'
+  if (q >= 5) return paars ? 'rgba(168,85,247,0.55)' : '#f59e0b'
   return '#ef4444'
 }
 
@@ -66,7 +68,7 @@ const uurTekst = (u) => `${String(u).replace('.', ',')} uur`
 
 // startNacht: de nacht die meteen gekozen is (iso van de ochtend); lijstOpenStart: de lijst met
 // alle nachten en wat de klant erbij schreef staat al open (het slaapvenster in Training).
-export default function SlaapInsight({ db, client, isMobile, startNacht = null, lijstOpenStart = false }) {
+export default function SlaapInsight({ db, client, isMobile, startNacht = null, lijstOpenStart = false, paars = false }) {
   const [nachten, setNachten] = useState([])
   const [laden, setLaden] = useState(true)
   const [gekozen, setGekozen] = useState(startNacht) // iso van de aangetikte nacht
@@ -154,7 +156,7 @@ export default function SlaapInsight({ db, client, isMobile, startNacht = null, 
       borderBottom: '1px solid rgba(255,255,255,0.04)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        <Moon size={13} color="rgba(255,255,255,0.5)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+        <Moon size={13} color={paars ? '#a855f7' : 'rgba(255,255,255,0.5)'} strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
             Slaap · laatste {NACHTEN} nachten ({nachtLabel(nachten[0].iso).split(' → ')[0]} t/m {dagKort(nachten[nachten.length - 1].iso)} {maandKort(nachten[nachten.length - 1].iso)})
@@ -202,7 +204,7 @@ export default function SlaapInsight({ db, client, isMobile, startNacht = null, 
               >
                 <div style={{
                   width: '100%', height: `${pct}%`,
-                  background: kleurVoorCijfer(n.cijfer),
+                  background: kleurVoorCijfer(n.cijfer, paars),
                   opacity: n.cijfer == null ? 0.5 : 1,
                 }} />
               </div>
@@ -222,7 +224,7 @@ export default function SlaapInsight({ db, client, isMobile, startNacht = null, 
       </div>
 
       {/* De aangetikte nacht, voluit. */}
-      {actief && <NachtRegel n={actief} vet />}
+      {actief && <NachtRegel n={actief} vet paars={paars} />}
 
       {/* Alle gelogde nachten, nieuwste boven. Wat de klant schreef staat
           erbij: vaak de enige regel die zegt waar het gesprek over moet gaan. */}
@@ -235,20 +237,20 @@ export default function SlaapInsight({ db, client, isMobile, startNacht = null, 
           Alle {gelogd.length} nachten
         </button>
       )}
-      {lijstOpen && [...gelogd].reverse().map(n => <NachtRegel key={n.iso} n={n} />)}
+      {lijstOpen && [...gelogd].reverse().map(n => <NachtRegel key={n.iso} n={n} paars={paars} />)}
     </div>
   )
 }
 
 // Eén nacht: "zo 18 → ma 19 okt  23:30 → 06:45  7,3 uur  6/10" + notitie.
-function NachtRegel({ n, vet = false }) {
+function NachtRegel({ n, vet = false, paars = false }) {
   return (
     <div style={{ marginTop: vet ? 6 : 3, padding: vet ? '6px 8px' : '3px 0', borderRadius: 6, background: vet ? 'rgba(255,255,255,0.05)' : 'none' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0 8px', fontSize: vet ? '0.72rem' : '0.66rem', fontWeight: 800 }}>
         <span style={{ color: '#fff' }}>{nachtLabel(n.iso)}</span>
         {(n.bed || n.op) && <span style={{ color: 'rgba(255,255,255,0.55)' }}>{n.bed || '?'} → {n.op || '?'}</span>}
         <span style={{ color: '#fff' }}>{uurTekst(n.uren)}</span>
-        {n.cijfer != null && <span style={{ color: kleurVoorCijfer(n.cijfer) }}>{n.cijfer}/10</span>}
+        {n.cijfer != null && <span style={{ color: kleurVoorCijfer(n.cijfer, paars) }}>{n.cijfer}/10</span>}
       </div>
       {(n.diep || n.rem || n.rust != null || n.hrv != null || n.horloge) && (
         <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>

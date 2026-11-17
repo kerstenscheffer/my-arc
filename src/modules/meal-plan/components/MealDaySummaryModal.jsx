@@ -761,7 +761,7 @@ export default function MealDaySummaryModal({
               </div>
               {/* Coach Inzicht: de dagenstrook boven de tegels, zelfde vorm als bij
                   Training: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
-              <div style={ingebed && !gedeeld ? { position: 'sticky', top: '-0.4rem', zIndex: 5, background: '#0e0e0e', margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` } : undefined}>
+              <div style={gedeeld ? { position: 'sticky', top: 0, zIndex: 3, background: '#050505', paddingBottom: 6 } : ingebed ? { position: 'sticky', top: '-0.4rem', zIndex: 5, background: '#0e0e0e', margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` } : undefined}>
               {ingebed && !gedeeld && (
                 <div style={{ display: 'flex', gap: 6, margin: '0.3rem 0 5px' }}>
                   {week.map((w, i) => {
