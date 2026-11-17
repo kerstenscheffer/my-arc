@@ -137,6 +137,9 @@ const DAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', t
 const DAG_KORT = { monday: 'ma', tuesday: 'di', wednesday: 'wo', thursday: 'do', friday: 'vr', saturday: 'za', sunday: 'zo' }
 const DAG_VOLGORDE = Object.keys(DAG_NL)
 
+// Redenen voor een wissel; de tekst zelf wordt opgeslagen (client_plan_changes.reden).
+const WISSEL_REDENEN = ['Apparaat bezet', 'Apparaat is er niet', 'Pijn of blessure', 'Voelt niet lekker', 'Te zwaar of te moeilijk', 'Zin in iets anders']
+
 export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, weekdag, dagenMetTraining = [], schema, onClose, onSwapComplete, db, client }) {
   const isMobile = window.innerWidth <= 768
   // Staat deze training vaker in de week (Push op ma én do), dan kan de
@@ -300,6 +303,8 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   const ookTekstVoor = (doelen) => doelen.length ? ` (ook in ${doelen.map(a => a.naam).join(', ')})` : ''
   // Stap 2 na "Altijd": ook in de andere training(en)?
   const [vraagOok, setVraagOok] = useState(false)
+  // Waarom wissel je? Eén tik, verplicht: de coach ziet de reden bij de wissel (17 nov 2026, Kersten).
+  const [reden, setReden] = useState(null)
   useEffect(() => { setVraagOok(false) }, [gekozenAlt])
 
   // alleenDag: de wissel geldt alleen voor deze weekdag, niet voor de andere
@@ -338,7 +343,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       await WorkoutServiceNew.saveWeeklyOverride(
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
-      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: alleenDag ? 'wissel_dag' : 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: alleenDag ? 'wissel_dag' : 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name, reden })
 
       const coachId = client?.coach_id || client?.trainer_id
       if (coachId) {
@@ -349,7 +354,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: alleenDag ? `${clientName} heeft een oefening gewisseld voor ${DAG_NL[dag] || 'één dag'}` : `${clientName} heeft een oefening gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}`,
+          message: `${exercise.name} → ${newExercise.name}${reden ? ` · ${reden}` : ''}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Swap notification failed:', err))
       }
@@ -412,7 +417,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
         })
         await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, a.dk, a.i, db, { alleDagen: true })
       }
-      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_permanent', oefening: newExercise.name, was: exercise.name })
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_permanent', oefening: newExercise.name, was: exercise.name, reden })
 
       const coachId = client?.coach_id || client?.trainer_id
       if (coachId) {
@@ -423,7 +428,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: `${clientName} heeft een oefening permanent gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}${ookTekstVoor(doelen)}`,
+          message: `${exercise.name} → ${newExercise.name}${ookTekstVoor(doelen)}${reden ? ` · ${reden}` : ''}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Permanent swap notification failed:', err))
       }
@@ -523,10 +528,16 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           {gekozenAlt && (
             <div key={gekozenAlt.name} style={{ display: 'flex', flexDirection: 'column', gap: space[2], animation: 'okPopIn 0.3s ease both' }}>
               {!vraagOok ? (<>
+                <div style={{ ...kopje, textAlign: 'center', color: reden ? colors.textSecondary : '#fff' }}>Waarom wissel je?</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+                  {WISSEL_REDENEN.map(r => (
+                    <button key={r} type="button" onClick={() => setReden(r)} aria-pressed={reden === r} style={blokPil(reden === r)}>{r}</button>
+                  ))}
+                </div>
                 {vaker && <div style={{ ...kopje, textAlign: 'center' }}>Elke keer · {alleDagenLabel}</div>}
-                <div style={{ display: 'flex', gap: space[2] }}>
-                  <button disabled={swapping} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Alleen nu</button>
-                  <button disabled={swapping} onClick={() => (andereTrainingen.length ? setVraagOok(true) : handleMakePermanent(gekozenAlt))} style={knop(false)}>Altijd</button>
+                <div style={{ display: 'flex', gap: space[2], opacity: reden ? 1 : 0.4 }}>
+                  <button disabled={swapping || !reden} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Alleen nu</button>
+                  <button disabled={swapping || !reden} onClick={() => (andereTrainingen.length ? setVraagOok(true) : handleMakePermanent(gekozenAlt))} style={knop(false)}>Altijd</button>
                 </div>
               </>) : (
                 // Stap 2: dezelfde oefening staat ook in een andere training.
@@ -573,7 +584,8 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
                 </div>
               )}
               {vaker && !vraagOok && (
-                <button disabled={swapping} onClick={() => handleSwap(gekozenAlt, { alleenDag: true })} style={{
+                <button disabled={swapping || !reden} onClick={() => handleSwap(gekozenAlt, { alleenDag: true })} style={{
+                  opacity: reden ? 1 : 0.4,
                   background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 800,
                   fontFamily: 'inherit', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline', textUnderlineOffset: 3,
                 }}>{dezeDagLabel}</button>

@@ -7,7 +7,7 @@
 //
 // Loggen mag de actie zelf nooit breken: fouten worden alleen gelogd.
 
-export async function logPlanWijziging(db, { client, schema, dayKey, soort, oefening, was = null }) {
+export async function logPlanWijziging(db, { client, schema, dayKey, soort, oefening, was = null, reden = null }) {
   try {
     const sb = db?.supabase
     if (!sb || !client?.id || !soort) return
@@ -24,6 +24,8 @@ export async function logPlanWijziging(db, { client, schema, dayKey, soort, oefe
       oefening: oefening || null,
       was: was || null,
       door,
+      // Waarom gewisseld (17 nov 2026): alleen meesturen als de klant iets koos.
+      ...(reden ? { reden } : {}),
     })
     if (error) console.warn('Planwijziging loggen mislukt:', error.message)
   } catch (e) {

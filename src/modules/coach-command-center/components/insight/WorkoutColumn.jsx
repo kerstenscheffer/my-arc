@@ -136,7 +136,7 @@ function PlanWijzigingen({ db, client, isMobile, altijdOpen = false }) {
   useEffect(() => {
     if (!client?.id || !db?.supabase) { setRijen([]); return }
     db.supabase.from('client_plan_changes')
-      .select('id, day_key, dag_naam, soort, oefening, was, door, created_at')
+      .select('id, day_key, dag_naam, soort, oefening, was, door, reden, created_at')
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
       .limit(40)
@@ -157,7 +157,7 @@ function PlanWijzigingen({ db, client, isMobile, altijdOpen = false }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.tekst(r)}</div>
               <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {m.sub}{r.dag_naam ? ` · ${r.dag_naam}` : ''} · {datum}
+                {r.reden && <b style={{ color: '#fff', fontWeight: 900 }}>{r.reden} · </b>}{m.sub}{r.dag_naam ? ` · ${r.dag_naam}` : ''} · {datum}
               </div>
             </div>
             <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 900, color: r.door === 'coach' ? 'rgba(255,255,255,0.5)' : '#fff', border: `1px solid ${r.door === 'coach' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)'}`, borderRadius: 999, padding: '2px 7px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

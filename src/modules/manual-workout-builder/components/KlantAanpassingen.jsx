@@ -29,7 +29,7 @@ export default function KlantAanpassingen({ db, client, knopStijl, refreshKey = 
     if (!client?.id || !db?.supabase) { setRijen([]); return undefined }
     let weg = false
     db.supabase.from('client_plan_changes')
-      .select('id, day_key, dag_naam, soort, oefening, was, door, created_at')
+      .select('id, day_key, dag_naam, soort, oefening, was, door, reden, created_at')
       .eq('client_id', client.id).eq('door', 'klant')
       .order('created_at', { ascending: false }).limit(60)
       .then(({ data }) => { if (!weg) setRijen(data || []) }, () => { if (!weg) setRijen([]) })
@@ -92,7 +92,7 @@ export default function KlantAanpassingen({ db, client, knopStijl, refreshKey = 
                       {m.wissel ? `${r.was || '?'} → ${r.oefening || '?'}` : (r.oefening || 'Oefening')}
                     </div>
                     <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {m.sub}{r.dag_naam ? ` · ${r.dag_naam}` : ''} · {datum}
+                      {r.reden && <b style={{ color: '#fff', fontWeight: 900 }}>{r.reden} · </b>}{m.sub}{r.dag_naam ? ` · ${r.dag_naam}` : ''} · {datum}
                     </div>
                   </div>
                 </div>
