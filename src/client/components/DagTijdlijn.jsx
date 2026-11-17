@@ -86,7 +86,12 @@ export default function DagTijdlijn({
   onSupplementInfo = null, // (supplement) → uitleg bij dat supplement
   volgendeLabel = '',
 }) {
-  const U = Math.max(0, Number(uitloop) || 0)
+  const UIT = Math.max(0, Number(uitloop) || 0)
+  // Desktop: alles blijft binnen de kolom van de pagina (ook de achtergrond en
+  // de balken rechts), anders hangt de helft aan de schermrand. Mobiel loopt
+  // de achtergrond wel door tot de rand.
+  const binnenKolom = !isMobile && zonderMarge
+  const U = binnenKolom ? 0 : UIT
   // Productfoto's van supplementen (het potje uit de winkelcatalogus), anders een passende stockfoto.
   const productFotos = useProductFotos()
   // De beschikbare hoogte bepaalt de schaal: de hele dag past zonder scrollen.
@@ -270,7 +275,7 @@ export default function DagTijdlijn({
   )
 
   return (
-    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box', marginLeft: zonderMarge ? 0 : -U, marginRight: zonderMarge ? 0 : -U }}>
+    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box', marginLeft: binnenKolom ? UIT : zonderMarge ? 0 : -U, marginRight: binnenKolom ? UIT : zonderMarge ? 0 : -U }}>
       {/* De dag */}
       <div style={{
         position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', background: 'transparent',

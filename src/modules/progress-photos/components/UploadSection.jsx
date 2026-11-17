@@ -9,12 +9,15 @@ import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 // De vijf foto's van een fotomoment. flex_f / flex_b = aangespannen voor en
 // achter (bewust zonder 'front'/'back' in de naam: oudere schermen zoeken op
 // die woorden en zouden ze anders bij de gewone foto's voegen).
+// `voorbeeld`: een stockfoto (Unsplash) die vaag in het lege vak staat, zodat
+// je ziet welke houding er bedoeld wordt. Te vervangen door eigen voorbeelden.
+const us = (id) => `https://images.unsplash.com/photo-${id}?w=300&h=400&fit=crop&q=60&fm=jpg`
 const VAKKEN = [
-  { hoek: 'front', label: 'Voor', Icoon: PersonStanding },
-  { hoek: 'flex_f', label: 'Voor flex', Icoon: BicepsFlexed },
-  { hoek: 'side', label: 'Zij', Icoon: PersonStanding },
-  { hoek: 'back', label: 'Achter', Icoon: PersonStanding },
-  { hoek: 'flex_b', label: 'Achter flex', Icoon: BicepsFlexed },
+  { hoek: 'front', label: 'Voor', Icoon: PersonStanding, voorbeeld: us('1580491934424-f4d543ccbf05') },
+  { hoek: 'flex_f', label: 'Voor flex', Icoon: BicepsFlexed, voorbeeld: us('1695976134832-7d958dc597f6') },
+  { hoek: 'side', label: 'Zij', Icoon: PersonStanding, voorbeeld: us('1672866332205-9246ee75ca14') },
+  { hoek: 'back', label: 'Achter', Icoon: PersonStanding, voorbeeld: us('1770626705140-d3d49dd2fd34') },
+  { hoek: 'flex_b', label: 'Achter flex', Icoon: BicepsFlexed, voorbeeld: us('1770628086880-db5ab893c420') },
 ]
 const lokaal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
@@ -103,12 +106,13 @@ export default function UploadSection({ photos = [], onUpload, todayData = {}, i
                   cursor: vakBezig ? 'wait' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}>
+                {!foto && vak.voorbeeld && <img src={vak.voorbeeld} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4, filter: 'grayscale(1)' }} />}
                 {foto && <img src={fotoWeergaveUrl(foto.photo_url, { breedte: 300 })} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 {foto && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.75) 100%)' }} />}
                 {bezig ? (
                   <span style={{ position: 'relative', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 ) : !foto && (
-                  <span style={{ position: 'relative', display: 'flex', color: 'rgba(255,255,255,0.55)' }}>
+                  <span style={{ position: 'relative', display: 'flex', color: '#fff', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))' }}>
                     <VakIcoon size={isMobile ? 22 : 28} strokeWidth={2.2} />
                     <Plus size={11} strokeWidth={3.4} style={{ position: 'absolute', right: -9, top: -4 }} />
                   </span>
@@ -118,7 +122,7 @@ export default function UploadSection({ photos = [], onUpload, todayData = {}, i
                     <Check size={11} strokeWidth={3.6} />
                   </span>
                 )}
-                <span style={{ position: foto ? 'absolute' : 'relative', left: 0, right: 0, bottom: foto ? 4 : 'auto', textAlign: 'center', fontSize: isMobile ? '0.6rem' : '0.72rem', fontWeight: 900, color: foto ? '#fff' : 'rgba(255,255,255,0.7)', lineHeight: 1.1, padding: '0 2px', textShadow: foto ? '0 1px 4px rgba(0,0,0,0.9)' : 'none' }}>
+                <span style={{ position: foto ? 'absolute' : 'relative', left: 0, right: 0, bottom: foto ? 4 : 'auto', textAlign: 'center', fontSize: isMobile ? '0.6rem' : '0.72rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, padding: '0 2px', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
                   {vak.label}
                 </span>
               </button>
