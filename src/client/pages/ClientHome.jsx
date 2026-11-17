@@ -172,11 +172,11 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
           <span>{getGreeting()}, {firstName}</span>
         </div>
         <div style={{
-          marginTop: 5, position: 'relative',
+          marginTop: 0, position: 'relative',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          // De datum even groot als de begroeting erboven (17 nov 2026, Kersten).
-          fontSize: isMobile ? '1.15rem' : '1.6rem',
-          fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.02em', lineHeight: 1.15,
+          // De datum in dezelfde stijl als de begroeting erboven, een maat kleiner.
+          fontSize: isMobile ? '0.98rem' : '1.3rem',
+          fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.15,
         }}>
           {onVerzet && (
             <button onClick={() => onVerzet(-1)} aria-label="Vorige dag" style={dagPijlKnop}>
@@ -184,8 +184,8 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
             </button>
           )}
           {/* Kort: "DI 17", met daarachter het gewicht van die dag (tik = wegen). */}
-          <span title={`${dayName} ${dateLabel}`} style={{ color: isVandaag === false ? '#fff' : 'rgba(255,255,255,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-            {dayName.slice(0, 2)} {getoond.getDate()}
+          <span title={`${dayName} ${dateLabel}`} style={{ color: '#fff', fontWeight: 900 }}>
+            {dayName.slice(0, 1).toUpperCase()}{dayName.slice(1, 2).toLowerCase()} {getoond.getDate()}
           </span>
           {gewichtSlot && <span ref={gewichtSlot} style={{ display: 'inline-flex', alignItems: 'center' }} />}
           {onVerzet && (

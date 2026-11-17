@@ -33,6 +33,9 @@ import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
 import DagTijdlijn from './DagTijdlijn'
 import StappenPil from './StappenPil'
+import SupplementInfoModal from '../../modules/meal-plan/components/SupplementInfoModal'
+import AIMealInfoModal from '../../modules/meal-plan/components/AIMealInfoModal'
+import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
 import StappenService, { STANDAARD_DOEL } from '../../modules/steps/StappenService'
 import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
 import WorkoutServiceNew from '../../modules/workout/services/WorkoutServiceNew'
@@ -152,7 +155,14 @@ export default function DagAgenda({
   // Twee manieren om dezelfde dag te lezen. De lijst is de standaard: die
   // beantwoordt "wat moet ik vandaag" zonder scrollen. Het rooster laat zien
   // hoe de dag verdeeld is, en dat is pas nuttig op een heel scherm.
-  const [weergave, setWeergave] = useState('lijst')
+  // De agenda (op tijd) is de standaard; de keuze van de klant blijft bewaard op het toestel.
+  const [weergave, setWeergaveRuw] = useState(() => {
+    try { return localStorage.getItem('myarc_home_weergave') === 'lijst' ? 'lijst' : 'rooster' } catch { return 'rooster' }
+  })
+  const setWeergave = (w) => {
+    setWeergaveRuw(w)
+    try { localStorage.setItem('myarc_home_weergave', w) } catch { /* privévenster */ }
+  }
   // Hoe hoog de agendaweergave mag zijn: van zijn bovenkant tot net boven de
   // zwevende menubalk. Opnieuw gemeten als het scherm van maat verandert.
   const wortelRef = useRef(null)
@@ -459,6 +469,18 @@ export default function DagAgenda({
   // niet gelogd). In de agendaweergave als maaltijd met een rondje: afvinken =
   // gegeten, net als op de maaltijdpagina.
   const [zelfGepland, setZelfGepland] = useState([])
+  const [suppInfo, setSuppInfo] = useState(null) // supplement waarvan de uitleg open staat
+  // De i op een maaltijdkaart opent hier het echte info- en bewerkvenster van
+  // de maaltijdpagina. Dat kan voor een maaltijd uit het plan; iets wat je los
+  // logde of zelf inplande heeft daar geen plek en opent de maaltijdpagina.
+  const [mealInfo, setMealInfo] = useState(null)
+  const [mealService] = useState(() => (db?.supabase ? new AIMealPlanService(db) : null))
+  const openMaaltijd = (b) => {
+    const slot = b.meta?.slot
+    const uitPlan = !b.meta?.los && !b.meta?.zelfGepland && slot ? data?.mealPlan?.week_structure?.[b.day]?.[slot] : null
+    if (uitPlan && typeof uitPlan === 'object' && mealService) { setMealInfo({ ...uitPlan, slot }); return }
+    onOpen?.(b)
+  }
   const [logVersie, setLogVersie] = useState(0)
   useEffect(() => {
     const sb = db?.supabase || db
@@ -817,14 +839,14 @@ export default function DagAgenda({
           schakelaar was drukker dan de dag eronder. */}
       {/* Achter de begroeting: schakelaar tussen de agenda (op tijd) en de lijst. */}
       {weergaveSlot && domPortal(
-        <span role="group" aria-label="Weergave" style={{ display: 'inline-flex', padding: 2, borderRadius: 10, background: 'rgba(255,255,255,0.08)' }}>
+        <span role="group" aria-label="Weergave" style={{ display: 'inline-flex', gap: 2 }}>
           {[{ id: 'rooster', icoon: CalendarClock, naam: 'Agenda' }, { id: 'lijst', icoon: List, naam: 'Lijst' }].map(({ id, icoon, naam }) => {
             const Icoon = icoon
             const aan = weergave === id
             return (
               <button key={id} onClick={() => setWeergave(id)} aria-pressed={aan} aria-label={naam} title={naam}
-                style={{ width: 32, height: 28, padding: 0, borderRadius: 8, border: 'none', background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                <Icoon size={15} strokeWidth={2.6} />
+                style={{ width: 32, height: 30, padding: 0, border: 'none', background: 'transparent', color: aan ? '#fff' : 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <Icoon size={17} strokeWidth={aan ? 2.8 : 2.4} />
               </button>
             )
           })}
@@ -1079,7 +1101,7 @@ export default function DagAgenda({
             <DagTijdlijn
               blokken={[...blokken, ...losseLogs, ...zelfGeplandBlokken]}
               isMobile={isMobile}
-              onOpen={onOpen}
+              onOpen={(b) => (b.type === 'meal' ? openMaaltijd(b) : onOpen?.(b))}
               isGedaan={(b) => (b.meta?.los ? true : isGedaan(b))}
               afronden={(b) => (b.meta?.los ? null : b.meta?.zelfGepland ? () => geplandGegeten(b.meta.rij) : b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
               onTijd={(b) => { if (!b.meta?.los && !b.meta?.zelfGepland) setBewerk(b) }}
@@ -1091,6 +1113,7 @@ export default function DagAgenda({
               voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
               water={dagWater}
               dagSleutel={dagIso}
+              onSupplementInfo={(sp) => setSuppInfo(sp)}
               onWater={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(100) : null}
               onWaterMin={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(-100) : null}
               onStappen={() => window.dispatchEvent(new CustomEvent('myarc:stappen-open'))}
@@ -1141,6 +1164,27 @@ export default function DagAgenda({
       {/* Het weekvenster van de stappen (bekijken, met de hand invullen, koppelen);
           opent via de stappenband in de agendaweergave. */}
       {db?.supabase && <StappenPil client={client} db={db} isMobile={isMobile} verborgen />}
+
+      {/* Info en bewerken van een planmaaltijd, zelfde venster als op de maaltijdpagina. */}
+      {mealInfo && mealService && (
+        <AIMealInfoModal
+          key={mealInfo.id || mealInfo.meal_id || mealInfo.slot}
+          isOpen
+          onClose={() => setMealInfo(null)}
+          meal={mealInfo}
+          db={db}
+          service={mealService}
+          client={client}
+          planId={data?.mealPlan?.id || null}
+          dayName={dag}
+          isToday={!!isVandaag}
+          datum={datum}
+          onSaved={() => { setVersie(v => v + 1); setLogVersie(v => v + 1) }}
+        />
+      )}
+
+      {/* Uitleg bij een supplement (de i op de kaart), zelfde venster als op de maaltijdpagina. */}
+      {suppInfo && <SupplementInfoModal supplement={suppInfo} db={db} isMobile={isMobile} onClose={() => setSuppInfo(null)} />}
 
       {/* Na het slepen: alleen vandaag of altijd? */}
       {verzetVraag && createPortal(

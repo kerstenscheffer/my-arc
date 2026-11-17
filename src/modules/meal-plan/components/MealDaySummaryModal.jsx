@@ -918,31 +918,36 @@ export default function MealDaySummaryModal({
                       title={`${fmt(kcal)} kcal${w.gelogd ? '' : w.plan ? ' gepland' : ''} · water ${liter(wt?.ml || 0)} / ${liter(waterDoel)} L`}
                       style={{
                         position: 'relative', flex: 1, minWidth: 0, height: '100%', padding: 0, overflow: 'hidden', borderRadius: 8,
-                        background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer',
-                        outline: aan ? '2px solid #fff' : 'none', outlineOffset: -2,
+                        background: ingebed ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', cursor: 'pointer',
+                        outline: ingebed && aan ? '2px solid #fff' : 'none', outlineOffset: -2,
                         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                       }}>
                       {/* De foto ís de staaf: hij vult van onderen tot de hoogte
                           van de kcal, donker, met kcal en eiwit er dik overheen. */}
                       {kcal > 0 && (
                         <span style={{
-                          position: 'absolute', left: ingebed ? 0 : 4, right: ingebed ? 5 : 12, bottom: ingebed ? 0 : 4, height: ingebed ? `${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}%` : `calc(${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}% - 8px)`,
-                          overflow: 'hidden', borderRadius: ingebed ? '6px 0 0 0' : 5, background: ingebed ? 'rgba(255,255,255,0.1)' : w.gelogd ? kcalKleur(w.kcal, doel.kcal) : 'rgba(255,255,255,0.14)', transition: 'height 0.3s ease',
+                          position: 'absolute', left: 0, right: ingebed ? 5 : 0, bottom: 0, height: ingebed ? `${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}%` : `max(${w.gelogd ? 30 : 18}px, ${Math.min(100, (kcal / staafMax) * 100)}%)`,
+                          boxSizing: 'border-box', border: !ingebed && aan ? '2px solid #fff' : 'none',
+                          overflow: 'hidden', borderRadius: ingebed ? '6px 0 0 0' : 7, background: ingebed ? 'rgba(255,255,255,0.1)' : w.gelogd ? kcalKleur(w.kcal, doel.kcal) : 'rgba(255,255,255,0.14)', transition: 'height 0.3s ease',
                         }}>
                           {ingebed && foto && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: w.gelogd ? 0.4 : 0.2 }} />}
                           {ingebed && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)' }} />}
                           {/* Kleur van de kcal tegen het doel: dunne lijn bovenop de staaf. */}
                           {ingebed && w.gelogd && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: kcalKleur(w.kcal, doel.kcal, '#fff') }} />}
-                          <span style={{ position: 'absolute', left: 2, right: 2, bottom: 4, textAlign: 'center', lineHeight: 1.1, textShadow: ingebed ? '0 1px 6px rgba(0,0,0,0.9)' : '0 1px 3px rgba(0,0,0,0.45)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                            <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 900, letterSpacing: '-0.02em', color: !ingebed ? (w.gelogd ? '#fff' : 'rgba(255,255,255,0.6)') : w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
-                            {w.gelogd && <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, color: '#fff' }}>E {fmt(w.eiwit)}g</span>}
+                          <span style={{ position: 'absolute', left: 1, right: 1, bottom: ingebed ? 4 : (aan ? 2 : 4), textAlign: 'center', lineHeight: 1.1, textShadow: ingebed ? '0 1px 6px rgba(0,0,0,0.9)' : '0 1px 3px rgba(0,0,0,0.45)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                            <span style={{ display: 'block', fontSize: ingebed ? '0.78rem' : '0.72rem', fontWeight: 900, letterSpacing: ingebed ? '-0.02em' : '-0.04em', color: !ingebed ? (w.gelogd ? '#fff' : 'rgba(255,255,255,0.6)') : w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
+                            {w.gelogd && <span style={{ display: 'block', fontSize: ingebed ? '0.6rem' : '0.56rem', fontWeight: 900, color: '#fff' }}>E {fmt(w.eiwit)}g</span>}
                           </span>
                         </span>
                       )}
-                      {/* Water: strook langs de rechterkant, van onderen gevuld. */}
-                      <span style={ingebed ? { position: 'absolute', top: 0, bottom: 0, right: 0, width: 5, background: 'rgba(0,0,0,0.55)' } : { position: 'absolute', top: 4, bottom: 4, right: 4, width: 4, borderRadius: 2, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
-                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(waterDeel * 100)}%`, background: '#38bdf8', borderRadius: ingebed ? 0 : 2, transition: 'height 0.3s ease' }} />
+                      {/* Leeg vak bij de klant: een laag streepje, zodat de dag wel aan te tikken is. */}
+                      {!ingebed && !(kcal > 0) && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, borderRadius: 3, boxSizing: 'border-box', background: 'rgba(255,255,255,0.1)', border: aan ? '2px solid #fff' : 'none' }} />}
+                      {/* Water: strook rechts, alleen bij de coach. De klant ziet water in de ring eronder. */}
+                      {ingebed && (
+                      <span style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 5, background: 'rgba(0,0,0,0.55)' }}>
+                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(waterDeel * 100)}%`, background: '#38bdf8', transition: 'height 0.3s ease' }} />
                       </span>
+                      )}
                     </button>
                   )
                 })}

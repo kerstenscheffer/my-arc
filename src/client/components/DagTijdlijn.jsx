@@ -18,6 +18,8 @@ import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foo
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
 import { kcalKleur } from '../../modules/meal-plan/utils/kcalKleur'
+import { supplementFoto } from '../../modules/supplements/utils/supplementFoto'
+import { useProductFotos } from '../../modules/supplements/utils/productFoto'
 
 const GROEN = '#10b981'
 const PAARS = '#a855f7'
@@ -81,9 +83,12 @@ export default function DagTijdlijn({
   // zo ver doorschuiven dat ook de late avond midden in beeld komt.
   onderRuimte = 0,
   onVolgendeDag = null, // onderaan de dag: door naar morgen
+  onSupplementInfo = null, // (supplement) → uitleg bij dat supplement
   volgendeLabel = '',
 }) {
   const U = Math.max(0, Number(uitloop) || 0)
+  // Productfoto's van supplementen (het potje uit de winkelcatalogus), anders een passende stockfoto.
+  const productFotos = useProductFotos()
   // De beschikbare hoogte bepaalt de schaal: de hele dag past zonder scrollen.
   const vak = useRef(null)
   const [vakHoogte, setVakHoogte] = useState(0)
@@ -179,13 +184,13 @@ export default function DagTijdlijn({
 
   const GROOT = isMobile ? 58 : 54
   // Een maaltijd is een kaart (foto, naam, macro's, i en vinkje), hoger dan een losse regel.
-  const KAART = isMobile ? 48 : 42
+  const KAART = isMobile ? 38 : 34
   const KLEIN = isMobile ? 34 : 28
   // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
   let onder = -Infinity
   const geplaatst = [...dingen].sort((a, b) => a.start - b.start).map(b => {
     const groot = b.type === 'training' || isCardio(b)
-    const h = groot ? GROOT : b.type === 'meal' ? KAART : KLEIN
+    const h = groot ? GROOT : (b.type === 'meal' || b.type === 'supplement') ? KAART : KLEIN
     // Het blok dat je sleept volgt je hand en duwt niets opzij.
     const mee = sleep?.id === b.id
     const top = mee ? (b.start + sleep.delta - asStart) * pxPerMin : Math.max((b.start - asStart) * pxPerMin, onder)
@@ -346,6 +351,45 @@ export default function DagTijdlijn({
               const openen = maaltijd && onOpen ? () => onOpen(b) : (wg?.kan ? wg.onLog : null)
               const extra = maaltijd ? (Number(b.meta?.kcal) > 0 ? `${fmt(b.meta.kcal)} kcal` : null)
                 : wg?.gelogd != null ? `${String(wg.gelogd).replace('.', ',')} kg` : null
+              // Supplementen: dezelfde kaart als een maaltijd, met de foto van het
+              // potje, de i voor uitleg en het vinkje.
+              if (b.type === 'supplement') {
+                const items = Array.isArray(b.meta?.items) ? b.meta.items : []
+                const eerste = items[0] || null
+                const foto = eerste ? (productFotos[eerste.id] || supplementFoto({ name: eerste.naam }, 120)) : supplementFoto({ name: naam }, 120)
+                const info = eerste && onSupplementInfo ? () => onSupplementInfo(eerste) : null
+                const onder = items.length === 1 ? eerste.dosering : (items.length > 1 ? `${items.length} supplementen` : null)
+                const knop = { flexShrink: 0, width: isMobile ? 38 : 32, alignSelf: 'stretch', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }
+                return (
+                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
+                    ...sleepStijl(b), position: 'absolute', left: 0, right: 0, top, height: KAART, boxSizing: 'border-box',
+                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
+                    background: mee ? '#1a1a1a' : '#121212',
+                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    <div onClick={alsGeenSleep(info)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: info ? 'pointer' : 'default', ...tik }}>
+                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#fff', opacity: klaar ? 0.5 : 1 }}>
+                        {info && (
+                          <span aria-hidden style={{ position: 'absolute', left: 3, bottom: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Info size={12} strokeWidth={2.6} color="#fff" />
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: klaar ? 0.6 : 1 }}>
+                        <span style={{ fontSize: isMobile ? '0.8rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: klaar ? 'line-through' : 'none' }}>{naam}</span>
+                        <span style={{ fontSize: isMobile ? '0.62rem' : '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {tijdKnop(b, 'inherit')}{onder ? ` · ${onder}` : ''}{volgende?.id === b.id && <span style={{ color: '#fff', fontWeight: 900 }}> · {overTekst(b)}</span>}
+                        </span>
+                      </span>
+                    </div>
+                    {vink && (
+                      <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
+                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
+                      </button>
+                    )}
+                  </div>
+                )
+              }
               // Maaltijd: een kaart zoals op de maaltijdpagina, met een i (openen) en het vinkje.
               if (maaltijd) {
                 const foto = resolveFoodImage({ image_url: b.meta?.image_url, name: naam }) || foodImageFallback(naam, b.meta?.slot, 120)
@@ -363,7 +407,14 @@ export default function DagTijdlijn({
                     border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: openen ? 'pointer' : 'default', ...tik }}>
-                      <span style={{ width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: doorgestreept ? 0.5 : 1 }} />
+                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: doorgestreept ? 0.5 : 1 }}>
+                        {/* De i ligt over de foto: tik op de foto of de naam opent de maaltijd. */}
+                        {openen && (
+                          <span aria-hidden style={{ position: 'absolute', left: 3, bottom: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Info size={12} strokeWidth={2.6} color="#fff" />
+                          </span>
+                        )}
+                      </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: doorgestreept ? 0.6 : 1 }}>
                         <span style={{ fontSize: isMobile ? '0.8rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: doorgestreept ? 'line-through' : 'none' }}>{naam}</span>
                         <span style={{ fontSize: isMobile ? '0.62rem' : '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -371,11 +422,6 @@ export default function DagTijdlijn({
                         </span>
                       </span>
                     </div>
-                    {openen && (
-                      <button onClick={alsGeenSleep(openen)} aria-label="Bekijk deze maaltijd" title="Bekijken" style={knop}>
-                        <Info size={isMobile ? 18 : 15} strokeWidth={2.4} color="rgba(255,255,255,0.6)" />
-                      </button>
-                    )}
                     {b.meta?.los && <span style={{ ...knop, cursor: 'default' }}><CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /></span>}
                     {vink && (
                       <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
