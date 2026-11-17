@@ -607,7 +607,7 @@ export default function MealDaySummaryModal({
                   const planId = `plan-${gekozenSleutel}-${m.slot}-${i}`
                   return (
                     <div key={`${m.slot}-${i}`}>
-                    <button onClick={onWisselMaaltijd ? () => { onWisselMaaltijd(gekozen, m); onClose?.() } : () => openInfo(m, planId)} aria-expanded={kanInfo ? info?.id === planId : undefined} style={{
+                    <button onClick={onWisselMaaltijd ? () => { onWisselMaaltijd(gekozen, m) } : () => openInfo(m, planId)} aria-expanded={kanInfo ? info?.id === planId : undefined} style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0',
                       background: 'none', border: 'none', borderTop: i ? `1px solid ${LIJN}` : 'none', textAlign: 'left',
                       fontFamily: 'inherit', cursor: 'pointer',

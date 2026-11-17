@@ -117,6 +117,26 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Tabblad waarop het log-venster opent: 'search' vanaf de ronde knop,
   // 'meals' vanuit "Maaltijd aanmaken" in het wisselvenster.
   const [foodLogTab, setFoodLogTab] = useState('search')
+  // Snel loggen openen van buitenaf (het plusje in de agenda op Home). Via een
+  // gebeurtenis als deze pagina al open staat, en via een vlaggetje als hij nog
+  // moet laden; wie het eerst is ruimt het vlaggetje op.
+  useEffect(() => {
+    const open = () => {
+      let vlag = null
+      try { vlag = sessionStorage.getItem('myarc_open_voedingslog'); sessionStorage.removeItem('myarc_open_voedingslog') } catch { /* geen opslag */ }
+      if (!vlag) return
+      setFoodLogTab('search')
+      setFoodLogTrigger(n => n + 1)
+      // Laadt de pagina nog, dan bestaat het dagschema (dat het venster opent)
+      // nog niet en gaat de eerste tik verloren: daarom nog een keer, iets later.
+      if (koud) setTimeout(() => setFoodLogTrigger(n => n + 1), 1200)
+    }
+    let koud = true
+    open()
+    koud = false
+    window.addEventListener('myarc:open-voedingslog', open)
+    return () => window.removeEventListener('myarc:open-voedingslog', open)
+  }, [])
   // Weken vooruit of terug, gestuurd door de pijlen in de kop.
   const [weekOffset, setWeekOffset] = useState(0)
   
@@ -649,7 +669,12 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     const weken = Math.round((maandag(datum) - maandag(new Date())) / (7 * 864e5))
     setWeekOffset(weken)
     setSelectedDay(DAYS_OF_WEEK[(new Date(datum).getDay() + 6) % 7].key)
-    if (wisselMaaltijd) setModals(prev => ({ ...prev, summary: false, alternatives: wisselMaaltijd }))
+    if (wisselMaaltijd) {
+      // Inzicht blijft nog even staan tot het wisselvenster er is; anders zie je
+      // de maaltijdpagina er kort tussendoor (17 nov 2026, Kersten).
+      setModals(prev => ({ ...prev, alternatives: wisselMaaltijd }))
+      setTimeout(() => setModals(prev => ({ ...prev, summary: false })), 500)
+    }
   }
 
   const handleDayChange = (newDay) => {

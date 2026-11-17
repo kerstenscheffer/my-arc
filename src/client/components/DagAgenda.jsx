@@ -1117,7 +1117,7 @@ export default function DagAgenda({
               onWater={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(100) : null}
               onWaterMin={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(-100) : null}
               onStappen={() => window.dispatchEvent(new CustomEvent('myarc:stappen-open'))}
-              onVoeding={onOpen ? () => onOpen({ type: 'meal', day: dag }) : null}
+              onVoeding={onOpen ? () => onOpen({ type: 'log', day: dag }) : null}
               onVerzet={(b, start) => setVerzetVraag({ blok: b, start })}
               onSlaap={!(slaapDagIso && slaapDagIso <= toIsoDate(nu)) ? null : () => {
                 // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
