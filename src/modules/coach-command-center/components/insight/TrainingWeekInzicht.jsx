@@ -39,6 +39,7 @@ const DAG_NL = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const ACTIVITEIT = { swimming: 'Zwemmen', cardio: 'Cardio', hiking: 'Wandelen', cycling: 'Fietsen', running: 'Hardlopen' }
 
 const fmt = (n) => Math.round(n || 0).toLocaleString('nl-NL')
+const ORANJE = '#f59e0b'
 const sleutel = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const maandagVan = (d) => { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m }
 const plusDagen = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
@@ -96,6 +97,26 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const [signalen, setSignalen] = useState({}) // { 'YYYY-MM-DD': [{ tekst, erg }] } — waar de coach naar moet kijken
   const [slaap, setSlaap] = useState({}) // { 'YYYY-MM-DD': uren } — de nacht die op die dag eindigt
   const [slaapVenster, setSlaapVenster] = useState(null) // dag (iso) waarvan de slaapband is aangeklikt
+  // Dagen waarop het traject op pauze stond (ziek, vakantie): oranje in de week.
+  const [pauzes, setPauzes] = useState([]) // [{ van: 'YYYY-MM-DD', tot: 'YYYY-MM-DD' | null, reden }]
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let weg = false
+    setPauzes([])
+    db.supabase.from('coaching_pauses').select('paused_at, resumed_at, reason').eq('client_id', clientId)
+      .then(r => r, () => ({ data: [] }))
+      .then(({ data }) => {
+        if (weg) return
+        setPauzes((data || []).filter(x => x.paused_at).map(x => ({ van: sleutel(new Date(x.paused_at)), tot: x.resumed_at ? sleutel(new Date(x.resumed_at)) : null, reden: (x.reason || '').trim() })))
+      })
+    return () => { weg = true }
+  }, [clientId, db])
+  // De reden van de pauze op die dag ('' als er geen reden is opgegeven), of null als de klant niet op pauze stond.
+  const pauzeVan = (k) => {
+    const raak = pauzes.filter(x => x.van <= k && (x.tot ? k <= x.tot : k <= sleutel(new Date())))
+    if (!raak.length) return null
+    return (raak.find(x => x.reden) || raak[0]).reden
+  }
 
   // Eén keer per klant: plan, vaste indeling, stappendoel en de cardiologs
   // van het laatste halfjaar.
@@ -451,17 +472,18 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const minVan = (ts) => { const t = ts ? new Date(ts) : null; return t && !Number.isNaN(t.getTime()) ? t.getHours() * 60 + t.getMinutes() : null }
   const regelsVan = (w, v) => {
     const nogTeDoen = w.toekomst || w.k === vandaagSleutel
+    const opPauze = pauzeVan(w.k) != null // op pauze telt een gemiste training niet als gemist
     const agendaBlokken = planWeek[weekSleutel]?.blocksByDay?.[AGENDA_DAGEN[w.i]] || null
     const isCardioBlok = (b) => b.type === 'custom' && /^Cardio\s*·\s*/.test(String(b.label || ''))
     const regels = [
       ...w.sessies.map(x => { const t = telling(x); return { id: `s-${x.id}`, groot: true, min: minVan(x.completed_at || x.created_at), naam: naamVoorSessie?.(x) || 'Training', sub: t.sets > 0 ? `${t.sets} sets` : 'gedaan', gedaan: true, foto: getWorkoutImage({ name: naamVoorSessie?.(x) || 'Training' }) } }),
       ...(w.sessies.length ? [] : agendaBlokken
-        ? agendaBlokken.filter(b => b.type === 'training').map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, min: b.start, naam: b.sublabel || b.label || 'Training', sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: b.sublabel || b.label || 'Training' }) }))
-        : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: pl.naam }) }))),
+        ? agendaBlokken.filter(b => b.type === 'training').map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, min: b.start, naam: b.sublabel || b.label || 'Training', sub: nogTeDoen ? 'gepland' : (opPauze ? 'pauze' : 'niet gedaan'), gedaan: false, gemist: !nogTeDoen && !opPauze, foto: getWorkoutImage({ name: b.sublabel || b.label || 'Training' }) }))
+        : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : (opPauze ? 'pauze' : 'niet gedaan'), gedaan: false, gemist: !nogTeDoen && !opPauze, foto: getWorkoutImage({ name: pl.naam }) }))),
       ...w.cardio.map(c => ({ id: `c-${c.id}`, groot: true, cardio: true, min: minVan(c.created_at), naam: c.cardio_type || 'Cardio', sub: Number(c.duration_minutes) > 0 ? `${c.duration_minutes} min` : 'gedaan', gedaan: true, foto: cardioFoto(c.cardio_type) })),
       ...(w.cardio.length ? [] : agendaBlokken
-        ? agendaBlokken.filter(isCardioBlok).map(b => { const soort = String(b.label).replace(/^Cardio\s*·\s*/, ''); return { id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, cardio: true, min: b.start, naam: soort, sub: nogTeDoen ? `${b.end - b.start} min` : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(soort) } })
-        : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
+        ? agendaBlokken.filter(isCardioBlok).map(b => { const soort = String(b.label).replace(/^Cardio\s*·\s*/, ''); return { id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, cardio: true, min: b.start, naam: soort, sub: nogTeDoen ? `${b.end - b.start} min` : (opPauze ? 'pauze' : 'niet gedaan'), gedaan: false, gemist: !nogTeDoen && !opPauze, foto: cardioFoto(soort) } })
+        : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : (opPauze ? 'pauze' : 'niet gedaan'), gedaan: false, gemist: !nogTeDoen && !opPauze, foto: cardioFoto(c.soort) }))),
       // Maaltijden: gelogd, of (dag zonder logs) wat er gepland staat in de agenda.
       // Is er al iets gelogd (17 nov 2026), dan blijft staan wat er nog moet komen: geplande
       // maaltijden die later zijn dan nu en niet onder dezelfde naam gelogd zijn.
@@ -508,11 +530,12 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         {voeding && <span style={{ width: AS_BREED, flexShrink: 0 }} />}
         {week.map((w, i) => {
           const aan = w.k === gekozenSleutel
+          const pz = pauzeVan(w.k)
           return (
-            <div key={w.k} onClick={() => setGekozen(w.d)} style={{
+            <div key={w.k} onClick={() => setGekozen(w.d)} title={pz != null ? `Traject op pauze${pz ? ` · ${pz}` : ''}` : undefined} style={{
               flex: 1, minWidth: 0, minHeight: 26, borderRadius: 7, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: aan ? '#fff' : 'transparent', color: aan ? '#000' : 'rgba(255,255,255,0.7)',
+              background: aan ? (pz != null ? ORANJE : '#fff') : pz != null ? 'rgba(245,158,11,0.16)' : 'transparent', color: aan ? '#000' : pz != null ? ORANJE : 'rgba(255,255,255,0.7)',
               fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
               whiteSpace: 'nowrap', overflow: 'hidden',
             }}>
@@ -526,6 +549,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
               )}
               <span style={{ flex: i === 0 || i === 6 ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
                 {DAG_NL[i]}<span style={{ fontWeight: 800, opacity: aan ? 0.75 : 0.6, letterSpacing: 0 }}>{w.d.getDate()}</span>
+                {pz != null && <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: 'none', fontWeight: 900 }}>{pz || 'Pauze'}</span>}
                 {/* De weging van die dag achter de datum. */}
                 {gewicht[w.k] > 0 && (
                   <span style={{ marginLeft: 4, fontWeight: 900, letterSpacing: 0, textTransform: 'none', color: aan ? '#000' : '#fff', fontVariantNumeric: 'tabular-nums' }}>
@@ -576,6 +600,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                 outline: aan ? '2px solid #fff' : 'none', outlineOffset: -2,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
+              {pauzeVan(w.k) != null && <span style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'rgba(245,158,11,0.09)', boxShadow: 'inset 0 0 0 1px rgba(245,158,11,0.4)', borderRadius: 8, pointerEvents: 'none' }} />}
               {foto && !voeding && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.45 : 0.2 }} />}
               {foto && !voeding && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.6) 100%)' }} />}
               {gedaan && !voeding && <span style={{ position: 'absolute', left: 0, right: 5, top: 0, height: 2, background: GROEN }} />}
