@@ -50,6 +50,7 @@ export default class TrajectPDFService {
     const ofType = (t, syn = []) => ph.filter(p => {
       const pt = (p.photo_type || '').toLowerCase()
       const st = (p.metadata?.subtype || '').toLowerCase()
+      if (st.startsWith('flex')) return false // aangespannen foto's horen niet bij de gewone hoeken
       return [t, ...syn].some(k => pt === k || st.includes(k))
     })
     const map = (arr) => arr.map(p => ({ id: p.id, url: p.photo_url, date: p.photo_date }))
@@ -91,6 +92,7 @@ export default class TrajectPDFService {
     const ofType = (t, syn = []) => ph.filter(p => {
       const pt = (p.photo_type || '').toLowerCase()
       const st = (p.metadata?.subtype || '').toLowerCase()
+      if (st.startsWith('flex')) return false // aangespannen foto's horen niet bij de gewone hoeken
       return [t, ...syn].some(k => pt === k || st.includes(k))
     })
     const anglePair = (arr, sel) => {

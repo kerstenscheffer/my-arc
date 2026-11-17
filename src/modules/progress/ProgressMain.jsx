@@ -146,7 +146,9 @@ export default function ProgressMain({ db, client }) {
     catch { return [] }
   }
 
-  const handlePhotoUpload = async (file, photoType) => {
+  const handlePhotoUpload = async (file, photoType, hoek = null) => {
+    // Vanuit een fotovak is de hoek al bekend: direct uploaden, geen vraag.
+    if (photoType === 'progress' && hoek) { await doUpload(file, photoType, hoek); return }
     // Progress photos need an angle. Open the picker modal; non-progress uploads run directly.
     if (photoType === 'progress') {
       setAnglePicker({ file, photoType })
@@ -605,6 +607,8 @@ export default function ProgressMain({ db, client }) {
               <option value="front">Voorkant (front)</option>
               <option value="side">Zijkant (side)</option>
               <option value="back">Achterkant (back)</option>
+              <option value="flex_f">Voorkant flex</option>
+              <option value="flex_b">Achterkant flex</option>
               <option value="other">Anders…</option>
             </select>
 

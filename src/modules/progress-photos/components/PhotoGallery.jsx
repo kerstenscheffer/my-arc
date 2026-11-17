@@ -10,6 +10,8 @@ const SUBTYPE_OPTIONS = [
   { value: 'front', label: 'Voorkant' },
   { value: 'side',  label: 'Zijkant'  },
   { value: 'back',  label: 'Achterkant' },
+  { value: 'flex_f', label: 'Voorkant flex' },
+  { value: 'flex_b', label: 'Achterkant flex' },
 ]
 
 

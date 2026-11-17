@@ -5,9 +5,10 @@
 import React from 'react'
 import UploadSection from '../../progress-photos/components/UploadSection'
 
-export default function RecentProgressPhotos({ onUpload, todayData = {}, isFriday = false, isMobile = false, naast = null }) {
+export default function RecentProgressPhotos({ photos = [], onUpload, todayData = {}, isFriday = false, isMobile = false, naast = null }) {
   return (
     <UploadSection
+      photos={photos}
       onUpload={onUpload}
       todayData={todayData}
       isFriday={isFriday}

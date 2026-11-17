@@ -196,7 +196,7 @@ class ProgressPhotosService {
         // the DB column constraint.
         const STANDARD_ANGLES = ['front', 'side', 'back']
         const sub = metadata.subtype
-        dbPhotoType = STANDARD_ANGLES.includes(sub) ? sub : 'front'
+        dbPhotoType = STANDARD_ANGLES.includes(sub) ? sub : sub === 'flex_b' ? 'back' : 'front' // flex_f / flex_b: aangespannen voor en achter
         category = 'progress'
       } else {
         // For non-progress photos, we need to use a valid photo_type
@@ -384,7 +384,7 @@ class ProgressPhotosService {
   async updatePhotoSubtype(photoId, subtype) {
     try {
       const STANDARD = ['front', 'side', 'back']
-      const dbPhotoType = STANDARD.includes(subtype) ? subtype : 'front'
+      const dbPhotoType = STANDARD.includes(subtype) ? subtype : subtype === 'flex_b' ? 'back' : 'front'
 
       const { data: current, error: fetchErr } = await this.supabase
         .from(this.tableName).select('metadata').eq('id', photoId).single()

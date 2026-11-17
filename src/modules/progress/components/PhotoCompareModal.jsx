@@ -17,7 +17,7 @@ import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw, ChevronLeft, Chev
 import { tekenTransformatie, FORMATEN } from './transformatieKaart'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')
-const ANGLE_LABEL = { front: 'Voorkant', side: 'Zijkant', back: 'Achterkant', overig: 'Overig' }
+const ANGLE_LABEL = { front: 'Voorkant', side: 'Zijkant', back: 'Achterkant', flex_f: 'Voorkant flex', flex_b: 'Achterkant flex', overig: 'Overig' }
 const angleLabel = (a) => ANGLE_LABEL[a] || (a.charAt(0).toUpperCase() + a.slice(1))
 const fmtDate = (d) => {
   if (!d) return ''
