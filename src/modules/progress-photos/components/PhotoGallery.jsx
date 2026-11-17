@@ -6,6 +6,8 @@ import React, { useState } from 'react'
 import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, Check, Edit2 } from 'lucide-react'
 import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 
+// Korte namen op de tegels: vijf naast elkaar is smal.
+const KORT = { front: 'Voor', flex_f: 'Voor flex', side: 'Zij', back: 'Achter', flex_b: 'Achter flex' }
 const SUBTYPE_OPTIONS = [
   { value: 'front', label: 'Voorkant' },
   { value: 'side',  label: 'Zijkant'  },
@@ -70,10 +72,17 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
       }}>
         {displayDates.map((date) => {
           // Vaste volgorde per dag: voorkant, zijkant, achterkant, dan de rest.
-          const VOLGORDE = { front: 0, side: 1, back: 2 }
-          const plek = (p) => VOLGORDE[String(p.metadata?.subtype || '').toLowerCase()] ?? 3
-          const dayPhotos = [...(photos[date] || [])].sort((a, b) => plek(a) - plek(b))
-          if (dayPhotos.length === 0) return null
+          // Vijf vaste kolommen, gelijk aan de vakken erboven: voor, voor flex, zij,
+          // achter, achter flex. Zo staat elke hoek door de weken heen onder elkaar.
+          // Ontbreekt een hoek, dan blijft die plek leeg; extra foto's komen erachter.
+          const VAST = ['front', 'flex_f', 'side', 'back', 'flex_b']
+          const hoek = (p) => String(p.metadata?.subtype || '').toLowerCase()
+          const alle = photos[date] || []
+          if (alle.length === 0) return null
+          const vaste = VAST.map(h => alle.find(p => hoek(p) === h) || null)
+          const rest = alle.filter(p => !vaste.includes(p))
+          const dayPhotos = [...vaste.map((p, i) => p || { leeg: true, id: `leeg-${i}` }), ...rest]
+          const aantal = alle.length
           const d = new Date(date)
           
           return (
@@ -86,22 +95,23 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                 <span style={{ fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
                   {d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>{dayPhotos.length}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>{aantal}</span>
               </div>
 
               {/* Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${isMobile ? 3 : 5}, 1fr)`,
-                gap: 6,
+                gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                gap: isMobile ? 6 : 10,
                 padding: isMobile ? '0 1rem' : '0 1.5rem'
               }}>
                 {dayPhotos.map(photo => {
+                  if (photo.leeg) return <div key={photo.id} />
                   const selected = isCompareSelected(photo)
                   return (
                     <div key={photo.id} onClick={() => handlePhotoClick(photo)}
                       style={{
-                        position: 'relative', paddingBottom: '125%', borderRadius: 10,
+                        position: 'relative', paddingBottom: '133.33%', borderRadius: 10,
                         overflow: 'hidden', cursor: 'pointer',
                         background: 'rgba(255, 255, 255, 0.02)',
                         outline: selected ? '2px solid #fff' : 'none',
@@ -118,7 +128,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                           background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)',
                           fontSize: '0.62rem', color: '#fff', fontWeight: 800,
                         }}>
-                          {SUBTYPE_OPTIONS.find(o => o.value === String(photo.metadata.subtype).toLowerCase())?.label || photo.metadata.subtype}
+                          {KORT[String(photo.metadata.subtype).toLowerCase()] || photo.metadata.subtype}
                         </div>
                       )}
                       {/* Compare checkmark */}

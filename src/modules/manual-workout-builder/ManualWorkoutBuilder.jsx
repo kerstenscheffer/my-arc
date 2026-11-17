@@ -22,7 +22,7 @@ import ClientAgendaView from '../client-agenda/ClientAgendaView'
 import KlantWeekrooster from './components/KlantWeekrooster'
 // Hetzelfde wisselvenster als op de workout-pagina van de klant (eigen
 // plannen + standaardplannen), zodat de coach en de klant hetzelfde zien.
-import PlanSwitchModal from '../workout/components/PlanSwitchModal'
+import PlannenCentrum from './components/PlannenCentrum'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
@@ -1182,6 +1182,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     { id: 'week', icon: <CalendarDays size={16} />, label: 'Trainingsweek', onClick: () => setShowAgenda(true), uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'De week van deze klant plannen' },
     { id: 'agenda', icon: <Calendar size={16} />, label: 'Agenda', onClick: () => setShowWeekAgenda(v => !v), uit: !effectiveClient, actief: showWeekAgenda && !!effectiveClient },
     { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
+    { id: 'plannen', icon: <Users size={16} />, label: 'Alle plannen', onClick: () => setShowPlanSwitch(true) },
     { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
     { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
     { id: 'fase', icon: <Flag size={16} />, label: 'Mesocyclus', onClick: () => setFaseOpen(v => !v), actief: faseOpen && !!selectedSchemaId, uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Mesocyclus starten, deload en gemeten TDEE' },
@@ -1900,10 +1901,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           onNieuw={nieuwPlanVoorKlant}
           onToegevoegd={() => herlaadKlant()} />
       )}
-      {showPlanSwitch && effectiveClient && (
-        <PlanSwitchModal client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach"
+      {/* Alle trainingsplannen op één scherm; met een klant open staat die klaar als doel. */}
+      {showPlanSwitch && (
+        <PlannenCentrum db={db} isMobile={isMobile} client={effectiveClient || null}
           onClose={() => setShowPlanSwitch(false)}
-          onActivated={async () => { setShowPlanSwitch(false); await herlaadKlant() }} />
+          onOpenKlant={(k) => { setShowPlanSwitch(false); const vol = (clients || []).find(c => c.id === k.id) || k; handleSelectLocalClient(vol) }}
+          onGewijzigd={() => { loadTemplates(); if (effectiveClient) herlaadKlant() }} />
       )}
 
       <ExerciseLibraryModal

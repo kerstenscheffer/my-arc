@@ -86,12 +86,27 @@ export default function UploadSection({ photos = [], onUpload, todayData = {}, i
       {/* ── Fotovakken: tik op een vak om die foto te maken of te kiezen ── */}
       <input ref={vakInput} type="file" accept="image/*" onChange={vakGekozen} style={{ display: 'none' }} />
       <div style={{ padding: isMobile ? '0.75rem 1rem 0' : '0.85rem 1.5rem 0' }}>
-        <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 8 }}>
-          Foto's van deze week
-          <span style={{ marginLeft: 8, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
-            {VAKKEN.filter(v => dezeWeek[v.hoek]).length}/{VAKKEN.length}
-          </span>
-        </div>
+        {(() => {
+          const binnen = VAKKEN.filter(v => dezeWeek[v.hoek]).length
+          const nog = VAKKEN.length - binnen
+          return (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Deze week inleveren</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{binnen}/{VAKKEN.length}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 11, fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap', background: nog ? 'rgba(245,158,11,0.16)' : 'rgba(16,185,129,0.16)', color: nog ? '#f59e0b' : '#10b981' }}>
+                  {nog ? `nog ${nog} nodig` : <><Check size={12} strokeWidth={3.4} /> compleet</>}
+                </span>
+              </div>
+              {nog > 0 && (
+                <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+                  Deze vijf foto's heeft je coach elke week nodig. Tik op een vak om hem te maken.
+                </div>
+              )}
+            </div>
+          )
+        })()}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: isMobile ? 6 : 10 }}>
           {VAKKEN.map((vak) => {
             const foto = dezeWeek[vak.hoek]

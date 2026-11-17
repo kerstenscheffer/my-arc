@@ -54,7 +54,10 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   const angles = useMemo(() => {
     if (!photos) return []
     const set = [...new Set(photos.map(angleOf))]
-    return set.sort((a, b) => (a === 'front' ? -1 : b === 'front' ? 1 : a.localeCompare(b)))
+    // Vaste volgorde: gewoon en flex naast elkaar per kant; eigen hoeken erachter.
+    const VOLGORDE = ['front', 'flex_f', 'side', 'back', 'flex_b']
+    const plek = (a) => (VOLGORDE.includes(a) ? VOLGORDE.indexOf(a) : VOLGORDE.length)
+    return set.sort((a, b) => plek(a) - plek(b) || a.localeCompare(b))
   }, [photos])
 
   useEffect(() => {
@@ -300,7 +303,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   // systeem-keuzelijst verscheen op een rare plek in het venster.
   const [hoekOpen, setHoekOpen] = useState(null) // foto-id
   const HoekKeuze = ({ foto }) => {
-    const opties = ['front', 'side', 'back', ...(['front', 'back', 'side'].includes(angleOf(foto)) ? [] : [angleOf(foto)])]
+    const opties = ['front', 'flex_f', 'side', 'back', 'flex_b', ...(['front', 'flex_f', 'side', 'back', 'flex_b'].includes(angleOf(foto)) ? [] : [angleOf(foto)])]
     const open = hoekOpen === foto.id
     return (
       <div style={{ position: 'relative' }}>
