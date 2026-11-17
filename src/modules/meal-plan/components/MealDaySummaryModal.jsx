@@ -959,7 +959,8 @@ export default function MealDaySummaryModal({
                   gepland en gelogd scrollen eronderdoor. */}
               <div style={{ marginTop: gedeeld ? 0 : '0.8rem' }}>{dagCijfersBlok}{dagKopBlok}</div>
               </div>
-              {dagGeplandBlok}{dagLijstBlok}{dagActieBlok}
+              {/* Coach Inzicht: eerst wat er gelogd is, daarna wat nog gepland staat. */}
+              {ingebed ? <>{dagLijstBlok}{dagGeplandBlok}</> : <>{dagGeplandBlok}{dagLijstBlok}</>}{dagActieBlok}
               {/* ── 4. Maand ── */}
               {/* De maand zit achter de kalenderknop, in een klein venster (17 nov 2026). */}
               {(() => {
