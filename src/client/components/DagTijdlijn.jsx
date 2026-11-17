@@ -54,7 +54,13 @@ export default function DagTijdlijn({
   voeding = null,       // { kcal, eiwit, doelKcal, doelEiwit }
   water = null,         // { ml, doel }
   dagSleutel = null,    // verandert de dag, dan springt de agenda terug naar de ochtend
+  // Hoeveel pixels de pagina links en rechts als marge heeft. De achtergrond
+  // (uurlijnen, slaap- en werkkleur) loopt door tot de schermrand; wat ertoe
+  // doet (tijden, blokken, balken) blijft binnen die marge staan.
+  uitloop = 0,
+  onSlaap = null,       // tik op de slaapband → slaap invullen
 }) {
+  const U = Math.max(0, Number(uitloop) || 0)
   // De beschikbare hoogte bepaalt de schaal: de hele dag past zonder scrollen.
   const vak = useRef(null)
   const [vakHoogte, setVakHoogte] = useState(0)
@@ -73,7 +79,8 @@ export default function DagTijdlijn({
   const dingen = blokken.filter(b => b.type !== 'work' && b.type !== 'sleep' && !b.meta?.placeholder)
 
   // De hele dag van 00:00 tot 24:00 staat erin; zestien uur past in beeld en
-  // de rest bereik je door te schuiven. Bij openen staat hij op 06:00.
+  // de rest bereik je door te schuiven. Bij openen: vandaag vanaf twee uur
+  // geleden, een andere dag vanaf 06:00.
   const asStart = 0
   const asEind = 24 * 60
   const tijdHoogte = Math.max(200, vakHoogte - BAND)
@@ -82,8 +89,9 @@ export default function DagTijdlijn({
   const baan = useRef(null)
   useEffect(() => {
     if (!baan.current || !vakHoogte) return
-    const start = nuMin != null ? Math.max(0, Math.min(8 * 60, nuMin - 5 * 60)) : 6 * 60
-    baan.current.scrollTop = Math.min(start, 6 * 60) * pxPerMin
+    // Vandaag: twee uur terug bovenaan, de rest van de dag eronder. Een andere dag: vanaf 06:00.
+    const start = nuMin != null ? Math.max(0, nuMin - 2 * 60) : 6 * 60
+    baan.current.scrollTop = start * pxPerMin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dagSleutel, vakHoogte > 0])
 
@@ -121,20 +129,20 @@ export default function DagTijdlijn({
   )
 
   return (
-    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box' }}>
+    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box', marginLeft: -U, marginRight: -U }}>
       {/* De dag */}
       <div style={{
-        position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', borderRadius: 12, background: '#070707',
+        position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', background: 'transparent',
       }}>
         {/* Slaap van de nacht ervoor */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+        <div onClick={onSlaap || undefined} role={onSlaap ? 'button' : undefined} aria-label={onSlaap ? 'Slaap invullen' : undefined} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(255,255,255,0.05)', overflow: 'hidden', cursor: onSlaap ? 'pointer' : 'default', zIndex: 5, ...tik }}>
           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(Math.min(1, (slaapUren || 0) / SLAAP_DOEL) * 100)}%`, background: 'rgba(168,85,247,0.4)' }} />
           <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: slaapUren > 0 ? '#d8b4fe' : 'rgba(255,255,255,0.4)' }}>
             <Moon size={10} strokeWidth={2.6} color={slaapUren > 0 ? PAARS : 'currentColor'} />{slaapUren > 0 ? `${String(Math.round(slaapUren * 10) / 10).replace('.', ',')}u` : '·'}
           </div>
         </div>
         {/* Stappen */}
-        <div style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(stDeel * 100)}%`, background: `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * stGroen).toFixed(2)})` }} />
           <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: st > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)' }}>
             <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />
@@ -143,11 +151,11 @@ export default function DagTijdlijn({
         </div>
 
         {/* De schuifbaan: de hele dag, met de uren links in beeld. */}
-        <div ref={baan} className="dag-tijdlijn-baan" style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: BALKEN, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={baan} className="dag-tijdlijn-baan" style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <style>{'.dag-tijdlijn-baan::-webkit-scrollbar{display:none}'}</style>
         <div style={{ position: 'relative', height: (asEind - asStart) * pxPerMin, backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent ${120 * pxPerMin}px)` }}>
         {uren.map(u => (
-          <span key={u} style={{ position: 'absolute', left: 6, top: (u - asStart) * pxPerMin + 3, fontSize: '0.62rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, zIndex: 3, pointerEvents: 'none' }}>{klok(u)}</span>
+          <span key={u} style={{ position: 'absolute', left: U + 2, top: (u - asStart) * pxPerMin + 3, fontSize: '0.62rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, zIndex: 3, pointerEvents: 'none' }}>{klok(u)}</span>
         ))}
         {/* Werk en slaap: zachte vlakken achter de rest. Tik op slaap om hem te loggen. */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
@@ -159,7 +167,7 @@ export default function DagTijdlijn({
             return (
               <div key={b.id} style={{ position: 'absolute', left: 0, right: 0, top: boven, height: hoog, background: slaapt ? 'rgba(168,85,247,0.07)' : 'rgba(255,255,255,0.035)' }}>
                 {hoog >= 14 && (
-                  <span onClick={sl?.kan ? sl.onLog : undefined} style={{ position: 'absolute', top: Math.max(3, -boven + 3), right: 4, display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 0', fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? 'rgba(216,180,254,0.6)' : 'rgba(255,255,255,0.3)', cursor: sl?.kan ? 'pointer' : 'default', ...tik }}>
+                  <span onClick={sl?.kan ? sl.onLog : undefined} style={{ position: 'absolute', top: Math.max(3, -boven + 3), right: U + BALKEN + 6, display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 0', fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? 'rgba(216,180,254,0.6)' : 'rgba(255,255,255,0.3)', cursor: sl?.kan ? 'pointer' : 'default', ...tik }}>
                     {slaapt ? <Moon size={9} strokeWidth={2.6} /> : <Briefcase size={9} strokeWidth={2.6} />}
                     {slaapt ? (sl?.gelogd ? `Slaap · ${String(sl.gelogd.uren).replace('.', ',')}u` : sl?.kan ? 'Slaap · loggen' : 'Slaap') : (b.label || 'Werk')}
                   </span>
@@ -182,7 +190,7 @@ export default function DagTijdlijn({
             <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Niets gepland op deze dag</span>
           </div>
         ) : (
-          <div style={{ position: 'absolute', top: 0, bottom: 0, left: UREN_BREED, right: 6 }}>
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: U + UREN_BREED - 4, right: U + BALKEN + 6 }}>
             {geplaatst.map(({ b, groot, top }) => {
               const gedaan = !!isGedaan(b)
               const vink = afronden(b)
@@ -248,7 +256,7 @@ export default function DagTijdlijn({
         </div>
         </div>
         {/* Voeding: één brede balk, kcal tegen het doel, met kcal en eiwit bovenin de vulling. */}
-        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: 4, width: BALKEN - 4, background: 'rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: U + 4, width: BALKEN - 4, background: 'rgba(255,255,255,0.05)', zIndex: 4, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(kDeel * 100)}%`, background: kKleur, opacity: 0.55, transition: 'height 0.3s ease' }} />
           {kcal > 0 && (
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(4, Math.round(kDeel * tijdHoogte) - 32), textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
@@ -258,7 +266,7 @@ export default function DagTijdlijn({
           )}
         </div>
         {/* Water */}
-        <div title={water ? `Water ${(Number(water.ml || 0) / 1000).toFixed(1).replace('.', ',')} / ${(Number(water.doel || 0) / 1000).toFixed(1).replace('.', ',')} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: 0, width: 4, background: 'rgba(0,0,0,0.55)' }}>
+        <div title={water ? `Water ${(Number(water.ml || 0) / 1000).toFixed(1).replace('.', ',')} / ${(Number(water.doel || 0) / 1000).toFixed(1).replace('.', ',')} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: U, width: 4, background: 'rgba(255,255,255,0.05)', zIndex: 4 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(wDeel * 100)}%`, background: '#38bdf8', transition: 'height 0.3s ease' }} />
         </div>
       </div>

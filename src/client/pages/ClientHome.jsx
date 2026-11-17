@@ -83,7 +83,9 @@ const pickTip = () => {
 //   1) Grote gouden DAG-naam + datum-pill (bv. "Maandag [10 juni]")
 //   2) Daaronder: "Goedemorgen, Kersten"
 // ============================================
-function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
+// `knoppenSlot`: plek rechts in de datumregel waar de agenda zijn knoppen neerzet.
+// `gewichtSlot`: plek achter de datum waar de agenda het gewicht van die dag neerzet.
+function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = null, gewichtSlot = null }) {
   const isMobile = useIsMobile()
 
   const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -165,7 +167,7 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
           {getGreeting()}, {firstName}
         </div>
         <div style={{
-          marginTop: 5,
+          marginTop: 5, position: 'relative',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
           fontSize: isMobile ? '0.72rem' : '0.78rem',
           fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em',
@@ -175,14 +177,18 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
               <ChevronLeft size={15} strokeWidth={3} />
             </button>
           )}
-          <span style={{ color: isVandaag === false ? '#fff' : 'inherit' }}>
-            {dayName.toLowerCase()} {dateLabel}
+          {/* Kort: "DI 17", met daarachter het gewicht van die dag (tik = wegen). */}
+          <span title={`${dayName} ${dateLabel}`} style={{ color: isVandaag === false ? '#fff' : 'rgba(255,255,255,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {dayName.slice(0, 2)} {getoond.getDate()}
           </span>
+          {gewichtSlot && <span ref={gewichtSlot} style={{ display: 'inline-flex', alignItems: 'center' }} />}
           {onVerzet && (
             <button onClick={() => onVerzet(1)} aria-label="Volgende dag" style={dagPijlKnop}>
               <ChevronRight size={15} strokeWidth={3} />
             </button>
           )}
+          {/* De knoppen van de agenda (lijst/agenda, dagindeling, volledig scherm). */}
+          {knoppenSlot && <span ref={knoppenSlot} style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }} />}
         </div>
       </div>
     </div>
@@ -645,6 +651,9 @@ export default function ClientHome({ client, db, setCurrentView }) {
   const isVandaagAgenda = agendaDatum
     ? agendaDatum.toDateString() === new Date().toDateString()
     : true
+  // Plek in de datumregel voor de knoppen van de agenda (alleen in de agendaweergave).
+  const [agendaKnoppen, setAgendaKnoppen] = useState(null)
+  const [agendaGewicht, setAgendaGewicht] = useState(null)
   const verzetAgendaDag = (richting) => {
     setDagStand(prev => (richting === 0 ? vandaagStand() : verzetDag(prev, richting)))
   }
@@ -661,6 +670,8 @@ export default function ClientHome({ client, db, setCurrentView }) {
         datum={agendaDatum}
         isVandaag={isVandaagAgenda}
         onVerzet={verzetAgendaDag}
+        knoppenSlot={setAgendaKnoppen}
+        gewichtSlot={setAgendaGewicht}
       />
 
       {/* ── De dag als agenda ─────────────────────────────────────────────
@@ -678,6 +689,9 @@ export default function ClientHome({ client, db, setCurrentView }) {
             dag={dagStand.dag}
             weekAnker={dagStand.weekAnker}
             onVerzetDag={verzetAgendaDag}
+            knoppenSlot={agendaKnoppen}
+            gewichtSlot={agendaGewicht}
+            zijMarge={isMobile ? 16 : 24}
             toonKop={false}
             toonMacros={false}
             onOpen={(blok) => {

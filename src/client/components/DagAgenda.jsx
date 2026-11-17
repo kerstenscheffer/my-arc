@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from '../paginaPortal'
+import { createPortal as domPortal } from 'react-dom'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
   CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
@@ -116,6 +117,14 @@ export default function DagAgenda({
   // Op home staan de macro's niet in de agenda: die horen op de maaltijdpagina,
   // en twee plekken met hetzelfde getal is er één te veel.
   toonMacros = true,
+  // De marge links en rechts van de pagina in pixels: de agendaweergave laat
+  // zijn achtergrond daar doorheen lopen tot de schermrand.
+  zijMarge = 0,
+  // In de agendaweergave: de drie knoppen in de datumregel van de pagina
+  // zetten in plaats van op een eigen regel (DOM-plek van de ouder).
+  knoppenSlot = null,
+  // Plek achter de datum op de pagina: het gewicht van die dag, tik = wegen.
+  gewichtSlot = null,
 }) {
   const service = useMemo(() => new ClientAgendaService(db?.supabase || db), [db])
   const [eigenWeekAnker, setEigenWeekAnker] = useState(() => getMondayOf(new Date()))
@@ -671,10 +680,15 @@ export default function DagAgenda({
       {/* Kaal rijtje iconen rechts: wisselen tussen lijst en rooster, je
           dagindeling, en (alleen in het rooster) op het hele scherm. De grote
           schakelaar was drukker dan de dag eronder. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 0,
-        paddingBottom: isMobile ? 4 : 6,
-      }}>
+      {/* Achter de datum: "89,7 kg" met een weegschaal; opent het weegvenster. */}
+      {gewichtSlot && slaapDagIso && domPortal(
+        <button onClick={() => { if (slaapDagIso <= toIsoDate(nu)) setWegenBlad(true) }} aria-label={gewogenOp != null ? `Gewogen: ${gewogenOp} kg. Aanpassen` : 'Gewicht invullen'} title={gewogenOp != null ? 'Gewicht aanpassen' : 'Gewicht invullen'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6, padding: '2px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 900, color: gewogenOp != null ? '#fff' : 'rgba(255,255,255,0.5)', cursor: slaapDagIso <= toIsoDate(nu) ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          {gewogenOp != null ? String(Math.round(Number(gewogenOp) * 10) / 10).replace('.', ',') : '--'} kg
+          <Scale size={13} strokeWidth={2.6} />
+        </button>, gewichtSlot)}
+      {(() => {
+        const knoppen = (<>
         <button
           onClick={() => setWeergave(weergave === 'lijst' ? 'rooster' : 'lijst')}
           title={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
@@ -701,10 +715,20 @@ export default function DagAgenda({
             {volledig ? <X size={17} strokeWidth={2.8} /> : <Maximize2 size={15} strokeWidth={2.6} />}
           </button>
         )}
-      </div>
+      </>)
+        // Agendaweergave op de homepagina: in de datumregel erboven.
+        if (knoppenSlot && weergave === 'rooster' && !volledig) return domPortal(<span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{knoppen}</span>, knoppenSlot)
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 0,
+            paddingBottom: isMobile ? 4 : 6,
+          }}>{knoppen}</div>
+        )
+      })()}
 
       {/* Dagvoortgang: hoeveel van wat er af te vinken valt, is gedaan. */}
-      {voortgang.totaal > 0 && (
+      {/* In de agendaweergave voorlopig niet (17 nov 2026, Kersten). */}
+      {voortgang.totaal > 0 && weergave !== 'rooster' && (
         <div style={{ flexShrink: 0, paddingBottom: weergave === 'lijst' && gedaanBlokken.length > 0 ? 0 : weergave === 'rooster' ? 4 : (isMobile ? 10 : 12) }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 6 }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : '#fff', letterSpacing: '-0.01em', transition: 'color 0.4s ease' }}>
@@ -903,6 +927,14 @@ export default function DagAgenda({
               voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
               water={dagWater}
               dagSleutel={dagIso}
+              onSlaap={() => {
+                // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
+                const b = blokken.find(x => x.type === 'sleep' && x.meta?.wrapHalf !== 'late')
+                const sl = b ? slaapVan(b) : null
+                if (sl?.kan) sl.onLog()
+                else if (slaapDagIso && slaapDagIso <= toIsoDate(nu)) setSlaapBlad({ datum: slaapDagIso, bed: '23:00', op: '07:00' })
+              }}
+              uitloop={volledig ? 0 : zijMarge}
             />
           )}
         </div>
