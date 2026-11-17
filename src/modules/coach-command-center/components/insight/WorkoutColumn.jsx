@@ -8,7 +8,7 @@ import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLi
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
-import KlantWeekrooster from '../../../manual-workout-builder/components/KlantWeekrooster'
+import TrainingWeekInzicht from './TrainingWeekInzicht'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
@@ -379,52 +379,6 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
       ) : view === 'progress' && selectedExercise ? (
         <ProgressView db={db} client={client} isMobile={isMobile} selectedExercise={selectedExercise} entries={getExerciseHistory()} onBack={() => setView(selectedSession ? 'exercises' : 'sessions')} />
       ) : null
-    // Eén regel per sessie: "Push · vrijdag 13/11" met rechts de notities.
-    const RIJ_HOOGTE = 42
-    const sessieRijen = workouts.length === 0
-      ? <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Nog geen trainingen gelogd</div>
-      : (
-        // Vijf tegelijk in beeld, de rest door te scrollen.
-        <div style={{ maxHeight: RIJ_HOOGTE * 5, overflowY: 'auto', WebkitOverflowScrolling: 'touch', margin: '0.5rem 0.9rem 0.6rem', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-          {workouts.slice(0, 60).map((w, idx) => {
-            const parsed = parseSessionNote(w.notes)
-            const notities = (exerciseNotesBySession[w.id] || 0) + (parsed.note ? 1 : 0)
-            const trainingNaam = naamVoorSessie(w)
-            const naam = trainingNaam || 'Training'
-            const d = w.workout_date ? new Date(`${String(w.workout_date).slice(0, 10)}T00:00:00`) : null
-            const wanneer = d && !isNaN(d) ? `${d.toLocaleDateString('nl-NL', { weekday: 'long' })} ${d.getDate()}/${d.getMonth() + 1}` : ''
-            const wissels = wisselsVoorSessie(w)
-            const aantalWissels = Object.keys(wissels).length
-            return (
-              <button
-                key={`${w.workout_date}-${idx}`}
-                onClick={() => { setSelectedSession({ ...w, workout_naam: trainingNaam || w.workout_naam || null, _wissels: wissels }); setView('exercises') }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: RIJ_HOOGTE, boxSizing: 'border-box',
-                  padding: '0 0.2rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.12)',
-                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.88rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {naam}{wanneer && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}> · {wanneer}</span>}
-                </span>
-                {aantalWissels > 0 && (
-                  <span title={`${aantalWissels} oefening${aantalWissels === 1 ? '' : 'en'} gewisseld`} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, color: '#f59e0b' }}>
-                    <ArrowLeftRight size={13} strokeWidth={2.6} />{aantalWissels}
-                  </span>
-                )}
-                {notities > 0 && (
-                  <span title={`${notities} notitie${notities === 1 ? '' : 's'}`} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, color: '#fff' }}>
-                    <MessageSquare size={13} strokeWidth={2.6} />{notities}
-                  </span>
-                )}
-                <ChevronRight size={15} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
-              </button>
-            )
-          })}
-        </div>
-      )
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         {/* In de kolomkop: plan, voortgang en knoppen (zie KolomKop). */}
@@ -492,12 +446,42 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio
               en stappen per dag, met pijlen naar eerdere weken. */}
           {!alleenSessies && <>
-          <div style={{ padding: isMobile ? '0.5rem 0.25rem 0' : '0.6rem 0.5rem 0', overflowX: 'auto' }}>
-            <KlantWeekrooster client={client} db={db} isMobile={isMobile} />
-          </div>
+          {/* Eigen coach-weergave, los van het rooster op de klantpagina. */}
+          <TrainingWeekInzicht
+            client={client} db={db} isMobile={isMobile}
+            workouts={workouts}
+            naamVoorSessie={naamVoorSessie}
+            tijdVan={logTijd}
+            toonSessie={(w) => {
+              const sessie = { ...w, workout_naam: naamVoorSessie(w) || w.workout_naam || null, _wissels: wisselsVoorSessie(w) }
+              const exs = []
+              Object.entries(exerciseProgress).forEach(([name, entries]) => {
+                const match = entries.find(e => e.sessionId === w.id)
+                if (match) exs.push({ name, ...match })
+              })
+              const lijst = exs.length === 0 && Array.isArray(w.exercises_completed)
+                ? w.exercises_completed.map(e => ({ name: e.name, sets: [], bestWeight: 0, bestReps: 0, totalSets: e.sets || 0 }))
+                : exs
+              return (
+                <SessieOefeningen ingebed db={db} isMobile={isMobile} selectedSession={sessie} exs={lijst}
+                  onBack={() => {}}
+                  onKies={(naam) => { setSelectedSession(sessie); setSelectedExercise(naam); setView('progress') }} />
+              )
+            }}
+            sessieTelling={(w) => {
+              const eigen = Object.values(exerciseProgress).map(entries => entries.find(e => e.sessionId === w.id)).filter(Boolean)
+              const parsed = parseSessionNote(w.notes)
+              return {
+                oefeningen: eigen.length || (Array.isArray(w.exercises_completed) ? w.exercises_completed.length : 0),
+                sets: eigen.reduce((t, e) => t + ((Array.isArray(e.sets) ? e.sets.length : 0) || Number(e.totalSets) || 0), 0),
+                notities: (exerciseNotesBySession[w.id] || 0) + (parsed.note ? 1 : 0),
+                wissels: Object.keys(wisselsVoorSessie(w)).length,
+              }
+            }}
+          />
           </>}
           {alleenSessies && workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
-          {!alleenSessies ? sessieRijen : workouts.length > 0 ? workouts.slice(0, 60).map((w, idx) => {
+          {!alleenSessies ? null : workouts.length > 0 ? workouts.slice(0, 60).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
             const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
             const FeelingIcon = feelingCfg?.icon
@@ -629,7 +613,9 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   return null
 }
 
-function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }) {
+// `ingebed`: alleen de notitie en de oefeningkaarten, zonder kop of eigen
+// scrollvlak (voor de kaart Training in Coach Inzicht).
+function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, ingebed = false }) {
   const fotoVan = useOefeningFotos(db, exs.map(e => e.name).filter(Boolean))
   const photoSize = isMobile ? 62 : 72
   const duur = useSessieDuur(db, selectedSession)
@@ -638,8 +624,8 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
     const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
     const FeelingIcon = feelingCfg?.icon
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <div style={ingebed ? {} : { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: ingebed ? 'none' : 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <button onClick={onBack} aria-label="Terug" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, minWidth: 28, minHeight: 28, touchAction: 'manipulation' }}><ArrowLeft size={16} /></button>
           <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{(selectedSession.workout_naam || '').trim() || WEEKDAG_NL[String(selectedSession.day_name || '').toLowerCase()] || selectedSession.day_name || 'Training'}</span>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
@@ -660,6 +646,7 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
             padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
             borderBottom: '1px solid rgba(255,255,255,0.04)',
             background: feelingCfg ? `${feelingCfg.color}08` : 'rgba(255,255,255,0.02)',
+            ...(ingebed ? { borderRadius: 12, borderBottom: 'none', marginBottom: '0.45rem' } : {}),
           }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -705,9 +692,9 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
           </div>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
+        <div style={ingebed ? {} : { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
           {exs.length > 0 ? exs.map((ex, idx) => (
-            <div key={idx} style={{ ...KAART, display: 'flex', alignItems: 'stretch' }}>
+            <div key={idx} style={{ ...KAART, ...(ingebed ? { margin: '0 0 0.45rem' } : {}), display: 'flex', alignItems: 'stretch' }}>
               {/* Foto links met het nummer linksboven, zoals de oefeningkaart van de klant. */}
               <div style={{ width: photoSize, alignSelf: 'stretch', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', inset: 0, backgroundImage: fotoVan(ex.name), backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />

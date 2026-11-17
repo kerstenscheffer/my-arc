@@ -76,7 +76,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Desktop: welke secties naast elkaar staan. De kopregel vinkt ze aan en uit,
   // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
   // een leeg paneel is geen bruikbare toestand.
-  const [openSecties, setOpenSecties] = useState(['weight', 'workout', 'meals', 'checkin', 'logboek'])
+  const [openSecties, setOpenSecties] = useState(['weight', 'workout', 'meals', 'logboek'])
   // De looptijd stond altijd open als balkenrij onder de kop. Dat is een blok
   // dat je één keer per maand nodig hebt en de rest van de tijd meekijkt, dus
   // nu dicht tenzij je erom vraagt.
@@ -91,6 +91,23 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
+  // Check-ins staan niet meer als vak in beeld (17 nov 2026, Kersten): een knop in de
+  // kopregel opent ze in een venster, met een bolletje zolang er een ongeziene ligt.
+  const [showCheckins, setShowCheckins] = useState(false)
+  const [checkinNieuw, setCheckinNieuw] = useState(0)
+  // Ongeziene check-ins van deze klant, voor het bolletje op de knop. Het venster
+  // zet ze op gezien (CheckinsColumn) en meldt dat met 'myarc:checkin-gezien'.
+  const checkinClientId = client?.id || null
+  useEffect(() => {
+    if (!checkinClientId || !db?.supabase) { setCheckinNieuw(0); return undefined }
+    let weg = false
+    db.supabase.from('client_checkins').select('id', { count: 'exact', head: true })
+      .eq('client_id', checkinClientId).eq('status', 'submitted').is('coach_gezien_at', null)
+      .then(({ count }) => { if (!weg) setCheckinNieuw(count || 0) }, () => {})
+    const gezien = (e) => { if (e.detail?.clientId === checkinClientId) setCheckinNieuw(0) }
+    window.addEventListener('myarc:checkin-gezien', gezien)
+    return () => { weg = true; window.removeEventListener('myarc:checkin-gezien', gezien) }
+  }, [checkinClientId, db])
   const [showMaaltijden, setShowMaaltijden] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
@@ -303,16 +320,18 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       tooltip. Aan = wit op een licht vlak, uit = gedimd. */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
                     {SECTIES.map((sec) => {
-                      const aan = openSecties.includes(sec.id)
+                      const isCheckin = sec.id === 'checkin'
+                      const aan = isCheckin ? showCheckins : openSecties.includes(sec.id)
                       const Icoon = sec.icon
                       return (
                         <button
                           key={sec.id}
-                          onClick={() => toggleSectie(sec.id)}
-                          title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
+                          onClick={() => (isCheckin ? setShowCheckins(true) : toggleSectie(sec.id))}
+                          title={isCheckin ? (checkinNieuw ? `Check-ins: ${checkinNieuw} nieuw` : 'Check-ins bekijken') : aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
                           aria-label={sec.label}
                           aria-pressed={aan}
                           style={{
+                            position: 'relative',
                             width: 36, height: 36, padding: 0, borderRadius: 10,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
@@ -323,6 +342,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                           }}
                         >
                           <Icoon size={18} strokeWidth={aan ? 2.6 : 2.2} />
+                          {isCheckin && checkinNieuw > 0 && (
+                            <span aria-hidden="true" style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 2px #0a0a0a' }} />
+                          )}
                         </button>
                       )
                     })}
@@ -702,6 +724,25 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══ CHECK-INS (venster) ═══ */}
+      {showCheckins && effectiveClient && !isMobile && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setShowCheckins(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-label="Check-ins" style={{ width: '100%', maxWidth: 520, height: 'min(82vh, 760px)', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.4rem 1rem' }}>
+              <ClipboardCheck size={15} color="#fff" strokeWidth={2.4} />
+              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Check-ins</span>
+              <button onClick={() => setShowCheckins(false)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <CheckinsColumn client={effectiveClient} db={db} isMobile={false} />
+            </div>
+          </div>
         </div>
       )}
 
