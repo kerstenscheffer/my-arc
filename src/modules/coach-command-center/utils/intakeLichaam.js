@@ -3,20 +3,23 @@
 // De lichaamsfoto's uit de intake (public-intake BodyFlow + GoalFlow), zodat
 // de coach terugziet welk lichaam de klant aanklikte: waar hij nu staat (één
 // foto, of twee als hij 'ertussenin' koos) en waar hij naartoe wil.
+//
+// De plaatjes staan in public/intake-lichaam (17 nov 2026): dezelfde als in de
+// intake, maar niet meer van i.ibb.co geladen, want die host gaf af en toe 503.
 
 const VET_FOTOS = [
-  { pct: 10, label: '7–10%',  img: 'https://i.ibb.co/Y7DfXsf7/Scherm-afbeelding-2026-03-27-om-12-38-24.png' },
-  { pct: 14, label: '10–15%', img: 'https://i.ibb.co/Kjtqwfmq/Scherm-afbeelding-2026-03-27-om-12-39-55.png' },
-  { pct: 18, label: '15–20%', img: 'https://i.ibb.co/3YNdy00M/Scherm-afbeelding-2026-03-27-om-12-38-46.png' },
-  { pct: 23, label: '20–25%', img: 'https://i.ibb.co/d09DQn2f/Scherm-afbeelding-2026-03-27-om-12-38-54.png' },
-  { pct: 33, label: '25–35%', img: 'https://i.ibb.co/RGKN8LZr/Scherm-afbeelding-2026-03-27-om-12-39-02.png' },
+  { pct: 10, label: '7–10%',  img: '/intake-lichaam/vet-10.png' },
+  { pct: 14, label: '10–15%', img: '/intake-lichaam/vet-14.png' },
+  { pct: 18, label: '15–20%', img: '/intake-lichaam/vet-18.png' },
+  { pct: 23, label: '20–25%', img: '/intake-lichaam/vet-23.png' },
+  { pct: 33, label: '25–35%', img: '/intake-lichaam/vet-33.png' },
 ]
 
 const SPIER_FOTOS = {
-  lean:     { label: 'Slank & atletisch',     img: 'https://i.ibb.co/BVSLB4dg/Scherm-afbeelding-2026-04-03-om-11-02-33.png' },
-  muscular: { label: 'Gespierd & droog',      img: 'https://i.ibb.co/yF4sXLc6/Scherm-afbeelding-2026-04-03-om-10-59-31.png' },
-  big:      { label: 'Heel gespierd & bulk',  img: 'https://i.ibb.co/ynvJBcxW/Scherm-afbeelding-2026-04-03-om-11-01-08.png' },
-  shredded: { label: 'Heel gespierd & droog', img: 'https://i.ibb.co/XrTRXk9h/Scherm-afbeelding-2026-04-03-om-11-00-52.png' },
+  lean:     { label: 'Slank & atletisch',     img: '/intake-lichaam/spier-lean.png' },
+  muscular: { label: 'Gespierd & droog',      img: '/intake-lichaam/spier-muscular.png' },
+  big:      { label: 'Heel gespierd & bulk',  img: '/intake-lichaam/spier-big.png' },
+  shredded: { label: 'Heel gespierd & droog', img: '/intake-lichaam/spier-shredded.png' },
 }
 
 // Dichtstbijzijnde foto bij een vetpercentage (doel 22% → de 20–25%-foto).

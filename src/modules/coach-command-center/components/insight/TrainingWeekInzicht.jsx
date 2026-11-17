@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import SlaapInsight from './SlaapInsight'
-import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink, X, AlertTriangle, CalendarDays } from 'lucide-react'
 import WorkoutServiceNew from '../../../workout/services/WorkoutServiceNew'
 import CardioService from '../../../workout/services/CardioService'
 import StappenService, { STANDAARD_DOEL } from '../../../steps/StappenService'
@@ -20,6 +20,8 @@ import { trainingenVanDag } from '../../../workout/utils/extraTrainingen'
 import { getWorkoutImage } from '../../../workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../../workout/utils/workoutFoto'
 import { kcalKleur } from '../../../meal-plan/utils/kcalKleur'
+import { spierWoord } from '../../../workout/bouwfase/bouwfaseData'
+import { spierpijnVan } from '../../../workout/bouwfase/rir'
 
 const LIJN = 'rgba(255,255,255,0.08)'
 const GROEN = '#10b981'
@@ -88,6 +90,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const [stappen, setStappen] = useState({}) // { weekSleutel: [7 dagen] }
   const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
   const [gewicht, setGewicht] = useState({}) // { 'YYYY-MM-DD': kg } — de weging van die dag
+  const [cijfer, setCijfer] = useState({}) // { 'YYYY-MM-DD': cijfer dat de klant de workout gaf }
+  const [signalen, setSignalen] = useState({}) // { 'YYYY-MM-DD': [{ tekst, erg }] } — waar de coach naar moet kijken
   const [slaap, setSlaap] = useState({}) // { 'YYYY-MM-DD': uren } — de nacht die op die dag eindigt
   const [slaapVenster, setSlaapVenster] = useState(null) // dag (iso) waarvan de slaapband is aangeklikt
 
@@ -109,6 +113,13 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     return () => { weg = true }
   }, [clientId, db])
 
+  // Het stappendoel is net aangepast (stappenvenster): direct overnemen.
+  useEffect(() => {
+    const nieuw = (e) => { if (e.detail?.clientId === clientId && Number(e.detail.doel) > 0) setStappenDoel(Number(e.detail.doel)) }
+    window.addEventListener('myarc:stappendoel', nieuw)
+    return () => window.removeEventListener('myarc:stappendoel', nieuw)
+  }, [clientId])
+
   // Per getoonde week: de planning van die week, de geplande cardio en de stappen.
   useEffect(() => {
     if (!clientId || !db?.supabase || vast === undefined) return
@@ -129,11 +140,47 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         .eq('client_id', clientId).gte('date', weekSleutel).lte('date', sleutel(plusDagen(ma, 6)))
         .order('created_at', { ascending: true })
         .then(r => r, () => ({ data: [] })),
-    ]).then(([p, b, st, sl, gw]) => {
+      db.supabase.from('training_feedback').select('datum, soort, oefening, spiergroep, score, gevoel, opmerking, spierpijn, werkdruk')
+        .eq('client_id', clientId).gte('datum', weekSleutel).lte('datum', sleutel(plusDagen(ma, 6)))
+        .then(r => r, () => ({ data: [] })),
+    ]).then(([p, b, st, sl, gw, fb]) => {
       if (weg) return
       setPlanning(prev => ({ ...prev, [weekSleutel]: p || {} }))
       setCardioBlokken(prev => ({ ...prev, [weekSleutel]: (b?.data || []).filter(x => !(x.skip_weeks || []).includes(weekSleutel)) }))
       setStappen(prev => ({ ...prev, [weekSleutel]: st || [] }))
+      setCijfer(prev => ({ ...prev, ...Object.fromEntries((fb?.data || []).filter(r => r.soort === 'workout' && r.score != null).map(r => [String(r.datum).slice(0, 10), Number(r.score)])) }))
+      // Signalen per dag: laag cijfer, opmerking, slecht herstel, pijn of techniek
+      // die brak, te veel werkdruk. `erg` = rood, anders oranje.
+      const perDag = {}
+      const meld = (r, tekst, erg = false) => { const k = String(r.datum).slice(0, 10); (perDag[k] = perDag[k] || []).push({ tekst, erg }) }
+      const hoofd = (x) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : '')
+      ;(fb?.data || []).forEach(r => {
+        const spier = hoofd(spierWoord(r.spiergroep) || r.spiergroep || '')
+        if (r.soort === 'workout') {
+          if (r.score != null && r.score <= 6) meld(r, `Workout ${r.score}/10`, r.score <= 4)
+          if (r.opmerking) meld(r, `Opmerking: ${r.opmerking}`)
+        } else if (r.soort === 'herstel') {
+          const sp = spierpijnVan(r)
+          if (sp != null && sp >= 2) meld(r, `${spier}: ${sp >= 3 ? 'nog spierpijn' : 'spierpijn net op tijd weg'}${r.opmerking ? ` · ${r.opmerking}` : ''}`, sp >= 3)
+          else if (r.opmerking) meld(r, `${spier}: ${r.opmerking}`)
+        } else if (r.soort === 'spier') {
+          if (r.werkdruk != null && r.werkdruk >= 3) meld(r, `${spier}: werkdruk te veel${r.opmerking ? ` · ${r.opmerking}` : ''}`, true)
+          else if (r.opmerking) meld(r, `${spier}: ${r.opmerking}`)
+        } else if (r.soort === 'oefening') {
+          const delen = [
+            r.gevoel === 'pijn' ? 'pijntje' : r.gevoel === 'techniek' ? 'techniek brak' : null,
+            r.score != null && r.score <= 5 ? `${r.score}/10` : null,
+            r.opmerking || null,
+          ].filter(Boolean)
+          if (delen.length) meld(r, `${r.oefening}: ${delen.join(' · ')}`, r.gevoel === 'pijn' || (r.score != null && r.score <= 4))
+        }
+      })
+      setSignalen(prev => {
+        const nieuw = { ...prev }
+        // Dagen van deze week zonder signalen leegmaken, anders blijft een oud signaal staan.
+        for (let i = 0; i < 7; i++) delete nieuw[sleutel(plusDagen(ma, i))]
+        return { ...nieuw, ...perDag }
+      })
       // Meerdere wegingen op één dag: de laatste telt.
       setGewicht(prev => ({ ...prev, ...Object.fromEntries((gw?.data || []).filter(r => Number(r.weight) > 0).map(r => [String(r.date).slice(0, 10), Number(r.weight)])) }))
       setSlaap(prev => ({ ...prev, ...Object.fromEntries((sl?.data || []).map(r => [String(r.log_date).slice(0, 10), Number(r.hours_slept) || 0])) }))
@@ -149,6 +196,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     return !d
   })
   const [statInfo, setStatInfo] = useState(null)
+  // Kalender om naar een andere maand te springen: { x, y, jaar, maand } terwijl hij open is.
+  const [kalender, setKalender] = useState(null)
 
   // Agendaatje: standaard 06:00 tot 22:00 in beeld; met het muiswiel (of
   // vegen) schuif je naar de nacht ervoor of erna. Alle dagen schuiven samen.
@@ -284,6 +333,9 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       ...(w.cardio.length ? [] : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
       ...((v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
     ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
+    // De signalen van de dag horen bij de (eerste) gedane training.
+    const eerste = regels.find(r => r.groot && !r.cardio && r.gedaan) || regels.find(r => r.groot && !r.cardio)
+    if (eerste && signalen[w.k]?.length) eerste.signalen = signalen[w.k]
       return regels
   }
   const TEGEL_HOOGTE = 468, BAND = 38 // slaapband + stappenband
@@ -313,13 +365,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
 
       {/* Dagenstrook: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
       <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px', flexShrink: 0 }}>
-        {/* Boven de tijdas: het trainingsplan openen in de builder. */}
-        {voeding && (
-          <button onClick={acties?.plan || undefined} disabled={!acties?.plan} title={acties?.plan ? `Trainingsplan openen in de builder${acties.planNaam ? ` (${acties.planNaam})` : ''}` : undefined} aria-label="Trainingsplan openen"
-            style={{ width: AS_BREED, flexShrink: 0, height: 26, padding: 0, background: 'transparent', border: 'none', color: '#fff', opacity: acties?.plan ? 0.8 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: acties?.plan ? 'pointer' : 'default' }}>
-            <ExternalLink size={14} strokeWidth={2.6} />
-          </button>
-        )}
+        {/* Lege hoek boven de tijdas, zodat de dagen boven hun tegel staan. */}
+        {voeding && <span style={{ width: AS_BREED, flexShrink: 0 }} />}
         {week.map((w, i) => {
           const aan = w.k === gekozenSleutel
           return (
@@ -331,6 +378,13 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
               whiteSpace: 'nowrap', overflow: 'hidden',
             }}>
               {i === 0 && <button onClick={(e) => { e.stopPropagation(); setGekozen(plusDagen(gekozen, -7)) }} aria-label="Vorige week" title="Vorige week" style={{ ...pijl, color: aan ? '#000' : '#fff' }}><ChevronLeft size={16} strokeWidth={3} /></button>}
+              {i === 0 && (
+                <button aria-label="Naar een andere maand" title="Naar een andere maand of week springen" aria-haspopup="dialog" aria-expanded={!!kalender}
+                  onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setKalender(k => (k ? null : { x: r.left, y: r.bottom + 6, jaar: gekozen.getFullYear(), maand: gekozen.getMonth() })) }}
+                  style={{ ...pijl, width: 22, color: aan ? '#000' : '#fff' }}>
+                  <CalendarDays size={14} strokeWidth={2.6} />
+                </button>
+              )}
               <span style={{ flex: i === 0 || i === 6 ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
                 {DAG_NL[i]}<span style={{ fontWeight: 800, opacity: aan ? 0.75 : 0.6, letterSpacing: 0 }}>{w.d.getDate()}</span>
                 {/* De weging van die dag achter de datum. */}
@@ -418,10 +472,15 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                         <Moon size={10} strokeWidth={2.6} color={slaap[w.k] > 0 ? PAARS : 'currentColor'} />{slaap[w.k] > 0 ? `${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')}u` : '·'}
                       </span>
                     </span>
-                    <span style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+                    {/* Klik = stappendoel instellen. Op de gekozen dag staat het doel erachter. */}
+                    <span role={acties?.stappen ? 'button' : undefined} tabIndex={acties?.stappen ? 0 : undefined} aria-label="Stappendoel instellen" title={`${fmt(w.stappen)} / ${fmt(stappenDoel)} stappen${acties?.stappen ? ' · klik: doel instellen' : ''}`}
+                      onClick={acties?.stappen ? (e) => { e.stopPropagation(); acties.stappen() } : undefined}
+                      onKeyDown={acties?.stappen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); acties.stappen() } } : undefined}
+                      style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden', cursor: acties?.stappen ? 'pointer' : 'inherit', zIndex: 2 }}>
                       <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(stapDeel * 100)}%`, background: `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * stapGroen).toFixed(2)})` }} />
                       <span style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: w.stappen > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)' }}>
-                        <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />{w.stappen > 0 ? kort(w.stappen) : '·'}
+                        <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />{w.stappen > 0 ? kort(w.stappen) : aan ? '0' : '·'}
+                        {aan && stappenDoel > 0 && <span style={{ opacity: 0.6 }}> / {kort(stappenDoel)}</span>}
                       </span>
                     </span>
                     {/* Eén brede voedingsbalk: vult met de kcal tegen het doel, in de
@@ -456,6 +515,15 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                               <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: r.gedaan ? 0.5 : 0.22 }} />
                               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                               {r.gedaan && <CircleCheck size={14} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
+                              {/* Iets om naar te kijken: gekleurde rand en een teller linksboven. */}
+                              {r.signalen?.length > 0 && (
+                                <>
+                                  <span style={{ position: 'absolute', inset: 0, borderRadius: 6, border: `2px solid ${r.signalen.some(x => x.erg) ? '#ef4444' : '#f59e0b'}`, pointerEvents: 'none' }} />
+                                  <span title={r.signalen.map(x => x.tekst).join('\n')} style={{ position: 'absolute', top: 3, left: 3, display: 'inline-flex', alignItems: 'center', gap: 2, height: 16, padding: '0 5px', borderRadius: 8, background: r.signalen.some(x => x.erg) ? '#ef4444' : '#f59e0b', color: '#000', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1 }}>
+                                    <AlertTriangle size={10} strokeWidth={3} />{r.signalen.length}
+                                  </span>
+                                </>
+                              )}
                               <span style={{ position: 'absolute', left: 5, right: 5, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, letterSpacing: '-0.02em', color: r.gemist ? '#ef4444' : '#fff' }}>
                                   {r.cardio && <HeartPulse size={10} strokeWidth={2.8} style={{ flexShrink: 0 }} />}
@@ -511,6 +579,13 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       <div style={voeding ? { position: 'sticky', top: 0, zIndex: 3, background: '#050505', paddingBottom: 6 } : undefined}>
       {/* De gekozen dag: stappen, sets, oefeningen en cardio tegen het plan. */}
       <div style={{ display: 'flex', gap: 14, marginTop: '0.8rem' }}>
+        {/* Het trainingsplan openen in de Workout Builder. */}
+        {voeding && acties?.plan && (
+          <button onClick={acties.plan} title={`Trainingsplan openen in de Workout Builder${acties.planNaam ? ` (${acties.planNaam})` : ''}`} aria-label="Trainingsplan openen"
+            style={{ flexShrink: 0, alignSelf: 'center', width: 30, height: 30, padding: 0, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ExternalLink size={14} strokeWidth={2.6} />
+          </button>
+        )}
         <Balk label="Stappen" waarde={dag.stappen} doel={stappenDoel} kleur={deelKleur(dag.stappen, stappenDoel)} onKlik={acties?.stappen} hint="Stappendoel instellen" />
         <Balk label="Sets" waarde={dagSets} doel={planSets} kleur={deelKleur(dagSets, planSets)} onKlik={acties?.kracht} hint="Kracht: per oefening de stand tegen de band van de fase" />
         <Balk label="Oefeningen" waarde={dagOef} doel={planOef} kleur={deelKleur(dagOef, planOef)} onKlik={acties?.bouwfase} hint="Bouwfase en herstel per spiergroep" />
@@ -538,6 +613,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
               <span style={{ minWidth: 0, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {kopDelen.join(' · ')}{gedaanAantal > 1 ? ` · +${gedaanAantal - 1}` : ''}
               </span>
+              {/* Het cijfer dat de klant de workout gaf. */}
+              {dag.sessies[0] && cijfer[dag.k] != null && (
+                <span title="Cijfer van de klant voor deze workout" style={{ flexShrink: 0, fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: cijfer[dag.k] >= 7 ? GROEN : cijfer[dag.k] >= 5 ? '#f59e0b' : '#ef4444' }}>{cijfer[dag.k]}/10</span>
+              )}
             </span>
             <ChevronRight size={15} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, transform: dicht ? 'none' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
           </button>
@@ -558,6 +637,17 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
           ))}
         </span>
       </div>
+      {/* Waar je naar wil kijken op deze dag. */}
+      {signalen[dag.k]?.length > 0 && (
+        <div style={{ margin: '2px 0 4px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {signalen[dag.k].map((x, n) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: '0.74rem', fontWeight: 800, color: x.erg ? '#ef4444' : '#f59e0b', lineHeight: 1.35 }}>
+              <AlertTriangle size={11} strokeWidth={2.8} style={{ flexShrink: 0, alignSelf: 'center' }} />
+              <span style={{ minWidth: 0 }}>{x.tekst}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {statOpen && (
         <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, textAlign: 'right' }}>
           {statOpen.uitleg}
@@ -626,6 +716,51 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
             </div>
           </div>
         </div>, document.body)}
+      {/* Kalender: kies een dag in welke maand dan ook; de week van die dag komt in beeld. */}
+      {kalender && createPortal((() => {
+        const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+        const eerste = new Date(kalender.jaar, kalender.maand, 1)
+        const leeg = (eerste.getDay() + 6) % 7
+        const dagen = new Date(kalender.jaar, kalender.maand + 1, 0).getDate()
+        const cellen = [...Array(leeg).fill(null), ...Array.from({ length: dagen }, (_, n) => n + 1)]
+        const verzet = (n) => setKalender(k => { const d = new Date(k.jaar, k.maand + n, 1); return { ...k, jaar: d.getFullYear(), maand: d.getMonth() } })
+        const B = 252
+        const knop = { width: 30, height: 30, padding: 0, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        return (
+          <>
+            <div onClick={() => setKalender(null)} style={{ position: 'fixed', inset: 0, zIndex: 12500 }} />
+            <div role="dialog" aria-label="Kalender" style={{ position: 'fixed', left: Math.max(8, Math.min(kalender.x, window.innerWidth - B - 8)), top: kalender.y, width: B, zIndex: 12501, padding: 10, borderRadius: 14, background: '#111', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 18px 40px rgba(0,0,0,0.6)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                <button onClick={() => verzet(-1)} aria-label="Vorige maand" style={knop}><ChevronLeft size={16} strokeWidth={3} /></button>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: '0.84rem', fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>{MAANDEN[kalender.maand]} {kalender.jaar}</div>
+                <button onClick={() => verzet(1)} aria-label="Volgende maand" style={knop}><ChevronRight size={16} strokeWidth={3} /></button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                {DAG_NL.map(d => <div key={d} style={{ fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', textAlign: 'center', textTransform: 'uppercase', padding: '2px 0' }}>{d}</div>)}
+                {cellen.map((d, n) => {
+                  if (!d) return <div key={`l${n}`} />
+                  const datum = new Date(kalender.jaar, kalender.maand, d)
+                  const k = sleutel(datum)
+                  const inWeek = k >= weekSleutel && k <= sleutel(plusDagen(maandag, 6))
+                  const aan = k === gekozenSleutel
+                  return (
+                    <button key={k} onClick={() => { setGekozen(datum); setKalender(null) }} style={{
+                      height: 30, padding: 0, borderRadius: 8, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                      background: aan ? '#fff' : inWeek ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      color: aan ? '#000' : '#fff',
+                      border: k === vandaagSleutel && !aan ? '1px solid rgba(255,255,255,0.6)' : '1px solid transparent',
+                    }}>{d}</button>
+                  )
+                })}
+              </div>
+              <button onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setGekozen(d); setKalender(null) }}
+                style={{ marginTop: 8, width: '100%', height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}>
+                Vandaag
+              </button>
+            </div>
+          </>
+        )
+      })(), document.body)}
     </div>
   )
 }

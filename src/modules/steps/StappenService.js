@@ -137,6 +137,8 @@ const StappenService = {
     const { error } = await db.supabase
       .from('clients').update({ step_goal: waarde }).eq('id', clientId)
     if (error) throw error
+    // Schermen die het doel al toonden (trainingsweek in Coach Inzicht) nemen het meteen over.
+    try { window.dispatchEvent(new CustomEvent('myarc:stappendoel', { detail: { clientId, doel: waarde } })) } catch { /* geen venster */ }
     return true
   },
 }

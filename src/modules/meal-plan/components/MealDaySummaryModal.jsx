@@ -220,17 +220,22 @@ export default function MealDaySummaryModal({
     try { localStorage.setItem('ci_voeding_gelogd_dicht', d ? '0' : '1') } catch { /* privévenster */ }
     return !d
   })
-  const openInfo = async (m) => {
-    if (info?.id === m.id) { setInfo(null); return }
-    setInfo({ id: m.id, ingredienten: null, bron: null })
-    let lijst = Array.isArray(m.ingredients) && m.ingredients.length ? m.ingredients : null
-    let bron = lijst ? 'log' : null
-    if (!lijst && m.meal_id) {
-      const r = await db.supabase.from('ai_meals').select('ingredients_list').eq('id', m.meal_id).maybeSingle().then(x => x, () => ({ data: null }))
+  // planId: een geplande maaltijd (uit het plan) heeft geen log-id; dan is dit de sleutel
+  // en zoeken we het recept op het id van de maaltijd zelf.
+  const openInfo = async (m, planId = null) => {
+    const id = planId || m.id
+    if (info?.id === id) { setInfo(null); return }
+    setInfo({ id, ingredienten: null, bron: null })
+    const eigen = [m.ingredients, m.ingredients_list].find(l => Array.isArray(l) && l.length)
+    let lijst = eigen || null
+    let bron = lijst ? (planId ? 'plan' : 'log') : null
+    const receptId = m.meal_id || (planId ? m.id : null)
+    if (!lijst && receptId) {
+      const r = await db.supabase.from('ai_meals').select('ingredients_list').eq('id', receptId).maybeSingle().then(x => x, () => ({ data: null }))
       if (Array.isArray(r.data?.ingredients_list) && r.data.ingredients_list.length) { lijst = r.data.ingredients_list; bron = 'recept' }
     }
-    const uit = lijst ? await schrijfIngredientenUit(db, lijst) : []
-    setInfo(nu => (nu?.id === m.id ? { id: m.id, ingredienten: uit, bron: uit.length ? bron : null } : nu))
+    const uit = lijst ? await schrijfIngredientenUit(db, lijst).then(x => x, () => []) : []
+    setInfo(nu => (nu?.id === id ? { id, ingredienten: uit, bron: uit.length ? bron : null } : nu))
   }
 
   // Gepland: per dag van de week van de gekozen dag, vanaf vandaag.
@@ -272,6 +277,49 @@ export default function MealDaySummaryModal({
   // Water per dag van de getoonde week (alleen in Coach Inzicht).
   const [water, setWater] = useState({}) // { 'YYYY-MM-DD': { ml, doel } }
   const [maandPop, setMaandPop] = useState(null) // plek van de maandknop terwijl het venster open is
+
+  // Coach Inzicht: ook zonder meegegeven plan vooruit kijken. De geplande
+  // maaltijden van vandaag en later komen uit de agenda van de klant (zelfde
+  // bron als zijn weekrooster: plan, dagwissels, tijden) plus wat hij zelf
+  // alvast klaarzette (geplande_maaltijden).
+  useEffect(() => {
+    if (!ingebed || activePlan || !isOpen || !db?.supabase || !clientId) return
+    let weg = false
+    ;(async () => {
+      const ma = vanSleutel(weekSleutel)
+      const vandaagK = sleutel(new Date())
+      const dagen = Array.from({ length: 7 }, (_, i) => plusDagen(ma, i)).filter(d => sleutel(d) >= vandaagK)
+      if (!dagen.length) return
+      const klok = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+      const [weekPlan, eigen] = await Promise.all([
+        new ClientAgendaService(db.supabase).loadWeek(clientId, ma).then(r => r, () => null),
+        db.supabase.from('geplande_maaltijden')
+          .select('id, datum, meal_type, meal_name, calories, protein, carbs, fat, image_url')
+          .eq('client_id', clientId).is('gelogd_id', null).gte('datum', sleutel(dagen[0])).lte('datum', sleutel(dagen[dagen.length - 1]))
+          .then(r => r, () => ({ data: [] })),
+      ])
+      const uit = {}
+      dagen.forEach(d => {
+        const k = sleutel(d)
+        const dagKey = DAYS_OF_WEEK[(d.getDay() + 6) % 7]
+        const uitPlan = (weekPlan?.blocksByDay?.[dagKey] || [])
+          .filter(b => b.type === 'meal' && !b.meta?.placeholder && (b.sublabel || Number(b.meta?.kcal) > 0))
+          .map(b => ({
+            name: b.sublabel || b.label || 'Maaltijd', timeSlot: b.label || '', timing: klok(b.start), slot: b.meta?.slot || null,
+            calories: Number(b.meta?.kcal) || 0, protein: Number(b.meta?.protein) || 0, carbs: Number(b.meta?.carbs) || 0, fat: Number(b.meta?.fat) || 0,
+            image_url: b.meta?.image_url || null,
+          }))
+        const zelf = (eigen?.data || []).filter(r => String(r.datum).slice(0, 10) === k).map(r => ({
+          name: r.meal_name || 'Maaltijd', timeSlot: 'Ingepland', timing: '', slot: r.meal_type || null,
+          calories: Number(r.calories) || 0, protein: Number(r.protein) || 0, carbs: Number(r.carbs) || 0, fat: Number(r.fat) || 0,
+          image_url: r.image_url || null,
+        }))
+        uit[k] = [...uitPlan, ...zelf]
+      })
+      if (!weg) setGepland(prev => ({ ...prev, ...uit }))
+    })()
+    return () => { weg = true }
+  }, [ingebed, activePlan, isOpen, db, clientId, weekSleutel])
 
   // Gecombineerde week: per dag kcal, eiwit en water naar de kaart Training.
   const meldWeek = gedeeld?.meldWeek
@@ -528,11 +576,13 @@ export default function MealDaySummaryModal({
                   <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Voor deze dag staat niets in je plan.</div>
                 ) : gekozenGepland.map((m, i) => {
                   const naam = m.name || m.meal_name || 'Maaltijd'
+                  const planId = `plan-${gekozenSleutel}-${m.slot}-${i}`
                   return (
-                    <button key={`${m.slot}-${i}`} onClick={onWisselMaaltijd ? () => { onWisselMaaltijd(gekozen, m); onClose?.() } : undefined} style={{
+                    <div key={`${m.slot}-${i}`}>
+                    <button onClick={onWisselMaaltijd ? () => { onWisselMaaltijd(gekozen, m); onClose?.() } : ingebed ? () => openInfo(m, planId) : undefined} aria-expanded={ingebed ? info?.id === planId : undefined} style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0',
                       background: 'none', border: 'none', borderTop: i ? `1px solid ${LIJN}` : 'none', textAlign: 'left',
-                      fontFamily: 'inherit', cursor: onWisselMaaltijd ? 'pointer' : 'default',
+                      fontFamily: 'inherit', cursor: onWisselMaaltijd || ingebed ? 'pointer' : 'default',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}>
                       <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${resolveFoodImage({ ...m, name: naam }, { size: 120 })})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
@@ -547,7 +597,35 @@ export default function MealDaySummaryModal({
                         <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{fmt(m.protein)}g eiwit</span>
                       </span>
                       {onWisselMaaltijd && <RefreshCw size={15} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0 }} />}
+                      {ingebed && <Info size={16} strokeWidth={2.4} color={info?.id === planId ? '#fff' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />}
                     </button>
+                    {/* Coach Inzicht: het i-tje klapt de macro's en ingrediënten van de geplande maaltijd uit. */}
+                    {ingebed && info?.id === planId && (
+                      <div style={{ padding: '0 0 0.6rem 52px' }}>
+                        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>
+                          {fmt(m.calories)} kcal · {fmt(m.protein)} E · {fmt(m.carbs)} K · {fmt(m.fat)} V
+                        </div>
+                        {info.ingredienten === null ? (
+                          <div style={{ marginTop: 6, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Laden…</div>
+                        ) : info.ingredienten.length === 0 ? (
+                          <div style={{ marginTop: 6, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Bij deze maaltijd staan geen ingrediënten.</div>
+                        ) : (
+                          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {info.bron === 'recept' && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Volgens het recept</div>}
+                            {info.ingredienten.map((x, n) => (
+                              <div key={`${x.name}-${n}`} style={{ display: 'flex', gap: 8, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</span>
+                                <span style={{ flexShrink: 0, fontWeight: 900, color: '#fff' }}>{fmt(x.amount)}{eenheidKort(x.unit)}</span>
+                                <span style={{ flexShrink: 0, width: 62, textAlign: 'right' }}>{fmt(x.calories)} kcal</span>
+                                <span style={{ flexShrink: 0, width: 44, textAlign: 'right' }}>{fmt(x.protein)} E</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(m.notes || m.coach_note) && <div style={{ marginTop: 6, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>{m.notes || m.coach_note}</div>}
+                      </div>
+                    )}
+                    </div>
                   )
                 })}
               </>)}

@@ -11,6 +11,7 @@ import StappenInsight from './StappenInsight'
 import TrainingWeekInzicht from './TrainingWeekInzicht'
 import { leesFeedbackVanDag, GEVOEL, spierWoord } from '../../../workout/bouwfase/bouwfaseData'
 import { rirLabel, POMP, WERKDRUK, spierpijnVan } from '../../../workout/bouwfase/rir'
+import { spierVan } from '../../../manual-workout-builder/spierGroepen'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
@@ -181,6 +182,17 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [selectedExercise, setSelectedExercise] = useState(null)
   const [swappedExercises, setSwappedExercises] = useState([])
   const [krachtOpen, setKrachtOpen] = useState(false)
+  // Spiergroep per oefening uit het plan, om herstelantwoorden bij de juiste kaart te zetten.
+  const spierPerOefening = useMemo(() => {
+    const uit = {}
+    Object.values(workoutData?.schema?.week_structure || {}).forEach(dag => {
+      (Array.isArray(dag?.exercises) ? dag.exercises : []).forEach(e => {
+        const g = e?.name ? spierVan(e) : null
+        if (g && g !== 'onbekend') uit[String(e.name).trim().toLowerCase()] = g
+      })
+    })
+    return uit
+  }, [workoutData?.schema?.week_structure])
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'stappen' |
   // 'bouwfase' | 'cardio' | 'aangepast' | null. In beeld blijven de week en de sessies.
   const [venster, setVenster] = useState(null)
@@ -479,6 +491,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
               return (
                 <SessieOefeningen ingebed db={db} isMobile={isMobile} selectedSession={sessie} exs={lijst}
                   historie={(naam) => exerciseProgress[naam] || []}
+                  spierVanNaam={(naam) => spierPerOefening[String(naam || '').trim().toLowerCase()] || null}
                   onBack={() => {}}
                   onKies={(naam) => { setSelectedSession(sessie); setSelectedExercise(naam); setView('progress') }} />
               )
@@ -632,7 +645,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
 // scrollvlak (voor de kaart Training in Coach Inzicht).
 // `historie(naam)`: eerdere sessies van die oefening; dan staat in de kaart een
 // kleine tabel met de sets per datum in plaats van alleen deze sessie.
-function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, ingebed = false, historie = null }) {
+function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, ingebed = false, historie = null, spierVanNaam = null }) {
   // De herstel- en gevoelsvragen van die dag (training_feedback), alleen in de
   // ingebedde kaarten: per oefening onder de titel, per spiergroep erboven.
   const [feedback, setFeedback] = useState(null)
@@ -644,6 +657,29 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
     leesFeedbackVanDag(db.supabase, fbKlant, fbDag).then(f => { if (!weg) setFeedback(f) }, () => {})
     return () => { weg = true }
   }, [ingebed, db, fbKlant, fbDag])
+  // Bij welke spiergroep hoort een oefening: wat de klant erbij invulde, anders het plan.
+  const groepVan = (ex) => feedback?.oefening?.[String(ex?.name || '').trim().toLowerCase()]?.spiergroep || spierVanNaam?.(ex?.name) || null
+  const herstelGroepen = feedback ? [...new Set([...Object.keys(feedback.herstel || {}), ...Object.keys(feedback.spier || {})])] : []
+  // Eén regel voor een spiergroep: herstel (spierpijn), pomp en werkdruk.
+  const herstelRegel = (g) => {
+    const KORT = ['geen spierpijn', 'spierpijn al weg', 'spierpijn net op tijd weg', 'nog spierpijn']
+    const KLEUR = ['#10b981', '#10b981', '#f59e0b', '#ef4444']
+    const sp = spierpijnVan(feedback?.herstel?.[g])
+    const sr = feedback?.spier?.[g]
+    const pomp = POMP.find(x => x.id === sr?.pomp)?.label
+    const druk = WERKDRUK.find(x => x.id === sr?.werkdruk)
+    const opm = feedback?.herstel?.[g]?.opmerking || sr?.opmerking
+    const naam = spierWoord(g) || g
+    return (
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.35 }}>
+        <b style={{ color: '#fff', fontWeight: 900 }}>{naam.charAt(0).toUpperCase() + naam.slice(1)}</b>
+        {sp != null && <span style={{ fontWeight: 900, color: KLEUR[sp] }}> · {KORT[sp]}</span>}
+        {pomp && <span> · pomp {pomp.toLowerCase()}</span>}
+        {druk && <span style={{ color: druk.id >= 3 ? '#ef4444' : undefined }}> · werkdruk {druk.label.toLowerCase()}</span>}
+        {opm && <span style={{ fontStyle: 'italic' }}> · {opm}</span>}
+      </span>
+    )
+  }
   const fotoVan = useOefeningFotos(db, exs.map(e => e.name).filter(Boolean))
   const photoSize = isMobile ? 62 : 72
   const duur = useSessieDuur(db, selectedSession)
@@ -721,39 +757,17 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
         )}
 
         <div style={ingebed ? {} : { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
-          {/* Herstel per spiergroep en het cijfer van de workout, één regel per antwoord. */}
+          {/* Herstel per spiergroep hoort bij de eerste oefening van die spiergroep
+              (zie de kaart). Hier alleen wat bij geen oefening past, en de
+              toelichting op de workout; het cijfer staat in de kopregel. */}
           {ingebed && feedback && (() => {
-            const SPIERPIJN_KORT = ['geen spierpijn', 'spierpijn al weg', 'spierpijn net op tijd weg', 'nog spierpijn']
-            const SPIERPIJN_KLEUR = ['#10b981', '#10b981', '#f59e0b', '#ef4444']
-            const groepen = [...new Set([...Object.keys(feedback.herstel || {}), ...Object.keys(feedback.spier || {})])]
+            const rest = herstelGroepen.filter(g => !exs.some(e => groepVan(e) === g))
             const w = feedback.workout
-            if (!groepen.length && !w) return null
-            const hoofd = (x) => x.charAt(0).toUpperCase() + x.slice(1)
+            if (!rest.length && !w?.opmerking) return null
             return (
-              <div style={{ margin: '0 0 0.5rem', display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
-                {w && (w.score != null || w.opmerking) && (
-                  <div>
-                    <b style={{ color: '#fff', fontWeight: 900 }}>Workout</b>
-                    {w.score != null && <span style={{ fontWeight: 900, color: w.score >= 7 ? '#10b981' : w.score >= 5 ? '#f59e0b' : '#ef4444' }}> {w.score}/10</span>}
-                    {w.opmerking && <span style={{ fontStyle: 'italic' }}> · {w.opmerking}</span>}
-                  </div>
-                )}
-                {groepen.map(g => {
-                  const sp = spierpijnVan(feedback.herstel?.[g])
-                  const sr = feedback.spier?.[g]
-                  const pomp = POMP.find(x => x.id === sr?.pomp)?.label
-                  const druk = WERKDRUK.find(x => x.id === sr?.werkdruk)
-                  const opm = feedback.herstel?.[g]?.opmerking || sr?.opmerking
-                  return (
-                    <div key={g}>
-                      <b style={{ color: '#fff', fontWeight: 900 }}>{hoofd(spierWoord(g) || g)}</b>
-                      {sp != null && <span style={{ fontWeight: 900, color: SPIERPIJN_KLEUR[sp] }}> · {SPIERPIJN_KORT[sp]}</span>}
-                      {pomp && <span> · pomp {pomp.toLowerCase()}</span>}
-                      {druk && <span style={{ color: druk.id >= 3 ? '#ef4444' : undefined }}> · werkdruk {druk.label.toLowerCase()}</span>}
-                      {opm && <span style={{ fontStyle: 'italic' }}> · {opm}</span>}
-                    </div>
-                  )
-                })}
+              <div style={{ margin: '0 0 0.5rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {w?.opmerking && <div style={{ fontSize: '0.74rem', fontWeight: 700, fontStyle: 'italic', color: 'rgba(255,255,255,0.7)' }}>{w.opmerking}</div>}
+                {rest.map(g => <div key={g}>{herstelRegel(g)}</div>)}
               </div>
             )
           })()}
@@ -782,6 +796,12 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies, 
                     </span>
                   )}
                 </div>
+                {/* Herstel van de spiergroep: bij de eerste oefening van die groep. */}
+                {ingebed && (() => {
+                  const g = groepVan(ex)
+                  if (!g || !herstelGroepen.includes(g) || exs.findIndex(e => groepVan(e) === g) !== idx) return null
+                  return <div style={{ marginTop: 2 }}>{herstelRegel(g)}</div>
+                })()}
                 {/* Wat de klant na deze oefening invulde: cijfer, uitvoering, herhalingen over, pomp. */}
                 {ingebed && (() => {
                   const f = feedback?.oefening?.[String(ex.name || '').trim().toLowerCase()]
