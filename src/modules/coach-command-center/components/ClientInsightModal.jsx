@@ -186,7 +186,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     const inStapel = gestapeld.flat(2).filter(isOpen).length
     return openSecties.length - inStapel + gestapeld.length
   })()
-  const middenBreedte = aantalKolommen > 1 ? 1500 : 980
+  // De gecombineerde week (Training + Voeding open) krijgt de volle breedte.
+  const middenBreedte = !isMobile && openSecties.includes('workout') && openSecties.includes('meals') ? 1900 : aantalKolommen > 1 ? 1500 : 980
+  // Staan alle vier de vaste vakken open, dan is de onderste rij ongelijk verdeeld:
+  // Gewicht breed (met de progressiefoto's ernaast), Logboek smaller (17 nov 2026).
+  const breedGewicht = STAPELS.every(st => st.every(vak => vak.some(id => openSecties.includes(id)))) && openSecties.every(id => STAPELS.flat(2).includes(id))
 
   // Het huidige gewicht stond als eerste cel in de cijferregel. Die regel is nu
   // dicht, en dit getal wil je bij de naam zien — het is wie je voor je hebt,
@@ -213,12 +217,16 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Eén definitie per sectie voor desktop én mobiel. Stond eerder twee keer
   // in het bestand (één blok per weergave), waardoor een prop-wijziging in de
   // ene helft stilletjes langs de andere ging.
-  const renderSectie = (id, klein) => {
+  // `extra`: bij 'workout' de voeding voor de gecombineerde week (functie),
+  // bij 'meals' de gedeelde week ({ gekozen, setGekozen, meldWeek }).
+  const renderSectie = (id, klein, extra = null) => {
     if (id === 'weight') return (
       <WeightColumn
         client={effectiveClient} weightData={weightData} circumData={circumData}
         photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={klein}
         onOpenGallery={() => setShowGallery(true)}
+        onOpenFoto={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
+        fotosNaast={breedGewicht && !klein}
         db={db} onClientUpdate={handleClientUpdate}
       />
     )
@@ -227,6 +235,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
         isMobile={klein} onNavigateWorkout={onNavigateWorkout}
         client={effectiveClient} onClose={onClose}
+        voeding={extra}
       />
     )
     if (id === 'meals') return (
@@ -234,6 +243,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         client={effectiveClient} mealData={mealData} isMobile={klein}
         onNavigatePlan={onNavigatePlan} onClose={onClose}
         db={db} coachId={coachId}
+        gedeeld={extra}
         onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
       />
     )
@@ -560,6 +570,45 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   if (sec.id !== st[0].find(isOpen)) return
                   kolommen.push(st.map(vak => vak.filter(isOpen).map(id => SECTIES.find(x => x.id === id))))
                 })
+                const kaart = (sec, groei = 1) => (
+                  <div key={sec.id} style={{ flex: `${groei} 1 0`, minWidth: 0, overflow: 'hidden', ...VAK_KAART }}>
+                    <KolomKop icon={sec.icon} titel={sec.label} zonderBalk={sec.id === 'meals'}
+                      onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                      {renderSectie(sec.id, false)}
+                    </KolomKop>
+                  </div>
+                )
+                // Training en Voeding samen = één brede kaart 'Week' bovenaan
+                // (17 nov 2026, Kersten): één week, één gekozen dag, links de
+                // oefeningen en rechts wat er gelogd is. De rest eronder.
+                if (isOpen('workout') && isOpen('meals')) {
+                  const rest = open.filter(sec => sec.id !== 'workout' && sec.id !== 'meals')
+                  const weekSec = SECTIES.find(x => x.id === 'workout')
+                  return (
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: VAK_RUIMTE }}>
+                      <div style={{ flex: rest.length ? '1.6 1 0' : '1 1 0', minHeight: 0, overflow: 'hidden', ...VAK_KAART }}>
+                        <KolomKop icon={weekSec.icon} titel="Week" onVerberg={null}>
+                          {renderSectie('workout', false, (gedeeld) => renderSectie('meals', false, gedeeld))}
+                        </KolomKop>
+                      </div>
+                      {rest.length > 0 && (
+                        <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', gap: VAK_RUIMTE }}>
+                          {rest.map(sec => kaart(sec, sec.id === 'weight' ? 1.9 : 1))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                // Vier vaste vakken: twee rijen, zodat de onderste rij een eigen verdeling krijgt.
+                if (breedGewicht && kolommen.length === 2) return (
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: VAK_RUIMTE }}>
+                    {[0, 1].map(rij => (
+                      <div key={rij} style={{ flex: '1 1 0', minHeight: 0, display: 'flex', gap: VAK_RUIMTE }}>
+                        {kolommen.map(kolom => kolom[rij]).flat().map(sec => kaart(sec, rij === 1 && sec.id === 'weight' ? 1.9 : 1))}
+                      </div>
+                    ))}
+                  </div>
+                )
                 return kolommen.map((kolom) => (
                   <div key={kolom[0][0].id} style={{
                     flex: '1 1 0',

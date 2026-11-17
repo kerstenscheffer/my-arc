@@ -101,6 +101,10 @@ export default function MealDaySummaryModal({
   ingebed = false,
   // Waterdoel in liters (alleen ingebed): de strook rechts in elke dagstaaf.
   waterDoelL = 3,
+  // Gecombineerde week in Coach Inzicht: de kaart Training toont de week en
+  // kiest de dag; dit onderdeel toont dan alleen de dag zelf en meldt de
+  // weekcijfers terug. { gekozen, setGekozen, meldWeek }
+  gedeeld = null,
   // Klik op het waterbalkje (alleen ingebed): de coach opent het venster met het doel.
   onWaterKlik = null,
   // Plan openen (alleen ingebed): knop rechts in de dagenregel, de kaart heeft geen eigen kop meer.
@@ -121,7 +125,8 @@ export default function MealDaySummaryModal({
     return plusDagen(maandagVan(vandaag), idx)
   }, [selectedDay])
 
-  const [gekozen, setGekozen] = useState(startDatum)
+  const [gekozenEigen, setGekozen] = useState(startDatum)
+  const gekozen = gedeeld?.gekozen || gekozenEigen
   const [maand, setMaand] = useState(() => ({ y: startDatum.getFullYear(), m: startDatum.getMonth() }))
   const [perDag, setPerDag] = useState(null) // { 'YYYY-MM-DD': [maaltijden] }
 
@@ -265,6 +270,40 @@ export default function MealDaySummaryModal({
   // Water per dag van de getoonde week (alleen in Coach Inzicht).
   const [water, setWater] = useState({}) // { 'YYYY-MM-DD': { ml, doel } }
   const [maandPop, setMaandPop] = useState(null) // plek van de maandknop terwijl het venster open is
+
+  // Gecombineerde week: per dag kcal, eiwit en water naar de kaart Training.
+  const meldWeek = gedeeld?.meldWeek
+  const doelKcalMeld = Number(targets.calories) || 0
+  const doelEiwitMeld = Number(targets.protein) || 0
+  useEffect(() => {
+    if (!meldWeek || perDag === null) return
+    const ma = vanSleutel(weekSleutel)
+    const tel = (lijst, veld) => (lijst || []).reduce((t, m) => t + (parseFloat(m[veld]) || 0), 0)
+    const dagen = {}
+    for (let i = 0; i < 7; i++) {
+      const k = sleutel(plusDagen(ma, i))
+      const lijst = perDag[k] || []
+      const wt = water[k] || null
+      dagen[k] = {
+        kcal: tel(lijst, 'calories'), eiwit: tel(lijst, 'protein'), gelogd: lijst.length > 0,
+        planKcal: tel(gepland[k], 'calories'), planEiwit: tel(gepland[k], 'protein'),
+        waterMl: wt?.ml || 0, waterDoel: (wt?.doel || 0) > 0 ? wt.doel : Math.round((Number(waterDoelL) || 3) * 1000),
+        // Voor het agendaatje in de tegel: de maaltijden op tijd. Gelogd, en
+        // voor een dag zonder logs wat er gepland staat.
+        items: lijst.length > 0
+          ? lijst.map(m => {
+            const t = m.consumed_at ? new Date(m.consumed_at) : null
+            return { id: m.id, naam: m.meal_name || 'Maaltijd', min: t ? t.getHours() * 60 + t.getMinutes() : null, kcal: Number(m.calories) || 0, gelogd: true, foto: m.image_url || foodImageFallback(m.meal_name || 'Maaltijd', m.meal_type, 80) }
+          })
+          : (gepland[k] || []).map((m, n) => {
+            const naam = m.name || m.meal_name || 'Maaltijd'
+            const [u, mi] = String(m.timing || '').split(':').map(Number)
+            return { id: `plan-${n}`, naam, min: Number.isFinite(u) ? u * 60 + (mi || 0) : null, kcal: Number(m.calories) || 0, gelogd: false, foto: resolveFoodImage({ ...m, name: naam }, { size: 80 }) }
+          }),
+      }
+    }
+    meldWeek({ dagen, doel: { kcal: doelKcalMeld, eiwit: doelEiwitMeld } })
+  }, [meldWeek, perDag, gepland, water, weekSleutel, doelKcalMeld, doelEiwitMeld, waterDoelL])
   useEffect(() => {
     if (!ingebed || !isOpen || !db?.supabase || !clientId) return
     let weg = false
@@ -341,7 +380,7 @@ export default function MealDaySummaryModal({
   // kun je er direct naartoe.
   const dezeWeek = maandagVan(new Date())
   const inDezeWeek = gekozen >= dezeWeek && gekozen <= plusDagen(dezeWeek, 6)
-  const kies = (d) => { setGekozen(d); if (d.getMonth() !== maand.m || d.getFullYear() !== maand.y) setMaand({ y: d.getFullYear(), m: d.getMonth() }) }
+  const kies = (d) => { if (gedeeld?.setGekozen) gedeeld.setGekozen(d); else setGekozen(d); if (d.getMonth() !== maand.m || d.getFullYear() !== maand.y) setMaand({ y: d.getFullYear(), m: d.getMonth() }) }
 
   const pijl = {
     width: 34, height: 34, padding: 0, background: 'transparent', border: 'none', color: '#fff',
@@ -659,7 +698,7 @@ export default function MealDaySummaryModal({
   const inhoud = (
     <div
       onClick={zwevend || ingebed ? undefined : onClose}
-      style={ingebed ? { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 } : zwevend ? { position: 'fixed', inset: 0, zIndex: 2147482000, pointerEvents: 'none' } : {
+      style={gedeeld ? {} : ingebed ? { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 } : zwevend ? { position: 'fixed', inset: 0, zIndex: 2147482000, pointerEvents: 'none' } : {
         position: 'fixed', inset: 0, zIndex: 2147482000,
         background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
@@ -668,7 +707,7 @@ export default function MealDaySummaryModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={ingebed ? {
+        style={gedeeld ? {} : ingebed ? {
           flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         } : zwevend ? {
           ...venster.vensterStijl, zIndex: 2147482000, pointerEvents: 'auto',
@@ -700,7 +739,7 @@ export default function MealDaySummaryModal({
         </div>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: ingebed ? (isMobile ? '0.4rem 1rem 1rem' : '0.4rem 1.25rem 1rem') : isMobile ? '1rem 1rem 1.5rem' : '1.2rem 1.25rem 1.6rem' }}>
+        <div style={gedeeld ? {} : { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: ingebed ? (isMobile ? '0.4rem 1rem 1rem' : '0.4rem 1.25rem 1rem') : isMobile ? '1rem 1rem 1.5rem' : '1.2rem 1.25rem 1.6rem' }}>
           {perDag === null ? (
             <div style={{ padding: '2.5rem 0', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Laden…</div>
           ) : (
@@ -720,8 +759,8 @@ export default function MealDaySummaryModal({
               </div>
               {/* Coach Inzicht: de dagenstrook boven de tegels, zelfde vorm als bij
                   Training: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
-              <div style={ingebed ? { position: 'sticky', top: '-0.4rem', zIndex: 5, background: '#0e0e0e', margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` } : undefined}>
-              {ingebed && (
+              <div style={ingebed && !gedeeld ? { position: 'sticky', top: '-0.4rem', zIndex: 5, background: '#0e0e0e', margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` } : undefined}>
+              {ingebed && !gedeeld && (
                 <div style={{ display: 'flex', gap: 6, margin: '0.3rem 0 5px' }}>
                   {week.map((w, i) => {
                     const aan = w.k === gekozenSleutel
@@ -758,7 +797,7 @@ export default function MealDaySummaryModal({
                   })}
                 </div>
               )}
-              <div style={{ position: 'relative', height: ingebed ? 84 : 120, display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+              <div style={{ position: 'relative', height: ingebed ? 84 : 120, display: gedeeld ? 'none' : 'flex', alignItems: 'flex-end', gap: 6 }}>
                 {doel.kcal > 0 && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doel.kcal / staafMax) * 100}%`, borderTop: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none', zIndex: 1 }} />
                 )}
@@ -826,7 +865,7 @@ export default function MealDaySummaryModal({
               </div>
               {/* Coach Inzicht: tot hier staat alles vast (dagen, tegels, cijfers, weekstats);
                   gepland en gelogd scrollen eronderdoor. */}
-              {ingebed && <div style={{ marginTop: '0.8rem' }}>{dagCijfersBlok}{dagKopBlok}</div>}
+              {ingebed && <div style={{ marginTop: gedeeld ? 0 : '0.8rem' }}>{dagCijfersBlok}{dagKopBlok}</div>}
               </div>
               {ingebed && <>{dagGeplandBlok}{dagLijstBlok}</>}
               {!ingebed && (

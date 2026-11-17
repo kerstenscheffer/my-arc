@@ -15,6 +15,8 @@ import MetingenTabel from './MetingenTabel'
 import DoelenMacrosPaneel from './DoelenMacrosPaneel'
 import SlaapInsight from './SlaapInsight'
 
+import { PRIVE_FOTO } from '../../utils/privacyModus'
+import { fotoWeergaveUrl } from '../../../progress/fotoWeergave'
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
 // Venster voor de drie dingen die niet altijd in beeld hoeven: doelen & macro's,
@@ -51,7 +53,7 @@ function Venster({ titel, icoon, breed = 520, isMobile, onSluit, children }) {
   )
 }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate, onOpenFoto = null, fotosNaast = false }) {
   const history = weightData?.history || []
   // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
   // "sinds start" telt.
@@ -117,7 +119,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <ExternalLink size={11} /> Plan
         </button>
       </KolomKopInhoud>
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {/* Fase bovenaan: die bepaalt hoe je de cijfers eronder moet lezen.
             +0,1 kg is goed nieuws in een build en slecht in een cut. */}
         <FasePaneel
@@ -196,6 +199,36 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
         {!history.length && actieveFase && !circumData?.latest && photos.length === 0 && (
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Nog geen wegingen</div>
         )}
+      </div>
+      {/* Progressiefoto's naast de grafiek (17 nov 2026, Kersten): per dag, nieuwste
+          boven. Klik = groot bekijken. Alleen in het brede vak op de computer. */}
+      {fotosNaast && !isMobile && photos.length > 0 && (() => {
+        const dagen = []
+        const opDag = new Map()
+        photos.forEach((p, idx) => {
+          const d = String(p.photo_date || p.created_at || '').slice(0, 10)
+          if (!opDag.has(d)) { opDag.set(d, []); dagen.push(d) }
+          opDag.get(d).push({ p, idx })
+        })
+        dagen.sort((a, b) => (a < b ? 1 : -1))
+        return (
+          <div style={{ width: '36%', minWidth: 220, maxWidth: 420, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.5rem 0.7rem 0.8rem' }}>
+            {dagen.map(d => (
+              <div key={d} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', margin: '0 0 5px' }}>{d ? formatDate(d) : 'Zonder datum'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 5 }}>
+                  {opDag.get(d).map(({ p, idx }) => (
+                    <button key={p.id} type="button" onClick={() => (onOpenFoto ? onOpenFoto(idx) : onOpenGallery?.())} title={p.photo_type || 'Foto'}
+                      style={{ aspectRatio: '3 / 4', padding: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer' }}>
+                      <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
       </div>
 
       {venster === 'doelen' && (

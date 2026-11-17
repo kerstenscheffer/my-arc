@@ -244,7 +244,9 @@ function bouwDagen(rijen, wissels) {
 
 const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
 
-export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db }) {
+// `gedeeld` = { gekozen, setGekozen, meldWeek }: de gecombineerde week in
+// Coach Inzicht; dan toont dit alleen de voeding van de gekozen dag.
+export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db, gedeeld = null }) {
   const [view, setView] = useState('days')
   const [selectedDay, setSelectedDay] = useState(null)
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
@@ -559,16 +561,17 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={gedeeld ? {} : { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0 }}>
           {/* Geen kop meer (17 nov 2026, Kersten): Plan staat in de dagenregel, water achter het waterbalkje. */}
 
           </div>
           {/* Het Inzicht-scherm van de klant (dag, week, maand) staat hier vast
               in de kaart; was een knop in de kop met een weekstrook eronder. */}
-          <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={gedeeld ? {} : { flex: 1, minHeight: 0 }}>
             <MealDaySummaryModal
               isOpen ingebed
+              gedeeld={gedeeld}
               waterDoelL={waterDoelL}
               onWaterKlik={() => setVenster('water')}
               onPlan={onNavigatePlan ? () => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() } : null}

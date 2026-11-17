@@ -173,7 +173,7 @@ function PlanWijzigingen({ db, client, isMobile, altijdOpen = false }) {
 }
 
 // alleenSessies: alleen de gelogde sessies (pop-up in de workout-builder).
-export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose, alleenSessies = false }) {
+export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose, alleenSessies = false, voeding = null }) {
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
@@ -449,6 +449,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           {/* Eigen coach-weergave, los van het rooster op de klantpagina. */}
           <TrainingWeekInzicht
             client={client} db={db} isMobile={isMobile}
+            voeding={voeding}
             workouts={workouts}
             naamVoorSessie={naamVoorSessie}
             tijdVan={logTijd}
