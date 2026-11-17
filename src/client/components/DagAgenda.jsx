@@ -22,7 +22,7 @@ import {
   CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
 } from 'lucide-react'
 import {
-  ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
+  ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor,
 } from '../../modules/client-agenda/ClientAgendaService'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { workoutFoto } from './workoutFoto'
@@ -372,6 +372,8 @@ export default function DagAgenda({
     onLog: () => setWegenBlad(true),
   } : null)
   const minNaarTijd = (m) => (Number.isFinite(m) ? `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` : null)
+  // De pauze van de getoonde dag (eigen blok 'Pauze'), als die er is.
+  const bestaandePauze = blokken.find(x => x.type === 'custom' && /^pauze$/i.test(String(x.label || '').trim())) || null
   const slaapVan = (b) => {
     if (b.type !== 'sleep' || !slaapDagIso) return null
     const nacht = b.meta?.wrapHalf === 'late' ? morgenIso : slaapDagIso
@@ -419,6 +421,26 @@ export default function DagAgenda({
   const [losseLogs, setLosseLogs] = useState([])     // gelogd buiten het plan om, als blokken
   const [dagStappen, setDagStappen] = useState(null) // { steps, doel }
   const [dagWater, setDagWater] = useState(null)     // { ml, doel }
+  // Na het slepen van een blok in de agendaweergave: alleen vandaag of altijd?
+  const [verzetVraag, setVerzetVraag] = useState(null) // { blok, start }
+  const [verzetBezig, setVerzetBezig] = useState(false)
+  const [verzetFout, setVerzetFout] = useState(null)
+  const voerVerzetUit = async (altijd) => {
+    if (!verzetVraag || !dagIso) return
+    const { blok, start } = verzetVraag
+    const duur = Math.max(5, (blok.end || 0) - (blok.start || 0))
+    setVerzetBezig(true); setVerzetFout(null)
+    try {
+      if (altijd) await service.shiftBlock({ block: { ...blok, clientId: client.id }, newStartMin: start, mealPlanId: data?.mealPlan?.id || null })
+      else await service.upsertOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(blok), startMin: start, endMin: Math.min(24 * 60, start + duur) })
+      setVerzetVraag(null)
+      setVersie(v => v + 1)
+    } catch (e) {
+      console.error('Blok verzetten mislukt:', e)
+      setVerzetFout(e?.message || 'Verzetten lukte niet.')
+    }
+    setVerzetBezig(false)
+  }
   // Water bijtikken vanuit de agenda: 100 ml per tik, met een korte adempauze
   // zodat vijf tikken één rij worden (zelfde opslag als de fles op de maaltijdpagina).
   const waterTimer = useRef(null)
@@ -959,6 +981,8 @@ export default function DagAgenda({
               water={dagWater}
               dagSleutel={dagIso}
               onWater={dagIso && dagIso <= toIsoDate(nu) ? waterErbij : null}
+              onVoeding={onOpen ? () => onOpen({ type: 'meal', day: dag }) : null}
+              onVerzet={(b, start) => setVerzetVraag({ blok: b, start })}
               onSlaap={() => {
                 // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
                 const b = blokken.find(x => x.type === 'sleep' && x.meta?.wrapHalf !== 'late')
@@ -991,6 +1015,27 @@ export default function DagAgenda({
         onGewicht={(r) => { if (r?.datum === slaapDagIso) setGewogenOp(r.gewicht) }}
       />
 
+      {/* Na het slepen: alleen vandaag of altijd? */}
+      {verzetVraag && createPortal(
+        <div onClick={() => { if (!verzetBezig) setVerzetVraag(null) }} style={{ position: 'fixed', inset: 0, zIndex: 2147483100, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>
+          <div role="dialog" aria-label="Verzetten" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, padding: isMobile ? '1.1rem 1rem calc(1.1rem + env(safe-area-inset-bottom, 0px))' : '1.2rem', borderRadius: isMobile ? '20px 20px 0 0' : 20, background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              {verzetVraag.blok.sublabel || verzetVraag.blok.label || 'Blok'} naar {minNaarTijd(verzetVraag.start)}
+            </div>
+            <div style={{ margin: '4px 0 14px', fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+              Was {minNaarTijd(verzetVraag.blok.start)}. Geldt dit alleen vandaag of altijd?
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => voerVerzetUit(false)} disabled={verzetBezig} style={{ flex: 1, minHeight: 52, borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff', fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer', opacity: verzetBezig ? 0.6 : 1, touchAction: 'manipulation' }}>Alleen deze dag</button>
+              <button onClick={() => voerVerzetUit(true)} disabled={verzetBezig} style={{ flex: 1, minHeight: 52, borderRadius: 14, background: '#fff', border: '1px solid #fff', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer', opacity: verzetBezig ? 0.6 : 1, touchAction: 'manipulation' }}>Altijd</button>
+            </div>
+            <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Altijd = elke {DAY_LABELS_NL_LONG[verzetVraag.blok.day]?.toLowerCase() || 'week'}, ook de weken hierna.</div>
+            {verzetFout && <div style={{ marginTop: 8, fontSize: '0.76rem', fontWeight: 800, color: '#ef4444' }}>{verzetFout}</div>}
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Tijd verzetten: dezelfde sheet vanuit de lijst en vanuit het rooster. */}
       {bewerk && dagIso && (
         <BlokTijdSheet
@@ -1016,20 +1061,26 @@ export default function DagAgenda({
                 .filter(x => x.type === 'sleep' && (x.meta?.wrapHalf || null) === (bewerk.meta?.wrapHalf || null))
                 .slice(0, 1))
               : []}
-          // Werk zonder pauze op deze dag: knop om er een toe te voegen. Die opent
-          // dit venster opnieuw, nu voor een nieuwe pauze midden in de werktijd.
-          onPauze={bewerk?.type === 'work' && !blokken.some(x => x.type === 'custom' && /^pauze$/i.test(String(x.label || '').trim()))
+          // Werk: de pauze hoort op dezelfde plek. Staat er nog geen, dan voeg je
+          // hem toe; staat hij er al, dan pas je hem hier aan. In beide gevallen
+          // gaan de werktijden die je net draaide mee.
+          pauzeTekst={bestaandePauze ? `Pauze aanpassen · ${minNaarTijd(bestaandePauze.start)} – ${minNaarTijd(bestaandePauze.end)}` : 'Pauze toevoegen'}
+          onPauze={bewerk?.type === 'work'
             ? (nieuw) => {
               const werk = bewerk
-              // De tijden die in het werkvenster al gedraaid waren gaan mee naar de pauze.
               const van = nieuw?.gewijzigd ? nieuw.start : werk.start
               const tot = nieuw?.gewijzigd ? nieuw.end : werk.end
+              const andere = Object.entries(data?.blocksByDay || {}).flatMap(([d, lijst]) => d === werk.day ? [] : (lijst || [])
+                .filter(x => x.type === 'work' && (x.label || '') === (werk.label || '')).slice(0, 1))
+              const werkWijziging = nieuw?.gewijzigd ? { blok: werk, start: van, end: tot, andere } : null
+              const p = bestaandePauze
+              setBewerk(null)
+              if (p) { setTimeout(() => setBewerk({ ...p, meta: { ...(p.meta || {}), werkWijziging } }), 0); return }
               const midden = Math.round(((van + tot) / 2) / 5) * 5
               const start = Math.max(van, Math.min(tot - 30, midden - 15))
-              setBewerk(null)
               setTimeout(() => setBewerk({
                 id: 'nieuwe-pauze', day: werk.day, type: 'custom', label: 'Pauze', start, end: start + 30, editable: true,
-                meta: { nieuw: true, werkLabel: werk.label || '', werkWijziging: nieuw?.gewijzigd ? { blok: werk, start: van, end: tot } : null },
+                meta: { nieuw: true, werkLabel: werk.label || '', werkWijziging },
               }), 0)
             }
             : null}

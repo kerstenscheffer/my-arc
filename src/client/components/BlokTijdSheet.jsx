@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from '../paginaPortal'
 import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check, Moon, Sun, Briefcase, Flag, Coffee } from 'lucide-react'
-import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
+import { recurringIdFor, DAY_LABELS_NL_LONG, DAY_LABELS_NL, DAYS } from '../../modules/client-agenda/ClientAgendaService'
 import TijdWiel from './TijdWiel'
 import { STAP, tijdTekst as tijd } from './tijdHelpers'
 
@@ -37,6 +37,7 @@ export default function BlokTijdSheet({
   zelfdeOpAndereDagen = [],
   // Werk: knop om een pauze toe te voegen (de ouder opent daarna dit venster voor de pauze).
   onPauze = null,
+  pauzeTekst = 'Pauze toevoegen',
 }) {
   const duurVan = (b) => {
     const d = b.end >= b.start ? b.end - b.start : (24 * 60 - b.start) + b.end
@@ -58,6 +59,8 @@ export default function BlokTijdSheet({
   const [start, setStart] = useState(() => Math.round(blok.start / STAP) * STAP)
   const [duur, setDuur] = useState(() => duurVan(blok))
   const [bereik, setBereik] = useState(null)    // bewust leeg: je kiest zelf
+  // 'Zelf dagen kiezen': welke weekdagen aanstaan (begint met de dag van het blok).
+  const [dagen, setDagen] = useState(() => new Set([blok.day]))
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function BlokTijdSheet({
   const recurringId = recurringIdFor(blok)
   // Een nieuwe pauze bestaat nog niet: die mag je ook op de voorgestelde tijd opslaan.
   const isNieuw = !!blok.meta?.nieuw
-  const verzet = isNieuw || (tweeTijden
+  const verzet = isNieuw || !!blok.meta?.werkWijziging || (tweeTijden
     ? (bed !== nachtStart || op !== nachtEind)
     : (blok.start !== start || duurVan(blok) !== duur))
   // Bij slaap is 'start' de bedtijd.
@@ -98,7 +101,51 @@ export default function BlokTijdSheet({
     }
   }
 
+  // Had je in het werkvenster ook je werktijden verzet voordat je naar de pauze
+  // ging? Die gaan mee, voor dezelfde dagen als de pauze.
+  const werkMee = async () => {
+    const w = blok.meta?.werkWijziging
+    if (!w?.blok) return
+    if (bereik === 'vandaag') {
+      await service.upsertOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(w.blok), startMin: w.start, endMin: w.end })
+      return
+    }
+    for (const b of (bereik === 'werkdagen' ? [w.blok, ...(w.andere || [])] : [w.blok])) {
+      await service.shiftBlock({ block: { ...b, clientId: client.id }, newStartMin: w.start, newEndMin: w.end, mealPlanId })
+    }
+  }
+
+  const klokTekst = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`
+  // Een pauze op de gekozen dagen zetten: bestaat hij daar al (vast blok
+  // 'Pauze'), dan bijwerken, anders aanmaken. Niet via de bulkroute van de
+  // agenda: die kijkt alleen naar het soort blok en zou een ander eigen blok
+  // (cardio) op die dag overschrijven.
+  const pauzeOpDagen = async (lijst) => {
+    const { data: bestaand, error } = await service.supabase.from('client_agenda_blocks')
+      .select('id, day').eq('client_id', client.id).eq('type', 'custom').ilike('label', 'pauze').is('week_start', null).in('day', lijst)
+    if (error) throw error
+    const perDag = Object.fromEntries((bestaand || []).map(r => [r.day, r.id]))
+    for (const d of lijst) {
+      const velden = { start_time: klokTekst(startOpslaan), end_time: klokTekst(eind), updated_at: new Date().toISOString() }
+      const r = perDag[d]
+        ? await service.supabase.from('client_agenda_blocks').update(velden).eq('id', perDag[d])
+        : await service.supabase.from('client_agenda_blocks').insert({ client_id: client.id, day: d, type: 'custom', label: blok.label || 'Pauze', ...velden })
+      if (r.error) throw r.error
+    }
+  }
+  const isPauze = blok.type === 'custom' && /^pauze$/i.test(String(blok.label || '').trim())
+
   const bewaar = () => doe(async () => {
+    // Zelf dagen gekozen: dezelfde tijden op elk van die weekdagen, voortaan.
+    if (bereik === 'dagen') {
+      const lijst = DAYS.filter(d => dagen.has(d))
+      if (!lijst.length) throw new Error('Kies minstens één dag')
+      if (isPauze) await pauzeOpDagen(lijst)
+      else await service.applyBulkShift({ block: { ...blok, clientId: client.id }, newStartMin: startOpslaan, newEndMin: eind, days: lijst, mealPlanId, clientId: client.id })
+      const w = blok.meta?.werkWijziging
+      if (w?.blok) await service.applyBulkShift({ block: { ...w.blok, clientId: client.id }, newStartMin: w.start, newEndMin: w.end, days: lijst, mealPlanId, clientId: client.id })
+      return
+    }
     // Nieuwe pauze: een eigen blok in de agenda. Alleen deze dag = alleen deze
     // week (week_start), anders vast op deze weekdag of op alle werkdagen.
     if (isNieuw) {
@@ -113,18 +160,7 @@ export default function BlokTijdSheet({
       const rijen = dagen.map(d => rij(d, bereik === 'vandaag' ? { week_start: maandag } : {}))
       const { error } = await service.supabase.from('client_agenda_blocks').insert(rijen)
       if (error) throw error
-      // Had je vóór 'Pauze toevoegen' ook je werktijden verzet? Die gaan mee,
-      // voor dezelfde dagen als de pauze.
-      const w = blok.meta?.werkWijziging
-      if (w?.blok) {
-        if (bereik === 'vandaag') {
-          await service.upsertOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(w.blok), startMin: w.start, endMin: w.end })
-        } else {
-          for (const b of (bereik === 'werkdagen' ? [w.blok, ...zelfdeOpAndereDagen] : [w.blok])) {
-            await service.shiftBlock({ block: { ...b, clientId: client.id }, newStartMin: w.start, newEndMin: w.end, mealPlanId })
-          }
-        }
-      }
+      await werkMee()
       return
     }
     if (bereik === 'vandaag') {
@@ -132,6 +168,7 @@ export default function BlokTijdSheet({
         clientId: client.id, dateIso: dagIso, recurringId,
         startMin: startOpslaan, endMin: eind,
       })
+      await werkMee()
       return
     }
     if (bereik === 'werkdagen') {
@@ -146,6 +183,7 @@ export default function BlokTijdSheet({
       newStartMin: startOpslaan, newEndMin: eind,
       mealPlanId,
     })
+    await werkMee()
   })
 
   const slaOver = () => doe(() => service.upsertOverride({
@@ -356,6 +394,11 @@ export default function BlokTijdSheet({
                     ? 'Zet deze slaaptijden op elke nacht, ook de weken hierna.'
                     : `Zet deze tijden op al je ${zelfdeOpAndereDagen.length + 1} werkdagen, ook de weken hierna.`,
                 }] : []),
+                // Zelf kiezen: alle zeven dagen in beeld, aantikken wat meedoet.
+                ...(blok.type !== 'supplement' && !volgtTraining ? [{
+                  id: 'dagen', titel: 'Zelf dagen kiezen',
+                  uitleg: 'Tik aan op welke dagen dit geldt, ook de weken hierna.',
+                }] : []),
               ].map(k => {
                 const aan = bereik === k.id
                 return (
@@ -398,6 +441,25 @@ export default function BlokTijdSheet({
                   </button>
                 )
               })}
+              {bereik === 'dagen' && (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {DAYS.map(d => {
+                    const aan = dagen.has(d)
+                    return (
+                      <button key={d} onClick={() => setDagen(prev => { const n = new Set(prev); if (n.has(d)) n.delete(d); else n.add(d); return n })}
+                        aria-pressed={aan}
+                        style={{
+                          flex: 1, minHeight: 44, padding: 0, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900,
+                          background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : '#fff',
+                          border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.2)'}`, cursor: 'pointer',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}>
+                        {DAY_LABELS_NL[d]}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -432,7 +494,7 @@ export default function BlokTijdSheet({
         {/* Weg voor vandaag, of terug naar wat de coach had gezet. Hoort bij de
             eerste stap: het zijn andere antwoorden op dezelfde vraag, geen
             vervolg erop. */}
-        {isNieuw && blok.meta?.werkWijziging && (
+        {blok.meta?.werkWijziging && (
           <div style={{ marginTop: 8, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
             Je nieuwe werktijden ({tijd(blok.meta.werkWijziging.start)} – {tijd(blok.meta.werkWijziging.end)}) worden meteen mee opgeslagen.
           </div>
@@ -440,7 +502,7 @@ export default function BlokTijdSheet({
         {opTijd && isWerk && onPauze && (
           <button onClick={() => onPauze({ start: bed, end: op, gewijzigd: bed !== nachtStart || op !== nachtEind })} disabled={bezig} style={{ ...stilleKnop, width: '100%', marginTop: 8 }}>
             <Coffee size={13} strokeWidth={2.8} />
-            Pauze toevoegen
+            {pauzeTekst}
           </button>
         )}
         {opTijd && !isNieuw && (

@@ -13,7 +13,7 @@
 // van DagAgenda, die de gegevens en de vensters al heeft.
 
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee } from 'lucide-react'
+import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils } from 'lucide-react'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
@@ -22,7 +22,11 @@ import { kcalKleur } from '../../modules/meal-plan/utils/kcalKleur'
 const GROEN = '#10b981'
 const PAARS = '#a855f7'
 const SLAAP_DOEL = 8
-const BAND = 38 // slaapband + stappenband
+const BAND = 50 // slaapband + stappenband, elk hoog genoeg voor de ring
+const BAND_HOOG = 24
+// De balken van voeding en water beginnen iets boven de onderrand, zodat een
+// lage stand met zijn ring niet onder in beeld wegvalt.
+const BALK_BODEM = 56
 // Ruimte links in de dag voor de uren, die nu in de tegel zelf staan.
 const UREN_BREED = 40
 // Rechts, tegen de schermrand: de voedingsbalk en daarnaast de waterbalk.
@@ -63,6 +67,8 @@ export default function DagTijdlijn({
   uitloop = 0,
   onSlaap = null,       // tik op de slaapband → slaap invullen
   onWater = null,       // tik op het flesje → 100 ml erbij
+  onVoeding = null,     // tik op de ring bij voeding → naar de maaltijdpagina
+  onVerzet = null,      // (blok, nieuweStart) na slepen → de ouder vraagt: alleen vandaag of altijd?
 }) {
   const U = Math.max(0, Number(uitloop) || 0)
   // De beschikbare hoogte bepaalt de schaal: de hele dag past zonder scrollen.
@@ -101,6 +107,63 @@ export default function DagTijdlijn({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dagSleutel, vakHoogte > 0])
 
+  // ── Slepen: een blok oppakken en naar een andere tijd schuiven ──
+  // Muis: vastpakken en bewegen. Vinger: even ingedrukt houden (anders is het
+  // scrollen), dan schuiven. Loslaten meldt de nieuwe tijd aan de ouder.
+  const [sleep, setSleep] = useState(null) // { id, delta } in minuten
+  const sleepActief = useRef(false)
+  const gesleept = useRef(false)
+  const pxRef = useRef(pxPerMin)
+  pxRef.current = pxPerMin
+  useEffect(() => {
+    const el = baan.current
+    if (!el) return
+    // Tijdens het slepen met een vinger mag de agenda zelf niet meescrollen.
+    const blok = (e) => { if (sleepActief.current && e.cancelable) e.preventDefault() }
+    el.addEventListener('touchmove', blok, { passive: false })
+    return () => el.removeEventListener('touchmove', blok)
+  }, [])
+  const magSlepen = (b) => !!onVerzet && b.editable !== false && !b.meta?.los && !b.meta?.virtueel && b.type !== 'weging' && b.type !== 'checkin'
+  const beginSleep = (e, b) => {
+    if (!magSlepen(b) || (e.pointerType === 'mouse' && e.button !== 0)) return
+    const startY = e.clientY
+    const vinger = e.pointerType !== 'mouse'
+    let delta = 0
+    let wacht = null
+    const activeer = () => { sleepActief.current = true; setSleep({ id: b.id, delta: 0 }); if (vinger && navigator.vibrate) navigator.vibrate(12) }
+    if (vinger) wacht = setTimeout(activeer, 350)
+    const klaar = () => {
+      if (wacht) clearTimeout(wacht)
+      window.removeEventListener('pointermove', beweeg); window.removeEventListener('pointerup', los); window.removeEventListener('pointercancel', stop)
+    }
+    const beweeg = (ev) => {
+      const dy = ev.clientY - startY
+      if (!sleepActief.current) {
+        if (vinger) { if (Math.abs(dy) > 8) klaar(); return } // bewogen vóór het vasthouden: dat is scrollen
+        if (Math.abs(dy) < 4) return
+        activeer()
+      }
+      const d = Math.round(dy / pxRef.current / 5) * 5
+      if (d !== delta) { delta = d; setSleep({ id: b.id, delta }) }
+    }
+    const stop = () => { klaar(); sleepActief.current = false; setSleep(null) }
+    const los = () => {
+      const was = sleepActief.current
+      stop()
+      if (!was) return
+      gesleept.current = true
+      setTimeout(() => { gesleept.current = false }, 300)
+      if (delta !== 0) onVerzet(b, Math.max(0, Math.min(24 * 60 - 5, b.start + delta)))
+    }
+    window.addEventListener('pointermove', beweeg); window.addEventListener('pointerup', los); window.addEventListener('pointercancel', stop)
+  }
+  // Een tik na het slepen telt niet als openen.
+  const alsGeenSleep = (fn) => (fn ? (e) => { if (gesleept.current) { e?.stopPropagation?.(); return } fn(e) } : undefined)
+  const sleepStijl = (b) => (magSlepen(b) ? {
+    cursor: sleep?.id === b.id ? 'grabbing' : 'grab', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+    ...(sleep?.id === b.id ? { outline: '2px solid #fff', outlineOffset: -2, zIndex: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.6)' } : {}),
+  } : {})
+
   const GROOT = isMobile ? 58 : 54
   const KLEIN = isMobile ? 34 : 28
   // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
@@ -108,9 +171,11 @@ export default function DagTijdlijn({
   const geplaatst = [...dingen].sort((a, b) => a.start - b.start).map(b => {
     const groot = b.type === 'training' || isCardio(b)
     const h = groot ? GROOT : KLEIN
-    const top = Math.max((b.start - asStart) * pxPerMin, onder)
-    onder = top + h + 2
-    return { b, groot, top, h }
+    // Het blok dat je sleept volgt je hand en duwt niets opzij.
+    const mee = sleep?.id === b.id
+    const top = mee ? (b.start + sleep.delta - asStart) * pxPerMin : Math.max((b.start - asStart) * pxPerMin, onder)
+    if (!mee) onder = top + h + 2
+    return { b, groot, top, h, mee }
   })
 
   const st = Number(stappen?.steps) || 0
@@ -129,7 +194,7 @@ export default function DagTijdlijn({
   const wDeel = water?.doel > 0 ? Math.min(1, (Number(water.ml) || 0) / water.doel) : 0
 
   const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
-  const tijdKnop = (b, kleur) => (
+  const tijdKnop = (b, kleur) => (sleep?.id === b.id ? <span style={{ color: '#fff', fontWeight: 900 }}>{klok(Math.max(0, b.start + sleep.delta))}</span> :
     <span role={onTijd ? 'button' : undefined} onClick={onTijd ? (e) => { e.stopPropagation(); onTijd(b) } : undefined}
       style={{ cursor: onTijd ? 'pointer' : 'default', color: kleur, ...tik }}>{klok(b.start)}</span>
   )
@@ -140,21 +205,33 @@ export default function DagTijdlijn({
       <div style={{
         position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', background: 'transparent',
       }}>
-        {/* Slaap van de nacht ervoor */}
-        <div onClick={onSlaap || undefined} role={onSlaap ? 'button' : undefined} aria-label={onSlaap ? 'Slaap invullen' : undefined} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(255,255,255,0.05)', overflow: 'hidden', cursor: onSlaap ? 'pointer' : 'default', zIndex: 5, ...tik }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(Math.min(1, (slaapUren || 0) / SLAAP_DOEL) * 100)}%`, background: 'rgba(168,85,247,0.4)' }} />
-          <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: slaapUren > 0 ? '#d8b4fe' : 'rgba(255,255,255,0.4)' }}>
-            <Moon size={10} strokeWidth={2.6} color={slaapUren > 0 ? PAARS : 'currentColor'} />{slaapUren > 0 ? `${String(Math.round(slaapUren * 10) / 10).replace('.', ',')}u` : '·'}
-          </div>
-        </div>
-        {/* Stappen */}
-        <div style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(stDeel * 100)}%`, background: `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * stGroen).toFixed(2)})` }} />
-          <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: st > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)' }}>
-            <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />
-            <span>{st > 0 ? kort(st) : '·'}{st > 0 && stDoel > 0 && <span style={{ opacity: 0.6 }}> / {kort(stDoel)}</span>}</span>
-          </div>
-        </div>
+        {/* Slaap van de nacht ervoor en de stappen: alleen het gevulde deel,
+            met op het eind een ring met icoon (zelfde vorm als bij voeding en
+            water) en de stand ernaast. */}
+        {[
+          { id: 'slaap', top: 0, deel: Math.min(1, (slaapUren || 0) / SLAAP_DOEL), vulling: 'rgba(168,85,247,0.4)', ring: PAARS, Icoon: Moon,
+            tekst: slaapUren > 0 ? `${String(Math.round(slaapUren * 10) / 10).replace('.', ',')}u` : 'Slaap', kleur: slaapUren > 0 ? '#e9d5ff' : 'rgba(255,255,255,0.5)', onKlik: onSlaap, label: 'Slaap invullen' },
+          { id: 'stappen', top: BAND_HOOG + 1, deel: stDeel, vulling: `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * stGroen).toFixed(2)})`, ring: st > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.5)', Icoon: Footprints,
+            tekst: st > 0 ? `${kort(st)}${stDoel > 0 ? ` / ${kort(stDoel)}` : ''}` : 'Stappen', kleur: st > 0 ? '#fff' : 'rgba(255,255,255,0.5)', onKlik: null, label: 'Stappen' },
+        ].map(x => {
+          const R = BAND_HOOG - 2
+          // Het midden van de ring: op het eind van de vulling, maar altijd binnen beeld.
+          const plek = `clamp(${U + R / 2 + 2}px, ${Math.round(x.deel * 100)}%, calc(100% - ${U + R / 2 + 2}px))`
+          const links = x.deel > 0.6
+          return (
+            <div key={x.id} onClick={x.onKlik || undefined} role={x.onKlik ? 'button' : undefined} aria-label={x.label}
+              style={{ position: 'absolute', top: x.top, left: 0, right: 0, height: BAND_HOOG, cursor: x.onKlik ? 'pointer' : 'default', zIndex: 5, ...tik }}>
+              <div style={{ position: 'absolute', left: 0, top: 3, bottom: 3, width: `${Math.round(x.deel * 100)}%`, background: x.vulling, transition: 'width 0.4s ease' }} />
+              <span style={{ position: 'absolute', top: 1, left: plek, width: R, height: R, marginLeft: -R / 2, boxSizing: 'border-box', borderRadius: '50%', border: `2px solid ${x.ring}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', transition: 'left 0.4s ease' }}>
+                <x.Icoon size={11} strokeWidth={2.6} />
+              </span>
+              <span style={{ position: 'absolute', top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontSize: '0.68rem', fontWeight: 900, color: x.kleur, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: '0 1px 4px rgba(0,0,0,0.9)',
+                ...(links ? { right: `calc(100% - ${plek} + ${R / 2 + 5}px)` } : { left: `calc(${plek} + ${R / 2 + 5}px)` }) }}>
+                {x.tekst}
+              </span>
+            </div>
+          )
+        })}
 
         {/* De schuifbaan: de hele dag, met de uren links in beeld. */}
         <div ref={baan} className="dag-tijdlijn-baan" style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -198,7 +275,7 @@ export default function DagTijdlijn({
           </div>
         ) : (
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: U + UREN_BREED - 4, right: BALKEN + 8 }}>
-            {geplaatst.map(({ b, groot, top }) => {
+            {geplaatst.map(({ b, groot, top, mee }) => {
               const gedaan = !!isGedaan(b)
               const vink = afronden(b)
               if (groot) {
@@ -207,7 +284,7 @@ export default function DagTijdlijn({
                 const foto = cardio ? cardioFoto(naam) : getWorkoutImage({ name: naam })
                 const sub = cardio ? `${Math.max(0, b.end - b.start)} min` : (b.meta?.exercise_count > 0 ? `${b.meta.exercise_count} oefeningen` : null)
                 return (
-                  <div key={b.id} onClick={onOpen ? () => onOpen(b) : undefined} style={{ position: 'absolute', left: 0, right: 0, top, height: GROOT, borderRadius: 9, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
+                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: 0, top, height: GROOT, borderRadius: 9, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.5 : 0.35 }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                     {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
@@ -232,8 +309,8 @@ export default function DagTijdlijn({
               const extra = maaltijd ? (Number(b.meta?.kcal) > 0 ? `${fmt(b.meta.kcal)} kcal` : null)
                 : wg?.gelogd != null ? `${String(wg.gelogd).replace('.', ',')} kg` : null
               return (
-                <div key={b.id} style={{ position: 'absolute', left: 0, right: 0, top, height: KLEIN, display: 'flex', alignItems: 'center', gap: 5, opacity: klaar && !b.meta?.los ? 0.6 : 1 }}>
-                  <div onClick={openen || undefined} style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', gap: 5, cursor: openen ? 'pointer' : 'default', ...tik }}>
+                <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{ ...sleepStijl(b), background: mee ? '#141414' : undefined, borderRadius: mee ? 6 : undefined, position: 'absolute', left: 0, right: 0, top, height: KLEIN, display: 'flex', alignItems: 'center', gap: 5, opacity: klaar && !b.meta?.los ? 0.6 : 1 }}>
+                  <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', gap: 5, cursor: openen ? 'pointer' : 'default', ...tik }}>
                     {maaltijd ? (
                       <span style={{ width: KLEIN, height: KLEIN, flexShrink: 0, borderRadius: 5, backgroundImage: `url(${resolveFoodImage({ image_url: b.meta?.image_url, name: naam }) || foodImageFallback(naam, b.meta?.slot, 80)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }} />
                     ) : (
@@ -265,14 +342,30 @@ export default function DagTijdlijn({
         </div>
         </div>
         {/* Voeding: één brede balk, kcal tegen het doel, met kcal en eiwit bovenin de vulling. */}
-        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: WATER_BREED, width: VOEDING_BREED, background: 'rgba(255,255,255,0.05)', zIndex: 4, overflow: 'hidden' }}>
+        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 4, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(kDeel * 100)}%`, background: kKleur, opacity: 0.55, transition: 'height 0.3s ease' }} />
-          {kcal > 0 && (
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(4, Math.round(kDeel * tijdHoogte) - 32), textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>{fmt(kcal)}</div>
-              <div style={{ fontSize: '0.6rem', fontWeight: 900, color: eKleur }}>E{fmt(eiwit)}</div>
-            </div>
-          )}
+          {/* Ring met bestek precies op de rand van de vulling (zelfde vorm als
+              het flesje bij water); tik = naar je voeding. De stand staat eronder,
+              of erboven als de balk nog bijna leeg is. */}
+          {(() => {
+            const KNOP = 30
+            const balkHoogte = tijdHoogte - BALK_BODEM
+            const vul = Math.round(kDeel * balkHoogte)
+            const knopOnder = Math.max(4, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
+            const tekstOnder = knopOnder >= 34 ? knopOnder - 30 : knopOnder + KNOP + 4
+            return (
+              <>
+                <button onClick={onVoeding || undefined} disabled={!onVoeding} aria-label="Naar je voeding" title={onVoeding ? 'Naar je voeding' : undefined}
+                  style={{ position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: `2px solid ${kcal > 0 ? kKleur : 'rgba(255,255,255,0.5)'}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onVoeding ? 'pointer' : 'default', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
+                  <Utensils size={14} strokeWidth={2.6} />
+                </button>
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: tekstOnder, textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', pointerEvents: 'none', transition: 'bottom 0.3s ease' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>{fmt(kcal)}</div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: eKleur }}>E{fmt(eiwit)}</div>
+                </div>
+              </>
+            )
+          })()}
         </div>
         {/* Water: tegen de schermrand, met de stand erop en bovenaan de
             vulling een flesje: elke tik is 100 ml erbij (zoals de fles op de
@@ -281,21 +374,22 @@ export default function DagTijdlijn({
           const ml = Number(water?.ml) || 0
           const doel = Number(water?.doel) || 0
           const l = (x) => String(Math.round(x / 100) / 10).replace('.', ',')
-          const vul = Math.round(wDeel * tijdHoogte)
+          const balkHoogte = tijdHoogte - BALK_BODEM
+          const vul = Math.round(wDeel * balkHoogte)
           return (
-            <div title={water ? `Water ${l(ml)} / ${l(doel)} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: 0, right: 0, width: WATER_BREED, background: 'rgba(255,255,255,0.05)', zIndex: 4, overflow: 'hidden' }}>
+            <div title={water ? `Water ${l(ml)} / ${l(doel)} L` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: 0, width: WATER_BREED, background: 'transparent', zIndex: 4, overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(wDeel * 100)}%`, background: '#38bdf8', opacity: 0.55, transition: 'height 0.3s ease' }} />
               {/* Het flesje staat precies op de rand van de vulling: half erin,
                   half erboven. De stand staat eronder, of erboven als de balk
                   nog bijna leeg is. */}
               {(() => {
                 const KNOP = 30
-                const knopOnder = Math.max(4, Math.min(tijdHoogte - KNOP - 4, vul - KNOP / 2))
+                const knopOnder = Math.max(4, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
                 const tekstOnder = knopOnder >= 34 ? knopOnder - 30 : knopOnder + KNOP + 4
                 return (
                   <>
                     <button onClick={onWater || undefined} disabled={!onWater} aria-label="100 ml water erbij" title={onWater ? '100 ml erbij' : undefined}
-                      style={{ position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: '#0a0a0a', border: '2px solid #38bdf8', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onWater ? 'pointer' : 'default', boxShadow: '0 2px 8px rgba(0,0,0,0.6)', zIndex: 2, transition: 'bottom 0.3s ease', ...tik }}>
+                      style={{ position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: '2px solid #38bdf8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onWater ? 'pointer' : 'default', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
                       <Milk size={15} strokeWidth={2.6} />
                     </button>
                     <div style={{ position: 'absolute', left: 0, right: 0, bottom: tekstOnder, textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', pointerEvents: 'none', transition: 'bottom 0.3s ease' }}>
