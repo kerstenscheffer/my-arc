@@ -1,7 +1,8 @@
 // src/modules/manual-workout-builder/sweetspot.js
 //
-// Sweet spot finder (17 nov 2026, Kersten): elke week per spiergroep één set
-// erbij zolang de klant herstelt, de training goed voelt en er tijd is, tot de
+// Sweet spot finder (17 nov 2026, Kersten). Begint pas als de klant zelf laat
+// weten dat hij meer kan en wil (vraag na de training). Vanaf dan elke week per
+// spiergroep één set erbij zolang de klant herstelt, de training goed voelt en er tijd is, tot de
 // bovenkant van de range (intermediair 12-16 sets per week). Remt het herstel
 // of zakt de kracht, dan gaat de laatst toegevoegde set er weer af en staat die
 // spier vast voor de rest van de fase. Er gaat nooit meer af dan die ene set.
@@ -27,9 +28,11 @@ const komma = (v) => String(Math.round(v * 10) / 10).replace('.', ',')
 //       komt er twee keer in voor), elk { id, name, exercises: [{ id, name, sets, … }] }.
 // stand: { [spier]: { vast, laatste_plus: { dayId, naam, naar } } } uit sweetspot_stand.
 // lang: Set dag-ids waar de klant de training te lang vond. scores: laatste cijfers (nieuwste eerst).
+// wilMeer: het laatste antwoord van de klant na een training was "ik kan en wil meer".
+//          Zonder dat komt er nooit iets bij; de rem werkt altijd.
 // Geeft { wijzigingen: [{ spier, dayId, exId, naam, dagNaam, van, naar, reden }], meldingen: [tekst],
 //         stand: { [spier]: { frac, doel: [lo, hi], uitkomst, vast } }, nieuweStand: { [spier]: {...} } }.
-export function sweetspotStap({ days = [], ctx = {}, herstel = {}, budget = 90, factor = 1, stand = {}, lang = new Set(), scores = [] }) {
+export function sweetspotStap({ days = [], ctx = {}, herstel = {}, budget = 90, factor = 1, stand = {}, lang = new Set(), scores = [], wilMeer = false }) {
   const status = RANGE[ctx.status] ? ctx.status : 'intermediate'
   const [lo, hi] = RANGE[status].bulk
   const advies = volumeAdvies({ days, ctx, herstel, budget, factor })
@@ -43,8 +46,8 @@ export function sweetspotStap({ days = [], ctx = {}, herstel = {}, budget = 90, 
   const cut = ctx.fase === 'cut' && !OPBOUWEN_IN_CUT
   const gemScore = scores.length ? scores.slice(0, 2).reduce((n, x) => n + x, 0) / Math.min(2, scores.length) : null
   const voeltSlecht = gemScore != null && gemScore < SCORE_MIN
-  if (cut) uit.meldingen.push('In een cut komt er geen volume bij.')
-  if (voeltSlecht) uit.meldingen.push(`De laatste trainingen voelden niet goed (gemiddeld ${komma(gemScore)}): er komt niets bij.`)
+  if (wilMeer && cut) uit.meldingen.push('Wil meer doen, maar zit in een cut: daar komt geen volume bij.')
+  if (wilMeer && voeltSlecht) uit.meldingen.push(`De laatste trainingen voelden niet goed (gemiddeld ${komma(gemScore)}): er komt niets bij.`)
   if (lang.size) uit.meldingen.push('Training te lang gevonden: op die dag komt er niets bij.')
 
   const kandidaten = []
@@ -77,6 +80,7 @@ export function sweetspotStap({ days = [], ctx = {}, herstel = {}, budget = 90, 
       continue
     }
     if (s.vast) { rij.uitkomst = 'vast'; continue }
+    if (!wilMeer) { rij.uitkomst = 'klant vroeg niet om meer'; continue }
     if (cut || voeltSlecht) continue
     if (a.frac + 1 > hi) { rij.uitkomst = 'bovengrens'; continue }
     if (herstel[spier]?.pijnReeks?.length) { rij.uitkomst = 'pijn'; uit.meldingen.push(`${spierLabel(spier)}: 2 keer achter elkaar pijn bij een oefening. Eerst de oefening wisselen.`); continue }

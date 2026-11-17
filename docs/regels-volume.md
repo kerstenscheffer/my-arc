@@ -64,3 +64,17 @@ sets de oefening vooraan. Melding als een zware compound (squat, deadlift, press
 7 dagen = de week: volgorde uit het weekrooster van de klant. Langer (8-14): volgorde in de builder (pijltjes per kolom).
 Volume en frequentie per week = per cyclus × 7 / lengte. "Geen rustdag" als dezelfde spier twee dagen achter elkaar direct getraind wordt.
 De klantapp volgt nog steeds het weekrooster; een cyclus > 7 is nu planning in de builder.
+
+## Sweet spot finder (17 nov 2026)
+Code: `sweetspot.js` (regels), `sweetspotRun.js` (wekelijkse ronde), `volumeData.js` (laden). Tabellen: `sweetspot_instelling`
+(uit / proef / aan), `sweetspot_runs` (per klant per week wat er gebeurde), `sweetspot_stand` (vastgezette spieren, laatst toegevoegde set).
+- Start pas als de klant het vraagt: na de training "Hoe was de lengte?" → Te lang / Precies goed / Ik kan en wil meer
+  (`training_feedback.duur` = lang / goed / kort). Alleen bij het laatste antwoord 'kort' komt er iets bij.
+- Per week: +1 set per spier als hersteld gemeld (of onder de ondergrens zonder tegenbericht), tot de bovenkant van de build-range
+  van de status (intermediair 12-16). Max 3 sets per klant per week, grootste tekort eerst. Zelfde grenzen als de knop in de builder
+  (tijd uit de intake, max per sessie, max per training, geen oefening met pijn).
+- Niets erbij: in een cut (`OPBOUWEN_IN_CUT`), bij gemiddeld cijfer < 6 over de laatste 2 trainingen, op een dag die "te lang" was,
+  tijdens deload.
+- Rem: niet hersteld of kracht zakt 2 weken → de laatst toegevoegde set eraf, spier vast voor dit plan, melding in de ronde.
+  Er gaat nooit meer af dan die ene set.
+- Draait in de browser van de coach bij het openen van de CoachHub (één keer per klant per week); scherm: Workout Builder → Templates → Sweet spot.

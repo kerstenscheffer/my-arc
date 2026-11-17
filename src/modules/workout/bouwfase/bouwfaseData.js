@@ -14,6 +14,14 @@ export const GEVOEL = [
   { id: 'techniek', label: 'Techniek brak' },
   { id: 'pijn', label: 'Pijntje' },
 ]
+// Na de training (17 nov 2026): hoe was de lengte? 'kort' = de klant kan en wil
+// meer; pas dan gaat de sweet spot finder sets toevoegen. 'lang' = niets erbij.
+export const DUUR = [
+  { id: 'lang', label: 'Te lang' },
+  { id: 'goed', label: 'Precies goed' },
+  { id: 'kort', label: 'Ik kan en wil meer' },
+]
+
 export const HERSTEL = [
   // id = voelt hij nog? (nee = hersteld); blijft zo staan voor de indicator.
   { id: 'nee', label: 'Goed', kleur: '#10b981' },
@@ -82,7 +90,7 @@ export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
   const leeg = { oefening: {}, herstel: {}, spier: {}, workout: null }
   if (!sb || !clientId) return leeg
   const { data } = await sb.from('training_feedback')
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk')
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk, duur')
     .eq('client_id', clientId).eq('datum', datum)
     .then(r => r, () => ({ data: [] }))
   for (const r of data || []) {
@@ -99,7 +107,7 @@ export async function leesFeedbackVanDag(sb, clientId, datum = vandaagIso()) {
 export async function bewaarFeedback(sb, rij) {
   const { data, error } = await sb.from('training_feedback')
     .upsert({ datum: vandaagIso(), ...rij, updated_at: new Date().toISOString() }, { onConflict: 'client_id,datum,sleutel' })
-    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk').single()
+    .select('id, soort, oefening, spiergroep, score, gevoel, opmerking, datum, rir, spierpijn, pomp, werkdruk, duur').single()
   if (error) throw error
   window.dispatchEvent(new CustomEvent('myarc:training-feedback'))
   return data

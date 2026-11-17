@@ -348,6 +348,14 @@ export default function CoachHub() {
   const setCount = (key) => (n) => setWidgetCounts(prev => prev[key] === n ? prev : { ...prev, [key]: n })
   
   const db = DatabaseService
+
+  // Sweet spot finder: staat hij aan en is er deze week nog niet gedraaid, dan
+  // nu, op de achtergrond (sweetspotRun.js). Standaard staat hij op proef.
+  useEffect(() => {
+    if (!db?.supabase) return
+    const t = setTimeout(() => { import('../modules/manual-workout-builder/sweetspotRun').then(m => m.sweetspotAutomaat(db.supabase), () => null) }, 8000)
+    return () => clearTimeout(t)
+  }, [db])
   const isMobile = useIsMobile()
 
   // Split alleen op desktop. Op een telefoon is een halve kolom onbruikbaar,

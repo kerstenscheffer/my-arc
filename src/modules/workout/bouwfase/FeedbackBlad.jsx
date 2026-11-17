@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, Smile, Meh, Frown } from 'lucide-react'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
-import { GEVOEL, bewaarFeedback, spierWoord } from './bouwfaseData'
+import { GEVOEL, DUUR, bewaarFeedback, spierWoord } from './bouwfaseData'
 import { RIR_KEUZES, rirLabel, rirTekst, SPIERPIJN, POMP, WERKDRUK } from './rir'
 
 const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
@@ -46,6 +46,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   const [gekozen, setGekozen] = useState(false) // uitvoering gekozen → toelichting open
   const [rir, setRir] = useState(null)
   const [pomp, setPomp] = useState(null)
+  const [duur, setDuur] = useState(null) // alleen na de training: te lang / goed / kan en wil meer
   // Uitgebreide vragen per spiergroep (model RP): alleen met RIR-progressie aan.
   const metRir = soort === 'oefening' && rirDoel != null
 
@@ -59,6 +60,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
     setRir(rirGelogd ?? bestaand?.rir ?? null)
     setStap(soort === 'oefening' && rirDoel != null ? (rirGelogd != null ? 2 : 0) : 1)
     setPomp(bestaand?.pomp ?? null)
+    setDuur(bestaand?.duur ?? null)
     setGekozen(!!bestaand || (soort === 'oefening' && rirDoel != null && rirGelogd != null))
   }, [open, bestaand, soort, rirDoel, rirGelogd])
 
@@ -78,6 +80,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         gevoel: soort === 'workout' || soort === 'spier' ? null : gevoel,
         opmerking: opmerking.trim() || null,
         ...(metRir ? { rir } : {}),
+        ...(soort === 'workout' && duur ? { duur } : {}),
         ...extra,
       })
       onOpgeslagen?.(rij)
@@ -202,6 +205,17 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
                 <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>Hoe goed ging de uitvoering?</div>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                   {GEVOEL.map(g => <button key={g.id} onClick={() => { setGevoel(g.id); setGekozen(true) }} style={chip(gekozen && gevoel === g.id)}>{g.label}</button>)}
+                </div>
+              </>
+            )}
+            {soort === 'workout' && (
+              <>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 10 }}>Hoe was de lengte van de training?</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  {DUUR.map(d => <button key={d.id} onClick={() => setDuur(duur === d.id ? null : d.id)} style={{ ...chip(duur === d.id), fontSize: '0.78rem', lineHeight: 1.15, padding: '0 6px' }}>{d.label}</button>)}
+                </div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginBottom: 14, lineHeight: 1.4 }}>
+                  Kies je "meer", dan komt er de komende weken een set bij zolang je goed herstelt.
                 </div>
               </>
             )}

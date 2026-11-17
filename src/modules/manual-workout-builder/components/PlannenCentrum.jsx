@@ -17,6 +17,8 @@ import { createPortal } from 'react-dom'
 import { Archive, ArchiveRestore, BadgeCheck, Pencil, Check, ChevronDown, Dumbbell, ExternalLink, Search, X } from 'lucide-react'
 import { PRIVE } from '../../coach-command-center/utils/privacyModus'
 import { planFoto } from '../../workout/components/planFoto'
+import { sweetspotRun, leesInstelling, zetInstelling, leesRuns } from '../sweetspotRun'
+import { spierLabel } from '../spierGroepen'
 
 const PLAN_KOLOMMEN = 'id, name, days_per_week, is_template, is_public, is_archived, is_canoniek, client_id, client_name, original_schema_id, deload_van, user_id, created_at, updated_at'
 const GROEN = '#10b981'
@@ -51,6 +53,28 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
   const [dagen, setDagen] = useState({})            // plan-id → dagen
   const [doel, setDoel] = useState(client || null)  // de klant voor wie je een template kiest
   const [bezig, setBezig] = useState(null)
+  // Sweet spot finder: modus (uit / proef / aan) en de rondes van deze week.
+  const [ssModus, setSsModus] = useState(null)
+  const [ssRuns, setSsRuns] = useState([])
+  const [ssVoortgang, setSsVoortgang] = useState(null)
+  const laadSs = useCallback(async () => {
+    const [m, runs] = await Promise.all([leesInstelling(db.supabase), leesRuns(db.supabase)])
+    setSsModus(m); setSsRuns(runs)
+  }, [db])
+  useEffect(() => { if (tab === 'sweetspot') laadSs() }, [tab, laadSs])
+  const kiesSsModus = async (m) => {
+    try { await zetInstelling(db.supabase, m); setSsModus(m) } catch (e) { setFout(e?.message || 'Opslaan mislukt') }
+  }
+  const draaiSs = async (modus) => {
+    if (ssVoortgang) return
+    setSsVoortgang('0'); setFout(null)
+    try {
+      await sweetspotRun(db.supabase, { modus, opVoortgang: (i, n) => setSsVoortgang(`${i} / ${n}`) })
+      await laadSs()
+      if (modus === 'aan') { await laad(); onGewijzigd?.() }
+    } catch (e) { setFout(e?.message || 'Ronde mislukt') }
+    finally { setSsVoortgang(null) }
+  }
 
   const laad = useCallback(async () => {
     setFout(null)
@@ -222,6 +246,7 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
     { id: 'templates', label: 'Templates', n: templates.filter(p => !p.is_archived).length },
     { id: 'klanten', label: 'Klanten', n: actieveRijen.length },
     { id: 'overig', label: 'Overig', n: overig.length },
+    { id: 'sweetspot', label: 'Sweet spot', n: '' },
   ]
 
   return createPortal(
@@ -379,6 +404,46 @@ export default function PlannenCentrum({ db, isMobile = false, client = null, on
               </div>
             ))}
           </>)}
+
+          {!laden && tab === 'sweetspot' && (() => {
+            // Per klant de echte ronde van deze week, anders de proef.
+            const perKlant = new Map()
+            for (const x of ssRuns) if (!perKlant.has(x.client_id) || x.modus === 'aan') perKlant.set(x.client_id, x)
+            const rijen = [...perKlant.values()].map(x => ({ ...x, k: klanten.find(k => k.id === x.client_id) }))
+              .sort((a, b) => ((b.wijzigingen?.length || 0) - (a.wijzigingen?.length || 0)) || ((b.meldingen?.length || 0) - (a.meldingen?.length || 0)) || naam(a.k).localeCompare(naam(b.k)))
+            const metWijziging = rijen.filter(x => x.wijzigingen?.length).length
+            const optie = (id, label) => <button key={id} onClick={() => kiesSsModus(id)} style={{ ...kaal, ...(ssModus === id ? { background: '#fff', color: '#0a0a0a', border: '1px solid #fff' } : {}) }}>{label}</button>
+            return (<>
+              <div style={{ paddingTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {optie('uit', 'Uit')}{optie('proef', 'Proef')}{optie('aan', 'Aan')}
+                <span style={{ flex: 1 }} />
+                <button onClick={() => draaiSs('proef')} disabled={!!ssVoortgang} style={{ ...kaal, opacity: ssVoortgang ? 0.5 : 1 }}>{ssVoortgang ? `Bezig ${ssVoortgang}` : 'Proef draaien'}</button>
+                {ssModus === 'aan' && <button onClick={() => draaiSs('aan')} disabled={!!ssVoortgang} style={{ ...wit, opacity: ssVoortgang ? 0.5 : 1 }}>Nu echt draaien</button>}
+              </div>
+              <div style={{ ...grijs, marginTop: 8, lineHeight: 1.5 }}>
+                {ssModus === 'aan' ? 'Aan: elke week, zodra je het coachportaal opent, komt er per spiergroep hooguit één set bij (max 3 per klant).'
+                  : ssModus === 'uit' ? 'Uit: er gebeurt niets.' : 'Proef: plannen veranderen niet. "Proef draaien" laat zien wat er deze week zou gebeuren.'}
+                {' '}Alleen bij klanten die na een training "Ik kan en wil meer" kozen, hersteld zijn en tijd over hebben.
+              </div>
+              {rijen.length > 0 && <div style={kopje}>Deze week · {rijen.length} klanten · {metWijziging} met wijziging</div>}
+              {rijen.length === 0 && <div style={{ ...grijs, padding: '1rem 0' }}>Deze week nog niet gedraaid.</div>}
+              {rijen.map(x => (
+                <div key={x.id} style={{ padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span className={PRIVE} style={{ fontSize: '0.88rem', fontWeight: 900 }}>{naam(x.k)}</span>
+                    <span style={grijs}>{x.modus === 'aan' ? 'doorgevoerd' : 'proef'}{x.stand ? ` · ${x.stand.fase === 'cut' ? 'cut' : x.stand.fase === 'bulk' ? 'build' : 'onderhoud'} · ${x.stand.budget} min${x.stand.wilMeer ? ' · wil meer' : ''}` : ''}</span>
+                  </div>
+                  {(x.wijzigingen || []).map((w, i) => (
+                    <div key={i} style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', marginTop: 3 }}>
+                      <span style={{ color: w.naar > w.van ? GROEN : '#f59e0b', fontWeight: 900 }}>{w.naar > w.van ? '+1' : '−1'}</span> {spierLabel(w.spier)} · {w.naam} ({w.dagNaam}) {w.van} → {w.naar} sets <span style={grijs}>· {w.reden}</span>
+                    </div>
+                  ))}
+                  {(x.meldingen || []).map((m, i) => <div key={`m${i}`} style={{ ...grijs, marginTop: 3 }}>{m}</div>)}
+                  {!(x.wijzigingen || []).length && !(x.meldingen || []).length && <div style={{ ...grijs, marginTop: 3 }}>{x.stand?.wilMeer ? 'Niets te doen deze week.' : 'Vroeg niet om meer.'}</div>}
+                </div>
+              ))}
+            </>)
+          })()}
 
           {!laden && tab === 'overig' && (<>
             <div style={{ ...grijs, paddingTop: 10 }}>Plannen zonder klant die ook geen template zijn. Niemand traint hiermee.</div>
