@@ -335,12 +335,12 @@ export default function DagTijdlijn({
             if (!past) labelY = Math.max(0, boven) + 2
             const vlak = slaapt ? { background: 'rgba(168,85,247,0.07)' }
               : pauze ? { background: 'repeating-linear-gradient(135deg, #0a0a0a 0, #0a0a0a 6px, #1c1c1c 6px, #1c1c1c 12px)' }
-              : { background: 'rgba(96,165,250,0.14)', boxShadow: 'inset 0 1px 0 rgba(96,165,250,0.5), inset 0 -1px 0 rgba(96,165,250,0.5)' }
+              : { background: 'rgba(255,255,255,0.055)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(255,255,255,0.28)' }
             return (
               <div key={b.id} style={{ position: 'absolute', left: 0, right: 0, top: boven, height: hoog, ...vlak }}>
                 {hoog >= 14 && (
                   <span role={onTijd ? 'button' : undefined} onClick={onTijd ? () => onTijd(b) : undefined} title={onTijd ? 'Tijden aanpassen' : undefined}
-                    style={{ position: 'absolute', top: labelY - boven, right: BALKEN + 8, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 4, padding: past ? '4px 0 4px 8px' : '3px 7px', borderRadius: past ? 0 : 7, background: past ? 'transparent' : 'rgba(10,10,10,0.88)', fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? '#e9d5ff' : pauze ? '#fff' : '#bfdbfe', cursor: onTijd ? 'pointer' : 'default', ...tik }}>
+                    style={{ position: 'absolute', top: labelY - boven, right: BALKEN + 8, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 4, padding: past ? '4px 0 4px 8px' : '3px 7px', borderRadius: past ? 0 : 7, background: past ? 'transparent' : 'rgba(10,10,10,0.88)', fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? '#e9d5ff' : pauze ? '#fff' : '#d4d4d4', cursor: onTijd ? 'pointer' : 'default', ...tik }}>
                     {slaapt ? <Moon size={11} strokeWidth={2.6} /> : pauze ? <Coffee size={11} strokeWidth={2.6} /> : <Briefcase size={11} strokeWidth={2.6} />}
                     {slaapt ? (sl?.gelogd ? `Slaap · ${String(sl.gelogd.uren).replace('.', ',')}u` : 'Slaap') : (b.label || 'Werk')}
                   </span>
@@ -411,7 +411,7 @@ export default function DagTijdlijn({
                   <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
-                    background: mee ? '#1a1a1a' : '#121212',
+                    background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
                     border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(info)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: info ? 'pointer' : 'default', ...tik }}>
@@ -450,7 +450,7 @@ export default function DagTijdlijn({
                   <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
-                    background: mee ? '#1a1a1a' : '#121212',
+                    background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
                     border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: openen ? 'pointer' : 'default', ...tik }}>

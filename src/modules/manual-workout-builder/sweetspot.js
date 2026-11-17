@@ -20,6 +20,8 @@ export const SCORE_MIN = 6           // gemiddeld cijfer van de laatste 2 traini
 // In een cut het volume niet verhogen (regels-volume.md, regel 5). Op true gaat
 // de finder ook in een cut door tot de bovenkant van de range.
 export const OPBOUWEN_IN_CUT = false
+// Deze spieren krijgen als eerste een set erbij (Kersten, 17 nov 2026).
+export const VOORRANG = ['chest', 'back']
 
 const sleutel = (n) => String(n || '').trim().toLowerCase()
 const komma = (v) => String(Math.round(v * 10) / 10).replace('.', ',')
@@ -89,8 +91,9 @@ export function sweetspotStap({ days = [], ctx = {}, herstel = {}, budget = 90, 
     else rij.uitkomst = hv === 'beetje' ? 'matig hersteld' : 'geen herstelantwoord'
   }
 
-  // Grootste tekort eerst; daarna de spier met de minste sets.
-  kandidaten.sort((x, y) => y.tekort - x.tekort || x.a.frac - y.a.frac)
+  // Borst en rug eerst; daarna het grootste tekort, dan de spier met de minste sets.
+  const rang = (k) => (VOORRANG.includes(k.spier) ? 0 : 1)
+  kandidaten.sort((x, y) => rang(x) - rang(y) || y.tekort - x.tekort || x.a.frac - y.a.frac)
   for (const k of kandidaten) {
     if (uit.wijzigingen.filter(w => w.naar > w.van).length >= MAX_PLUS_PER_WEEK) { uit.stand[k.spier].uitkomst = 'volgende week'; continue }
     const w = plusEen({ days: werk, ctx, spier: k.spier, budget, pijn: k.pijn, geenPlus: lang })

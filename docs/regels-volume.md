@@ -71,7 +71,7 @@ Code: `sweetspot.js` (regels), `sweetspotRun.js` (wekelijkse ronde), `volumeData
 - Start pas als de klant het vraagt: na de training "Hoe was de lengte?" → Te lang / Precies goed / Ik kan en wil meer
   (`training_feedback.duur` = lang / goed / kort). Alleen bij het laatste antwoord 'kort' komt er iets bij.
 - Per week: +1 set per spier als hersteld gemeld (of onder de ondergrens zonder tegenbericht), tot de bovenkant van de build-range
-  van de status (intermediair 12-16). Max 3 sets per klant per week, grootste tekort eerst. Zelfde grenzen als de knop in de builder
+  van de status (intermediair 12-16). Max 3 sets per klant per week: borst en rug eerst (`VOORRANG`), daarna het grootste tekort. Zelfde grenzen als de knop in de builder
   (tijd uit de intake, max per sessie, max per training, geen oefening met pijn).
 - Niets erbij: in een cut (`OPBOUWEN_IN_CUT`), bij gemiddeld cijfer < 6 over de laatste 2 trainingen, op een dag die "te lang" was,
   tijdens deload.
