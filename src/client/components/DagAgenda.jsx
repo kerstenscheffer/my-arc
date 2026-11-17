@@ -1110,7 +1110,7 @@ export default function DagAgenda({
               nuMin={isVandaag ? nuMin : null}
               slaapUren={Number(slaapLogs[slaapDagIso]?.uren) || 0}
               stappen={dagStappen}
-              voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
+              voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, kh: verbruikt.carbs, vet: verbruikt.fat, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0, doelKh: doelen?.carbs || 0, doelVet: doelen?.fat || 0 }}
               water={dagWater}
               dagSleutel={dagIso}
               onSupplementInfo={(sp) => setSuppInfo(sp)}
