@@ -580,7 +580,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
 
       {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.
              Verbergen in focus-mode, net als de balk zelf. ── */}
-      {!focusMode && (
+      {/* Niet op Home (17 nov 2026, Kersten): daar stond hij over de agenda heen. */}
+      {!focusMode && currentView !== 'home' && (
         <VideoTeaser
           client={client}
           isMobile={isMobile}

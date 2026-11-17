@@ -712,13 +712,15 @@ export default function ClientHome({ client, db, setCurrentView }) {
           'm hebt afgespeeld of afgevinkt. */}
       {/* Lege secties (geen video, geen call) nemen ook geen marge in. */}
       <style>{'.home-sectie:empty{display:none}'}</style>
-      <div className="home-sectie" style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
+      {/* In de agendaweergave vult de agenda het scherm tot onderaan; wat hier
+          onder staat zie je in de lijstweergave. */}
+      <div className="home-sectie" style={{ marginTop: isMobile ? '1.4rem' : '1.75rem', display: agendaWeergave === 'rooster' ? 'none' : undefined }}>
         <BelangrijkeVideo client={client} pagina="home" isMobile={isMobile} />
       </div>
 
       {/* Wat er nog los boven de acties staat: de eerstvolgende call. */}
       <FadeOnScroll>
-        <div className="home-sectie" style={{ marginTop: isMobile ? '2.75rem' : '3.5rem' }}>
+        <div className="home-sectie" style={{ marginTop: isMobile ? '2.75rem' : '3.5rem', display: agendaWeergave === 'rooster' ? 'none' : undefined }}>
           <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
         </div>
       </FadeOnScroll>

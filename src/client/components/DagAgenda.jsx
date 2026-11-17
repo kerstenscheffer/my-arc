@@ -171,7 +171,10 @@ export default function DagAgenda({
       const r = el.getBoundingClientRect()
       const boven = ouder ? r.top - ouder.getBoundingClientRect().top + ouder.scrollTop : r.top + (window.scrollY || 0)
       const zicht = ouder ? ouder.clientHeight : window.innerHeight
-      const onder = 124 // het dashboard houdt onderaan 120px vrij voor de zwevende balk
+      // Tot de onderkant van het scherm: de agenda loopt door achter de zwevende
+      // balk. De 120px die het dashboard onderaan vrijhoudt, haalt de negatieve
+      // marge op de wortel weer weg, zodat de pagina zelf niet scrolt.
+      const onder = 0
       setPasHoogte(Math.max(360, Math.round(zicht - boven - onder)))
     }
     meet()
@@ -456,6 +459,50 @@ export default function DagAgenda({
   // Voor de agendaweergave: stappen en water van de getoonde dag. Alleen
   // ophalen als die weergave open staat.
   const [losseLogs, setLosseLogs] = useState([])     // gelogd buiten het plan om, als blokken
+  // Wat de klant zelf alvast klaarzette om te eten (geplande_maaltijden, nog
+  // niet gelogd). In de agendaweergave als maaltijd met een rondje: afvinken =
+  // gegeten, net als op de maaltijdpagina.
+  const [zelfGepland, setZelfGepland] = useState([])
+  const [logVersie, setLogVersie] = useState(0)
+  useEffect(() => {
+    const sb = db?.supabase || db
+    if (weergave !== 'rooster' || !sb?.from || !client?.id || !dagIso) return
+    let weg = false
+    sb.from('geplande_maaltijden')
+      .select('id, meal_type, meal_name, calories, image_url, payload')
+      .eq('client_id', client.id).eq('datum', dagIso).is('gelogd_id', null).order('created_at')
+      .then(({ data }) => { if (!weg) setZelfGepland(data || []) }, () => { if (!weg) setZelfGepland([]) })
+    return () => { weg = true }
+  }, [weergave, db, client?.id, dagIso, logVersie])
+  const geplandGegeten = async (r) => {
+    const sb = db?.supabase || db
+    if (!sb?.from || !r?.payload) return
+    const nuTijd = new Date()
+    const consumed_at = dagIso === toIsoDate(nuTijd) ? nuTijd.toISOString() : new Date(`${dagIso}T12:00:00`).toISOString()
+    const { data: rij, error } = await sb.from('consumed_meals').insert({ ...r.payload, client_id: client.id, consumed_at, created_at: nuTijd.toISOString() }).select('id').single()
+    if (error) { console.error('Geplande maaltijd loggen mislukt:', error); return }
+    await sb.from('geplande_maaltijden').update({ gelogd_id: rij.id, updated_at: nuTijd.toISOString() }).eq('id', r.id)
+    if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+    setLogVersie(v => v + 1)
+  }
+  // Zelf ingeplande maaltijden als blokken. Ze hebben geen tijd, alleen een
+  // eetmoment: dan de tijd van dat moment uit het plan, anders een vaste tijd.
+  const zelfGeplandBlokken = (() => {
+    const VAST = { breakfast: 8 * 60, lunch: 12 * 60 + 30, snack: 15 * 60 + 30, dinner: 18 * 60 + 30 }
+    const NAAM = { breakfast: 'Ontbijt', lunch: 'Lunch', snack: 'Snack', dinner: 'Diner' }
+    const teller = {}
+    return zelfGepland.map(r => {
+      const moment = VAST[r.meal_type] != null ? r.meal_type : 'snack'
+      const uitPlan = blokken.find(b => b.type === 'meal' && String(b.meta?.slot || '').replace(/\d+$/, '') === moment)
+      const n = teller[moment] = (teller[moment] || 0) + 1
+      const start = Math.min(24 * 60 - 20, (uitPlan ? uitPlan.start : VAST[moment]) + (n - 1) * 5)
+      return {
+        id: `zelf-${r.id}`, day: dag, type: 'meal', label: NAAM[moment], sublabel: r.meal_name || 'Maaltijd',
+        start, end: start + 15, editable: false,
+        meta: { zelfGepland: true, rij: r, kcal: Number(r.calories) || 0, image_url: r.image_url || null, slot: moment },
+      }
+    })
+  })()
   const [dagStappen, setDagStappen] = useState(null) // { steps, doel }
   const [dagWater, setDagWater] = useState(null)     // { ml, doel }
   // Na het slepen van een blok in de agendaweergave: alleen vandaag of altijd?
@@ -531,7 +578,7 @@ export default function DagAgenda({
         zetGelogd(data || [])
       })
     return () => { weg = true }
-  }, [db, client?.id, dagIso, terug])
+  }, [db, client?.id, dagIso, terug, logVersie])
 
   const zetGelogd = (rijen) => {
     const som = { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -727,6 +774,7 @@ export default function DagAgenda({
   const inhoud = (
     <div ref={wortelRef} style={{
       display: 'flex', flexDirection: 'column', minHeight: 0,
+      marginBottom: !volledig && weergave === 'rooster' && pasHoogte ? -120 : 0,
       // De lijst groeit mee met de dag; het rooster krijgt een vaste hoogte en
       // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
       // De agendaweergave mag hoger dan de lijst: daar staat de hele dag op tijd.
@@ -1005,12 +1053,12 @@ export default function DagAgenda({
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', paddingTop: 40, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Dag laden…</div>
           ) : (
             <DagTijdlijn
-              blokken={[...blokken, ...losseLogs]}
+              blokken={[...blokken, ...losseLogs, ...zelfGeplandBlokken]}
               isMobile={isMobile}
               onOpen={onOpen}
               isGedaan={(b) => (b.meta?.los ? true : isGedaan(b))}
-              afronden={(b) => (b.meta?.los ? null : b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
-              onTijd={(b) => { if (!b.meta?.los) setBewerk(b) }}
+              afronden={(b) => (b.meta?.los ? null : b.meta?.zelfGepland ? () => geplandGegeten(b.meta.rij) : b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
+              onTijd={(b) => { if (!b.meta?.los && !b.meta?.zelfGepland) setBewerk(b) }}
               slaapVan={slaapVan}
               wegenVan={wegenVan}
               nuMin={isVandaag ? nuMin : null}
@@ -1030,6 +1078,13 @@ export default function DagAgenda({
                 else if (slaapDagIso && slaapDagIso <= toIsoDate(nu)) setSlaapBlad({ datum: slaapDagIso, bed: '23:00', op: '07:00' })
               }}
               uitloop={volledig ? 0 : zijMarge}
+              onderRuimte={volledig ? 0 : 100}
+              onVolgendeDag={() => verzet(1)}
+              volgendeLabel={(() => {
+                if (!datum) return 'Volgende dag'
+                const m = new Date(datum); m.setDate(m.getDate() + 1)
+                return `Naar ${m.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' }).replace('.', '')}`
+              })()}
             />
           )}
         </div>

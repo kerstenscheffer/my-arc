@@ -13,7 +13,7 @@
 // van DagAgenda, die de gegevens en de vensters al heeft.
 
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils } from 'lucide-react'
+import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight } from 'lucide-react'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
@@ -69,6 +69,12 @@ export default function DagTijdlijn({
   onWater = null,       // tik op het flesje → 100 ml erbij
   onVoeding = null,     // tik op de ring bij voeding → naar de maaltijdpagina
   onVerzet = null,      // (blok, nieuweStart) na slepen → de ouder vraagt: alleen vandaag of altijd?
+  // Hoeveel pixels onderaan achter de zwevende menubalk vallen. De agenda en de
+  // balken lopen daar gewoon door; alleen de ringen blijven erboven, en je kunt
+  // zo ver doorschuiven dat ook de late avond midden in beeld komt.
+  onderRuimte = 0,
+  onVolgendeDag = null, // onderaan de dag: door naar morgen
+  volgendeLabel = '',
 }) {
   const U = Math.max(0, Number(uitloop) || 0)
   // De beschikbare hoogte bepaalt de schaal: de hele dag past zonder scrollen.
@@ -340,6 +346,15 @@ export default function DagTijdlijn({
         )}
 
         </div>
+        {/* Onder 24:00: schuifruimte zodat ook de late avond midden in beeld
+            kan komen, met bovenaan de stap naar de volgende dag. */}
+        <div style={{ height: Math.round(tijdHoogte * 0.5), boxSizing: 'border-box', paddingTop: 10, paddingLeft: U, paddingRight: BALKEN + 8 }}>
+          {onVolgendeDag && (
+            <button onClick={onVolgendeDag} style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', ...tik }}>
+              {volgendeLabel || 'Volgende dag'} <ChevronRight size={16} strokeWidth={3} />
+            </button>
+          )}
+        </div>
         </div>
         {/* Voeding: één brede balk, kcal tegen het doel, met kcal en eiwit bovenin de vulling. */}
         <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden' }}>
@@ -351,8 +366,8 @@ export default function DagTijdlijn({
             const KNOP = 30
             const balkHoogte = tijdHoogte - BALK_BODEM
             const vul = Math.round(kDeel * balkHoogte)
-            const knopOnder = Math.max(4, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
-            const tekstOnder = knopOnder >= 34 ? knopOnder - 30 : knopOnder + KNOP + 4
+            const knopOnder = Math.max(4 + onderRuimte, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
+            const tekstOnder = knopOnder >= 34 + onderRuimte ? knopOnder - 30 : knopOnder + KNOP + 4
             return (
               <>
                 <button onClick={onVoeding || undefined} disabled={!onVoeding} aria-label="Naar je voeding" title={onVoeding ? 'Naar je voeding' : undefined}
@@ -384,8 +399,8 @@ export default function DagTijdlijn({
                   nog bijna leeg is. */}
               {(() => {
                 const KNOP = 30
-                const knopOnder = Math.max(4, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
-                const tekstOnder = knopOnder >= 34 ? knopOnder - 30 : knopOnder + KNOP + 4
+                const knopOnder = Math.max(4 + onderRuimte, Math.min(balkHoogte - KNOP - 4, vul - KNOP / 2))
+                const tekstOnder = knopOnder >= 34 + onderRuimte ? knopOnder - 30 : knopOnder + KNOP + 4
                 return (
                   <>
                     <button onClick={onWater || undefined} disabled={!onWater} aria-label="100 ml water erbij" title={onWater ? '100 ml erbij' : undefined}
