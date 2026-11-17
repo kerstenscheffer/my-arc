@@ -40,6 +40,13 @@ function Kaartje({ active, payload, label }) {
   const meting = van('meting')
   const band = van('band')
   const doel = van('doel')
+  // De weekdag erbij ("ma 9 nov"): zo zie je meteen of het een weekenddag was.
+  const iso = payload[0]?.payload?.datum
+  let dag = ''
+  if (iso) {
+    const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`)
+    if (!Number.isNaN(d.getTime())) dag = d.toLocaleDateString('nl-NL', { weekday: 'short' })
+  }
 
   const regel = (naam, waarde, dik = false) => waarde == null ? null : (
     <div key={naam} style={{
@@ -59,8 +66,8 @@ function Kaartje({ active, payload, label }) {
       borderRadius: 10, padding: '0.5rem 0.65rem',
       boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
     }}>
-      <div style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>
-        {label}
+      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#fff', marginBottom: 2 }}>
+        {dag ? `${dag} ` : ''}{label}
       </div>
       {regel('7-daags gemiddelde', trend != null ? `${trend} kg` : null, true)}
       {regel('Weging', meting != null ? `${meting} kg` : null)}
