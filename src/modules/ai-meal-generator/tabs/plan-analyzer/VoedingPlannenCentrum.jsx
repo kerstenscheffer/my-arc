@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BadgeCheck, Bookmark, Check, ChevronDown, Download, ExternalLink, Mars, Search, UserPlus, UtensilsCrossed, Venus, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BadgeCheck, Bookmark, Check, ChevronDown, Download, ExternalLink, Mars, Pencil, Search, UserPlus, UtensilsCrossed, Venus, X } from 'lucide-react'
 import { PRIVE } from '../../../coach-command-center/utils/privacyModus'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { supplementenVoorSjabloon } from './sjabloonExtras'
@@ -43,6 +43,7 @@ export default function VoedingPlannenCentrum({
   client = null,          // de klant die open staat (voor "Laden")
   onLoad = null,          // (week_structure, naam, { pre_workout_meal, supplements, template_id }) → in het open plan zetten
   onOpenKlant = null,     // (klant) → die klant openen in de Plan Analyzer
+  onBewerk = null,        // (template) → de template zelf openen in de Plan Analyzer
 }) {
   const sb = db.supabase
   const [laden, setLaden] = useState(true)
@@ -355,6 +356,7 @@ export default function VoedingPlannenCentrum({
                               <BadgeCheck size={18} strokeWidth={2.4} />
                             </button>
                           )}
+                          {onBewerk && !t.is_archived && <button onClick={() => onBewerk(t)} title="Template aanpassen" aria-label="Template aanpassen" style={icoonKnop}><Pencil size={16} /></button>}
                           <button onClick={() => zet(t, { is_archived: !t.is_archived })} disabled={!!bezig} title={t.is_archived ? 'Terugzetten' : 'Archiveren'} aria-label={t.is_archived ? 'Terugzetten' : 'Archiveren'} style={icoonKnop}>
                             {t.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                           </button>

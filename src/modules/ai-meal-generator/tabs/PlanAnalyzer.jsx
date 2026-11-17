@@ -300,6 +300,12 @@ export default function PlanAnalyzer({
   const [targets, setTargets] = useState(dailyTargets || null)
   const [blancoBezig, setBlancoBezig] = useState(false)
   const [planMeta, setPlanMeta] = useState(null)
+  // Een template zelf bewerken (17 nov 2026), zonder klant: { id, naam }. Zolang
+  // dit gezet is schrijft opslaan naar meal_plan_templates en nooit naar een
+  // klantplan (actievePlanId is dan leeg). De ref is er voor de opslagfuncties.
+  const [sjabloon, setSjabloonState] = useState(null)
+  const sjabloonRef = useRef(null)
+  const setSjabloon = (v) => { sjabloonRef.current = v; setSjabloonState(v) }
   // Week-modus: null = het basisplan (herhaalt elke week). Anders de maandag
   // ('JJJJ-MM-DD') van de week die je apart aanpast. Dan schrijft opslaan
   // geen week_structure, maar per afwijkende dag een datum-dag
@@ -481,6 +487,7 @@ export default function PlanAnalyzer({
       // Het oude plan blijft (gedimd) staan tot het nieuwe er is, zodat je
       // niet eerst het beginscherm ziet flitsen (9 okt 2026).
       setGegenereerdGenegeerd(true)
+      setSjabloon(null)
       setWisselBezig(true)
       setActivated(false)
       setHistory([]); setHistoryIndex(-1)
@@ -673,6 +680,7 @@ export default function PlanAnalyzer({
           .then(r => r, () => ({ data: null }))
         templateName = tmpl?.name || null
       }
+      setSjabloon(null)
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
       // Weer de basis; het effect bij datumModus legt de week (laatsteWeekRef)
       // er direct weer overheen.
@@ -948,6 +956,24 @@ export default function PlanAnalyzer({
   })
 
   const persistWeekData = async (updated, vorige = null, geldt = 'altijd') => {
+    // Template bewerken: de week gaat naar de template zelf, met nieuwe gemiddelden.
+    if (sjabloonRef.current) {
+      const ws = {}
+      updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
+      const tot = updated.map(d => d.totals).filter(t => t && (t.kcal || t.calories || t.protein))
+      const gem = (key, alt) => (tot.length ? Math.round(tot.reduce((n, t) => n + (t[key] ?? (alt ? t[alt] : 0) ?? 0), 0) / tot.length) : 0)
+      const cal = gem('kcal', 'calories'), prot = gem('protein'), carb = gem('carbs'), fat = gem('fat')
+      setWeekSaveState('saving')
+      const { data, error } = await db.supabase.from('meal_plan_templates').update({
+        week_structure: ws, daily_calories: cal, daily_protein: prot, daily_carbs: carb, daily_fat: fat,
+        base_macros: { calories: cal, protein: prot, carbs: carb, fat },
+        meals_per_day: Math.max(1, ...updated.map(d => Object.values(d.meals || {}).filter(Boolean).length)),
+        updated_at: new Date().toISOString(),
+      }).eq('id', sjabloonRef.current.id).select('id').then(x => x, (e) => ({ data: null, error: e }))
+      if (error || !data?.length) { console.error('❌ Template opslaan mislukt:', error || 'geen rij bijgewerkt'); setWeekSaveState('error') }
+      else { setWeekSaveState('saved'); setTimeout(() => setWeekSaveState(x => (x === 'saved' ? 'idle' : x)), 2000) }
+      return
+    }
     const planId = actievePlanId
     if (planId && weekModus) {
       if (geldt !== 'week' && vorige && basisDagenRef.current) {
@@ -1064,6 +1090,15 @@ export default function PlanAnalyzer({
   // Pre-workout maaltijd zetten of wissen. Schrijft naar een eigen kolom, niet
   // naar week_structure — zie de opmerking bij de state hierboven.
   const bewaarPreWorkout = async (meal) => {
+    if (sjabloonRef.current) {
+      setPreWorkoutMeal(meal)
+      setWeekSaveState('saving')
+      const { data, error } = await db.supabase.from('meal_plan_templates').update({ pre_workout_meal: meal, updated_at: new Date().toISOString() })
+        .eq('id', sjabloonRef.current.id).select('id').then(x => x, (e) => ({ data: null, error: e }))
+      if (error || !data?.length) { console.error('❌ Pre-workout van template opslaan mislukt:', error || 'geen rij bijgewerkt'); setWeekSaveState('error') }
+      else { setWeekSaveState('saved'); setTimeout(() => setWeekSaveState(x => (x === 'saved' ? 'idle' : x)), 2000) }
+      return
+    }
     const planId = actievePlanId
     setPreWorkoutMeal(meal)
     if (!planId) return
@@ -1412,7 +1447,35 @@ export default function PlanAnalyzer({
   // De pre-workout gaat in de eigen kolom van het plan (en dus automatisch op
   // de trainingsdagen van déze klant); de supplementen op het actieve
   // supplementenplan van de klant, met de trainingsdagen-regel ingevuld.
+  // Een template zelf openen om te bewerken; er hoeft geen klant gekozen te zijn.
+  const openSjabloon = async (t) => {
+    const { data, error } = await db.supabase.from('meal_plan_templates').select('id, name, template_name, week_structure, pre_workout_meal').eq('id', t.id).single()
+      .then(x => x, (e) => ({ data: null, error: e }))
+    if (error || !data?.week_structure) { console.error('❌ Template openen mislukt:', error); return }
+    const days = await hydrateWeekStructure(data.week_structure)
+    if (!days) return
+    const naam = data.name || data.template_name || 'Template'
+    setSelectedConceptId(null)
+    setWeekModus(null); setAfwijkendeDagen([]); basisDagenRef.current = null
+    setWisselBezig(false)
+    setSjabloon({ id: data.id, naam })
+    setPlanMeta({ id: null, name: naam, isActive: false, clientId: null })
+    setPreWorkoutMeal(data.pre_workout_meal || null)
+    setActivated(false)
+    setWeekData(days)
+    setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
+    setShowPlanLibrary(false); setDockedSection(null)
+  }
+  const sluitSjabloon = () => {
+    setSjabloon(null); setPlanMeta(null); setWeekData(null); setPreWorkoutMeal(null)
+    setHistory([]); setHistoryIndex(-1)
+    if (resolvedClientId) loadConceptPlansForClient(resolvedClientId)
+  }
+
   const handleLoadSavedPlan = async (ws, name, extra = {}) => {
+    // In een template laden zou die template overschrijven: eerst sluiten.
+    if (sjabloonRef.current) return
+
     if (!ws) return
     const hydrated = await hydrateWeekStructure(ws)
     if (!hydrated) return
@@ -1814,9 +1877,16 @@ export default function PlanAnalyzer({
             {/* Altijd bereikbaar: een opgeslagen sjabloon (full_week) laden — ook voor
                 een verse klant zonder eigen plan (maakt dan een nieuw plan aan). */}
             <button onClick={() => setShowPlanLibrary(true)} style={startKnop(false)}>
-              <Bookmark size={15} /> Sjabloon laden
+              <Bookmark size={15} /> Templates
             </button>
           </div>
+        )}
+
+        {/* Zonder klant: de templates zijn er altijd, om te bekijken, toe te wijzen of te bewerken. */}
+        {!resolvedClientId && (
+          <button onClick={() => setShowPlanLibrary(true)} style={{ ...startKnop(true), width: '100%', margin: '0.4rem 0 1.25rem' }}>
+            <Bookmark size={15} /> Voedingsplannen en templates
+          </button>
         )}
 
         {/* Het plan dat de klant nu volgt: groene streep en "Actief", zodat
@@ -1865,7 +1935,7 @@ export default function PlanAnalyzer({
             preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
             clientName={clientRecord?.first_name || ''}
             doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
-            onLoad={handleLoadSavedPlan}
+            onLoad={sjabloon ? null : handleLoadSavedPlan} onBewerk={openSjabloon}
             client={clientRecord || selectedClient || null}
             onOpenKlant={onSelectClient ? (k) => { setShowPlanLibrary(false); onSelectClient((clients || []).find(c => c.id === k.id) || k) } : null}
             onClose={() => setShowPlanLibrary(false)} />
@@ -2051,6 +2121,13 @@ export default function PlanAnalyzer({
     // waardoor de zijbalk hoger begon dan de rechterkant en de zwevende
     // Terug-knop over de klantknop viel (Kersten, 9 okt 2026).
     <div style={{ display: 'flex', flexDirection: 'column', position: 'sticky', top: kleefTop, height: paneelHoogte, minHeight: '400px', background: '#0a0a0a' }}>
+        {sjabloon && (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 34, padding: '0 1rem', background: '#000', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '0.8rem', fontWeight: 900, color: '#10b981' }}>
+            Template bewerken: <span style={{ color: '#fff' }}>{sjabloon.naam}</span>
+            <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>elke wijziging gaat direct in de template</span>
+            <button onClick={sluitSjabloon} style={{ minHeight: 26, padding: '0 0.6rem', borderRadius: 7, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer' }}>Sluiten</button>
+          </div>
+        )}
         {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
         {(planMeta || selectedConceptId || resolvedClientId) && (
           <div style={{ flexShrink: 0, opacity: wisselBezig ? 0.5 : 1, transition: 'opacity 0.2s ease', pointerEvents: wisselBezig ? 'none' : undefined }}>
@@ -2743,7 +2820,7 @@ export default function PlanAnalyzer({
           preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
           clientName={clientRecord?.first_name || ''}
           doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
-          onLoad={handleLoadSavedPlan}
+          onLoad={sjabloon ? null : handleLoadSavedPlan} onBewerk={openSjabloon}
           client={clientRecord || selectedClient || null}
           onOpenKlant={onSelectClient ? (k) => { setShowPlanLibrary(false); onSelectClient((clients || []).find(c => c.id === k.id) || k) } : null}
           onClose={() => setShowPlanLibrary(false)} />
