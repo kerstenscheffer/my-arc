@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from '../paginaPortal'
-import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check, Moon, Sun, Briefcase, Flag } from 'lucide-react'
+import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check, Moon, Sun, Briefcase, Flag, Coffee } from 'lucide-react'
 import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
 import TijdWiel from './TijdWiel'
 import { STAP, tijdTekst as tijd } from './tijdHelpers'
@@ -35,6 +35,8 @@ export default function BlokTijdSheet({
   blok, client, service, dagIso, mealPlanId, isMobile = false, onSluit, onKlaar,
   // Hetzelfde blok op andere dagen (nu alleen werk): voor 'Elke werkdag'.
   zelfdeOpAndereDagen = [],
+  // Werk: knop om een pauze toe te voegen (de ouder opent daarna dit venster voor de pauze).
+  onPauze = null,
 }) {
   const duurVan = (b) => {
     const d = b.end >= b.start ? b.end - b.start : (24 * 60 - b.start) + b.end
@@ -68,9 +70,11 @@ export default function BlokTijdSheet({
   const soort = blok.type === 'meal' ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || 'Blok')
   const naam = blok.sublabel || (blok.type === 'meal' ? null : blok.label)
   const recurringId = recurringIdFor(blok)
-  const verzet = tweeTijden
+  // Een nieuwe pauze bestaat nog niet: die mag je ook op de voorgestelde tijd opslaan.
+  const isNieuw = !!blok.meta?.nieuw
+  const verzet = isNieuw || (tweeTijden
     ? (bed !== nachtStart || op !== nachtEind)
-    : (blok.start !== start || duurVan(blok) !== duur)
+    : (blok.start !== start || duurVan(blok) !== duur))
   // Bij slaap is 'start' de bedtijd.
   const startOpslaan = tweeTijden ? bed : start
   const slaapUren = (() => { const m = op >= bed ? op - bed : (1440 - bed) + op; return Math.round((m / 60) * 10) / 10 })()
@@ -95,6 +99,34 @@ export default function BlokTijdSheet({
   }
 
   const bewaar = () => doe(async () => {
+    // Nieuwe pauze: een eigen blok in de agenda. Alleen deze dag = alleen deze
+    // week (week_start), anders vast op deze weekdag of op alle werkdagen.
+    if (isNieuw) {
+      const rij = (day, extra = {}) => ({
+        client_id: client.id, day, type: 'custom', label: blok.label || 'Pauze',
+        start_time: `${String(Math.floor(startOpslaan / 60)).padStart(2, '0')}:${String(startOpslaan % 60).padStart(2, '0')}:00`,
+        end_time: `${String(Math.floor(eind / 60)).padStart(2, '0')}:${String(eind % 60).padStart(2, '0')}:00`,
+        updated_at: new Date().toISOString(), ...extra,
+      })
+      const maandag = (() => { const d = new Date(`${dagIso}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+      const dagen = bereik === 'werkdagen' ? [blok.day, ...zelfdeOpAndereDagen.map(b => b.day)] : [blok.day]
+      const rijen = dagen.map(d => rij(d, bereik === 'vandaag' ? { week_start: maandag } : {}))
+      const { error } = await service.supabase.from('client_agenda_blocks').insert(rijen)
+      if (error) throw error
+      // Had je vóór 'Pauze toevoegen' ook je werktijden verzet? Die gaan mee,
+      // voor dezelfde dagen als de pauze.
+      const w = blok.meta?.werkWijziging
+      if (w?.blok) {
+        if (bereik === 'vandaag') {
+          await service.upsertOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(w.blok), startMin: w.start, endMin: w.end })
+        } else {
+          for (const b of (bereik === 'werkdagen' ? [w.blok, ...zelfdeOpAndereDagen] : [w.blok])) {
+            await service.shiftBlock({ block: { ...b, clientId: client.id }, newStartMin: w.start, newEndMin: w.end, mealPlanId })
+          }
+        }
+      }
+      return
+    }
     if (bereik === 'vandaag') {
       await service.upsertOverride({
         clientId: client.id, dateIso: dagIso, recurringId,
@@ -317,9 +349,12 @@ export default function BlokTijdSheet({
                       : 'Past je plan aan, ook voor de weken hierna.',
                   uit: volgtTraining,
                 },
-                ...(isWerk && zelfdeOpAndereDagen.length > 0 ? [{
-                  id: 'werkdagen', titel: 'Elke werkdag',
-                  uitleg: `Zet deze tijden op al je ${zelfdeOpAndereDagen.length + 1} werkdagen, ook de weken hierna.`,
+                ...((isWerk || isSlaap || isNieuw) && zelfdeOpAndereDagen.length > 0 ? [{
+                  // Werk: elke werkdag. Slaap: de hele week (17 nov 2026).
+                  id: 'werkdagen', titel: isSlaap ? 'De hele week' : 'Elke werkdag',
+                  uitleg: isSlaap
+                    ? 'Zet deze slaaptijden op elke nacht, ook de weken hierna.'
+                    : `Zet deze tijden op al je ${zelfdeOpAndereDagen.length + 1} werkdagen, ook de weken hierna.`,
                 }] : []),
               ].map(k => {
                 const aan = bereik === k.id
@@ -397,7 +432,18 @@ export default function BlokTijdSheet({
         {/* Weg voor vandaag, of terug naar wat de coach had gezet. Hoort bij de
             eerste stap: het zijn andere antwoorden op dezelfde vraag, geen
             vervolg erop. */}
-        {opTijd && (
+        {isNieuw && blok.meta?.werkWijziging && (
+          <div style={{ marginTop: 8, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+            Je nieuwe werktijden ({tijd(blok.meta.werkWijziging.start)} – {tijd(blok.meta.werkWijziging.end)}) worden meteen mee opgeslagen.
+          </div>
+        )}
+        {opTijd && isWerk && onPauze && (
+          <button onClick={() => onPauze({ start: bed, end: op, gewijzigd: bed !== nachtStart || op !== nachtEind })} disabled={bezig} style={{ ...stilleKnop, width: '100%', marginTop: 8 }}>
+            <Coffee size={13} strokeWidth={2.8} />
+            Pauze toevoegen
+          </button>
+        )}
+        {opTijd && !isNieuw && (
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button onClick={slaOver} disabled={bezig} style={stilleKnop}>
               <CalendarOff size={13} strokeWidth={2.8} />

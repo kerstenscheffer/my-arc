@@ -416,8 +416,28 @@ export default function DagAgenda({
 
   // Voor de agendaweergave: stappen en water van de getoonde dag. Alleen
   // ophalen als die weergave open staat.
+  const [losseLogs, setLosseLogs] = useState([])     // gelogd buiten het plan om, als blokken
   const [dagStappen, setDagStappen] = useState(null) // { steps, doel }
   const [dagWater, setDagWater] = useState(null)     // { ml, doel }
+  // Water bijtikken vanuit de agenda: 100 ml per tik, met een korte adempauze
+  // zodat vijf tikken één rij worden (zelfde opslag als de fles op de maaltijdpagina).
+  const waterTimer = useRef(null)
+  const waterErbij = () => {
+    const sb = db?.supabase || db
+    if (!sb?.from || !client?.id || !dagIso) return
+    const doel = dagWater?.doel || 3000
+    const nieuw = (dagWater?.ml || 0) + 100
+    setDagWater({ ml: nieuw, doel })
+    if (navigator.vibrate) navigator.vibrate(10)
+    const datum = dagIso
+    if (waterTimer.current) clearTimeout(waterTimer.current)
+    waterTimer.current = setTimeout(() => {
+      sb.from('ai_water_tracking').upsert({
+        client_id: client.id, date: datum, milliliters: nieuw, glasses: Math.round(nieuw / 250),
+        target_milliliters: doel, updated_at: new Date().toISOString(),
+      }, { onConflict: 'client_id,date' }).then(r => { if (r?.error) console.error('Water opslaan mislukt:', r.error) }, (e) => console.error('Water opslaan mislukt:', e))
+    }, 600)
+  }
   useEffect(() => {
     if (weergave !== 'rooster' || !client?.id || !dagIso) return
     const sb = db?.supabase || db
@@ -443,7 +463,7 @@ export default function DagAgenda({
     let weg = false
     db.supabase
       .from('consumed_meals')
-      .select('id, meal_id, meal_type, meal_name, calories, protein, carbs, fat, source')
+      .select('id, meal_id, meal_type, meal_name, calories, protein, carbs, fat, source, consumed_at, image_url')
       .eq('client_id', client.id)
       .gte('consumed_at', `${dagIso}T00:00:00`)
       .lt('consumed_at', `${dagIso}T23:59:59`)
@@ -472,6 +492,17 @@ export default function DagAgenda({
       carbs: Math.round(som.carbs), fat: Math.round(som.fat),
     })
     setGelogd(perSlot)
+    // Losse logs (niet uit het plan afgevinkt): in de agendaweergave op het
+    // tijdstip van loggen, zodat je ook ziet wat je er zelf bij at.
+    setLosseLogs(rijen.filter(r => r.source !== 'plan_check' && r.consumed_at).map(r => {
+      const t = new Date(r.consumed_at)
+      const start = t.getHours() * 60 + t.getMinutes()
+      return {
+        id: `log-${r.id}`, day: dag, type: 'meal', label: 'Gelogd', sublabel: r.meal_name || 'Gelogd',
+        start, end: Math.min(24 * 60, start + 15), editable: false,
+        meta: { los: true, kcal: Number(r.calories) || 0, image_url: r.image_url || null, slot: r.meal_type || null },
+      }
+    }))
   }
 
   const sleutelVan = (blok) => blok.sourceId || `type:${String(blok.meta?.slot || '').replace(/\d+$/, '')}`
@@ -913,12 +944,12 @@ export default function DagAgenda({
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', paddingTop: 40, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Dag laden…</div>
           ) : (
             <DagTijdlijn
-              blokken={blokken}
+              blokken={[...blokken, ...losseLogs]}
               isMobile={isMobile}
               onOpen={onOpen}
-              isGedaan={isGedaan}
-              afronden={(b) => (b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
-              onTijd={(b) => setBewerk(b)}
+              isGedaan={(b) => (b.meta?.los ? true : isGedaan(b))}
+              afronden={(b) => (b.meta?.los ? null : b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
+              onTijd={(b) => { if (!b.meta?.los) setBewerk(b) }}
               slaapVan={slaapVan}
               wegenVan={wegenVan}
               nuMin={isVandaag ? nuMin : null}
@@ -927,6 +958,7 @@ export default function DagAgenda({
               voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
               water={dagWater}
               dagSleutel={dagIso}
+              onWater={dagIso && dagIso <= toIsoDate(nu) ? waterErbij : null}
               onSlaap={() => {
                 // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
                 const b = blokken.find(x => x.type === 'sleep' && x.meta?.wrapHalf !== 'late')
@@ -973,7 +1005,34 @@ export default function DagAgenda({
             ? Object.entries(data?.blocksByDay || {}).flatMap(([d, lijst]) => d === bewerk.day ? [] : (lijst || [])
               .filter(x => x.type === 'work' && (x.label || '') === (bewerk.label || ''))
               .slice(0, 1))
-            : []}
+            // Nieuwe pauze: de andere dagen met hetzelfde werkblok, voor 'Elke werkdag'.
+            : bewerk?.meta?.nieuw
+              ? Object.entries(data?.blocksByDay || {}).flatMap(([d, lijst]) => d === bewerk.day ? [] : (lijst || [])
+                .filter(x => x.type === 'work' && (x.label || '') === (bewerk.meta.werkLabel || ''))
+                .slice(0, 1))
+            // Slaap: dezelfde helft van de nacht op de andere dagen, voor 'De hele week'.
+            : bewerk?.type === 'sleep'
+              ? Object.entries(data?.blocksByDay || {}).flatMap(([d, lijst]) => d === bewerk.day ? [] : (lijst || [])
+                .filter(x => x.type === 'sleep' && (x.meta?.wrapHalf || null) === (bewerk.meta?.wrapHalf || null))
+                .slice(0, 1))
+              : []}
+          // Werk zonder pauze op deze dag: knop om er een toe te voegen. Die opent
+          // dit venster opnieuw, nu voor een nieuwe pauze midden in de werktijd.
+          onPauze={bewerk?.type === 'work' && !blokken.some(x => x.type === 'custom' && /^pauze$/i.test(String(x.label || '').trim()))
+            ? (nieuw) => {
+              const werk = bewerk
+              // De tijden die in het werkvenster al gedraaid waren gaan mee naar de pauze.
+              const van = nieuw?.gewijzigd ? nieuw.start : werk.start
+              const tot = nieuw?.gewijzigd ? nieuw.end : werk.end
+              const midden = Math.round(((van + tot) / 2) / 5) * 5
+              const start = Math.max(van, Math.min(tot - 30, midden - 15))
+              setBewerk(null)
+              setTimeout(() => setBewerk({
+                id: 'nieuwe-pauze', day: werk.day, type: 'custom', label: 'Pauze', start, end: start + 30, editable: true,
+                meta: { nieuw: true, werkLabel: werk.label || '', werkWijziging: nieuw?.gewijzigd ? { blok: werk, start: van, end: tot } : null },
+              }), 0)
+            }
+            : null}
           onSluit={() => setBewerk(null)}
           onKlaar={() => { setBewerk(null); setVersie(v => v + 1) }}
         />
