@@ -76,6 +76,25 @@ function MacroBalk({ label, waarde, doel, compact = false, eenheid = 'g', kleur 
   )
 }
 
+// Klantvenster: één ring per cijfer, het getal erin, label en doel eronder.
+function Ring({ label, waarde, doel, tekst = null, doelTekst = null, kleur = '#fff' }) {
+  const R = 22, O = 2 * Math.PI * R
+  const deel = doel > 0 ? Math.max(0, Math.min(1, waarde / doel)) : 0
+  return (
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ position: 'relative', width: 54, height: 54 }}>
+        <svg width="54" height="54" viewBox="0 0 54 54" style={{ display: 'block', transform: 'rotate(-90deg)' }} aria-hidden="true">
+          <circle cx="27" cy="27" r={R} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+          <circle cx="27" cy="27" r={R} fill="none" stroke={kleur} strokeWidth="5" strokeLinecap="round" strokeDasharray={O} strokeDashoffset={O * (1 - deel)} style={{ transition: 'stroke-dashoffset 0.4s ease' }} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{tekst ?? fmt(waarde)}</div>
+      </div>
+      <div style={{ marginTop: 4, fontSize: '0.56rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.1 }}>{label}</div>
+      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{doelTekst ?? (doel > 0 ? `/ ${fmt(doel)}` : '')}</div>
+    </div>
+  )
+}
+
 const kopje = (tekst, extra = null, compact = false) => (
   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: compact ? '0.8rem 0 0.35rem' : '1.5rem 0 0.75rem' }}>
     <span style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tekst}</span>
@@ -440,9 +459,6 @@ export default function MealDaySummaryModal({
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
-  const dagTitel = gekozenSleutel === vandaagSleutel ? 'Vandaag'
-    : gekozenSleutel === sleutel(plusDagen(new Date(), -1)) ? 'Gisteren'
-    : gekozen.toLocaleDateString('nl-NL', { weekday: 'long' })
 
   // Weekcijfers voor Coach Inzicht: gekleurd van rood naar groen, met uitleg.
   const schaal = (t) => {
@@ -456,31 +472,33 @@ export default function MealDaySummaryModal({
   const geweest = week.filter(w => w.k <= vandaagSleutel).length
   const stats = [
     {
-      id: 'kcal', label: 'gem. kcal', waarde: weekGem ? fmt(weekGem.kcal) : '–',
+      id: 'kcal', label: 'gem. kcal', kort: 'kcal gem', waarde: weekGem ? fmt(weekGem.kcal) : '–',
       kleur: weekGem && doel.kcal ? kcalKleur(weekGem.kcal, doel.kcal, '#fff') : '#fff',
       uitleg: !doel.kcal ? 'Geen kcal-doel ingesteld.' : !weekGem ? `Doel ${fmt(doel.kcal)} kcal per dag. Deze week nog niets gelogd.`
         : `Doel ${fmt(doel.kcal)} kcal per dag, werkelijk gemiddeld ${fmt(weekGem.kcal)} over ${gelogdeDagen.length} gelogde ${gelogdeDagen.length === 1 ? 'dag' : 'dagen'}: ${weekGem.kcal >= doel.kcal ? `${fmt(weekGem.kcal - doel.kcal)} erboven` : `${fmt(doel.kcal - weekGem.kcal)} eronder`}.`,
     },
     {
-      id: 'eiwit', label: 'gem. eiwit', waarde: weekGem ? `${fmt(weekGem.eiwit)}g` : '–',
+      id: 'eiwit', label: 'gem. eiwit', kort: 'eiwit gem', waarde: weekGem ? `${fmt(weekGem.eiwit)}g` : '–',
       // 60% van het doel of minder is rood, het doel halen is groen.
       kleur: weekGem && doel.eiwit ? schaal((weekGem.eiwit / doel.eiwit - 0.6) / 0.4) : '#fff',
       uitleg: !doel.eiwit ? 'Geen eiwitdoel ingesteld.' : !weekGem ? `Doel ${fmt(doel.eiwit)} g per dag. Deze week nog niets gelogd.`
         : `Doel ${fmt(doel.eiwit)} g per dag, werkelijk gemiddeld ${fmt(weekGem.eiwit)} g (${Math.round((weekGem.eiwit / doel.eiwit) * 100)}% van het doel).`,
     },
     {
-      id: 'dagen', label: 'dagen gelogd', waarde: `${gelogdeDagen.length}/7`,
+      id: 'dagen', label: 'dagen gelogd', kort: 'gelogd', waarde: `${gelogdeDagen.length}/7`,
       kleur: geweest ? schaal(gelogdeDagen.length / geweest) : '#fff',
       uitleg: geweest ? `Doel: elke dag loggen. ${gelogdeDagen.length} van de ${geweest} ${geweest === 1 ? 'dag' : 'dagen'} die al geweest zijn.` : 'Deze week moet nog beginnen.',
     },
     ...(doel.kcal > 0 ? [{
-      id: 'opdoel', label: 'op doel', waarde: `${opDoel}/${gelogdeDagen.length || 0}`,
+      id: 'opdoel', label: 'op doel', kort: 'op doel', waarde: `${opDoel}/${gelogdeDagen.length || 0}`,
       kleur: gelogdeDagen.length ? schaal(opDoel / gelogdeDagen.length) : '#fff',
       uitleg: `Op doel = binnen 100 kcal van ${fmt(doel.kcal)}. ${opDoel} van de ${gelogdeDagen.length} gelogde ${gelogdeDagen.length === 1 ? 'dag' : 'dagen'}.`,
     }] : []),
   ]
   const statOpen = stats.find(x => x.id === statInfo) || null
   // Achtergrond van het vlak waar dit in staat: de kaart in Coach Inzicht of het venster bij de klant.
+  // Klantvenster op de telefoon: alles moet op één regel passen.
+  const smal = isMobile && !ingebed
   const vlak = ingebed ? '#0e0e0e' : '#0a0a0a'
   // Een geplande maaltijd openklappen kan overal waar tikken niet al wisselen betekent.
   const kanInfo = !onWisselMaaltijd
@@ -492,11 +510,25 @@ export default function MealDaySummaryModal({
   const dagCijfersBlok = (
     <>
               {/* ── 1. De dag ── */}
-              {/* Kcal, de drie macro's en water op één regel (op de telefoon twee regels van drie). */}
+              {/* Kcal, de drie macro's en water op één regel: bij de klant als ringen, bij de coach als balkjes. */}
               {(() => {
                 const c = toonPlan ? dagCijfers : dag
+                if (!ingebed) {
+                  const wt = water[gekozenSleutel] || null
+                  const doelMl = gekozenSleutel < vandaagSleutel && (wt?.doel || 0) > 0 ? wt.doel : waterDoelNu
+                  const l = (x) => (x / 1000).toFixed(1).replace('.', ',').replace(',0', '')
+                  return (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Ring label={toonPlan ? 'Gepland' : 'Kcal'} waarde={c.kcal} doel={doel.kcal} kleur={toonPlan ? 'rgba(255,255,255,0.45)' : maaltijden.length ? kcalKleur(dag.kcal, doel.kcal, '#fff') : '#fff'} />
+                      <Ring label="Eiwit" waarde={c.eiwit} doel={doel.eiwit} doelTekst={doel.eiwit > 0 ? `/ ${fmt(doel.eiwit)}g` : 'g'} />
+                      <Ring label="Koolh." waarde={c.koolh} doel={doel.koolh} doelTekst={doel.koolh > 0 ? `/ ${fmt(doel.koolh)}g` : 'g'} />
+                      <Ring label="Vet" waarde={c.vet} doel={doel.vet} doelTekst={doel.vet > 0 ? `/ ${fmt(doel.vet)}g` : 'g'} />
+                      <Ring label="Water" waarde={wt?.ml || 0} doel={doelMl} tekst={l(wt?.ml || 0)} doelTekst={`/ ${l(doelMl)}L`} kleur="#38bdf8" />
+                    </div>
+                  )
+                }
                 return (
-                  <div style={isMobile && !ingebed ? { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px 14px' } : { display: 'flex', gap: 14 }}>
+                  <div style={{ display: 'flex', gap: 14 }}>
                     {/* Naar de Plan Analyzer met het plan van deze klant (17 nov 2026, Kersten). */}
                     {onPlan && (
                       <button type="button" onClick={onPlan} aria-label="Plan openen in de Plan Analyzer" title="Voedingsplan openen in de Plan Analyzer"
@@ -634,14 +666,14 @@ export default function MealDaySummaryModal({
               {/* Coach Inzicht: de gelogde maaltijden als stapeltje kaarten dat
                   openklapt, zoals 'gedaan' op de homepagina van de klant. */}
               {(
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: isMobile && !ingebed ? 'wrap' : 'nowrap', gap: isMobile && !ingebed ? '2px 10px' : 10, margin: '0.7rem 0 0', minHeight: 44 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0.7rem 0 0', minHeight: 44 }}>
               {!toekomst && (maaltijden.length > 0 || suppDag.length > 0) ? (
                 <button onClick={wisselLijst} aria-expanded={!lijstDicht}
                   aria-label={`${maaltijden.length} gelogd, ${lijstDicht ? 'bekijken' : 'inklappen'}`}
                   style={{ flexShrink: 0, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                   <style>{`@keyframes ciDeckUit { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }`}</style>
                   <span style={{ display: 'flex', alignItems: 'center', paddingLeft: 2 }}>
-                    {maaltijden.slice(0, isMobile && !ingebed ? 5 : 8).map((m, i) => {
+                    {maaltijden.slice(0, smal ? 2 : 8).map((m, i) => {
                       const rot = ((i * 37) % 9) - 4
                       return (
                         <span key={m.id || i} style={{
@@ -659,7 +691,7 @@ export default function MealDaySummaryModal({
                     )}
                   </span>
                   <span style={{ fontSize: '0.78rem', fontWeight: 900, color: GROEN, whiteSpace: 'nowrap' }}>
-                    {maaltijden.length} gelogd{suppDag.length > 0 ? ` · ${suppDag.length} ${suppDag.length === 1 ? 'supplement' : 'supplementen'}` : ''}
+                    {maaltijden.length} gelogd{suppDag.length > 0 && !smal ? ` · ${suppDag.length} ${suppDag.length === 1 ? 'supplement' : 'supplementen'}` : ''}
                   </span>
                   <ChevronRight size={15} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, transform: lijstDicht ? 'none' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
                 </button>
@@ -667,14 +699,14 @@ export default function MealDaySummaryModal({
                 <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{toekomst ? 'Nog niet geweest' : 'Niets gelogd'}</span>
               )}
                 {/* Weekcijfers, klein en dicht op elkaar, rechts van het stapeltje. */}
-                <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexShrink: 0 }}>
+                <span style={{ marginLeft: 'auto', display: 'flex', gap: smal ? 9 : 12, flexShrink: 0 }}>
                   {stats.map(x => (
                     <button key={x.id} onClick={() => setStatInfo(v => (v === x.id ? null : x.id))} title={x.uitleg}
                       style={{ padding: 0, background: 'none', border: 'none', textAlign: 'right', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, fontSize: '0.84rem', fontWeight: 900, color: x.kleur, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-                        {x.waarde}<Info size={10} strokeWidth={2.6} color={statInfo === x.id ? '#fff' : 'rgba(255,255,255,0.35)'} />
+                        {x.waarde}{!smal && <Info size={10} strokeWidth={2.6} color={statInfo === x.id ? '#fff' : 'rgba(255,255,255,0.35)'} />}
                       </span>
-                      <span style={{ display: 'block', fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 1, whiteSpace: 'nowrap' }}>{x.label}</span>
+                      <span style={{ display: 'block', fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 1, whiteSpace: 'nowrap' }}>{smal ? x.kort : x.label}</span>
                     </button>
                   ))}
                 </span>
@@ -801,21 +833,14 @@ export default function MealDaySummaryModal({
           {...(zwevend && !ingebed ? venster.sleepHandvat : {})}
           style={ingebed
             ? { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isMobile ? '0.5rem 0.6rem 0.2rem 1rem' : '0.4rem 0.8rem 0.1rem 1.25rem' }
-            : { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isMobile ? '0.9rem 0.75rem 0.8rem 1rem' : '1rem 1rem 0.9rem 1.25rem', borderBottom: `1px solid ${LIJN}`, ...(zwevend ? (venster.sleepHandvat.style || {}) : {}) }}
+            : { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isMobile ? '0.6rem 0.75rem 0.3rem 1rem' : '0.7rem 1rem 0.3rem 1.25rem', ...(zwevend ? (venster.sleepHandvat.style || {}) : {}) }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: ingebed ? 'none' : 'block', fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Inzicht</div>
-            <div style={{ fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {dagTitel} <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'none' }}>· {gekozen.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace(/\.$/, '')}</span>
-            </div>
-          </div>
-          {/* De dag kies je in de weekstrook; hier de maand en een week terug of verder. */}
+          <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Inzicht</div>
+          {/* De dag en de week kies je in de weekstrook; hier alleen de maand. */}
           <button type="button" aria-haspopup="dialog" aria-expanded={!!maandPop} aria-label="Maand kiezen" title={`${NL_MONTHS[maand.m]} ${maand.y}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMaandPop(o => (o ? null : { x: r.left, y: r.bottom + 2, boven: r.top })) }}
             style={pijl}><CalendarDays size={18} strokeWidth={2.6} /></button>
-          <button onClick={() => kies(plusDagen(gekozen, -7))} aria-label="Vorige week" title="Vorige week" style={pijl}><ChevronLeft size={20} strokeWidth={3} /></button>
-          <button onClick={() => kies(plusDagen(gekozen, 7))} aria-label="Volgende week" title="Volgende week" style={pijl}><ChevronRight size={20} strokeWidth={3} /></button>
           {!ingebed && <button onClick={onClose} aria-label="Sluiten" style={{ ...pijl, width: 38, height: 38, marginLeft: 4, borderRadius: 11, background: 'rgba(255,255,255,0.06)', border: `1px solid ${LIJN}` }}><X size={18} strokeWidth={2.8} /></button>}
         </div>
         )}
@@ -829,8 +854,11 @@ export default function MealDaySummaryModal({
               {/* Coach Inzicht: de dagenstrook boven de tegels, zelfde vorm als bij
                   Training: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
               <div style={gedeeld ? { position: 'sticky', top: 0, zIndex: 3, background: '#050505', paddingBottom: 6 } : { position: 'sticky', top: '-0.4rem', zIndex: 5, background: vlak, margin: `0 ${isMobile ? '-1rem' : '-1.25rem'}`, padding: `0.4rem ${isMobile ? '1rem' : '1.25rem'} 0.5rem`, borderBottom: `1px solid ${LIJN}` }}>
+              <div style={ingebed ? undefined : { position: 'relative' }}>
+              {!ingebed && <button onClick={() => kies(plusDagen(gekozen, -7))} aria-label="Vorige week" title="Vorige week" style={{ ...pijl, position: 'absolute', left: isMobile ? -16 : -19, top: 0, width: 18, height: 26, zIndex: 2 }}><ChevronLeft size={17} strokeWidth={3} /></button>}
+              <div>
               {!gedeeld && (
-                <div style={{ display: 'flex', gap: 6, margin: '0.3rem 0 5px' }}>
+                <div style={{ display: 'flex', gap: smal ? 4 : 6, margin: '0.3rem 0 5px' }}>
                   {week.map((w, i) => {
                     const aan = w.k === gekozenSleutel
                     const wPijl = { ...pijl, width: 18, height: 26, flexShrink: 0, color: aan ? '#000' : '#fff' }
@@ -866,7 +894,7 @@ export default function MealDaySummaryModal({
                   })}
                 </div>
               )}
-              <div style={{ position: 'relative', height: 84, display: gedeeld ? 'none' : 'flex', alignItems: 'flex-end', gap: 6 }}>
+              <div style={{ position: 'relative', height: 84, display: gedeeld ? 'none' : 'flex', alignItems: 'flex-end', gap: smal ? 4 : 6 }}>
                 {doel.kcal > 0 && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doel.kcal / staafMax) * 100}%`, borderTop: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none', zIndex: 1 }} />
                 )}
@@ -898,26 +926,29 @@ export default function MealDaySummaryModal({
                           van de kcal, donker, met kcal en eiwit er dik overheen. */}
                       {kcal > 0 && (
                         <span style={{
-                          position: 'absolute', left: 0, right: 5, bottom: 0, height: `${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}%`,
-                          overflow: 'hidden', borderRadius: '6px 0 0 0', background: 'rgba(255,255,255,0.1)', transition: 'height 0.3s ease',
+                          position: 'absolute', left: ingebed ? 0 : 4, right: ingebed ? 5 : 12, bottom: ingebed ? 0 : 4, height: ingebed ? `${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}%` : `calc(${Math.max(34, Math.min(100, (kcal / staafMax) * 100))}% - 8px)`,
+                          overflow: 'hidden', borderRadius: ingebed ? '6px 0 0 0' : 5, background: ingebed ? 'rgba(255,255,255,0.1)' : w.gelogd ? kcalKleur(w.kcal, doel.kcal) : 'rgba(255,255,255,0.14)', transition: 'height 0.3s ease',
                         }}>
-                          {foto && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: w.gelogd ? 0.4 : 0.2 }} />}
-                          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)' }} />
+                          {ingebed && foto && <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: w.gelogd ? 0.4 : 0.2 }} />}
+                          {ingebed && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)' }} />}
                           {/* Kleur van de kcal tegen het doel: dunne lijn bovenop de staaf. */}
-                          {w.gelogd && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: kcalKleur(w.kcal, doel.kcal, '#fff') }} />}
-                          <span style={{ position: 'absolute', left: 2, right: 2, bottom: 4, textAlign: 'center', lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                            <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 900, letterSpacing: '-0.02em', color: w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
+                          {ingebed && w.gelogd && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: kcalKleur(w.kcal, doel.kcal, '#fff') }} />}
+                          <span style={{ position: 'absolute', left: 2, right: 2, bottom: 4, textAlign: 'center', lineHeight: 1.1, textShadow: ingebed ? '0 1px 6px rgba(0,0,0,0.9)' : '0 1px 3px rgba(0,0,0,0.45)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                            <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 900, letterSpacing: '-0.02em', color: !ingebed ? (w.gelogd ? '#fff' : 'rgba(255,255,255,0.6)') : w.gelogd ? kcalKleur(w.kcal, doel.kcal, '#fff') : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
                             {w.gelogd && <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, color: '#fff' }}>E {fmt(w.eiwit)}g</span>}
                           </span>
                         </span>
                       )}
                       {/* Water: strook langs de rechterkant, van onderen gevuld. */}
-                      <span style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 5, background: 'rgba(0,0,0,0.55)' }}>
-                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(waterDeel * 100)}%`, background: '#38bdf8', transition: 'height 0.3s ease' }} />
+                      <span style={ingebed ? { position: 'absolute', top: 0, bottom: 0, right: 0, width: 5, background: 'rgba(0,0,0,0.55)' } : { position: 'absolute', top: 4, bottom: 4, right: 4, width: 4, borderRadius: 2, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
+                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(waterDeel * 100)}%`, background: '#38bdf8', borderRadius: ingebed ? 0 : 2, transition: 'height 0.3s ease' }} />
                       </span>
                     </button>
                   )
                 })}
+              </div>
+              </div>
+              {!ingebed && <button onClick={() => kies(plusDagen(gekozen, 7))} aria-label="Volgende week" title="Volgende week" style={{ ...pijl, position: 'absolute', right: isMobile ? -16 : -19, top: 0, width: 18, height: 26, zIndex: 2 }}><ChevronRight size={17} strokeWidth={3} /></button>}
               </div>
               {/* Coach Inzicht: tot hier staat alles vast (dagen, tegels, cijfers, weekstats);
                   gepland en gelogd scrollen eronderdoor. */}

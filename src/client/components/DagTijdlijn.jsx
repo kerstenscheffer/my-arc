@@ -13,7 +13,7 @@
 // van DagAgenda, die de gegevens en de vensters al heeft.
 
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight } from 'lucide-react'
+import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight, Info } from 'lucide-react'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
@@ -68,6 +68,8 @@ export default function DagTijdlijn({
   // (uurlijnen, slaap- en werkkleur) loopt door tot de schermrand; wat ertoe
   // doet (tijden, blokken, balken) blijft binnen die marge staan.
   uitloop = 0,
+  // Het vlak eromheen loopt zelf al van rand tot rand: dan geen negatieve marge.
+  zonderMarge = false,
   onSlaap = null,       // tik op de slaapband → slaap invullen
   onWater = null,       // tik op het flesje → 100 ml erbij
   onVoeding = null,     // 'Loggen' in het ballonnetje bij de voedingsring → naar de maaltijdpagina
@@ -176,12 +178,14 @@ export default function DagTijdlijn({
   } : {})
 
   const GROOT = isMobile ? 58 : 54
+  // Een maaltijd is een kaart (foto, naam, macro's, i en vinkje), hoger dan een losse regel.
+  const KAART = isMobile ? 48 : 42
   const KLEIN = isMobile ? 34 : 28
   // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
   let onder = -Infinity
   const geplaatst = [...dingen].sort((a, b) => a.start - b.start).map(b => {
     const groot = b.type === 'training' || isCardio(b)
-    const h = groot ? GROOT : KLEIN
+    const h = groot ? GROOT : b.type === 'meal' ? KAART : KLEIN
     // Het blok dat je sleept volgt je hand en duwt niets opzij.
     const mee = sleep?.id === b.id
     const top = mee ? (b.start + sleep.delta - asStart) * pxPerMin : Math.max((b.start - asStart) * pxPerMin, onder)
@@ -230,7 +234,7 @@ export default function DagTijdlijn({
   )
 
   return (
-    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box', marginLeft: -U, marginRight: -U }}>
+    <div ref={vak} style={{ position: 'relative', flex: 1, minHeight: 320, height: hoogte || '100%', display: 'flex', gap: 6, boxSizing: 'border-box', marginLeft: zonderMarge ? 0 : -U, marginRight: zonderMarge ? 0 : -U }}>
       {/* De dag */}
       <div style={{
         position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden', background: 'transparent',
@@ -342,6 +346,45 @@ export default function DagTijdlijn({
               const openen = maaltijd && onOpen ? () => onOpen(b) : (wg?.kan ? wg.onLog : null)
               const extra = maaltijd ? (Number(b.meta?.kcal) > 0 ? `${fmt(b.meta.kcal)} kcal` : null)
                 : wg?.gelogd != null ? `${String(wg.gelogd).replace('.', ',')} kg` : null
+              // Maaltijd: een kaart zoals op de maaltijdpagina, met een i (openen) en het vinkje.
+              if (maaltijd) {
+                const foto = resolveFoodImage({ image_url: b.meta?.image_url, name: naam }) || foodImageFallback(naam, b.meta?.slot, 120)
+                const doorgestreept = klaar && !b.meta?.los
+                const delen = [
+                  Number(b.meta?.kcal) > 0 ? `${fmt(b.meta.kcal)} kcal` : null,
+                  Number(b.meta?.protein) > 0 ? `${fmt(b.meta.protein)}g eiwit` : null,
+                ].filter(Boolean)
+                const knop = { flexShrink: 0, width: isMobile ? 38 : 32, alignSelf: 'stretch', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }
+                return (
+                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
+                    ...sleepStijl(b), position: 'absolute', left: 0, right: 0, top, height: KAART, boxSizing: 'border-box',
+                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
+                    background: mee ? '#1a1a1a' : '#121212',
+                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: openen ? 'pointer' : 'default', ...tik }}>
+                      <span style={{ width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: doorgestreept ? 0.5 : 1 }} />
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: doorgestreept ? 0.6 : 1 }}>
+                        <span style={{ fontSize: isMobile ? '0.8rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: doorgestreept ? 'line-through' : 'none' }}>{naam}</span>
+                        <span style={{ fontSize: isMobile ? '0.62rem' : '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {tijdKnop(b, 'inherit')}{delen.length ? ` · ${delen.join(' · ')}` : ''}{volgende?.id === b.id && <span style={{ color: '#fff', fontWeight: 900 }}> · {overTekst(b)}</span>}
+                        </span>
+                      </span>
+                    </div>
+                    {openen && (
+                      <button onClick={alsGeenSleep(openen)} aria-label="Bekijk deze maaltijd" title="Bekijken" style={knop}>
+                        <Info size={isMobile ? 18 : 15} strokeWidth={2.4} color="rgba(255,255,255,0.6)" />
+                      </button>
+                    )}
+                    {b.meta?.los && <span style={{ ...knop, cursor: 'default' }}><CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /></span>}
+                    {vink && (
+                      <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
+                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
+                      </button>
+                    )}
+                  </div>
+                )
+              }
               return (
                 <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{ ...sleepStijl(b), background: mee ? '#141414' : undefined, borderRadius: mee ? 6 : undefined, position: 'absolute', left: 0, right: 0, top, height: KLEIN, display: 'flex', alignItems: 'center', gap: 5, opacity: klaar && !b.meta?.los ? 0.6 : 1 }}>
                   <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', gap: 5, cursor: openen ? 'pointer' : 'default', ...tik }}>

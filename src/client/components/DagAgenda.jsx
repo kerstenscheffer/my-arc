@@ -107,7 +107,7 @@ function verdeelInKolommen(blokken) {
 }
 
 export default function DagAgenda({
-  client, db, isMobile = false, hoogte, onOpen,
+  client, db, isMobile = false, onOpen,
   // Van buitenaf gestuurd: staan de pijltjes elders op de pagina (bij de
   // begroeting), dan houdt die de dag bij en toont de agenda zijn eigen kop
   // niet. Zonder deze props stuurt hij zichzelf.
@@ -156,53 +156,31 @@ export default function DagAgenda({
   // Hoe hoog de agendaweergave mag zijn: van zijn bovenkant tot net boven de
   // zwevende menubalk. Opnieuw gemeten als het scherm van maat verandert.
   const wortelRef = useRef(null)
-  const [pasHoogte, setPasHoogte] = useState(0)
+  // Agendaweergave op de pagina: het vlak zit met CSS vast aan de onderrand van
+  // het scherm (position: fixed, bottom 0), net als de zwevende menubalk. Alleen
+  // de bovenkant en de linkermarge worden gemeten; de onderkant kan dus nooit
+  // te kort of te lang uitvallen.
+  const bakenRef = useRef(null)   // onzichtbaar punt linksboven in het scherm (zelfde 'vast' als de menubalk)
+  const plekRef = useRef(null)    // waar de agenda in de pagina begint
+  const [vast, setVast] = useState(null) // { top, links }
   useEffect(() => {
     if (weergave !== 'rooster') return
-    // Het vlak dat scrolt is niet altijd het venster (meekijken, zwevend
-    // paneel): meet daarom tegen de dichtstbijzijnde scrollende ouder.
-    const scrollOuder = (el) => {
-      for (let p = el?.parentElement; p; p = p.parentElement) {
-        const o = getComputedStyle(p).overflowY
-        if ((o === 'auto' || o === 'scroll') && p !== document.body && p !== document.documentElement) return p
-      }
-      return null
-    }
     const meet = () => {
-      const el = wortelRef.current
-      if (!el) return
-      const ouder = scrollOuder(el)
-      const r = el.getBoundingClientRect()
-      let boven, zicht
-      if (ouder) {
-        // In een geschaald paneel (meekijken) zijn de gemeten rechthoeken
-        // verkleind en de hoogte van het vlak niet: reken terug naar gewone pixels.
-        const or = ouder.getBoundingClientRect()
-        const schaal = ouder.clientHeight > 0 && or.height > 0 ? or.height / ouder.clientHeight : 1
-        boven = (r.top - or.top) / (schaal || 1) + ouder.scrollTop
-        zicht = ouder.clientHeight
-      } else {
-        boven = r.top + (window.scrollY || 0)
-        zicht = window.innerHeight
-      }
-      // Tot de onderkant van het scherm: de agenda loopt door achter de zwevende
-      // balk. De 120px die het dashboard onderaan vrijhoudt, haalt de negatieve
-      // marge op de wortel weer weg, zodat de pagina zelf niet scrolt.
-      setPasHoogte(Math.max(360, Math.round(zicht - boven)))
+      const plek = plekRef.current, baken = bakenRef.current
+      if (!plek || !baken) return
+      const r = plek.getBoundingClientRect(), b = baken.getBoundingClientRect()
+      // In een geschaald paneel (meekijken) zijn gemeten afstanden verkleind.
+      const schaal = plek.offsetWidth > 0 && r.width > 0 ? r.width / plek.offsetWidth : 1
+      const top = Math.max(0, Math.round((r.top - b.top) / (schaal || 1)))
+      const links = Math.max(0, Math.round((r.left - b.left) / (schaal || 1)))
+      setVast(v => (v && v.top === top && v.links === links ? v : { top, links }))
     }
     meet()
-    // Wat erboven staat kan na het laden nog van hoogte veranderen (banners,
-    // de kop): dan opnieuw meten, anders zakt de onderkant onder het scherm.
-    const timers = [250, 800, 2000].map(ms => setTimeout(meet, ms))
+    const timers = [100, 400, 1200, 2500].map(ms => setTimeout(meet, ms))
     window.addEventListener('resize', meet)
-    const ouder = scrollOuder(wortelRef.current)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(meet) : null
-    if (ro) {
-      if (ouder) { ro.observe(ouder); if (ouder.firstElementChild) ro.observe(ouder.firstElementChild) }
-      else ro.observe(document.body)
-    }
+    if (ro) { ro.observe(document.body); if (wortelRef.current?.parentElement) ro.observe(wortelRef.current.parentElement) }
     return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', meet); if (ro) ro.disconnect() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weergave])
   useEffect(() => { onWeergave?.(weergave) }, [weergave]) // eslint-disable-line react-hooks/exhaustive-deps
   const [volledig, setVolledig] = useState(false)
@@ -792,13 +770,12 @@ export default function DagAgenda({
   const inhoud = (
     <div ref={wortelRef} style={{
       display: 'flex', flexDirection: 'column', minHeight: 0,
-      marginBottom: !volledig && weergave === 'rooster' && pasHoogte ? -120 : 0,
       // De lijst groeit mee met de dag; het rooster krijgt een vaste hoogte en
       // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
       // De agendaweergave mag hoger dan de lijst: daar staat de hele dag op tijd.
       // Agendaweergave: precies tot boven de menubalk, zodat de pagina zelf niet
       // meer scrolt en er geen lege zwarte ruimte onder komt.
-      height: volledig ? '100%' : (weergave === 'rooster' ? (pasHoogte || (Number(hoogte) > 0 ? Number(hoogte) + 200 : (hoogte || '100%'))) : 'auto'),
+      height: volledig ? '100%' : 'auto',
     }}>
       {/* Kop: pijltjes om de dag heen. Staan die elders op de pagina, dan
           slaat de agenda zijn eigen kop over. */}
@@ -882,7 +859,7 @@ export default function DagAgenda({
         >
           <SlidersHorizontal size={15} strokeWidth={2.6} />
         </button>
-        {(weergave === 'rooster' || volledig) && (
+        {volledig && (
           <button
             onClick={() => setVolledig(v => !v)}
             title={volledig ? 'Sluiten' : 'Op het hele scherm'}
@@ -1090,7 +1067,12 @@ export default function DagAgenda({
       {/* Agendaweergave: de dag als één tegel op tijd, met slaap, stappen,
           voeding en water (zelfde opbouw als een dag in Coach Inzicht). */}
       {weergave === 'rooster' && (
-        <div ref={roosterRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div ref={plekRef} style={volledig ? { flex: 1, minHeight: 0, display: 'flex' } : { height: 0 }}>
+        <div ref={roosterRef} style={volledig ? { flex: 1, minHeight: 0, display: 'flex' } : {
+          // Vast aan het scherm: van hier tot helemaal onderaan, achter de menubalk langs.
+          position: 'fixed', top: vast ? vast.top : 0, left: 0, right: 0, bottom: 0, zIndex: 85,
+          display: vast ? 'flex' : 'none', background: '#0a0a0a',
+        }}>
           {laden ? (
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', paddingTop: 40, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Dag laden…</div>
           ) : (
@@ -1121,7 +1103,8 @@ export default function DagAgenda({
                 if (sl?.kan) sl.onLog()
                 else if (slaapDagIso && slaapDagIso <= toIsoDate(nu)) setSlaapBlad({ datum: slaapDagIso, bed: '23:00', op: '07:00' })
               }}
-              uitloop={volledig ? 0 : zijMarge}
+              uitloop={volledig ? 0 : (vast?.links ?? zijMarge)}
+              zonderMarge={!volledig}
               onderRuimte={volledig ? 0 : 100}
               onVolgendeDag={() => verzet(1)}
               volgendeLabel={(() => {
@@ -1131,6 +1114,7 @@ export default function DagAgenda({
               })()}
             />
           )}
+        </div>
         </div>
       )}
 
@@ -1153,6 +1137,7 @@ export default function DagAgenda({
         onGewicht={(r) => { if (r?.datum === slaapDagIso) setGewogenOp(r.gewicht) }}
       />
 
+      {weergave === 'rooster' && !volledig && <div ref={bakenRef} aria-hidden style={{ position: 'fixed', left: 0, top: 0, width: 0, height: 0, pointerEvents: 'none' }} />}
       {/* Het weekvenster van de stappen (bekijken, met de hand invullen, koppelen);
           opent via de stappenband in de agendaweergave. */}
       {db?.supabase && <StappenPil client={client} db={db} isMobile={isMobile} verborgen />}
