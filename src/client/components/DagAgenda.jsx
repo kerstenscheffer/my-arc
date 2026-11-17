@@ -32,6 +32,7 @@ import usePaginaTerug from '../usePaginaTerug'
 import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
 import DagTijdlijn from './DagTijdlijn'
+import StappenPil from './StappenPil'
 import StappenService, { STANDAARD_DOEL } from '../../modules/steps/StappenService'
 import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
 import WorkoutServiceNew from '../../modules/workout/services/WorkoutServiceNew'
@@ -172,21 +173,35 @@ export default function DagAgenda({
       if (!el) return
       const ouder = scrollOuder(el)
       const r = el.getBoundingClientRect()
-      const boven = ouder ? r.top - ouder.getBoundingClientRect().top + ouder.scrollTop : r.top + (window.scrollY || 0)
-      const zicht = ouder ? ouder.clientHeight : window.innerHeight
+      let boven, zicht
+      if (ouder) {
+        // In een geschaald paneel (meekijken) zijn de gemeten rechthoeken
+        // verkleind en de hoogte van het vlak niet: reken terug naar gewone pixels.
+        const or = ouder.getBoundingClientRect()
+        const schaal = ouder.clientHeight > 0 && or.height > 0 ? or.height / ouder.clientHeight : 1
+        boven = (r.top - or.top) / (schaal || 1) + ouder.scrollTop
+        zicht = ouder.clientHeight
+      } else {
+        boven = r.top + (window.scrollY || 0)
+        zicht = window.innerHeight
+      }
       // Tot de onderkant van het scherm: de agenda loopt door achter de zwevende
       // balk. De 120px die het dashboard onderaan vrijhoudt, haalt de negatieve
       // marge op de wortel weer weg, zodat de pagina zelf niet scrolt.
-      const onder = 0
-      setPasHoogte(Math.max(360, Math.round(zicht - boven - onder)))
+      setPasHoogte(Math.max(360, Math.round(zicht - boven)))
     }
     meet()
-    const t = setTimeout(meet, 250) // na het laden kan de kop erboven nog van hoogte veranderen
+    // Wat erboven staat kan na het laden nog van hoogte veranderen (banners,
+    // de kop): dan opnieuw meten, anders zakt de onderkant onder het scherm.
+    const timers = [250, 800, 2000].map(ms => setTimeout(meet, ms))
     window.addEventListener('resize', meet)
     const ouder = scrollOuder(wortelRef.current)
-    const ro = ouder && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(meet) : null
-    if (ro) ro.observe(ouder)
-    return () => { clearTimeout(t); window.removeEventListener('resize', meet); if (ro) ro.disconnect() }
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(meet) : null
+    if (ro) {
+      if (ouder) { ro.observe(ouder); if (ouder.firstElementChild) ro.observe(ouder.firstElementChild) }
+      else ro.observe(document.body)
+    }
+    return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', meet); if (ro) ro.disconnect() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weergave])
   useEffect(() => { onWeergave?.(weergave) }, [weergave]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -531,11 +546,11 @@ export default function DagAgenda({
   // Water bijtikken vanuit de agenda: 100 ml per tik, met een korte adempauze
   // zodat vijf tikken één rij worden (zelfde opslag als de fles op de maaltijdpagina).
   const waterTimer = useRef(null)
-  const waterErbij = () => {
+  const waterErbij = (stap = 100) => {
     const sb = db?.supabase || db
     if (!sb?.from || !client?.id || !dagIso) return
     const doel = dagWater?.doel || 3000
-    const nieuw = (dagWater?.ml || 0) + 100
+    const nieuw = Math.max(0, (dagWater?.ml || 0) + (Number(stap) || 100))
     setDagWater({ ml: nieuw, doel })
     if (navigator.vibrate) navigator.vibrate(10)
     const datum = dagIso
@@ -879,7 +894,12 @@ export default function DagAgenda({
         )}
       </>)
         // Agendaweergave op de homepagina: in de datumregel erboven.
-        if (knoppenSlot && weergave === 'rooster' && !volledig) return domPortal(<span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{knoppen}</span>, knoppenSlot)
+        if (knoppenSlot && weergave === 'rooster' && !volledig) return domPortal(
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Dagvoortgang, klein: hoeveel van wat er af te vinken valt is gedaan. */}
+            {voortgang.totaal > 0 && <span title={voortgang.rond ? 'Dag rond' : `${voortgang.gedaan} van ${voortgang.totaal} gedaan`} style={{ fontSize: '0.72rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums', letterSpacing: 0, marginRight: 2 }}>{voortgang.gedaan}/{voortgang.totaal}</span>}
+            {knoppen}
+          </span>, knoppenSlot)
         return (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 0,
@@ -1089,7 +1109,9 @@ export default function DagAgenda({
               voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
               water={dagWater}
               dagSleutel={dagIso}
-              onWater={dagIso && dagIso <= toIsoDate(nu) ? waterErbij : null}
+              onWater={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(100) : null}
+              onWaterMin={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(-100) : null}
+              onStappen={() => window.dispatchEvent(new CustomEvent('myarc:stappen-open'))}
               onVoeding={onOpen ? () => onOpen({ type: 'meal', day: dag }) : null}
               onVerzet={(b, start) => setVerzetVraag({ blok: b, start })}
               onSlaap={!(slaapDagIso && slaapDagIso <= toIsoDate(nu)) ? null : () => {
@@ -1130,6 +1152,10 @@ export default function DagAgenda({
         alleenGewicht
         onGewicht={(r) => { if (r?.datum === slaapDagIso) setGewogenOp(r.gewicht) }}
       />
+
+      {/* Het weekvenster van de stappen (bekijken, met de hand invullen, koppelen);
+          opent via de stappenband in de agendaweergave. */}
+      {db?.supabase && <StappenPil client={client} db={db} isMobile={isMobile} verborgen />}
 
       {/* Na het slepen: alleen vandaag of altijd? */}
       {verzetVraag && createPortal(

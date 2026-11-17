@@ -21,7 +21,9 @@ const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 const kort = (n) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nl(n))
 
 // `kaal`: zonder bolletje, voor in de zwarte bovenbalk.
-export default function StappenPil({ client, db, isMobile = false, kaal = false }) {
+// `verborgen`: geen pil in beeld; het weekvenster opent dan via de gebeurtenis
+// 'myarc:stappen-open' (de stappenband in de agenda op Home).
+export default function StappenPil({ client, db, isMobile = false, kaal = false, verborgen = false }) {
   const [week, setWeek] = useState([])
   const [doel, setDoel] = useState(STANDAARD_DOEL)
   const [open, setOpen] = useState(false)
@@ -66,6 +68,13 @@ export default function StappenPil({ client, db, isMobile = false, kaal = false 
     return true
   }
 
+  useEffect(() => {
+    if (!verborgen) return
+    const op = () => setOpen(true)
+    window.addEventListener('myarc:stappen-open', op)
+    return () => window.removeEventListener('myarc:stappen-open', op)
+  }, [verborgen])
+
   if (!klaar || !client?.id) return null
 
   const vandaag = week.find(d => d.isVandaag)
@@ -76,6 +85,7 @@ export default function StappenPil({ client, db, isMobile = false, kaal = false 
   return (
     <>
       <button
+        hidden={verborgen}
         onClick={() => setOpen(true)}
         title="Stappen van deze week"
         aria-label={`Stappen vandaag: ${nl(stand)}. Bekijk je week.`}
