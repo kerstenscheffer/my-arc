@@ -219,6 +219,8 @@ const CHAT_LICHT = [
 // plus internet: alleen lezen, wijzigen via voorstellen.
 const SLIM_MODEL = process.env.PA_SLIM_MODEL || 'claude-fable-5-2'
 const SLIM_TOEGESTAAN = [...CHAT_TOEGESTAAN, 'WebSearch', 'WebFetch']
+// Per bericht. Loopt het al bij het inlezen van een lang gesprek vol, dan probeert rondeChat het één keer opnieuw.
+const SLIM_BUDGET = 10
 const SLIM_ARGS = [
   '--model', SLIM_MODEL,
   '--effort', 'high',
@@ -647,7 +649,7 @@ async function maakWarm(slim = null) {
     '--append-system-prompt', prompt,
     '--allowedTools', (slim.toegestaan || SLIM_TOEGESTAAN).join(','),
     ...(slim.hervat ? ['--resume', slim.id] : ['--session-id', slim.id]),
-    '--max-budget-usd', '10',
+    '--max-budget-usd', String(SLIM_BUDGET),
     ...SLIM_ARGS,
   ] : [
     ...basis,
@@ -672,8 +674,10 @@ async function maakWarm(slim = null) {
     }
   })
   p.stderr.on('data', d => { w.fout = (w.fout || '') + d })
-  p.on('close', () => {
+  p.on('close', (code, signaal) => {
     w.dood = true
+    w.code = code
+    w.signaal = signaal
     if (ctx) { vraagProcessen.delete(ctx.sleutel); vraagToolKapot(w.fout) }
     w.opEinde?.()
   })
@@ -700,11 +704,30 @@ const KLANT_FOCUS = `Je zit in het tabje Klanten. Hier gaat het over Kerstens co
 
 `
 
+// Waarom een chat geen antwoord gaf, in gewone taal (17 nov 2026: twee chats
+// eindigden stil met 'Geen antwoord van Claude Code'). Claude Code sluit dan af
+// met een eindbericht zonder tekst; de soort staat in subtype. Nooit leeg.
+const kort = (t, n = 200) => String(t || '').replace(/\s+/g, ' ').trim().replace(/[.!\s]+$/, '').slice(0, n)
+function redenVanEinde(m, budget) {
+  const sub = String(m?.subtype || '')
+  if (/budget/.test(sub)) return { soort: 'budget', reden: `het budget van $${budget} per bericht was op${m.total_cost_usd ? ` (dit bericht kostte $${Number(m.total_cost_usd).toFixed(2)})` : ''}, meestal doordat een lang gesprek na een pauze helemaal opnieuw ingelezen moest worden` }
+  if (/max_turns/.test(sub)) return { soort: 'stappen', reden: 'te veel stappen achter elkaar zonder eindantwoord' }
+  const fout = kort([].concat(m?.errors || []).map(e => (typeof e === 'string' ? e : e?.message || JSON.stringify(e))).join('; ') || m?.result)
+  if (fout) return { soort: 'fout', reden: `Claude Code gaf een fout (${fout})` }
+  if (sub && sub !== 'success') return { soort: 'fout', reden: `Claude Code stopte met ${sub}` }
+  return { soort: 'leeg', reden: 'Claude Code gaf een leeg antwoord' }
+}
+// Bestaat de sessie al op schijf? Dan hervatten, ook als de eerste beurt mislukte
+// (anders weigert Claude Code het sessie-id bij elk volgend bericht).
+const SESSIE_BESTANDEN = path.join(os.homedir(), '.claude', 'projects', MAP.replace(/[^a-zA-Z0-9]/g, '-'))
+const sessieBestaat = (id) => { try { return fs.statSync(path.join(SESSIE_BESTANDEN, `${id}.jsonl`)).size > 0 } catch { return false } }
+
 // opDeel(tekst): halve tekst tijdens het typen.
 // rijId: bij welke opdracht een toestemmingsvraag hoort; zonderVragen: groeironde; toegestaan: smallere toolset (statscheck).
+// Mislukt: { ok: false, reden, soort } en de reden ook als antwoord.tekst (groeirondes lezen die).
 async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zonderVragen = false, toegestaan = null } = {}) {
   const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
-  const hervat = !!slimId && slimSessies.has(slimId)
+  const hervat = !!slimId && (slimSessies.has(slimId) || sessieBestaat(slimId))
   let w
   if (slimId) w = await maakWarm({ id: slimId, hervat, zonderVragen, toegestaan })
   else {
@@ -730,7 +753,9 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
     .slice(-10).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
   const r = await new Promise((klaar) => {
     let deel = ''
-    const stop = maakKlok((slimId ? 10 : 5) * 60 * 1000, () => w.p.kill('SIGTERM'))
+    const maxMin = slimId ? 10 : 5
+    let teLang = false, gestopt = false
+    const stop = maakKlok(maxMin * 60 * 1000, () => { teLang = true; w.p.kill('SIGTERM') })
     let vast = null
     const hond = maakWaakhond(() => w.p.pid, (reden) => {
       if (vast) return
@@ -749,18 +774,30 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
       } else if (m.type === 'result') {
         stop.stop()
         hond.klok.stop()
-        klaar({ ok: m.subtype === 'success' && !m.is_error, tekst: m.result || '' })
+        const ok = m.subtype === 'success' && !m.is_error && !!m.result
+        klaar(ok ? { ok, tekst: m.result } : { ok, ...redenVanEinde(m, slimId ? SLIM_BUDGET : 3) })
         w.p.stdin.end()
       }
     }
-    w.opEinde = () => { stop.stop(); hond.klok.stop(); klaar({ ok: false, tekst: vast || w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
-    opStop?.(() => w.p.kill('SIGTERM'))
+    w.opEinde = () => {
+      stop.stop(); hond.klok.stop()
+      const reden = vast ? kort(vast, 400)
+        : gestopt ? 'gestopt'
+        : teLang ? `het duurde langer dan ${maxMin} minuten`
+        : w.fout?.trim() ? `Claude Code stopte met een fout (${kort(w.fout)})`
+        : `Claude Code stopte zonder antwoord${w.signaal ? ` (${w.signaal})` : w.code ? ` (code ${w.code})` : ''}`
+      klaar({ ok: false, soort: vast ? 'vast' : teLang ? 'tijd' : 'gestopt', reden, volledig: vast })
+    }
+    opStop?.(() => { gestopt = true; w.p.kill('SIGTERM') })
     if (w.dood) return w.opEinde()
     w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
   })
   if (slimId && r.ok) bewaarSlimSessie(slimId)
   if (!slimId) setTimeout(zetWarmKlaar, 500)
-  if (!r.ok || !r.tekst) return { ok: false, antwoord: { tekst: r.tekst || 'Geen antwoord van Claude Code.', acties: [] } }
+  if (!r.ok) {
+    const reden = r.reden || 'geen antwoord van Claude Code'
+    return { ok: false, reden, soort: r.soort || 'fout', antwoord: { tekst: r.volledig || reden, acties: [] } }
+  }
   return { ok: true, antwoord: leesAntwoord(r.tekst) }
 }
 
