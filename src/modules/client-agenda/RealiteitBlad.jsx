@@ -5,7 +5,7 @@
 // oefeningen met hun sets. Zelfde kaarten en zelfde ophaalwegen als het
 // voedings- en trainingspaneel in het inzicht, zodat het één verhaal blijft.
 
-import { verwijderSessie } from '../workout/utils/sessieVerwijderen'
+import { verwijderSessie, verwijderOefeningenUitSessie } from '../workout/utils/sessieVerwijderen'
 import { useEffect, useState } from 'react'
 import { MessageSquare, Pencil } from 'lucide-react'
 import BladModal from '../workout/components/todays-workout/components/BladModal'
@@ -99,15 +99,28 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
   const [wegFout, setWegFout] = useState(null)
   const verwijder = async () => {
     setWegBezig(true); setWegFout(null)
-    try { await verwijderSessie(db.supabase, meta.sessionId); onVerwijderd?.() }
-    catch (e) { setWegFout(e.message || 'Verwijderen mislukt'); setWegBezig(false) }
+    try {
+      // Eén van twee trainingen op deze dag: alleen de oefeningen die hier staan.
+      if (deel) await verwijderOefeningenUitSessie(db.supabase, meta.sessionId, oefeningen)
+      else await verwijderSessie(db.supabase, meta.sessionId)
+      onVerwijderd?.()
+    } catch (e) { setWegFout(e.message || 'Verwijderen mislukt'); setWegBezig(false) }
   }
-  const [oefeningen, setOefeningen] = useState(null)
+  const [alle, setOefeningen] = useState(null)
+  // Twee trainingen op één dag delen één sessie (17 nov 2026). meta.oefFilter zegt welke
+  // gelogde oefeningen bij deze training horen: { soort: 'alleen' | 'behalve', namen }.
+  const filter = meta.oefFilter || null
+  const schoon = (n) => String(n || '').trim().toLowerCase()
+  const oefeningen = alle === null ? null : !filter ? alle : alle.filter(o => {
+    const erin = (filter.namen || []).includes(schoon(o.exercise_name))
+    return filter.soort === 'alleen' ? erin : !erin
+  })
+  const deel = !!filter && alle !== null && oefeningen.length < alle.length
   useEffect(() => {
     let weg = false
     if (!meta.sessionId || !db?.supabase) { setOefeningen([]); return }
     db.supabase.from('workout_progress')
-      .select('exercise_name, sets, notes, created_at, attachment_used')
+      .select('id, exercise_name, sets, notes, created_at, attachment_used')
       .eq('session_id', meta.sessionId)
       .order('created_at', { ascending: true })
       .then(({ data }) => { if (!weg) setOefeningen(data || []) }, () => { if (!weg) setOefeningen([]) })
@@ -119,12 +132,17 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
   return (
     <>
       <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '0.75rem' }}>
-        {tijd(blok.start)}–{tijd(blok.end)} · {meta.estimated_time}{meta.exercise_count ? ` · ${meta.exercise_count} oefeningen` : ''}{meta.afgerond ? ' · afgerond' : ''}
+        {deel ? (() => {
+          // Eigen begin en eind van dit deel van de dag, uit de tijden van de gelogde oefeningen.
+          const ts = oefeningen.map(o => new Date(o.created_at)).filter(d => !Number.isNaN(d.getTime())).sort((a, b) => a - b)
+          const hm = (d) => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+          return `${ts.length ? `${hm(ts[0])}${ts.length > 1 ? `–${hm(ts[ts.length - 1])}` : ''} · ` : ''}${oefeningen.length} ${oefeningen.length === 1 ? 'oefening' : 'oefeningen'}`
+        })() : <>{tijd(blok.start)}–{tijd(blok.end)} · {meta.estimated_time}{meta.exercise_count ? ` · ${meta.exercise_count} oefeningen` : ''}{meta.afgerond ? ' · afgerond' : ''}</>}
       </div>
       {oefeningen === null ? (
         <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
       ) : oefeningen.length === 0 ? (
-        <div style={{ padding: '0.5rem 0 1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>Geen oefeningen gelogd in deze sessie.</div>
+        <div style={{ padding: '0.5rem 0 1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>{filter ? 'Van deze training is niets gelogd.' : 'Geen oefeningen gelogd in deze sessie.'}</div>
       ) : oefeningen.map((ex, idx) => {
         const sets = Array.isArray(ex.sets) ? ex.sets : []
         const beste = sets.reduce((m, st) => Math.max(m, Number(st.weight) || 0), 0)
@@ -189,9 +207,9 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
           {meta.afgerond ? 'Verder met deze training' : 'Doorgaan met training'}
         </button>
       )}
-      {onVerwijderd && meta.sessionId && (vraagWeg ? (
+      {onVerwijderd && meta.sessionId && !(filter && oefeningen !== null && oefeningen.length === 0) && (vraagWeg ? (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', textAlign: 'center', marginBottom: 8 }}>Deze training met alle gelogde sets verwijderen? Dit kan niet ongedaan worden.</div>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', textAlign: 'center', marginBottom: 8 }}>{deel ? `Alleen deze training (${oefeningen.length} ${oefeningen.length === 1 ? 'oefening' : 'oefeningen'}) verwijderen? De andere training van deze dag blijft staan. Dit kan niet ongedaan worden.` : 'Deze training met alle gelogde sets verwijderen? Dit kan niet ongedaan worden.'}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setVraagWeg(false)} disabled={wegBezig} style={{ flex: 1, minHeight: 44, borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Annuleren</button>
             <button onClick={verwijder} disabled={wegBezig} style={{ flex: 1, minHeight: 44, borderRadius: 12, background: '#ef4444', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', opacity: wegBezig ? 0.6 : 1 }}>{wegBezig ? 'Bezig…' : 'Verwijderen'}</button>

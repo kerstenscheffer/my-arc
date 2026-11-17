@@ -224,6 +224,28 @@ export default function WeekSchedule({
   const [gedaneDagen, setGedaneDagen] = useState([]) // [{ workout_day, workout_date, sessie }]
   // Geopende afgeronde sessie (tik op een 'Gedaan'-tegel): blok voor RealiteitBlad.
   const [sessieBlad, setSessieBlad] = useState(null)
+  // Een gedane tegel openen. Staan er twee (of meer) trainingen op de dag, dan delen ze
+  // één sessie in de database; het blad toont en verwijdert dan alleen de oefeningen van
+  // de aangeklikte training (17 nov 2026). Wat bij geen van de extra trainingen hoort,
+  // valt onder de hoofdtraining.
+  const openGedaan = (day, key = null) => {
+    const g = gedaneDagen.find(u => u.workout_day === day)
+    if (!g?.blok) return
+    const vanDeDag = trainingenVanDag(tempSchedule, day)
+    if (!key || vanDeDag.length < 2 || !vanDeDag.includes(key)) { setSessieBlad(g.blok); return }
+    const schoon = (n) => String(n || '').trim().toLowerCase()
+    const namenVan = (k) => (getWorkoutData(k)?.exercises || []).map(e => schoon(e?.name)).filter(Boolean)
+    const eigen = namenVan(key)
+    const isHoofd = key === vanDeDag[0]
+    const vanExtras = vanDeDag.slice(1).flatMap(namenVan).filter(n => !namenVan(vanDeDag[0]).includes(n))
+    const data = getWorkoutData(key)
+    setSessieBlad({
+      ...g.blok,
+      id: `${g.blok.id}-${key}`,
+      sublabel: (data?.name || data?.focus || g.blok.sublabel || 'Training').trim(),
+      meta: { ...g.blok.meta, oefFilter: isHoofd ? { soort: 'behalve', namen: vanExtras } : { soort: 'alleen', namen: eigen } },
+    })
+  }
   // Geopende gedane cardio (tik op een groene cardiotegel): { log, soort, gepland }
   const [cardioBlad, setCardioBlad] = useState(null)
   // Logscherm voor één oefening op een afgeronde dag: { exercise, datum }.
@@ -913,7 +935,7 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
-                onOpenGedaan={(day) => { const g = gedaneDagen.find(u => u.workout_day === day); if (g?.blok) setSessieBlad(g.blok) }}
+                onOpenGedaan={openGedaan}
                 onOpenCardioGedaan={(c) => c?.log && setCardioBlad({ log: c.log, soort: c.soort, gepland: c.duur })}
                 onRemoveTraining={vraagTraining}
                 randloos={isMobile}

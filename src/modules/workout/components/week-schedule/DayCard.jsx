@@ -270,7 +270,7 @@ export default function DayCard({
               foto={getWorkoutImage({ name: gedaanAnders.naam || 'Training' })}
               eyebrow="Gedaan" titel={gedaanAnders.naam || 'Training'}
               klaar kanSchuiven={false}
-              onClick={onOpenGedaan || undefined}
+              onClick={onOpenGedaan ? () => onOpenGedaan(null) : undefined}
               aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
             />
           )}
@@ -282,7 +282,7 @@ export default function DayCard({
               klaar={isCompleted}
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
-              onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || kanBekijken || swapMode ? handleClick : undefined)}
+              onClick={isCompleted && onOpenGedaan ? () => onOpenGedaan(workoutKey) : (kanOpenen || kanBekijken || swapMode ? handleClick : undefined)}
               aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
@@ -299,7 +299,7 @@ export default function DayCard({
               kanSchuiven={!x.klaar && kanPlannen && !!onShiftExtra}
               onLinks={() => onShiftExtra?.(x.rosterKey, -1)} onRechts={() => onShiftExtra?.(x.rosterKey, +1)}
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
-              onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
+              onClick={x.klaar && onOpenGedaan ? () => onOpenGedaan(x.key) : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
               aaneen={aaneen} isMobile={isMobile} icoon={Dumbbell} band={band()}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
               onUitplannen={kanPlannen && onUitplannenExtra ? () => onUitplannenExtra(x.rosterKey) : null}

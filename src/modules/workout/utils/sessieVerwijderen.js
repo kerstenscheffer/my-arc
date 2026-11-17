@@ -19,3 +19,23 @@ export async function verwijderSessie(sb, sessionId) {
   }
   window.dispatchEvent(new CustomEvent('myarc:workout-verwijderd'))
 }
+
+// Eén training van een dag met twee trainingen eruit (17 nov 2026). Alle sets van een
+// dag hangen aan dezelfde sessie, dus hier gaan alleen de gelogde oefeningen van die
+// ene training weg (op id). Blijft er niets over, dan gaat de sessie zelf ook weg.
+export async function verwijderOefeningenUitSessie(sb, sessionId, progressRijen) {
+  const ids = (progressRijen || []).map(r => r?.id).filter(Boolean)
+  if (!sessionId || !ids.length) throw new Error('Niets om te verwijderen')
+  const { data: rij } = await sb.from('workout_sessions').select('id, client_id, workout_date').eq('id', sessionId).maybeSingle()
+  const { data: weg, error } = await sb.from('workout_progress').delete().eq('session_id', sessionId).in('id', ids).select('id')
+  if (error) throw error
+  if (!weg?.length) throw new Error('Geen rechten om deze training te verwijderen')
+  // Het cijfer per oefening van de bouwfase hoort bij die oefening: gaat mee.
+  const namen = [...new Set((progressRijen || []).map(r => r?.exercise_name).filter(Boolean))]
+  if (rij && namen.length) {
+    await sb.from('training_feedback').delete().eq('client_id', rij.client_id).eq('datum', rij.workout_date).eq('soort', 'oefening').in('oefening', namen).then(r => r, () => null)
+  }
+  const { count } = await sb.from('workout_progress').select('id', { count: 'exact', head: true }).eq('session_id', sessionId)
+  if (!count) { await verwijderSessie(sb, sessionId); return }
+  window.dispatchEvent(new CustomEvent('myarc:workout-verwijderd'))
+}

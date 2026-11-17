@@ -30,6 +30,8 @@ import MacroBoxes from './MacroBoxes'
 import usePaginaTerug from '../usePaginaTerug'
 import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
+import DagTijdlijn from './DagTijdlijn'
+import StappenService, { STANDAARD_DOEL } from '../../modules/steps/StappenService'
 import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
 import WorkoutServiceNew from '../../modules/workout/services/WorkoutServiceNew'
 import { workoutCompletionPct } from '../../modules/workout/utils/exerciseCompletion'
@@ -402,6 +404,31 @@ export default function DagAgenda({
   // Wat er op deze dag is gelogd. Eén query per dag; bij het afvinken werken
   // we de lijst hier lokaal bij, zodat de ringen meteen meebewegen.
   const dagIso = datum ? toIsoDate(datum) : null
+
+  // Voor de agendaweergave: stappen en water van de getoonde dag. Alleen
+  // ophalen als die weergave open staat.
+  const [dagStappen, setDagStappen] = useState(null) // { steps, doel }
+  const [dagWater, setDagWater] = useState(null)     // { ml, doel }
+  useEffect(() => {
+    if (weergave !== 'rooster' || !client?.id || !dagIso) return
+    const sb = db?.supabase || db
+    if (!sb?.from) return
+    let weg = false
+    const dbObj = { supabase: sb }
+    Promise.all([
+      StappenService.haalWeek(dbObj, client.id, new Date(`${dagIso}T12:00:00`)).then(r => r, () => []),
+      StappenService.haalDoel(dbObj, client.id).then(r => r, () => STANDAARD_DOEL),
+      sb.from('ai_water_tracking').select('milliliters, target_milliliters').eq('client_id', client.id).eq('date', dagIso).maybeSingle().then(r => r, () => ({ data: null })),
+    ]).then(([week, doel, w]) => {
+      if (weg) return
+      const rij = (week || []).find(x => x.iso === dagIso)
+      setDagStappen({ steps: Number(rij?.steps) || 0, doel: doel || STANDAARD_DOEL })
+      const standaard = Math.round((Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3) * 1000)
+      setDagWater({ ml: Number(w?.data?.milliliters) || 0, doel: Number(w?.data?.target_milliliters) > 0 ? Number(w.data.target_milliliters) : standaard })
+    })
+    return () => { weg = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weergave, client?.id, dagIso, db])
   useEffect(() => {
     if (!client?.id || !db?.supabase || !dagIso) return
     let weg = false
@@ -603,7 +630,8 @@ export default function DagAgenda({
       display: 'flex', flexDirection: 'column', minHeight: 0,
       // De lijst groeit mee met de dag; het rooster krijgt een vaste hoogte en
       // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
-      height: volledig ? '100%' : (weergave === 'rooster' ? (hoogte || '100%') : 'auto'),
+      // De agendaweergave mag hoger dan de lijst: daar staat de hele dag op tijd.
+      height: volledig ? '100%' : (weergave === 'rooster' ? (Number(hoogte) > 0 ? Number(hoogte) + 200 : (hoogte || '100%')) : 'auto'),
     }}>
       {/* Kop: pijltjes om de dag heen. Staan die elders op de pagina, dan
           slaat de agenda zijn eigen kop over. */}
@@ -677,7 +705,7 @@ export default function DagAgenda({
 
       {/* Dagvoortgang: hoeveel van wat er af te vinken valt, is gedaan. */}
       {voortgang.totaal > 0 && (
-        <div style={{ flexShrink: 0, paddingBottom: weergave === 'lijst' && gedaanBlokken.length > 0 ? 0 : (isMobile ? 10 : 12) }}>
+        <div style={{ flexShrink: 0, paddingBottom: weergave === 'lijst' && gedaanBlokken.length > 0 ? 0 : weergave === 'rooster' ? 4 : (isMobile ? 10 : 12) }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 6 }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : '#fff', letterSpacing: '-0.01em', transition: 'color 0.4s ease' }}>
               {voortgang.rond ? 'Dag rond' : `${voortgang.gedaan} van ${voortgang.totaal} gedaan`}
@@ -853,86 +881,31 @@ export default function DagAgenda({
       )}
 
       {/* Rooster */}
+      {/* Agendaweergave: de dag als één tegel op tijd, met slaap, stappen,
+          voeding en water (zelfde opbouw als een dag in Coach Inzicht). */}
       {weergave === 'rooster' && (
-      <div
-        ref={roosterRef}
-        style={{
-          flex: 1, minHeight: 0, position: 'relative',
-          display: 'flex', overflowY: 'auto',
-          borderTop: `1px solid ${LIJN}`,
-        }}
-      >
-        {/* Tijdas */}
-        <div style={{ width: isMobile ? 34 : 40, flexShrink: 0, position: 'relative', height: roosterHoogte }}>
-          {uren.map(u => (
-            <div key={u} style={{
-              position: 'absolute', top: pxVan(u * 60), left: 0, right: 4,
-              transform: 'translateY(-50%)',
-              fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.25)',
-              textAlign: 'right', fontVariantNumeric: 'tabular-nums',
-            }}>
-              {String(u).padStart(2, '0')}
-            </div>
-          ))}
-        </div>
-
-        {/* Dagkolom */}
-        <div style={{ flex: 1, minWidth: 0, position: 'relative', height: roosterHoogte }}>
-          {uren.map(u => (
-            <div key={u} style={{
-              position: 'absolute', top: pxVan(u * 60), left: 0, right: 0,
-              borderTop: `1px solid ${LIJN_ZACHT}`,
-            }} />
-          ))}
-
-          {toonNuLijn && (
-            <div style={{
-              position: 'absolute', top: pxVan(nuMin), left: 0, right: 0,
-              height: 0, borderTop: '1px solid rgba(255,255,255,0.5)', zIndex: 6,
-            }}>
-              <span style={{
-                position: 'absolute', left: -3, top: -3,
-                width: 6, height: 6, borderRadius: '50%', background: '#fff',
-              }} />
-            </div>
-          )}
-
-          {laden && (
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 40,
-              fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
-            }}>
-              Dag laden…
-            </div>
-          )}
-
-          {!laden && blokken.length === 0 && (
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingTop: 40,
-              color: 'rgba(255,255,255,0.3)',
-            }}>
-              <Calendar size={18} />
-              <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Niets gepland op deze dag</span>
-            </div>
-          )}
-
-          {blokken.map(b => (
-            <Blok
-              key={b.id}
-              blok={b}
+        <div ref={roosterRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          {laden ? (
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', paddingTop: 40, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Dag laden…</div>
+          ) : (
+            <DagTijdlijn
+              blokken={blokken}
               isMobile={isMobile}
-              pxVan={pxVan}
-              uurHoogte={uurHoogte}
               onOpen={onOpen}
-              afgerond={(b.type === 'meal' && !!gelogd[sleutelVan(b)]) || (b.type === 'supplement' && supplementGedaan(b))}
-              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null)}
-              onTijd={() => setBewerk(b)}
-              slaap={slaapVan(b)}
+              isGedaan={isGedaan}
+              afronden={(b) => (b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null))}
+              onTijd={(b) => setBewerk(b)}
+              slaapVan={slaapVan}
+              wegenVan={wegenVan}
+              nuMin={isVandaag ? nuMin : null}
+              slaapUren={Number(slaapLogs[slaapDagIso]?.uren) || 0}
+              stappen={dagStappen}
+              voeding={{ kcal: verbruikt.calories, eiwit: verbruikt.protein, doelKcal: doelen?.calories || 0, doelEiwit: doelen?.protein || 0 }}
+              water={dagWater}
+              dagSleutel={dagIso}
             />
-          ))}
+          )}
         </div>
-      </div>
       )}
 
       <SlaapLogBlad

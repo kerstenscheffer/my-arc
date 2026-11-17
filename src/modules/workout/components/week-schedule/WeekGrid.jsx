@@ -188,7 +188,7 @@ export default function WeekGrid({
             onUitplannen={onUitplannen ? () => onUitplannen(day) : null}
             onUitplannenExtra={onUitplannen ? (rk) => onUitplannen(day, rk) : null}
             onRemoveCardio={onRemoveCardio}
-            onOpenGedaan={onOpenGedaan ? () => onOpenGedaan(day) : null}
+            onOpenGedaan={onOpenGedaan ? (key) => onOpenGedaan(day, key) : null}
             gedaanAnders={gedaanAnders}
             onOpenCardioGedaan={onOpenCardioGedaan}
             smal={leeg[index]}
