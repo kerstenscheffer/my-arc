@@ -412,6 +412,20 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
 
                   {/* Doorstap, agenda, voedingsplan, logboek en notificatie stonden hier ook (17 nov 2026,
                       Kersten: weg uit de kop op de computer). Op de telefoon staan ze er nog. */}
+                  {/* Laatste contactmoment: de laatste dag waarop het rondje is aangevinkt. */}
+                  {dagCheck && (() => {
+                    const d = dagCheck.dagenGeleden
+                    const tekst = dagCheck.gehad ? 'vandaag'
+                      : !dagCheck.laatste ? 'geen contact'
+                      : d === 1 ? 'gisteren'
+                      : new Date(`${dagCheck.laatste}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+                    return (
+                      <span title={dagCheck.laatste || dagCheck.gehad ? 'Laatste contactmoment' : 'In de laatste twee weken niet afgevinkt'}
+                        style={{ fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: dagCheck.gehad ? '#10b981' : (!dagCheck.laatste || d >= 3) ? '#f59e0b' : '#fff' }}>
+                        {tekst}{!dagCheck.gehad && d >= 2 ? ` · ${d}d` : ''}
+                      </span>
+                    )
+                  })()}
                   {dagCheck && (
                     <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
                       title={dagCheck.gehad ? 'Vandaag afgevinkt — klik om terug te draaien' : 'Vandaag afvinken'}

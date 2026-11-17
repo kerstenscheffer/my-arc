@@ -635,7 +635,7 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
           onNavigateTab={onNavigateTab}
           db={db}
           coachId={coachId}
-          dagCheck={{ gehad, bezig: checkBezig, onWissel: wisselDagCheck }}
+          dagCheck={{ gehad, bezig: checkBezig, onWissel: wisselDagCheck, laatste: laatsteCheck, dagenGeleden }}
           doorstap={doorstap}
           onDoorstap={onDoorstap}
           onOpenMealPanel={onOpenMealPanel}

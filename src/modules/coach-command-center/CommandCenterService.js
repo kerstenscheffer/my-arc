@@ -295,7 +295,7 @@ export default class CommandCenterService {
         const uit = []
         for (let van = 0; ; van += PAGINA) {
           const { data, error } = await this.supabase.from('workout_progress')
-            .select('id, session_id, exercise_name, sets, notes, attachment_used')
+            .select('id, session_id, exercise_name, sets, notes, attachment_used, created_at')
             .in('session_id', batch).order('id').range(van, van + PAGINA - 1)
           if (error || !data) break
           uit.push(...data)
@@ -323,6 +323,7 @@ export default class CommandCenterService {
           totalVolume: completedSets.reduce((v, s) => v + ((s.weight || 0) * (s.reps || 0)), 0),
           notes: entry.notes || null,
           attachment_used: entry.attachment_used || null,
+          gelogdOp: entry.created_at || null, // voor de volgorde waarin de klant de oefeningen deed
         })
       })
       return progressByClient

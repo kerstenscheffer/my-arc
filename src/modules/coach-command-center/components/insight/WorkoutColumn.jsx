@@ -355,7 +355,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     if (exercises.length === 0 && selectedSession.exercises_completed) {
       return selectedSession.exercises_completed.map(e => ({ name: e.name, sets: [], bestWeight: 0, bestReps: 0, totalSets: e.sets || 0 }))
     }
-    return exercises
+    return exercises.sort((a, b) => String(a.gelogdOp || '').localeCompare(String(b.gelogdOp || '')))
   }
 
   const getExerciseHistory = () => {
@@ -485,6 +485,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                 const match = entries.find(e => e.sessionId === w.id)
                 if (match) exs.push({ name, ...match })
               })
+              // In de volgorde waarin de klant ze logde (eerste set van elke oefening).
+              exs.sort((a, b) => String(a.gelogdOp || '').localeCompare(String(b.gelogdOp || '')))
               const lijst = exs.length === 0 && Array.isArray(w.exercises_completed)
                 ? w.exercises_completed.map(e => ({ name: e.name, sets: [], bestWeight: 0, bestReps: 0, totalSets: e.sets || 0 }))
                 : exs
