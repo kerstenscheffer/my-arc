@@ -80,8 +80,9 @@ const GRID_MIN_HOOGTE = { desktop: 900, mobiel: 900 }
 const KOP_DAG = { desktop: 26, mobiel: 24 }
 const KOP_STAPPEN = 18
 const KOP_VOEDING = 28
+const KOP_LIJF = 18 // slaap en gewicht van de dag (17 nov 2026)
 const kopDag = (isMobile) => (isMobile ? KOP_DAG.mobiel : KOP_DAG.desktop)
-const kopHoogte = (isMobile) => kopDag(isMobile) + KOP_STAPPEN + KOP_VOEDING + 1
+const kopHoogte = (isMobile) => kopDag(isMobile) + KOP_STAPPEN + KOP_LIJF + KOP_VOEDING + 1
 const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
 const MINUTES_VISIBLE = (HOUR_END - HOUR_START) * 60
 
@@ -433,6 +434,23 @@ function StappenRegel({ stappen, doel }) {
   )
 }
 
+// Slaap en gewicht van de dag, naast elkaar: uren van de nacht waaruit je die
+// dag wakker werd en de weging van die dag. Alleen wat gelogd is; anders een punt.
+function LijfRegel({ slaap, gewicht }) {
+  const nl = (x, d) => Number(x).toFixed(d).replace('.', ',').replace(/,0$/, '')
+  const stuk = (Icoon, tekst, titel) => (
+    <span title={titel} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, color: tekst ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+      <Icoon size={10} strokeWidth={2.6} style={{ opacity: 0.7 }} />{tekst || '·'}
+    </span>
+  )
+  return (
+    <div style={{ height: KOP_LIJF, flexShrink: 0, display: 'flex', alignItems: 'center', fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid rgba(255,255,255,0.04)', boxSizing: 'border-box' }}>
+      {stuk(Moon, slaap != null ? `${nl(slaap, 1)}u` : '', slaap != null ? `${nl(slaap, 1)} uur geslapen` : 'Geen slaap gelogd')}
+      {stuk(Scale, gewicht != null ? nl(gewicht, 1) : '', gewicht != null ? `${nl(gewicht, 1)} kg gewogen` : 'Niet gewogen')}
+    </div>
+  )
+}
+
 // Voeding van de dag: kcal en eiwit van de maaltijden in deze kolom (gepland,
 // of gegeten in Realiteit), met een balkje tegen het dagdoel. Zelfde kleur
 // als de weekstrook in Coach Inzicht.
@@ -476,7 +494,7 @@ function DayColumn({
   // naast de datum naar de vorige of volgende dag. Met zeven kolommen naast
   // elkaar heeft dat geen betekenis.
   onVorigeDag, onVolgendeDag,
-  stappen = null, stappenDoel = STANDAARD_DOEL, kcalDoel = 0, echt = false,
+  stappen = null, stappenDoel = STANDAARD_DOEL, kcalDoel = 0, echt = false, slaap = null, gewicht = null,
 }) {
   return (
     <div
@@ -542,6 +560,7 @@ function DayColumn({
           )}
         </div>
         <StappenRegel stappen={stappen} doel={stappenDoel} />
+        <LijfRegel slaap={slaap} gewicht={gewicht} />
         <VoedingRegel blocks={blocks} doel={kcalDoel} isMobile={isMobile} echt={echt} />
       </div>
       {/* Block-area */}
@@ -622,6 +641,7 @@ function TimeAxis({ isMobile }) {
       }}>
         <div style={{ height: kopDag(isMobile), flexShrink: 0 }} />
         <div style={{ height: KOP_STAPPEN, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Footprints size={11} strokeWidth={2.6} /></div>
+        <div style={{ height: KOP_LIJF, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Moon size={11} strokeWidth={2.6} /></div>
         <div style={{ height: KOP_VOEDING, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Utensils size={11} strokeWidth={2.6} /></div>
       </div>
       <div style={{
@@ -1362,6 +1382,7 @@ export default function ClientAgendaView({
   // Stappen van de getoonde week, voor de regel in de kop van elke dag.
   const [stappenWeek, setStappenWeek] = useState([])
   const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
+  const [lijfWeek, setLijfWeek] = useState([]) // per dag { slaap, gewicht }
   const weekIso = toIsoDate(weekAnchor)
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
@@ -1372,6 +1393,20 @@ export default function ClientAgendaView({
         if (weg) return
         setStappenWeek(dagen || []); setStappenDoel(doel || STANDAARD_DOEL)
       } catch (e) { console.error('stappen voor agenda laden mislukt:', e) }
+      // Slaap en gewicht van dezelfde week. Lukt het niet, dan blijft de regel leeg.
+      try {
+        const ma = new Date(weekAnchor); ma.setDate(ma.getDate() - ((ma.getDay() + 6) % 7)); ma.setHours(12, 0, 0, 0)
+        const isoVan = (i) => { const d = new Date(ma); d.setDate(d.getDate() + i); return toIsoDate(d) }
+        const leeg = () => ({ data: [] })
+        const [sl, gw] = await Promise.all([
+          db.supabase.from('sleep_logs').select('log_date, hours_slept').eq('client_id', client.id).gte('log_date', isoVan(0)).lte('log_date', isoVan(6)).then(r => r, leeg),
+          db.supabase.from('weight_challenge_logs').select('date, weight, created_at').eq('client_id', client.id).gte('date', isoVan(0)).lte('date', isoVan(6)).order('created_at', { ascending: true }).then(r => r, leeg),
+        ])
+        if (weg) return
+        const slaapOp = new Map((sl.data || []).filter(r => Number(r.hours_slept) > 0).map(r => [String(r.log_date).slice(0, 10), Number(r.hours_slept)]))
+        const gewichtOp = new Map((gw.data || []).filter(r => Number(r.weight) > 0).map(r => [String(r.date).slice(0, 10), Number(r.weight)]))
+        setLijfWeek(Array.from({ length: 7 }, (_, i) => ({ slaap: slaapOp.get(isoVan(i)) ?? null, gewicht: gewichtOp.get(isoVan(i)) ?? null })))
+      } catch (e) { console.error('slaap en gewicht voor agenda laden mislukt:', e) }
     }
     laad()
     window.addEventListener(STAPPEN_EVENT, laad)
@@ -2518,6 +2553,8 @@ export default function ClientAgendaView({
               isToday={isToday}
               stappen={stappenWeek.length === 7 ? stappenWeek[DAYS.indexOf(day)] : null}
               stappenDoel={stappenDoel}
+              slaap={lijfWeek[DAYS.indexOf(day)]?.slaap ?? null}
+              gewicht={lijfWeek[DAYS.indexOf(day)]?.gewicht ?? null}
               kcalDoel={Math.round(Number(client?.target_calories) || 0)}
               echt={isRealiteit}
             />

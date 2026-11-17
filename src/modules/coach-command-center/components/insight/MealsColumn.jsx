@@ -10,7 +10,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { KolomKopInhoud } from './KolomKop'
-import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
+import { kopKnopStijl } from './kolomKopStijl'
 import {
   UtensilsCrossed, ChevronRight, ChevronLeft, ArrowLeft, Zap, ExternalLink, Droplet, Info,
   ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays, Pill, FileText,
@@ -29,9 +29,9 @@ import KlantPlanTerugzetten from './KlantPlanTerugzetten'
 
 // Het waterblok: wat de klant drinkt, en het doel dat jij daarvoor zet.
 // Losse component zodat de kolom zelf niet nog meer state krijgt.
-function WaterDoel({ client, db, isMobile }) {
+function WaterDoel({ client, db, isMobile, start = null, onGewijzigd = null }) {
   const [liters, setLiters] = useState(
-    Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3
+    start ?? (Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3)
   )
   const [bezig, setBezig] = useState(false)
   const [bewaard, setBewaard] = useState(false)
@@ -79,6 +79,7 @@ function WaterDoel({ client, db, isMobile }) {
       const { error } = await db.supabase
         .from('clients').update({ water_intake_target: waarde }).eq('id', client.id)
       if (error) throw error
+      onGewijzigd?.(waarde)
       setBewaard(true)
       setTimeout(() => setBewaard(false), 1400)
     } catch (e) {
@@ -251,6 +252,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
   // 'aangepast' | 'supplementen' | 'documenten' | null. In beeld blijven de dagen.
   const [venster, setVenster] = useState(null)
+  // Het waterdoel zoals het nu staat: de klantrij, of wat je net in het watervenster zette.
+  const [waterNu, setWaterNu] = useState(null) // { id, liters }
+  const waterDoelL = waterNu?.id === client?.id ? waterNu.liters : (Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3)
   // Welke week de strook toont: 0 = deze week, -1 = vorige, enzovoort.
   const [weekTerug] = useState(0)
   // Gelogde maaltijd waarvan het info-blad open staat, plus zijn ingrediënten.
@@ -262,7 +266,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   const [dailyLog, setDailyLog] = useState(() => mealData?.dailyLog || {})
   const [vanaf, setVanaf] = useState(() => dagenTerug(STAP_DAGEN))
   const [, setEersteLog] = useState(undefined) // undefined = onbekend, null = nooit gelogd
-  const [laden, setLaden] = useState(false)
+  const [, setLaden] = useState(false)
 
   useEffect(() => {
     if (!db?.supabase || !client?.id) return
@@ -587,7 +591,8 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           <div style={{ flex: 1, minHeight: 0 }}>
             <MealDaySummaryModal
               isOpen ingebed
-              waterDoelL={Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3}
+              waterDoelL={waterDoelL}
+              onWaterKlik={() => setVenster('water')}
               onClose={() => {}}
               db={db}
               clientId={client.id}
@@ -604,7 +609,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
       {/* Waterdoel in liters op de klant (clients.water_intake_target); de fles
           op de maaltijdpagina rekent daarmee, 3 liter is de standaard. */}
       <BladModal open={venster === 'water'} titel="Water" onClose={() => setVenster(null)} zIndex={12000}>
-        <div className="ci-venster"><WaterDoel client={client} db={db} isMobile={isMobile} /></div>
+        <div className="ci-venster"><WaterDoel client={client} db={db} isMobile={isMobile} start={waterDoelL} onGewijzigd={(l) => setWaterNu({ id: client.id, liters: l })} /></div>
       </BladModal>
     </>
   )
