@@ -20,6 +20,8 @@ import { trainingenVanDag } from '../../../workout/utils/extraTrainingen'
 import { getWorkoutImage } from '../../../workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../../workout/utils/workoutFoto'
 import { kcalKleur } from '../../../meal-plan/utils/kcalKleur'
+import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
+import { ClientAgendaService, recurringIdFor, DAYS as AGENDA_DAGEN } from '../../../client-agenda/ClientAgendaService'
 import { spierWoord } from '../../../workout/bouwfase/bouwfaseData'
 import { spierpijnVan } from '../../../workout/bouwfase/rir'
 
@@ -196,6 +198,90 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     return !d
   })
   const [statInfo, setStatInfo] = useState(null)
+  // ── Plannen in de agenda (gecombineerde week) ──
+  // De geplande blokken komen uit de agenda van de klant zelf (zelfde bron als
+  // zijn eigen rooster), zodat verplaatsen hier precies doet wat het daar doet.
+  const agendaService = useMemo(() => (db?.supabase ? new ClientAgendaService(db.supabase) : null), [db])
+  const [planWeek, setPlanWeek] = useState({}) // { weekSleutel: { blocksByDay, mealPlanId } }
+  const [planVersie, setPlanVersie] = useState(0)
+  useEffect(() => {
+    if (!voeding || !agendaService || !clientId) return
+    let weg = false
+    agendaService.loadWeek(clientId, new Date(`${weekSleutel}T00:00:00`)).then(r => {
+      if (!weg && r) setPlanWeek(prev => ({ ...prev, [weekSleutel]: { blocksByDay: r.blocksByDay || {}, mealPlanId: r.mealPlan?.id || null } }))
+    }, () => {})
+    return () => { weg = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!voeding, agendaService, clientId, weekSleutel, planVersie])
+  // Shift-klik selecteert blokken; slepen verzet ze (alle geselecteerde samen).
+  const [selectie, setSelectie] = useState(() => new Set())
+  const [sleep, setSleep] = useState(null) // { ids, delta } tijdens het slepen en tot de vraag beantwoord is
+  const [vraag, setVraag] = useState(null) // { ids, delta } → eenmalig of standaard?
+  const [planBezig, setPlanBezig] = useState(false)
+  const [planFout, setPlanFout] = useState(null)
+  const regelIndex = useRef({}) // id → regel, voor de afhandeling na het slepen
+  const gesleept = useRef(false) // de klik na een sleep of shift-klik niet als dagkeuze tellen
+  const pxRef = useRef(1)
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') { setSelectie(new Set()); setSleep(null); setVraag(null) } }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [])
+  // Wat een verplaatsbaar blok erbij krijgt: de greep en hoe hij eruitziet als hij geselecteerd is of meebeweegt.
+  const sleepProps = (r) => (r.blok?.editable ? { onPointerDown: (e) => beginSleep(e, r) } : {})
+  const sleepStijl = (r) => {
+    if (!r.blok?.editable) return {}
+    const mee = sleep?.ids.includes(r.id)
+    return {
+      cursor: 'grab', touchAction: 'none', userSelect: 'none',
+      outline: selectie.has(r.id) || mee ? '2px solid #fff' : 'none', outlineOffset: -2,
+      zIndex: mee ? 5 : undefined, opacity: mee ? 0.95 : undefined,
+    }
+  }
+  const beginSleep = (e, r) => {
+    if (!r.blok?.editable || planBezig) return
+    e.stopPropagation()
+    if (e.shiftKey) {
+      e.preventDefault(); gesleept.current = true
+      setSelectie(prev => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n })
+      return
+    }
+    const ids = selectie.has(r.id) ? [...selectie] : [r.id]
+    const startY = e.clientY
+    let delta = 0
+    const beweeg = (ev) => {
+      const d = Math.round((ev.clientY - startY) / pxRef.current / 5) * 5
+      if (d !== delta) { delta = d; setSleep({ ids, delta }) }
+    }
+    const los = () => {
+      window.removeEventListener('pointermove', beweeg); window.removeEventListener('pointerup', los)
+      if (delta !== 0) { gesleept.current = true; setVraag({ ids, delta }) } else setSleep(null)
+    }
+    window.addEventListener('pointermove', beweeg); window.addEventListener('pointerup', los)
+  }
+  // Eenmalig = alleen die datum (override); standaard = het vaste patroon.
+  const voerVerplaatsingUit = async (standaard) => {
+    if (!vraag || !agendaService) return
+    setPlanBezig(true); setPlanFout(null)
+    const mealPlanId = planWeek[weekSleutel]?.mealPlanId || null
+    let mislukt = 0
+    for (const id of vraag.ids) {
+      const r = regelIndex.current[id]
+      const b = r?.blok
+      if (!b) continue
+      const duur = Math.max(5, (b.end || 0) - (b.start || 0))
+      const nieuw = Math.max(0, Math.min(24 * 60 - duur, (b.start || 0) + vraag.delta))
+      try {
+        if (standaard) await agendaService.shiftBlock({ block: { ...b, clientId }, newStartMin: nieuw, toDay: null, mealPlanId })
+        else await agendaService.upsertOverride({ clientId, dateIso: r.dagK, recurringId: recurringIdFor(b), startMin: nieuw, endMin: nieuw + duur })
+      } catch (err) { console.error('blok verplaatsen mislukt:', err); mislukt++ }
+    }
+    setPlanBezig(false); setVraag(null); setSleep(null); setSelectie(new Set())
+    if (mislukt) { setPlanFout(`${mislukt} ${mislukt === 1 ? 'blok kon' : 'blokken konden'} niet verplaatst worden.`); setTimeout(() => setPlanFout(null), 5000) }
+    setPlanVersie(v => v + 1)
+    window.dispatchEvent(new CustomEvent('myarc:ci-agenda-herlaad'))
+  }
+
   // Kalender om naar een andere maand te springen: { x, y, jaar, maand } terwijl hij open is.
   const [kalender, setKalender] = useState(null)
 
@@ -326,12 +412,21 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const minVan = (ts) => { const t = ts ? new Date(ts) : null; return t && !Number.isNaN(t.getTime()) ? t.getHours() * 60 + t.getMinutes() : null }
   const regelsVan = (w, v) => {
     const nogTeDoen = w.toekomst || w.k === vandaagSleutel
+    const agendaBlokken = planWeek[weekSleutel]?.blocksByDay?.[AGENDA_DAGEN[w.i]] || null
+    const isCardioBlok = (b) => b.type === 'custom' && /^Cardio\s*·\s*/.test(String(b.label || ''))
     const regels = [
       ...w.sessies.map(x => { const t = telling(x); return { id: `s-${x.id}`, groot: true, min: minVan(x.completed_at || x.created_at), naam: naamVoorSessie?.(x) || 'Training', sub: t.sets > 0 ? `${t.sets} sets` : 'gedaan', gedaan: true, foto: getWorkoutImage({ name: naamVoorSessie?.(x) || 'Training' }) } }),
-      ...(w.sessies.length ? [] : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: pl.naam }) }))),
+      ...(w.sessies.length ? [] : agendaBlokken
+        ? agendaBlokken.filter(b => b.type === 'training').map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, min: b.start, naam: b.sublabel || b.label || 'Training', sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: b.sublabel || b.label || 'Training' }) }))
+        : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: pl.naam }) }))),
       ...w.cardio.map(c => ({ id: `c-${c.id}`, groot: true, cardio: true, min: minVan(c.created_at), naam: c.cardio_type || 'Cardio', sub: Number(c.duration_minutes) > 0 ? `${c.duration_minutes} min` : 'gedaan', gedaan: true, foto: cardioFoto(c.cardio_type) })),
-      ...(w.cardio.length ? [] : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
-      ...((v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
+      ...(w.cardio.length ? [] : agendaBlokken
+        ? agendaBlokken.filter(isCardioBlok).map(b => { const soort = String(b.label).replace(/^Cardio\s*·\s*/, ''); return { id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: true, cardio: true, min: b.start, naam: soort, sub: nogTeDoen ? `${b.end - b.start} min` : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(soort) } })
+        : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
+      // Maaltijden: gelogd, of (dag zonder logs) wat er gepland staat in de agenda.
+      ...(!v?.gelogd && agendaBlokken && nogTeDoen
+        ? agendaBlokken.filter(b => b.type === 'meal' && !b.meta?.placeholder && (b.sublabel || Number(b.meta?.kcal) > 0)).map(b => ({ id: `b-${w.k}-${b.id}`, blok: b, dagK: w.k, groot: false, min: b.start, naam: b.sublabel || b.label || 'Maaltijd', kcal: Number(b.meta?.kcal) || 0, gelogd: false, foto: b.meta?.image_url || foodImageFallback(b.sublabel || b.label || 'Maaltijd', b.meta?.slot, 80) }))
+        : (v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
     ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
     // De signalen van de dag horen bij de (eerste) gedane training.
     const eerste = regels.find(r => r.groot && !r.cardio && r.gedaan) || regels.find(r => r.groot && !r.cardio)
@@ -427,7 +522,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
           const stapGroen = Math.min(1, w.stappen / 10000)
           const meng = (van, naar) => Math.round(van + (naar - van) * stapGroen)
           return (
-            <button key={w.k} onClick={() => setGekozen(w.d)}
+            <button key={w.k} onClick={(e) => { if (gesleept.current || e.shiftKey) { gesleept.current = false; return } setGekozen(w.d) }}
               title={`${naam || 'Rust'}${gedaan ? ' · gedaan' : naam ? (w.toekomst ? ' · gepland' : ' · niet gedaan') : ''} · ${fmt(w.stappen)} / ${fmt(stappenDoel)} stappen${slaap[w.k] > 0 ? ` · ${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')} uur slaap` : ''}${voeding && voedingWeek.dagen[w.k] ? ` · ${fmt(voedingWeek.dagen[w.k].kcal)} / ${fmt(voedingWeek.doel.kcal)} kcal · ${fmt(voedingWeek.dagen[w.k].eiwit)} / ${fmt(voedingWeek.doel.eiwit)} g eiwit · water ${(voedingWeek.dagen[w.k].waterMl / 1000).toFixed(1).replace('.', ',')} L` : ''}`}
               style={{
                 position: 'relative', flex: 1, minWidth: 0, height: '100%', padding: 0, overflow: 'hidden', borderRadius: 8,
@@ -502,16 +597,19 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                       if (!regels.length) return <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: BALKEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Rust</span>
                       // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
                       let onder = -Infinity
+                      pxRef.current = pxPerMin
                       const geplaatst = regels.map(r => {
+                        regelIndex.current[r.id] = r
                         const hoogte = r.groot ? 50 : 24
-                        const top = Math.max(((r.min ?? 6 * 60) - asStart) * pxPerMin, onder) // zonder tijd: op 06:00
+                        const verzet = sleep?.ids.includes(r.id) ? sleep.delta : 0
+                        const top = Math.max(((r.min ?? 6 * 60) + verzet - asStart) * pxPerMin, verzet ? -Infinity : onder) // zonder tijd: op 06:00
                         onder = top + hoogte + 2
                         return { ...r, top, hoogte }
                       })
                       return (
                         <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 4, right: BALKEN + 4, overflow: 'hidden', textAlign: 'left' }}>
                           {geplaatst.map(r => r.groot ? (
-                            <span key={r.id} style={{ position: 'absolute', left: 0, right: 0, top: r.top, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
+                            <span key={r.id} {...sleepProps(r)} style={{ ...sleepStijl(r), position: 'absolute', left: 0, right: 0, top: r.top, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
                               <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: r.gedaan ? 0.5 : 0.22 }} />
                               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                               {r.gedaan && <CircleCheck size={14} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
@@ -535,7 +633,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                               </span>
                             </span>
                           ) : (
-                            <span key={r.id} title={`${klok(r.min)} ${r.naam} · ${fmt(r.kcal)} kcal${r.gelogd ? '' : ' (gepland)'}`} style={{ position: 'absolute', left: 0, right: 0, top: r.top, height: 24, display: 'flex', alignItems: 'center', gap: 4, opacity: r.gelogd ? 1 : 0.5 }}>
+                            <span key={r.id} {...sleepProps(r)} title={`${klok(r.min)} ${r.naam} · ${fmt(r.kcal)} kcal${r.gelogd ? '' : ' (gepland)'}`} style={{ ...sleepStijl(r), position: 'absolute', left: 0, right: 0, top: r.top, height: 24, display: 'flex', alignItems: 'center', gap: 4, opacity: r.gelogd ? 1 : 0.5 }}>
                               <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 5, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }} />
                               <span style={{ flex: 1, minWidth: 0, lineHeight: 1.1 }}>
                                 <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.naam}</span>
@@ -716,6 +814,23 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
             </div>
           </div>
         </div>, document.body)}
+      {/* Na het slepen: eenmalig of standaard? */}
+      {vraag && createPortal(
+        <div onClick={() => { if (!planBezig) { setVraag(null); setSleep(null) } }} style={{ position: 'fixed', inset: 0, zIndex: 12600, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-label="Verplaatsen" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, padding: '1.1rem', borderRadius: 18, background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              {vraag.ids.length === 1 ? (regelIndex.current[vraag.ids[0]]?.naam || 'Blok') : `${vraag.ids.length} blokken`} {Math.abs(vraag.delta)} min {vraag.delta > 0 ? 'later' : 'eerder'}
+            </div>
+            <div style={{ margin: '4px 0 14px', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>De klant ziet de nieuwe tijd direct in zijn agenda.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => voerVerplaatsingUit(false)} disabled={planBezig} style={{ flex: 1, minHeight: 48, borderRadius: 13, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff', fontFamily: 'inherit', fontSize: '0.88rem', fontWeight: 900, cursor: 'pointer', opacity: planBezig ? 0.6 : 1 }}>Eenmalig</button>
+              <button onClick={() => voerVerplaatsingUit(true)} disabled={planBezig} style={{ flex: 1, minHeight: 48, borderRadius: 13, background: '#fff', border: '1px solid #fff', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.88rem', fontWeight: 900, cursor: 'pointer', opacity: planBezig ? 0.6 : 1 }}>Standaard</button>
+            </div>
+            <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>Eenmalig = alleen deze dag in deze week. Standaard = voortaan, elke week.</div>
+          </div>
+        </div>, document.body)}
+      {planFout && createPortal(
+        <div style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 12600, padding: '0.6rem 0.9rem', borderRadius: 12, background: '#ef4444', color: '#fff', fontSize: '0.8rem', fontWeight: 900 }}>{planFout}</div>, document.body)}
       {/* Kalender: kies een dag in welke maand dan ook; de week van die dag komt in beeld. */}
       {kalender && createPortal((() => {
         const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']

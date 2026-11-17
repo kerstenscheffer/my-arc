@@ -278,6 +278,14 @@ export default function MealDaySummaryModal({
   const [water, setWater] = useState({}) // { 'YYYY-MM-DD': { ml, doel } }
   const [maandPop, setMaandPop] = useState(null) // plek van de maandknop terwijl het venster open is
 
+  // Na een verplaatsing in de agenda van Coach Inzicht: het plan opnieuw ophalen.
+  const [agendaVersie, setAgendaVersie] = useState(0)
+  useEffect(() => {
+    if (!ingebed) return
+    const op = () => setAgendaVersie(v => v + 1)
+    window.addEventListener('myarc:ci-agenda-herlaad', op)
+    return () => window.removeEventListener('myarc:ci-agenda-herlaad', op)
+  }, [ingebed])
   // Coach Inzicht: ook zonder meegegeven plan vooruit kijken. De geplande
   // maaltijden van vandaag en later komen uit de agenda van de klant (zelfde
   // bron als zijn weekrooster: plan, dagwissels, tijden) plus wat hij zelf
@@ -319,7 +327,7 @@ export default function MealDaySummaryModal({
       if (!weg) setGepland(prev => ({ ...prev, ...uit }))
     })()
     return () => { weg = true }
-  }, [ingebed, activePlan, isOpen, db, clientId, weekSleutel])
+  }, [ingebed, activePlan, isOpen, db, clientId, weekSleutel, agendaVersie])
 
   // Gecombineerde week: per dag kcal, eiwit en water naar de kaart Training.
   const meldWeek = gedeeld?.meldWeek

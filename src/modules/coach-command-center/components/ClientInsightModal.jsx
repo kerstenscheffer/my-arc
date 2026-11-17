@@ -410,11 +410,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     )}
                   </div>
 
-                  {/* Doorstap na de week-5 evaluatie. Vanaf de klantkaart
-                      komt de waarde mee; anders haalt hij hem zelf op. */}
-                  <DoorstapKeuze client={effectiveClient} coachId={coachId} groot
-                    waarde={doorstap} zelfLaden={doorstap === undefined}
-                    onGewijzigd={onDoorstap} onBetaald={() => setTrajectModus('verleng')} />
+                  {/* Doorstap, agenda, voedingsplan, logboek en notificatie stonden hier ook (17 nov 2026,
+                      Kersten: weg uit de kop op de computer). Op de telefoon staan ze er nog. */}
                   {dagCheck && (
                     <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
                       title={dagCheck.gehad ? 'Vandaag afgevinkt — klik om terug te draaien' : 'Vandaag afvinken'}
@@ -424,18 +421,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   )}
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
-                  </button>
-                  <button onClick={() => setShowAgenda(v => !v)} title="Agenda" style={kopKnop()}>
-                    <CalendarDays size={17} />
-                  </button>
-                  <button onClick={() => setShowMaaltijden(v => !v)} title="Voedingsplan van de klant" style={kopKnop()}>
-                    <UtensilsCrossed size={17} />
-                  </button>
-                  <button onClick={() => toggleSectie('logboek')} title="Logboek" style={kopKnop()}>
-                    <BookOpen size={17} />
-                  </button>
-                  <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={kopKnop(true)}>
-                    <Bell size={17} strokeWidth={2.4} />
                   </button>
                   {onSwitchToClientView && (
                     <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Meekijken op de pagina van de klant" style={kopKnop()}>
