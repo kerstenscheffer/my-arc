@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import MealDaySummaryModal from '../../../meal-plan/components/MealDaySummaryModal'
 import { BRONNEN, bronVan, wisselsPerDag } from '../../../meal-plan/utils/logBron'
-import { kcalKleur } from '../../../meal-plan/utils/kcalKleur'
 import { colors, radius } from '../../../../ui/tokens'
 import GeneratePlanModal from './GeneratePlanModal'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
@@ -250,12 +249,11 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   const [view, setView] = useState('days')
   const [selectedDay, setSelectedDay] = useState(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
-  const [statsOpen, setStatsOpen] = useState(false)
   // Bijzaken achter een icoon in de kop (13 nov 2026, Kersten): 'water' |
   // 'aangepast' | 'supplementen' | 'documenten' | null. In beeld blijven de dagen.
   const [venster, setVenster] = useState(null)
   // Welke week de strook toont: 0 = deze week, -1 = vorige, enzovoort.
-  const [weekTerug, setWeekTerug] = useState(0)
+  const [weekTerug] = useState(0)
   // Gelogde maaltijd waarvan het info-blad open staat, plus zijn ingrediënten.
   const [infoMeal, setInfoMeal] = useState(null)
   const [infoIngredienten, setInfoIngredienten] = useState(null)
@@ -264,7 +262,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   // Tot het eerste antwoord binnen is, tonen we de 7 dagen die er al waren.
   const [dailyLog, setDailyLog] = useState(() => mealData?.dailyLog || {})
   const [vanaf, setVanaf] = useState(() => dagenTerug(STAP_DAGEN))
-  const [eersteLog, setEersteLog] = useState(undefined) // undefined = onbekend, null = nooit gelogd
+  const [, setEersteLog] = useState(undefined) // undefined = onbekend, null = nooit gelogd
   const [laden, setLaden] = useState(false)
 
   useEffect(() => {
@@ -371,7 +369,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     calories: Math.round(Number(doelBron.target_calories) || 0), protein: Math.round(Number(doelBron.target_protein) || 0),
     carbs: Math.round(Number(doelBron.target_carbs) || 0), fat: Math.round(Number(doelBron.target_fat) || 0),
   } : (mealData.targets || null)
-  const vandaagSleutel = sleutelVan(new Date())
 
   const pct = (val, target) => target > 0 ? Math.min(100, Math.round((val / target) * 100)) : 0
   // Binnen 10% van het doel is op doel (groen = behaald); verder eraf blijft wit.
@@ -559,34 +556,10 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     )
   }
 
-  // ── WEEKSTROOK ──
-  // Zeven balkjes naast elkaar in plaats van een dagenlijst (13 nov 2026,
-  // Kersten): de week in één blik, in dezelfde vorm als het rooster bij Training.
-  const weekMa = vanSleutel(maandagVan(vandaagSleutel)); weekMa.setDate(weekMa.getDate() + weekTerug * 7)
-  const weekZo = new Date(weekMa); weekZo.setDate(weekZo.getDate() + 6)
-  const weekDagen = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekMa); d.setDate(d.getDate() + i); return sleutelVan(d) })
-  const gelogd = weekDagen.filter(k => dailyLog[k])
-  const weekGem = gelogd.length ? {
-    kcal: Math.round(gelogd.reduce((t, k) => t + dailyLog[k].calories, 0) / gelogd.length),
-    eiwit: Math.round(gelogd.reduce((t, k) => t + dailyLog[k].protein, 0) / gelogd.length),
-  } : null
-  const weekTitel = weekTerug === 0 ? 'Deze week' : weekTerug === -1 ? 'Vorige week'
-    : `${weekMa.getDate()} ${weekMa.toLocaleDateString('nl-NL', { month: 'short' })} – ${weekZo.getDate()} ${weekZo.toLocaleDateString('nl-NL', { month: 'short' })}`
-  // Verder terug dan de eerste log valt er niets te zien.
-  const kanTerug = !!eersteLog && new Date(eersteLog) < weekMa
-  const doelKcal = targets?.calories > 0 ? targets.calories : 0
-  const schaal = Math.max(doelKcal * 1.25, ...gelogd.map(k => dailyLog[k].calories), 1)
-  const BALK_HOOGTE = isMobile ? 96 : 120
-  const pijlKnop = (aan) => ({
-    width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none',
-    color: '#fff', opacity: aan ? 0.9 : 0.25, cursor: aan ? 'pointer' : 'default',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
-  })
-
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '1.5rem' }}>
+        <div style={{ flexShrink: 0 }}>
           {/* In de kolomkop: welk plan, met Plan Analyzer, Genereer en het
               Inzicht-scherm van de klant (zie KolomKop). */}
           <KolomKopInhoud>
@@ -613,9 +586,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                 {React.createElement(Icoon, { size: 15 })}
               </button>
             ))}
-            <button onClick={() => setStatsOpen(true)} style={kopKnopStijl} title="Maand- en dagoverzicht, zoals de klant het ziet">
-              <CalendarDays size={13} strokeWidth={2.6} /> Inzicht
-            </button>
             {/* 'Plan' als laatste, zoals bij Training en Gewicht. */}
             {onNavigatePlan && (
               <button onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
@@ -625,64 +595,22 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             )}
           </KolomKopInhoud>
 
-          <div style={{ padding: isMobile ? '0.6rem 0.9rem 0' : '0.7rem 1.1rem 0' }}>
-            {/* Week kiezen, met rechts het gemiddelde over de gelogde dagen. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
-              <button onClick={() => kanTerug && setWeekTerug(w => w - 1)} disabled={!kanTerug} aria-label="Vorige week" title="Vorige week" style={pijlKnop(kanTerug)}><ChevronLeft size={17} strokeWidth={2.8} /></button>
-              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', minWidth: 96, textAlign: 'center' }}>{weekTitel}</span>
-              <button onClick={() => weekTerug < 0 && setWeekTerug(w => w + 1)} disabled={weekTerug >= 0} aria-label="Volgende week" title="Volgende week" style={pijlKnop(weekTerug < 0)}><ChevronRight size={17} strokeWidth={2.8} /></button>
-              <span style={{ marginLeft: 'auto', fontSize: '0.78rem', fontWeight: 800, color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                {laden ? 'laden…' : weekGem ? <>gem. <b style={{ color: '#fff', fontWeight: 900 }}>{weekGem.kcal.toLocaleString('nl-NL')}</b>{doelKcal ? ` / ${Math.round(doelKcal).toLocaleString('nl-NL')}` : ''} kcal · E <b style={{ color: '#fff', fontWeight: 900 }}>{weekGem.eiwit}</b>g · {gelogd.length}/7</> : 'niets gelogd'}
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? 4 : 8 }}>
-              {weekDagen.map(dag => {
-                const d = dailyLog[dag]
-                const datum = vanSleutel(dag)
-                const isVandaag = dag === vandaagSleutel
-                const toekomst = dag > vandaagSleutel
-                const kcal = d ? Math.round(d.calories) : 0
-                const kleur = d ? (targets ? kcalKleur(kcal, targets.calories, '#fff') : '#fff') : 'rgba(255,255,255,0.3)'
-                return (
-                  <button key={dag} disabled={!d}
-                    onClick={() => { if (d) { setSelectedDay(dag); setView('detail') } }}
-                    title={d ? `${datum.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}: ${kcal.toLocaleString('nl-NL')} kcal, ${Math.round(d.protein)} g eiwit, ${d.meals.length} gelogd` : toekomst ? '' : 'Niets gelogd'}
-                    style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 5, minWidth: 0,
-                      padding: '6px 4px 7px', borderRadius: 10, fontFamily: 'inherit', color: '#fff',
-                      background: isVandaag ? 'rgba(255,255,255,0.07)' : 'transparent',
-                      border: `1px solid ${isVandaag ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                      cursor: d ? 'pointer' : 'default', opacity: toekomst ? 0.4 : 1,
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: isVandaag ? '#fff' : colors.textMuted, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      {datum.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2)} {datum.getDate()}
-                    </span>
-                    {/* De balk: hoogte naar kcal, het streepje is het doel. */}
-                    <span style={{ position: 'relative', display: 'block', height: BALK_HOOGTE, borderRadius: 6, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-                      {d && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (kcal / schaal) * 100)}%`, background: kleur, opacity: 0.85, borderRadius: '4px 4px 0 0' }} />}
-                      {doelKcal > 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doelKcal / schaal) * 100}%`, height: 2, background: '#fff' }} />}
-                    </span>
-                    <span style={{ fontSize: isMobile ? '0.7rem' : '0.82rem', fontWeight: 900, color: kleur, textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                      {d ? kcal.toLocaleString('nl-NL') : '–'}
-                    </span>
-                    <span style={{ fontSize: isMobile ? '0.6rem' : '0.68rem', fontWeight: 800, color: colors.textMuted, textAlign: 'center', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                      {d ? `E ${Math.round(d.protein)}g` : ' '}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {eersteLog === null && (
-              <div style={{ marginTop: 10, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>
-                Deze klant heeft nog niets gelogd. Zodra er een maaltijd binnenkomt, zie je hem hier.
-              </div>
-            )}
+          </div>
+          {/* Het Inzicht-scherm van de klant (dag, week, maand) staat hier vast
+              in de kaart; was een knop in de kop met een weekstrook eronder. */}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <MealDaySummaryModal
+              isOpen ingebed
+              waterDoelL={Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3}
+              onClose={() => {}}
+              db={db}
+              clientId={client.id}
+              selectedDay="today"
+              targets={targets || { calories: 0, protein: 0, carbs: 0, fat: 0 }}
+              isMobile={isMobile}
+            />
           </div>
         </div>
-      </div>
 
       {/* De vensters achter de iconen in de kop. Een blok dat niets te tonen
           heeft geeft niets terug; dan zegt het venster dat zelf. */}
@@ -703,20 +631,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           <ClientDocumentsSection db={db} clientId={client.id} coachId={coachId} isMobile={isMobile} isClientView={false} />
         )}</div>
       </BladModal>
-
-      {/* Het Inzicht-scherm van de klant: dag, week en maand. */}
-      {statsOpen && (
-        <MealDaySummaryModal
-          isOpen={statsOpen}
-          onClose={() => setStatsOpen(false)}
-          db={db}
-          clientId={client.id}
-          selectedDay="today"
-          targets={targets || { calories: 0, protein: 0, carbs: 0, fat: 0 }}
-          isMobile={isMobile}
-          zwevend
-        />
-      )}
 
       {showGenerateModal && (
         <GeneratePlanModal
