@@ -10,7 +10,7 @@
 // het was: plannen en schuiven doe je daar, hier kijk je alleen.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleCheck, Info, HeartPulse, MessageSquare, ArrowLeftRight, Footprints, Moon, ExternalLink } from 'lucide-react'
 import WorkoutServiceNew from '../../../workout/services/WorkoutServiceNew'
 import CardioService from '../../../workout/services/CardioService'
 import StappenService, { STANDAARD_DOEL } from '../../../steps/StappenService'
@@ -23,6 +23,9 @@ const LIJN = 'rgba(255,255,255,0.08)'
 const GROEN = '#10b981'
 // Breedte van de balken rechts in een tegel (kcal, eiwit, water) in de gecombineerde week.
 const BALKEN = 42
+// Slaapdoel voor de paarse band bovenin de tegel.
+const SLAAP_DOEL = 8
+const PAARS = '#a855f7'
 const DAG_EN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAG_NL = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const ACTIVITEIT = { swimming: 'Zwemmen', cardio: 'Cardio', hiking: 'Wandelen', cycling: 'Fietsen', running: 'Hardlopen' }
@@ -43,11 +46,15 @@ const schaal = (t) => {
 }
 
 // Label direct boven het getal, dunne balk er strak onder.
-function Balk({ label, waarde, doel, eenheid = '', kleur = '#fff' }) {
+// `onKlik` + `hint`: het cijfer opent het venster dat erbij hoort (stappendoel,
+// kracht, bouwfase, cardio); stond eerder als los icoon in de kop.
+function Balk({ label, waarde, doel, eenheid = '', kleur = '#fff', onKlik = null, hint = '' }) {
   const pct = doel > 0 ? Math.min(100, (waarde / doel) * 100) : 0
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.1 }}>{label}</div>
+    <div onClick={onKlik || undefined} title={onKlik ? hint : undefined} style={{ flex: 1, minWidth: 0, cursor: onKlik ? 'pointer' : 'default' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.1 }}>
+        {label}{onKlik && <ChevronRight size={10} strokeWidth={3} />}
+      </div>
       <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {fmt(waarde)}<span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{doel > 0 ? ` / ${fmt(doel)}${eenheid}` : eenheid}</span>
       </div>
@@ -62,7 +69,7 @@ function Balk({ label, waarde, doel, eenheid = '', kleur = '#fff' }) {
 // `naamVoorSessie(w)` = naam van de training; `sessieTelling(w)` =
 // { sets, oefeningen, notities, wissels }; `tijdVan(w)` = 'uu:mm' of null;
 // `toonSessie(w)` geeft de oefeningkaarten van die sessie terug.
-export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [], naamVoorSessie, sessieTelling, toonSessie, tijdVan, voeding = null }) {
+export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [], naamVoorSessie, sessieTelling, toonSessie, tijdVan, voeding = null, acties = null }) {
   const clientId = client?.id
   const vandaagSleutel = sleutel(new Date())
   const [gekozen, setGekozen] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })
@@ -76,6 +83,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const [cardioLogs, setCardioLogs] = useState([])
   const [stappen, setStappen] = useState({}) // { weekSleutel: [7 dagen] }
   const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
+  const [gewicht, setGewicht] = useState({}) // { 'YYYY-MM-DD': kg } — de weging van die dag
+  const [slaap, setSlaap] = useState({}) // { 'YYYY-MM-DD': uren } — de nacht die op die dag eindigt
 
   // Eén keer per klant: plan, vaste indeling, stappendoel en de cardiologs
   // van het laatste halfjaar.
@@ -108,11 +117,21 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         .or(`week_start.is.null,week_start.eq.${weekSleutel}`)
         .then(r => r, () => ({ data: [] })),
       StappenService.haalWeek(db, clientId, ma).then(r => r, () => []),
-    ]).then(([p, b, st]) => {
+      db.supabase.from('sleep_logs').select('log_date, hours_slept')
+        .eq('client_id', clientId).gte('log_date', weekSleutel).lte('log_date', sleutel(plusDagen(ma, 6)))
+        .then(r => r, () => ({ data: [] })),
+      db.supabase.from('weight_challenge_logs').select('date, weight, created_at')
+        .eq('client_id', clientId).gte('date', weekSleutel).lte('date', sleutel(plusDagen(ma, 6)))
+        .order('created_at', { ascending: true })
+        .then(r => r, () => ({ data: [] })),
+    ]).then(([p, b, st, sl, gw]) => {
       if (weg) return
       setPlanning(prev => ({ ...prev, [weekSleutel]: p || {} }))
       setCardioBlokken(prev => ({ ...prev, [weekSleutel]: (b?.data || []).filter(x => !(x.skip_weeks || []).includes(weekSleutel)) }))
       setStappen(prev => ({ ...prev, [weekSleutel]: st || [] }))
+      // Meerdere wegingen op één dag: de laatste telt.
+      setGewicht(prev => ({ ...prev, ...Object.fromEntries((gw?.data || []).filter(r => Number(r.weight) > 0).map(r => [String(r.date).slice(0, 10), Number(r.weight)])) }))
+      setSlaap(prev => ({ ...prev, ...Object.fromEntries((sl?.data || []).map(r => [String(r.log_date).slice(0, 10), Number(r.hours_slept) || 0])) }))
     })
     return () => { weg = true }
   }, [clientId, db, weekSleutel, vast])
@@ -214,6 +233,30 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   ]
   const statOpen = stats.find(x => x.id === statInfo)
 
+  // Agendaatje in de tegels (gecombineerde week): wat er op een dag staat, op tijd.
+  const klok = (min) => (min == null ? '' : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`)
+  const minVan = (ts) => { const t = ts ? new Date(ts) : null; return t && !Number.isNaN(t.getTime()) ? t.getHours() * 60 + t.getMinutes() : null }
+  const regelsVan = (w, v) => {
+    const nogTeDoen = w.toekomst || w.k === vandaagSleutel
+    const regels = [
+      ...w.sessies.map(x => { const t = telling(x); return { id: `s-${x.id}`, groot: true, min: minVan(x.completed_at || x.created_at), naam: naamVoorSessie?.(x) || 'Training', sub: t.sets > 0 ? `${t.sets} sets` : 'gedaan', gedaan: true, foto: getWorkoutImage({ name: naamVoorSessie?.(x) || 'Training' }) } }),
+      ...(w.sessies.length ? [] : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: pl.naam }) }))),
+      ...w.cardio.map(c => ({ id: `c-${c.id}`, groot: true, cardio: true, min: minVan(c.created_at), naam: c.cardio_type || 'Cardio', sub: Number(c.duration_minutes) > 0 ? `${c.duration_minutes} min` : 'gedaan', gedaan: true, foto: cardioFoto(c.cardio_type) })),
+      ...(w.cardio.length ? [] : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
+      ...((v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
+    ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
+      return regels
+  }
+  // De tijdas loopt van het vroegste tot het laatste dat deze week staat,
+  // minstens van 07:00 tot 21:00.
+  const TEGEL_HOOGTE = 468, BAND = 38 // slaapband + stappenband
+  const alleMin = voeding ? week.flatMap(w => regelsVan(w, voedingWeek.dagen[w.k] || null).map(r => r.min).filter(m => m != null)) : []
+  const asStart = Math.floor(Math.min(7 * 60, ...alleMin) / 60) * 60
+  const asEind = Math.min(24 * 60, Math.ceil((Math.max(21 * 60, ...alleMin) + 60) / 60) * 60)
+  const pxPerMin = (TEGEL_HOOGTE - BAND - 6) / (asEind - asStart)
+  const asUren = Array.from({ length: Math.floor((asEind - asStart) / 120) + 1 }, (_, i) => asStart + i * 120)
+  const AS_BREED = 30
+
   const pijl = {
     width: 18, height: 26, padding: 0, flexShrink: 0, background: 'transparent', border: 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -234,6 +277,13 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
 
       {/* Dagenstrook: gekozen dag als witte pil, weekpijlen in het ma- en zo-vak. */}
       <div style={{ display: 'flex', gap: 6, margin: '0.8rem 0 5px' }}>
+        {/* Boven de tijdas: het trainingsplan openen in de builder. */}
+        {voeding && (
+          <button onClick={acties?.plan || undefined} disabled={!acties?.plan} title={acties?.plan ? `Trainingsplan openen in de builder${acties.planNaam ? ` (${acties.planNaam})` : ''}` : undefined} aria-label="Trainingsplan openen"
+            style={{ width: AS_BREED, flexShrink: 0, height: 26, padding: 0, background: 'transparent', border: 'none', color: '#fff', opacity: acties?.plan ? 0.8 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: acties?.plan ? 'pointer' : 'default' }}>
+            <ExternalLink size={14} strokeWidth={2.6} />
+          </button>
+        )}
         {week.map((w, i) => {
           const aan = w.k === gekozenSleutel
           return (
@@ -247,6 +297,12 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
               {i === 0 && <button onClick={(e) => { e.stopPropagation(); setGekozen(plusDagen(gekozen, -7)) }} aria-label="Vorige week" title="Vorige week" style={{ ...pijl, color: aan ? '#000' : '#fff' }}><ChevronLeft size={16} strokeWidth={3} /></button>}
               <span style={{ flex: i === 0 || i === 6 ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
                 {DAG_NL[i]}<span style={{ fontWeight: 800, opacity: aan ? 0.75 : 0.6, letterSpacing: 0 }}>{w.d.getDate()}</span>
+                {/* De weging van die dag achter de datum. */}
+                {gewicht[w.k] > 0 && (
+                  <span style={{ marginLeft: 4, fontWeight: 900, letterSpacing: 0, textTransform: 'none', color: aan ? '#000' : '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                    {String(Math.round(gewicht[w.k] * 10) / 10).replace('.', ',')}<span style={{ fontWeight: 700, opacity: 0.6 }}> kg</span>
+                  </span>
+                )}
               </span>
               {i === 6 && <button onClick={(e) => { e.stopPropagation(); setGekozen(plusDagen(gekozen, 7)) }} aria-label="Volgende week" title="Volgende week" style={{ ...pijl, color: aan ? '#000' : '#fff' }}><ChevronRight size={16} strokeWidth={3} /></button>}
             </div>
@@ -256,7 +312,14 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
 
       {/* Een tegel per dag: donkere foto van de training, naam en sets er dik
           overheen, de stappen als strook langs de rechterkant. */}
-      <div style={{ height: voeding ? 468 : 84, display: 'flex', gap: 6 }}>
+      <div style={{ height: voeding ? TEGEL_HOOGTE : 84, display: 'flex', gap: 6 }}>
+        {voeding && (
+          <span style={{ position: 'relative', width: AS_BREED, flexShrink: 0 }}>
+            {asUren.map(u => (
+              <span key={u} style={{ position: 'absolute', right: 2, top: BAND + (u - asStart) * pxPerMin - 5, fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{klok(u)}</span>
+            ))}
+          </span>
+        )}
         {week.map((w) => {
           const aan = w.k === gekozenSleutel
           const sessie = w.sessies[0] || null
@@ -275,10 +338,12 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
           const meng = (van, naar) => Math.round(van + (naar - van) * stapGroen)
           return (
             <button key={w.k} onClick={() => setGekozen(w.d)}
-              title={`${naam || 'Rust'}${gedaan ? ' · gedaan' : naam ? (w.toekomst ? ' · gepland' : ' · niet gedaan') : ''} · ${fmt(w.stappen)} / ${fmt(stappenDoel)} stappen${voeding && voedingWeek.dagen[w.k] ? ` · ${fmt(voedingWeek.dagen[w.k].kcal)} / ${fmt(voedingWeek.doel.kcal)} kcal · ${fmt(voedingWeek.dagen[w.k].eiwit)} / ${fmt(voedingWeek.doel.eiwit)} g eiwit · water ${(voedingWeek.dagen[w.k].waterMl / 1000).toFixed(1).replace('.', ',')} L` : ''}`}
+              title={`${naam || 'Rust'}${gedaan ? ' · gedaan' : naam ? (w.toekomst ? ' · gepland' : ' · niet gedaan') : ''} · ${fmt(w.stappen)} / ${fmt(stappenDoel)} stappen${slaap[w.k] > 0 ? ` · ${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')} uur slaap` : ''}${voeding && voedingWeek.dagen[w.k] ? ` · ${fmt(voedingWeek.dagen[w.k].kcal)} / ${fmt(voedingWeek.doel.kcal)} kcal · ${fmt(voedingWeek.dagen[w.k].eiwit)} / ${fmt(voedingWeek.doel.eiwit)} g eiwit · water ${(voedingWeek.dagen[w.k].waterMl / 1000).toFixed(1).replace('.', ',')} L` : ''}`}
               style={{
                 position: 'relative', flex: 1, minWidth: 0, height: '100%', padding: 0, overflow: 'hidden', borderRadius: 8,
-                background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                // Gecombineerde week: bijna zwart met een haarlijn per twee uur, geen grijs vlak.
+                background: voeding ? `repeating-linear-gradient(to bottom, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${120 * pxPerMin}px) 0 ${BAND}px / 100% 100% no-repeat, #070707` : 'rgba(255,255,255,0.05)',
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 outline: aan ? '2px solid #fff' : 'none', outlineOffset: -2,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
@@ -300,13 +365,20 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                 const eKleur = echt && vd.eiwit ? schaal((eiwit / vd.eiwit - 0.6) / 0.4) : 'rgba(255,255,255,0.45)'
                 const deel = (x, doel) => (doel > 0 ? Math.min(1, x / doel) : 0)
                 const balk = (rechts, breed, hoogte, kleur) => (
-                  <span style={{ position: 'absolute', top: 18, bottom: 0, right: rechts, width: breed, background: 'rgba(0,0,0,0.55)' }}>
+                  <span style={{ position: 'absolute', top: BAND, bottom: 0, right: rechts, width: breed, background: 'rgba(0,0,0,0.55)' }}>
                     <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(hoogte * 100)}%`, background: kleur, opacity: echt || kleur === '#38bdf8' ? 1 : 0.6, transition: 'height 0.3s ease' }} />
                   </span>
                 )
                 return (
                   <>
+                    {/* Slaap van de nacht ervoor: paarse band, vol bij acht uur. */}
                     <span style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+                      <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(Math.min(1, (slaap[w.k] || 0) / SLAAP_DOEL) * 100)}%`, background: 'rgba(168,85,247,0.4)' }} />
+                      <span style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: slaap[w.k] > 0 ? '#d8b4fe' : 'rgba(255,255,255,0.4)' }}>
+                        <Moon size={10} strokeWidth={2.6} color={slaap[w.k] > 0 ? PAARS : 'currentColor'} />{slaap[w.k] > 0 ? `${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')}u` : '·'}
+                      </span>
+                    </span>
+                    <span style={{ position: 'absolute', top: 19, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
                       <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(stapDeel * 100)}%`, background: `rgba(${meng(200, 16)},${meng(200, 185)},${meng(200, 129)},${(0.22 + 0.23 * stapGroen).toFixed(2)})` }} />
                       <span style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: w.stappen > 0 ? `rgb(${meng(255, 16)},${meng(255, 185)},${meng(255, 129)})` : 'rgba(255,255,255,0.4)' }}>
                         <Footprints size={10} strokeWidth={2.6} style={{ opacity: 0.8 }} />{w.stappen > 0 ? kort(w.stappen) : '·'}
@@ -314,10 +386,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                     </span>
                     {/* Eén brede voedingsbalk: vult met de kcal tegen het doel, in de
                         kleur van de kcal; kcal en eiwit staan erin. */}
-                    <span style={{ position: 'absolute', top: 18, bottom: 0, right: 4, width: BALKEN - 4, background: 'rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+                    <span style={{ position: 'absolute', top: BAND, bottom: 0, right: 4, width: BALKEN - 4, background: 'rgba(0,0,0,0.6)', overflow: 'hidden' }}>
                       <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(deel(kcal, vd.kcal) * 100)}%`, background: kKleur, opacity: echt ? 0.55 : 0.3, transition: 'height 0.3s ease' }} />
                       {kcal > 0 && (
-                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 4, textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(4, Math.round(deel(kcal, vd.kcal) * (TEGEL_HOOGTE - BAND)) - 30), textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '-0.03em', color: echt ? '#fff' : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
                           <span style={{ display: 'block', fontSize: '0.58rem', fontWeight: 900, color: echt ? eKleur : 'rgba(255,255,255,0.45)' }}>E{fmt(eiwit)}</span>
                         </span>
@@ -327,21 +399,20 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                     {/* Het agendaatje van de dag: training, cardio en maaltijden
                         onder elkaar op tijd. */}
                     {(() => {
-                      const klok = (min) => (min == null ? '' : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`)
-                      const minVan = (ts) => { const t = ts ? new Date(ts) : null; return t && !Number.isNaN(t.getTime()) ? t.getHours() * 60 + t.getMinutes() : null }
-                      const nogTeDoen = w.toekomst || w.k === vandaagSleutel
-                      const regels = [
-                        ...w.sessies.map(x => { const t = telling(x); return { id: `s-${x.id}`, groot: true, min: minVan(x.completed_at || x.created_at), naam: naamVoorSessie?.(x) || 'Training', sub: t.sets > 0 ? `${t.sets} sets` : 'gedaan', gedaan: true, foto: getWorkoutImage({ name: naamVoorSessie?.(x) || 'Training' }) } }),
-                        ...(w.sessies.length ? [] : w.gepland.filter(pl => !pl.isCardio).map((pl, n) => ({ id: `p-${n}`, groot: true, min: null, naam: pl.naam, sub: nogTeDoen ? 'gepland' : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: getWorkoutImage({ name: pl.naam }) }))),
-                        ...w.cardio.map(c => ({ id: `c-${c.id}`, groot: true, cardio: true, min: minVan(c.created_at), naam: c.cardio_type || 'Cardio', sub: Number(c.duration_minutes) > 0 ? `${c.duration_minutes} min` : 'gedaan', gedaan: true, foto: cardioFoto(c.cardio_type) })),
-                        ...(w.cardio.length ? [] : w.cardioPlan.map(c => ({ id: `cp-${c.id}`, groot: true, cardio: true, min: c.min, naam: c.soort, sub: nogTeDoen ? (c.duur ? `${c.duur} min` : 'gepland') : 'niet gedaan', gedaan: false, gemist: !nogTeDoen, foto: cardioFoto(c.soort) }))),
-                        ...((v?.items || []).map(m => ({ ...m, id: `m-${m.id}`, groot: false }))),
-                      ].sort((a, b) => (a.min ?? -1) - (b.min ?? -1))
-                      if (!regels.length) return <span style={{ position: 'absolute', top: 18, bottom: 0, left: 0, right: BALKEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Rust</span>
+                      const regels = regelsVan(w, v)
+                      if (!regels.length) return <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 0, right: BALKEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Rust</span>
+                      // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
+                      let onder = 0
+                      const geplaatst = regels.map(r => {
+                        const hoogte = r.groot ? 50 : 24
+                        const top = Math.max(r.min == null ? 0 : (r.min - asStart) * pxPerMin, onder)
+                        onder = top + hoogte + 2
+                        return { ...r, top, hoogte }
+                      })
                       return (
-                        <span style={{ position: 'absolute', top: 22, bottom: 4, left: 4, right: BALKEN + 4, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'hidden', textAlign: 'left' }}>
-                          {regels.map(r => r.groot ? (
-                            <span key={r.id} style={{ position: 'relative', flexShrink: 0, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
+                        <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 4, right: BALKEN + 4, overflow: 'hidden', textAlign: 'left' }}>
+                          {geplaatst.map(r => r.groot ? (
+                            <span key={r.id} style={{ position: 'absolute', left: 0, right: 0, top: r.top, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
                               <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: r.gedaan ? 0.5 : 0.22 }} />
                               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                               {r.gedaan && <CircleCheck size={14} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
@@ -356,7 +427,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                               </span>
                             </span>
                           ) : (
-                            <span key={r.id} title={`${klok(r.min)} ${r.naam} · ${fmt(r.kcal)} kcal${r.gelogd ? '' : ' (gepland)'}`} style={{ flexShrink: 0, height: 24, display: 'flex', alignItems: 'center', gap: 4, opacity: r.gelogd ? 1 : 0.5 }}>
+                            <span key={r.id} title={`${klok(r.min)} ${r.naam} · ${fmt(r.kcal)} kcal${r.gelogd ? '' : ' (gepland)'}`} style={{ position: 'absolute', left: 0, right: 0, top: r.top, height: 24, display: 'flex', alignItems: 'center', gap: 4, opacity: r.gelogd ? 1 : 0.5 }}>
                               <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 5, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }} />
                               <span style={{ flex: 1, minWidth: 0, lineHeight: 1.1 }}>
                                 <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.naam}</span>
@@ -398,10 +469,10 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       <div>
       {/* De gekozen dag: stappen, sets, oefeningen en cardio tegen het plan. */}
       <div style={{ display: 'flex', gap: 14, marginTop: '0.8rem' }}>
-        <Balk label="Stappen" waarde={dag.stappen} doel={stappenDoel} kleur={deelKleur(dag.stappen, stappenDoel)} />
-        <Balk label="Sets" waarde={dagSets} doel={planSets} kleur={deelKleur(dagSets, planSets)} />
-        <Balk label="Oefeningen" waarde={dagOef} doel={planOef} kleur={deelKleur(dagOef, planOef)} />
-        <Balk label="Cardio" waarde={dagCardio} doel={planCardio} eenheid=" min" kleur={planCardio ? deelKleur(dagCardio, planCardio) : dagCardio ? GROEN : '#fff'} />
+        <Balk label="Stappen" waarde={dag.stappen} doel={stappenDoel} kleur={deelKleur(dag.stappen, stappenDoel)} onKlik={acties?.stappen} hint="Stappendoel instellen" />
+        <Balk label="Sets" waarde={dagSets} doel={planSets} kleur={deelKleur(dagSets, planSets)} onKlik={acties?.kracht} hint="Kracht: per oefening de stand tegen de band van de fase" />
+        <Balk label="Oefeningen" waarde={dagOef} doel={planOef} kleur={deelKleur(dagOef, planOef)} onKlik={acties?.bouwfase} hint="Bouwfase en herstel per spiergroep" />
+        <Balk label="Cardio" waarde={dagCardio} doel={planCardio} eenheid=" min" kleur={planCardio ? deelKleur(dagCardio, planCardio) : dagCardio ? GROEN : '#fff'} onKlik={acties?.cardio} hint="Cardio die de klant logde" />
       </div>
 
       {/* Stapeltje 'gedaan' links, weekcijfers rechts. */}
@@ -445,7 +516,15 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
           ))}
         </span>
       </div>
-      {statOpen && <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, textAlign: 'right' }}>{statOpen.uitleg}</div>}
+      {statOpen && (
+        <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, textAlign: 'right' }}>
+          {statOpen.uitleg}
+          {statOpen.id === 'trainingen' && acties?.voortgang && <> In het hele plan: {acties.voortgang}.</>}
+          {statOpen.id === 'trainingen' && acties?.aangepast && (
+            <button onClick={acties.aangepast} style={{ marginLeft: 6, padding: 0, background: 'none', border: 'none', color: '#fff', fontSize: 'inherit', fontWeight: 900, fontFamily: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>Aangepast door klant</button>
+          )}
+        </div>
+      )}
 
       {/* Uitgeklapt: de sessies en de cardio van de dag. Een sessie opent in
           het venster met de oefeningen en de progressie. */}

@@ -225,7 +225,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         client={effectiveClient} weightData={weightData} circumData={circumData}
         photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={klein}
         onOpenGallery={() => setShowGallery(true)}
-        onOpenFoto={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
         fotosNaast={breedGewicht && !klein}
         db={db} onClientUpdate={handleClientUpdate}
       />
@@ -587,7 +586,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   return (
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: VAK_RUIMTE }}>
                       <div style={{ flex: rest.length ? '1.6 1 0' : '1 1 0', minHeight: 0, overflow: 'hidden', ...VAK_KAART }}>
-                        <KolomKop icon={weekSec.icon} titel="Week" onVerberg={null}>
+                        <KolomKop icon={weekSec.icon} titel="Week" onVerberg={null} zonderBalk>
                           {renderSectie('workout', false, (gedeeld) => renderSectie('meals', false, gedeeld))}
                         </KolomKop>
                       </div>

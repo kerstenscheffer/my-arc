@@ -382,7 +382,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         {/* In de kolomkop: plan, voortgang en knoppen (zie KolomKop). */}
-        {!alleenSessies && <KolomKopInhoud>
+        {/* Gecombineerde week: geen kopbalk; dezelfde knoppen zitten dan in de week zelf. */}
+        {!alleenSessies && !voeding && <KolomKopInhoud>
           <span title={workoutData?.schema ? `${workoutData.schema.name || 'Workout Plan'} · ${workoutData.schema.days_per_week || '-'}d/week · ${workoutData.schema.experience_level || '-'}` : 'Geen schema'}
             style={{ ...kopInfoStijl, flex: 1 }}>
             {workoutData?.schema ? (
@@ -450,6 +451,16 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <TrainingWeekInzicht
             client={client} db={db} isMobile={isMobile}
             voeding={voeding}
+            acties={{
+              stappen: () => setVenster('stappen'),
+              bouwfase: () => setVenster('bouwfase'),
+              cardio: () => setVenster('cardio'),
+              aangepast: () => setVenster('aangepast'),
+              kracht: () => setKrachtOpen(true),
+              plan: onNavigateWorkout ? () => { onNavigateWorkout(client?.id, workoutData?.schema?.id || null); if (onClose) onClose() } : null,
+              planNaam: workoutData?.schema?.name || null,
+              voortgang: workoutData?.totalWorkouts > 0 ? `${workoutData.completedWorkouts}/${workoutData.totalWorkouts}` : null,
+            }}
             workouts={workouts}
             naamVoorSessie={naamVoorSessie}
             tijdVan={logTijd}

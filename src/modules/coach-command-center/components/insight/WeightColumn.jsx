@@ -16,7 +16,7 @@ import DoelenMacrosPaneel from './DoelenMacrosPaneel'
 import SlaapInsight from './SlaapInsight'
 
 import { PRIVE_FOTO } from '../../utils/privacyModus'
-import { fotoWeergaveUrl } from '../../../progress/fotoWeergave'
+import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
 // Venster voor de drie dingen die niet altijd in beeld hoeven: doelen & macro's,
@@ -53,7 +53,7 @@ function Venster({ titel, icoon, breed = 520, isMobile, onSluit, children }) {
   )
 }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate, onOpenFoto = null, fotosNaast = false }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate, fotosNaast = false }) {
   const history = weightData?.history || []
   // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
   // "sinds start" telt.
@@ -92,6 +92,10 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
 
 
   const kopIcoon = { ...kopKnopStijl, width: 28, padding: 0, justifyContent: 'center' }
+  // Vaste lijst zolang de foto's dezelfde zijn: anders tekenen de drie kaarten bij elke render opnieuw.
+  const fotoSleutel = (photos || []).map(p => p.id).join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fotoLijst = React.useMemo(() => photos || [], [fotoSleutel])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -200,35 +204,21 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Nog geen wegingen</div>
         )}
       </div>
-      {/* Progressiefoto's naast de grafiek (17 nov 2026, Kersten): per dag, nieuwste
-          boven. Klik = groot bekijken. Alleen in het brede vak op de computer. */}
-      {fotosNaast && !isMobile && photos.length > 0 && (() => {
-        const dagen = []
-        const opDag = new Map()
-        photos.forEach((p, idx) => {
-          const d = String(p.photo_date || p.created_at || '').slice(0, 10)
-          if (!opDag.has(d)) { opDag.set(d, []); dagen.push(d) }
-          opDag.get(d).push({ p, idx })
-        })
-        dagen.sort((a, b) => (a < b ? 1 : -1))
-        return (
-          <div style={{ width: '36%', minWidth: 220, maxWidth: 420, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.5rem 0.7rem 0.8rem' }}>
-            {dagen.map(d => (
-              <div key={d} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', margin: '0 0 5px' }}>{d ? formatDate(d) : 'Zonder datum'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 5 }}>
-                  {opDag.get(d).map(({ p, idx }) => (
-                    <button key={p.id} type="button" onClick={() => (onOpenFoto ? onOpenFoto(idx) : onOpenGallery?.())} title={p.photo_type || 'Foto'}
-                      style={{ aspectRatio: '3 / 4', padding: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer' }}>
-                      <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
+      {/* Progressie naast de grafiek (17 nov 2026, Kersten): de MY ARC-transformatiekaart
+          per hoek (eerste tegen laatste foto), voor, zijkant en achter. Klik = alle foto's. */}
+      {fotosNaast && !isMobile && photos.length > 0 && (
+        <div style={{ width: '50%', maxWidth: 600, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.7rem', overflow: 'hidden' }}>
+          {[['front', 'Voor'], ['side', 'Zijkant'], ['back', 'Achter']].map(([hoek, label]) => (
+            <button key={hoek} type="button" onClick={() => onOpenGallery?.()} title={`${label}: alle foto's bekijken`}
+              style={{ flex: 1, minWidth: 0, padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <span className={PRIVE_FOTO} style={{ display: 'block' }}>
+                <BeforeAfterCard bare verbergDownload client={client} db={db} isMobile={false} hoek={hoek} fotos={fotoLijst} />
+              </span>
+              <span style={{ display: 'block', marginTop: 5, fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       </div>
 
       {venster === 'doelen' && (
