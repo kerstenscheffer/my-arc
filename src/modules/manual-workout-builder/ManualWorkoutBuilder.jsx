@@ -977,24 +977,26 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setActiveDay(null)
   }
 
-  const loadTemplate = (template) => {
+  // metCyclus: bij het bewerken van de template zelf komt ook de dagindeling mee.
+  const loadTemplate = (template, metCyclus = false) => {
     const days = []
     if (template.week_structure) {
       Object.entries(template.week_structure)
         .sort((a, b) => parseInt(a[0].replace('dag', '')) - parseInt(b[0].replace('dag', '')))
-        .forEach(([, day], index) => {
-          days.push({ id: Date.now() + index, name: day.name || `DAG ${index + 1}`, focus: day.focus || '', geschatteTijd: day.geschatteTijd || '60 minutes', exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() })) })
+        .forEach(([key, day], index) => {
+          days.push({ _bronKey: key, id: Date.now() + index, name: day.name || `DAG ${index + 1}`, focus: day.focus || '', geschatteTijd: day.geschatteTijd || '60 minutes', exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() })) })
         })
     }
     // Geen ' (Copy)' achter de naam: dit schema belandt één op één in de app van
     // de klant, en daar hoort geen werkaantekening van de coach in.
-    history.reset({ name: template.name, description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days })
+    history.reset({ name: template.name, description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days,
+      ...(metCyclus ? { cyclus: cyclusUitOpslag(template.cyclus, new Map(days.map(d => [d._bronKey, d.id]))) } : {}) })
     setShowTemplateManager(false)
   }
 
   // ── Sjabloon bewerken: plan-template of dag-template ──
   const startBewerk = (soort, tpl) => {
-    if (soort === 'plan') loadTemplate(tpl)
+    if (soort === 'plan') loadTemplate(tpl, true)
     else {
       const base = Date.now()
       history.reset({
@@ -1038,6 +1040,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
           split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length,
           week_structure: buildWeekStructure(), equipment: workoutPlan.equipment.slice(0, 10), updated_at: nu,
+          // De dagindeling (welke training op welke dag) hoort bij de template; die ging eerst verloren.
+          cyclus: cyclusVoorOpslaan(workoutPlan, cyc),
         }).eq('id', bewerk.id).eq('is_template', true).select('id')
       } else {
         const dag = workoutPlan.days[0]
@@ -1184,8 +1188,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     { id: 'week', icon: <CalendarDays size={16} />, label: 'Trainingsweek', onClick: () => setShowAgenda(true), uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'De week van deze klant plannen' },
     { id: 'agenda', icon: <Calendar size={16} />, label: 'Agenda', onClick: () => setShowWeekAgenda(v => !v), uit: !effectiveClient, actief: showWeekAgenda && !!effectiveClient },
     { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
-    { id: 'plannen', icon: <Users size={16} />, label: 'Alle plannen', onClick: () => setShowPlanSwitch(true) },
-    { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
+    { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowPlanSwitch(true), badge: templates.length || null },
     { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
     { id: 'fase', icon: <Flag size={16} />, label: 'Mesocyclus', onClick: () => setFaseOpen(v => !v), actief: faseOpen && !!selectedSchemaId, uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Mesocyclus starten, deload en gemeten TDEE' },
     { id: 'info', icon: <BarChart3 size={16} />, label: 'Planinfo', onClick: () => setInfoOpen(v => !v), actief: infoOpen },
@@ -1325,8 +1328,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
       {/* ══════════════ DAGEN ══════════════
           Alleen zonder klant (een template bouwen). Met een klant is het
-          weekrooster de dagkiezer: tik op een training = die dag openen. */}
-      {!effectiveClient && <div style={{ flexShrink: 0, borderBottom: DUN }}>
+          weekrooster de dagkiezer: tik op een training = die dag openen.
+          Staan alle dagen naast elkaar, dan zijn de kolomkoppen zelf de
+          dagkiezer en staat "Nieuwe dag" in de cyclusregel (17 nov 2026). */}
+      {!effectiveClient && !(!m && alleDagen && !dagenDicht && workoutPlan.days.length > 1) && <div style={{ flexShrink: 0, borderBottom: DUN }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem' : '0.6rem 1rem', display: 'flex', gap: m ? 4 : 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {workoutPlan.days.map((day, index) => {
             const aan = day.id === activeDay
@@ -1425,6 +1430,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             {losIds.length > 0 && <span title="Staat in het plan, maar de klant heeft hem niet in zijn week gezet. Telt niet mee in het weekvolume." style={{ color: '#f59e0b' }}>· {losIds.length} niet ingepland</span>}
             {cyc.lengte !== STANDAARD_LENGTE && <span title="Volume en frequentie worden omgerekend naar een week">= {String(Math.round(workoutPlan.days.length * cyclusFactor * 10) / 10).replace('.', ',')} trainingen per week</span>}
             {cyc.bron === 'rooster' && <span title="Bij een week van 7 dagen volgt de volgorde het weekrooster van de klant; pas het daar aan">· volgorde uit weekrooster</span>}
+            {!effectiveClient && bewerk?.soort !== 'dag' && (
+              <button onClick={() => setShowDayPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 0.7rem', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontSize: '0.76rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                <Plus size={13} strokeWidth={2.8} /> Nieuwe dag
+              </button>
+            )}
           </div>
         )}
         {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} onPointerMove={volgMuis} onPointerLeave={() => { plakDagRef.current = null; setPlakDag(null) }} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>

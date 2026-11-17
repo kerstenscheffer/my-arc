@@ -1431,13 +1431,21 @@ async getClientSchemas(clientId) {
         week_structure: tpl.week_structure, equipment: tpl.equipment,
         is_ai_generated: false, is_template: false, is_public: false,
         original_schema_id: templateId, created_at: now, updated_at: now,
+        // De dagindeling van de template gaat mee naar de kopie.
+        ...(tpl.cyclus ? { cyclus: tpl.cyclus } : {}),
       }
       const { data: schema, error } = await supabase.from('workout_schemas').insert(insert).select().single()
       if (error) throw error
       const shouldActivate = makeActive || !c?.assigned_schema_id
       if (shouldActivate) {
         // Verse default-schedule uit het nieuwe plan (zie setActiveWorkoutPlan).
-        const schedule = this._defaultScheduleFromStructure(tpl.week_structure)
+        // Staat in de template een weekindeling (7 dagen), dan is dat het rooster
+        // van de klant; anders de standaardverdeling.
+        const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        const uitTemplate = tpl.cyclus?.lengte === 7 && Array.isArray(tpl.cyclus.volgorde) && tpl.cyclus.volgorde.some(k => k && tpl.week_structure?.[k])
+          ? Object.fromEntries(WEEK.map((d, i) => [d, tpl.cyclus.volgorde[i] && tpl.week_structure?.[tpl.cyclus.volgorde[i]] ? tpl.cyclus.volgorde[i] : null]).filter(([, k]) => k))
+          : null
+        const schedule = uitTemplate || this._defaultScheduleFromStructure(tpl.week_structure)
         await supabase.from('clients').update({ assigned_schema_id: schema.id, workout_schedule: schedule, updated_at: now }).eq('id', clientId)
       }
       return { success: true, schema, activated: shouldActivate }
