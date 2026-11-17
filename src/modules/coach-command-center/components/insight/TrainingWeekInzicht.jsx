@@ -197,6 +197,13 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
     try { localStorage.setItem('ci_training_gedaan_dicht', d ? '0' : '1') } catch { /* privévenster */ }
     return !d
   })
+  // Klik op een gedane training in de agenda: de lijst eronder klapt open en
+  // schuift in beeld (17 nov 2026, Kersten). De dag kiest de kolom zelf al.
+  const lijstRef = useRef(null)
+  const toonLijst = () => {
+    setDicht(false)
+    setTimeout(() => lijstRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
   const [statInfo, setStatInfo] = useState(null)
   // ── Plannen in de agenda (gecombineerde week) ──
   // De geplande blokken komen uit de agenda van de klant zelf (zelfde bron als
@@ -582,6 +589,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                 const vd = voedingWeek.doel
                 const kcal = v ? (v.gelogd ? v.kcal : v.planKcal) : 0
                 const eiwit = v ? (v.gelogd ? v.eiwit : v.planEiwit) : 0
+                const koolh = v ? (v.gelogd ? v.koolh : v.planKoolh) || 0 : 0
+                const vet = v ? (v.gelogd ? v.vet : v.planVet) || 0 : 0
                 const echt = !!v?.gelogd
                 const kKleur = echt ? kcalKleur(kcal, vd.kcal, '#fff') : 'rgba(255,255,255,0.45)'
                 const eKleur = echt && vd.eiwit ? schaal((eiwit / vd.eiwit - 0.6) / 0.4) : 'rgba(255,255,255,0.45)'
@@ -620,9 +629,11 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                     <span style={{ position: 'absolute', top: BAND, bottom: 0, right: 4, width: BALKEN - 4, background: 'rgba(0,0,0,0.6)', overflow: 'hidden' }}>
                       <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.round(deel(kcal, vd.kcal) * 100)}%`, background: kKleur, opacity: echt ? 0.55 : 0.3, transition: 'height 0.3s ease' }} />
                       {kcal > 0 && (
-                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(4, Math.round(deel(kcal, vd.kcal) * (TEGEL_HOOGTE - BAND)) - 30), textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        <span style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(4, Math.round(deel(kcal, vd.kcal) * (TEGEL_HOOGTE - BAND)) - 52), textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '-0.03em', color: echt ? '#fff' : 'rgba(255,255,255,0.6)' }}>{fmt(kcal)}</span>
                           <span style={{ display: 'block', fontSize: '0.58rem', fontWeight: 900, color: echt ? eKleur : 'rgba(255,255,255,0.45)' }}>E{fmt(eiwit)}</span>
+                          <span style={{ display: 'block', fontSize: '0.58rem', fontWeight: 900, color: echt ? '#fff' : 'rgba(255,255,255,0.45)' }}>K{fmt(koolh)}</span>
+                          <span style={{ display: 'block', fontSize: '0.58rem', fontWeight: 900, color: echt ? '#fff' : 'rgba(255,255,255,0.45)' }}>V{fmt(vet)}</span>
                         </span>
                       )}
                     </span>
@@ -668,7 +679,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                       return (
                         <span style={{ position: 'absolute', top: BAND, bottom: 0, left: 4, right: BALKEN + 4, overflow: 'hidden', textAlign: 'left' }}>
                           {geplaatst.map(r => r.groot ? (
-                            <span key={r.id} {...sleepProps(r)} style={{ ...sleepStijl(r), position: 'absolute', left: 0, right: 0, top: r.top, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
+                            <span key={r.id} {...sleepProps(r)} onClick={r.gedaan ? toonLijst : undefined} style={{ cursor: r.gedaan ? 'pointer' : undefined, ...sleepStijl(r), position: 'absolute', left: 0, right: 0, top: r.top, height: 50, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: r.gedaan ? `inset 0 -2px 0 ${GROEN}` : 'none' }}>
                               <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${r.foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: r.gedaan ? 0.5 : 0.22 }} />
                               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                               {r.gedaan && <CircleCheck size={14} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
@@ -758,7 +769,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       </div>
 
       {/* Stapeltje 'gedaan' links, weekcijfers rechts. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0.7rem 0 0', minHeight: 44 }}>
+      <div ref={lijstRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0.7rem 0 0', minHeight: 44, scrollMarginTop: 8 }}>
         {gedaanAantal > 0 ? (
           <button onClick={wissel} aria-expanded={!dicht} aria-label={`${gedaanAantal} gedaan, ${dicht ? 'bekijken' : 'inklappen'}`}
             style={{ flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>

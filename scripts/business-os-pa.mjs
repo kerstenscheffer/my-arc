@@ -717,6 +717,10 @@ function redenVanEinde(m, budget) {
   if (sub && sub !== 'success') return { soort: 'fout', reden: `Claude Code stopte met ${sub}` }
   return { soort: 'leeg', reden: 'Claude Code gaf een leeg antwoord' }
 }
+// Tweede poging na een technische afbreking: de sessie bevat de vraag dan al een keer.
+const HERHAALD = 'Technische herhaling: je vorige poging op deze vraag brak af voordat Kersten iets zag (het commando dat je startte is niet uitgevoerd). Beantwoord de vraag hieronder gewoon, zonder excuus of verwijzing naar de afbreking.\n\n'
+const afgebrokenTekst = (reden) => `Mijn antwoord brak af: ${kort(reden, 400)}. Stuur je bericht nog een keer.`
+const PA_HERSTART_REDEN = 'de PA op de Mac stopte of herstartte tijdens je bericht'
 // Bestaat de sessie al op schijf? Dan hervatten, ook als de eerste beurt mislukte
 // (anders weigert Claude Code het sessie-id bij elk volgend bericht).
 const SESSIE_BESTANDEN = path.join(os.homedir(), '.claude', 'projects', MAP.replace(/[^a-zA-Z0-9]/g, '-'))
@@ -725,7 +729,7 @@ const sessieBestaat = (id) => { try { return fs.statSync(path.join(SESSIE_BESTAN
 // opDeel(tekst): halve tekst tijdens het typen.
 // rijId: bij welke opdracht een toestemmingsvraag hoort; zonderVragen: groeironde; toegestaan: smallere toolset (statscheck).
 // Mislukt: { ok: false, reden, soort } en de reden ook als antwoord.tekst (groeirondes lezen die).
-async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zonderVragen = false, toegestaan = null } = {}) {
+async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zonderVragen = false, toegestaan = null, opnieuw = false } = {}) {
   const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
   const hervat = !!slimId && (slimSessies.has(slimId) || sessieBestaat(slimId))
   let w
@@ -790,7 +794,7 @@ async function beantwoordChat(invoer, opDeel, opStop = null, { rijId = null, zon
     }
     opStop?.(() => { gestopt = true; w.p.kill('SIGTERM') })
     if (w.dood) return w.opEinde()
-    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
+    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (opnieuw ? HERHAALD : '') + (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
   })
   if (slimId && r.ok) bewaarSlimSessie(slimId)
   if (!slimId) setTimeout(zetWarmKlaar, 500)
@@ -978,20 +982,40 @@ async function rondeChat() {
       const nu = Date.now()
       if (nu - laatst > 300) { laatst = nu; schrijf(tekst) } else wachtend = setTimeout(() => { laatst = Date.now(); if (!klaar) schrijf(tekst) }, 300)
     }
-    const r = await beantwoordChat(rij.invoer, opDeel, (f) => lopend.set(rij.id, f), { rijId: rij.id })
+    // Een fout in de PA zelf (proces start niet, bijlage onleesbaar) telt ook als afgebroken, met reden.
+    const vraag = (opnieuw = false) => beantwoordChat(rij.invoer, opDeel, (f) => lopend.set(rij.id, f), { rijId: rij.id, opnieuw })
+      .catch(e => ({ ok: false, soort: 'fout', reden: `de PA op de Mac gaf een fout (${kort(e.message)})`, antwoord: { tekst: '', acties: [] } }))
+    let r = await vraag()
+    // Budget al op bij het inlezen van een lang gesprek (16 en 17 nov 2026: eerste beurt
+    // kostte $12 tegen een budget van $10, Claude Code stopte vóór het eerste commando).
+    // Het gesprek staat daarna in de cache, dus één keer opnieuw kost nog maar centen.
+    if (!r.ok && r.soort === 'budget' && Date.now() - t0 < 2 * 60 * 1000 && !lopend.get(rij.id)?.gestopt) {
+      console.log(`${tijd()} ↻ chat opnieuw (budget op bij het inlezen van het gesprek)`)
+      await new Promise(x => setTimeout(x, 2000)) // het eerste proces sluit de sessie nog af
+      r = await vraag(true)
+      if (!r.ok) r.reden = `${r.reden}; ook de tweede poging lukte niet`
+    }
     klaar = true
     clearTimeout(wachtend)
     const gestopt = lopend.get(rij.id)?.gestopt
     lopend.delete(rij.id)
     const model = rij.invoer?.modus === 'slim' ? `${SLIM_MODEL}, slim` : CHAT_MODEL
-    console.log(`${tijd()} ${gestopt ? '⏹ chat gestopt' : r.ok ? '✓ chat-antwoord' : '✗ chat-antwoord'} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})`)
-    const antwoord = r.ok && !gestopt ? await voerActiesUit(rij.id, r.antwoord).catch(e => {
+    console.log(`${tijd()} ${gestopt ? '⏹ chat gestopt' : r.ok ? '✓ chat-antwoord' : '✗ chat-antwoord'} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})${r.ok || gestopt ? '' : `: ${r.reden}`}`)
+    // Afgebroken eindigt nooit stil: reden in resultaat en als bericht in de chat.
+    // Vastgelopen (waakhond) heeft al een eigen volledige melding.
+    const antwoord = gestopt ? r.antwoord : r.ok ? await voerActiesUit(rij.id, r.antwoord).catch(e => {
       console.error(tijd(), 'Acties uitvoeren mislukt:', e.message)
       return { ...r.antwoord, tekst: `${r.antwoord.tekst}\n\n→ Acties uitvoeren mislukt: ${e.message}. Controleer de kaarten hieronder.` }
-    }) : r.antwoord
-    await sb.from('business_os_opdrachten')
-      .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord, klaar_at: new Date().toISOString() })
-      .eq('id', rij.id).eq('status', 'bezig')
+    }) : r.soort === 'vast' ? r.antwoord : { tekst: afgebrokenTekst(r.reden), acties: [] }
+    // Lukt het wegschrijven niet (netwerk), dan bleef de rij op 'bezig' hangen: drie pogingen.
+    for (let i = 0; i < 3; i++) {
+      const { error } = await sb.from('business_os_opdrachten')
+        .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord, klaar_at: new Date().toISOString(), ...(r.ok ? {} : { resultaat: kort(r.reden, 500) }) })
+        .eq('id', rij.id).eq('status', 'bezig').then(x => x, e => ({ error: e }))
+      if (!error) break
+      console.error(tijd(), 'Chat-antwoord opslaan mislukt:', error.message)
+      await new Promise(x => setTimeout(x, 2000))
+    }
   } finally { bezig.chat-- }
 }
 
@@ -1383,7 +1407,9 @@ async function start(g) {
   // terug in de wachtrij; een oude chatvraag heeft de chat al via de API gedaan.
   // Niet als er nu zelf iets loopt (opnieuw ingelogd tijdens een opdracht).
   if (!bezig.code) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'code')
-  if (!bezig.chat) await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
+  if (!bezig.chat) await sb.from('business_os_opdrachten')
+    .update({ status: 'mislukt', resultaat: PA_HERSTART_REDEN, antwoord: { tekst: afgebrokenTekst(PA_HERSTART_REDEN), acties: [] }, klaar_at: new Date().toISOString() })
+    .eq('status', 'bezig').eq('soort', 'chat')
   if (!bezig.groei) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'groei')
   await hartslag()
   await zetVragenAan().catch(e => console.error(tijd(), 'Toestemmingsvragen:', e.message))

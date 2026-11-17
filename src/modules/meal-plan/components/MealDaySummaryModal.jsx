@@ -358,8 +358,8 @@ export default function MealDaySummaryModal({
       const lijst = perDag[k] || []
       const wt = water[k] || null
       dagen[k] = {
-        kcal: tel(lijst, 'calories'), eiwit: tel(lijst, 'protein'), gelogd: lijst.length > 0,
-        planKcal: tel(gepland[k], 'calories'), planEiwit: tel(gepland[k], 'protein'),
+        kcal: tel(lijst, 'calories'), eiwit: tel(lijst, 'protein'), koolh: tel(lijst, 'carbs'), vet: tel(lijst, 'fat'), gelogd: lijst.length > 0,
+        planKcal: tel(gepland[k], 'calories'), planEiwit: tel(gepland[k], 'protein'), planKoolh: tel(gepland[k], 'carbs'), planVet: tel(gepland[k], 'fat'),
         waterMl: wt?.ml || 0, waterDoel: (wt?.doel || 0) > 0 ? wt.doel : Math.round((Number(waterDoelL) || 3) * 1000),
         // Voor het agendaatje in de tegel: de maaltijden op tijd. Gelogd, en
         // voor een dag zonder logs wat er gepland staat.
