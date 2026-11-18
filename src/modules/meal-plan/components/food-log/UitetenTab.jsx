@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer,
-  Utensils, ChevronLeft, ChevronDown, Minus, Plus, Check, Hand, Info, Search, X,
+  Utensils, ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Check, Hand, Info, Search, X,
 } from 'lucide-react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
@@ -153,7 +153,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     if (!regels.length || bezig) return
     setBezig(true)
     try {
-      const deelTekst = (d, k) => (k?.delen ? ' (aangepast)' : d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
+      const deelTekst = (d, k) => (k?.zelf ? ' (aangepast)' : d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
       await onLog({
         name: soort ? `Uit eten: ${soort}` : 'Uit eten',
         type: 'custom', source: 'uiteten', per100g: false, amount: 1, per_unit: 'portion',
@@ -178,7 +178,6 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     const k = gekozen[r.id]
     const basis = k?.delen ? somDelen(k.delen) : r
     const f = k ? k.aantal * (k.delen ? 1 : k.deel) : 1
-    const hoek = { width: 34, height: 30, padding: 0, background: 'transparent', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
     return (
       <div key={r.id} style={{ margin: `0 -${zij}` }}>
         {/* Dezelfde kaart als overal in de app: foto, naam, macro's; rechts info en toevoegen. */}
@@ -188,48 +187,16 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
           naNaam={zoekActief && r.soort !== 'alle' ? `${r.soort} · ${r.portie}` : r.portie}
           label={r.keuze === 'top' ? <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.04em', color: GROEN }}>SLIMME KEUZE</span> : null}
           compact isMobile={isMobile} geselecteerd={!!k}
-          onTik={() => tik(r.id)} onCheck={() => tik(r.id)}
-          rechts={
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginRight: -6 }}>
-              <button onClick={(e) => { e.stopPropagation(); setDetail(r.id) }} aria-label="Wat zit erin en aanpassen" style={{ ...hoek, opacity: 0.75 }}>
-                <Info size={17} strokeWidth={2.6} />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); tik(r.id) }} aria-label={k ? 'Weghalen' : 'Toevoegen'} style={hoek}>
-                <span style={{ width: 24, height: 24, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: k ? GROEN : '#fff', color: k ? '#fff' : '#0a0a0a' }}>
-                  {k ? <Check size={15} strokeWidth={3.5} /> : <Plus size={16} strokeWidth={3.2} />}
-                </span>
-              </button>
-            </div>
-          }
-          acties={[]}
+          // Tik op de kaart: eerst kijken wat erin zit, daar kies je of je hem toevoegt. De plus rechts voegt direct toe.
+          onTik={() => setDetail(r.id)} onCheck={() => setDetail(r.id)}
+          // Onderaan de kaart dezelfde knoppenrij als op een planmaaltijd: links direct toevoegen, rechts naar de info.
+          acties={[
+            k
+              ? { icon: <Check size={13} strokeWidth={3.2} />, label: 'Toegevoegd, tik om weg te halen', onClick: () => tik(r.id), kleur: GROEN }
+              : { icon: <Plus size={13} strokeWidth={3} />, label: 'Toevoegen', onClick: () => tik(r.id) },
+            { icon: <ChevronRight size={13} strokeWidth={3} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
+          ]}
         />
-        {k && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: `0 ${zij} 0.6rem` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button onClick={() => (k.aantal <= 1 ? tik(r.id) : zet(r.id, { aantal: k.aantal - 1 }))} aria-label="Minder" style={kleinKnop}><Minus size={15} strokeWidth={3} /></button>
-              <span style={{ minWidth: 18, textAlign: 'center', fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{k.aantal}</span>
-              <button onClick={() => zet(r.id, { aantal: Math.min(12, k.aantal + 1) })} aria-label="Meer" style={kleinKnop}><Plus size={15} strokeWidth={3} /></button>
-            </div>
-            {k.delen && (
-              <button onClick={() => setDetail(r.id)} style={{ padding: 0, background: 'transparent', border: 'none', color: GROEN, fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Aangepast · wijzig</button>
-            )}
-            {gang !== 'drank' && !k.delen && (
-              <div style={{ display: 'flex', gap: 16 }}>
-                {DELEN.map(([d, label]) => (
-                  <button key={d} onClick={() => zet(r.id, { deel: d })} style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-                    padding: '0.15rem 0 0.25rem', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer',
-                    color: k.deel === d ? GROEN : 'rgba(255,255,255,0.55)',
-                    borderBottom: `2px solid ${k.deel === d ? GROEN : 'transparent'}`,
-                  }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85 }}>±{Math.round(gramVan(r) * d / 5) * 5} g</span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>{label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     )
   }
@@ -301,14 +268,15 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     const g = gramVan(r)
     const standaard = r.delen || [{ n: r.naam, g, k: Math.round(r.kcal / g * 100), e: Math.round(r.eiwit / g * 1000) / 10, kh: Math.round(r.koolh / g * 1000) / 10, v: Math.round(r.vet / g * 1000) / 10 }]
     return (
-      <UitetenDetail key={r.id} gerecht={r} start={k?.delen || standaard} alGekozen={!!k} db={db} isMobile={isMobile}
+      <UitetenDetail key={r.id} gerecht={r} standaard={standaard} start={k?.delen || standaard} startAantal={k?.aantal || 1} startMaat={k?.delen ? (k.zelf ? null : k.deel) : 1} alGekozen={!!k} db={db} isMobile={isMobile}
         foto={r.image_url || fotoVan(r.naam)}
         onTerug={() => setDetail(null)}
-        onKlaar={(delen, aangepast) => {
+        onVerwijder={k ? () => { tikStil(r.id); setDetail(null) } : null}
+        onKlaar={(delen, aangepast, aantal, maat) => {
+          // maat = Klein/Middel/Groot/Enorm als factor; null = zelf onderdelen aangepast.
           setGekozen(prev => {
-            const oud = prev[r.id]
-            const nieuw = { aantal: oud?.aantal || 1, deel: aangepast || oud?.delen ? 1 : (oud?.deel || 1) }
-            if (aangepast || oud?.delen) nieuw.delen = delen
+            const nieuw = { aantal: aantal || 1, deel: maat || 1 }
+            if (aangepast) { nieuw.delen = delen; nieuw.zelf = maat == null }
             return { ...prev, [r.id]: nieuw }
           })
           setDetail(null)
