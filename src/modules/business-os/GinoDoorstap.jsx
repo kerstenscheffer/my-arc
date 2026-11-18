@@ -177,8 +177,10 @@ export default function GinoDoorstap({ isMobile = false }) {
     if (!ch.error) setSaleRijen(ch.data || [])
     setInstellingen(await haalInstellingen().catch(() => new Map()))
     // Gestopt telt ook wie niet meer actief is, dus los van de klantenlijst hierboven.
+    // Traject beëindigd, of het account staat niet meer op actief terwijl coaching_status
+    // nog op active bleef hangen (18 nov 2026: zo vielen twee refunds uit beide lijsten).
     const { data: geeindigd } = await supabase.from('clients').select('id, first_name, last_name, email')
-      .eq('coaching_status', 'ended').eq('coaching_total_weeks', CHALLENGE_WEKEN)
+      .eq('coaching_total_weeks', CHALLENGE_WEKEN).or('coaching_status.eq.ended,status.neq.active,status.is.null')
       .then(x => x, () => ({ data: [] }))
     setGestopt((geeindigd || []).filter(c => !isTest(c) && !['ja_mondeling', 'betaald'].includes(laatste.get(c.id)?.status)))
 
@@ -351,8 +353,11 @@ export default function GinoDoorstap({ isMobile = false }) {
   // De borg afronden bij wie stopt (16 nov 2026): terugbetaald of behouden. Dezelfde ene
   // kolom als het lead-systeem (setChallengeStatus). Klik 1 = 'Zeker?', klik 2 = opslaan.
   // Terugbetaald valt uit omzet en uitbetaling; behouden telt vanaf nu mee (trigger).
+  // Omzetten kan ook achteraf, in beide richtingen (18 nov 2026). Niets zet een gekozen
+  // terugbetaald terug: de automatische stap hierboven en de trigger borg-na-doorstap
+  // pakken alleen een borg die nog open staat.
   const rondBorgAf = async (r, sale, status) => {
-    if (bezig) return
+    if (bezig || sale.challenge_status === status) return
     if (borgVraag?.id !== r.client_id || borgVraag?.status !== status) {
       clearTimeout(bevestigKlok.current)
       setBorgVraag({ id: r.client_id, status })
@@ -361,10 +366,21 @@ export default function GinoDoorstap({ isMobile = false }) {
     }
     clearTimeout(bevestigKlok.current)
     setBorgVraag(null); setBezig(r.client_id); rijFoutWeg(r.client_id)
-    const { data, error } = await supabase.from('lead_movements').update({ challenge_status: status })
-      .eq('id', sale.id).eq('challenge_status', 'open').select('id').then(x => x, e => ({ error: e }))
+    // Was hij behouden en al aan Marcel uitbetaald, dan blijft die maand vast staan: melden.
+    const { data: alBetaald } = sale.challenge_status === 'behouden' && status === 'terugbetaald'
+      ? await supabase.from('partner_payout_items').select('id').eq('movement_id', sale.id).limit(1).then(x => x, () => ({ data: [] }))
+      : { data: [] }
+    // Terugbetaald: de uitbetaalmaand gaat leeg, zodat hij bij later toch behouden in de
+    // dan lopende periode valt (de trigger laat een gevulde maand staan).
+    const patch = status === 'terugbetaald' ? { challenge_status: status, telt_mee_vanaf: null } : { challenge_status: status }
+    const { data, error } = await supabase.from('lead_movements').update(patch)
+      .eq('id', sale.id).in('challenge_status', ['open', 'behouden', 'terugbetaald']).select('id').then(x => x, e => ({ error: e }))
     if (error || !data?.length) rijMislukt(r.client_id, error, 'Borg afronden mislukt')
-    else await laad()
+    else {
+      setOpenBorg(null)
+      await laad()
+      if (alBetaald?.length) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
+    }
     setBezig(null)
   }
 
@@ -664,9 +680,13 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
             const borgId = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id
             const borgSale = borgId ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === borgId) : null
-            // Is de borg al verrekend, dan zegt het witte label het en valt er niets meer te kiezen.
+            // Is de borg al verrekend, dan zegt het witte label het. De keuze blijft te wijzigen
+            // via de borg-knop; alleen bij een open borg van wie stopt staat hij vanzelf open.
             const borgKlaar = ['behouden', 'terugbetaald'].includes(borgSale?.challenge_status)
-            const borgOpen = !borgKlaar && (r.status === 'nee' || openBorg === r.client_id)
+            const borgOpen = openBorg === r.client_id || (r.status === 'nee' && !borgKlaar)
+            // Stand wijzigen kan ook in Afgerond. Alleen niet bij betaald met een geboekte
+            // verlenging: die boeking zou dan als wees blijven staan en in de omzet blijven tellen.
+            const standKiesbaar = r.status !== 'betaald' || !r.betaaldeSale
             const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && !bekendeBorg(r.client_id)) || borgOpen
             return (
               <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
@@ -745,13 +765,14 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     const aan = { color: colors.textPrimary }
                     return (
                       <div className="gd-balk" style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)', opacity: laadt ? 0.5 : 1 }}>
-                        {r.status !== 'betaald' && (
+                        {standKiesbaar && (
                           <span title="Stand kiezen" style={{ ...cel, borderLeft: 'none' }}>
                             <ChevronsUpDown size={15} strokeWidth={2.4} />
                             <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={laadt}
                               onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
                               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
                               <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
+                              {r.status === 'betaald' && <option value="betaald">Betaald</option>}
                               {STATUS_KEUZE.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
                               {r.gepauzeerd && <option value="hervat">Pauze eraf</option>}
                             </select>
@@ -765,9 +786,9 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                           </button>
                         )}
                         {borgSale && (
-                          <button type="button" disabled={borgKlaar} onClick={() => setOpenBorg(o => (o === r.client_id ? null : r.client_id))} aria-label="Borg"
-                            title={borgKlaar ? `Borg ${euro(borgSale.order_value)} ${borgSale.challenge_status}` : `Borg ${euro(borgSale.order_value)}: terugbetaald of behouden`}
-                            style={{ ...cel, ...(borgSale.challenge_status === 'behouden' ? { color: G } : borgOpen ? aan : {}), ...(borgKlaar ? { cursor: 'default' } : {}) }}>
+                          <button type="button" onClick={() => setOpenBorg(o => (o === r.client_id ? null : r.client_id))} aria-label="Borg" aria-expanded={borgOpen}
+                            title={borgKlaar ? `Borg ${euro(borgSale.order_value)} ${borgSale.challenge_status}. Klik: wijzigen` : `Borg ${euro(borgSale.order_value)}: terugbetaald of behouden`}
+                            style={{ ...cel, ...(borgSale.challenge_status === 'behouden' ? { color: G } : borgOpen ? aan : {}) }}>
                             <Euro size={15} strokeWidth={2.4} />
                           </button>
                         )}
@@ -778,7 +799,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                           </button>
                         )}
                         <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Looptijd of verlenging aanpassen`} aria-label="Looptijd"
-                          style={r.status === 'betaald' ? { ...cel, borderLeft: 'none' } : cel}>
+                          style={cel}>
                           <CalendarDays size={15} strokeWidth={2.4} />
                         </button>
                       </div>
@@ -815,17 +836,20 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     {borgOpen && (() => {
                       if (!borgSale) return <span style={{ color: colors.textSecondary }}>Geen borg gekoppeld. Refund zet je in het lead-systeem op de sale.</span>
                       const bedragBorg = euro(borgSale.order_value)
-                      if (borgSale.challenge_status !== 'open' || !borgSale.payment_received) return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} niet betaald</span>
+                      if (!['open', 'behouden', 'terugbetaald'].includes(borgSale.challenge_status) || !borgSale.payment_received) return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} niet betaald</span>
+                      // Al gekozen: de huidige keuze wit gevuld, de andere omlijnd. Open borg: beide gevuld.
                       const knopStijl = (status) => {
                         const zeker = borgVraag?.id === r.client_id && borgVraag.status === status
-                        return { height: 24, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, background: zeker ? G : colors.textPrimary, color: colors.bg }
+                        const huidig = borgSale.challenge_status === status
+                        const omlijnd = borgKlaar && !huidig && !zeker
+                        return { height: 24, padding: '0 10px', borderRadius: 7, border: omlijnd ? '1px solid rgba(255,255,255,0.3)' : 'none', cursor: huidig ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, background: zeker ? G : omlijnd ? 'transparent' : colors.textPrimary, color: omlijnd ? colors.textPrimary : colors.bg }
                       }
                       const tekst = (status, gewoon) => (borgVraag?.id === r.client_id && borgVraag.status === status ? 'Zeker?' : gewoon)
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span>Borg {bedragBorg}</span>
-                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'terugbetaald')} title="Het geld is teruggestort: valt uit omzet en uitbetaling" style={knopStijl('terugbetaald')}>{tekst('terugbetaald', 'Terugbetaald')}</button>
-                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'behouden')} title="Geen geld terug: de borg telt vanaf nu mee in omzet en uitbetaling" style={knopStijl('behouden')}>{tekst('behouden', 'Behouden')}</button>
+                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'terugbetaald')} aria-pressed={borgSale.challenge_status === 'terugbetaald'} title="Het geld is teruggestort: valt uit omzet en uitbetaling" style={knopStijl('terugbetaald')}>{tekst('terugbetaald', 'Terugbetaald')}</button>
+                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'behouden')} aria-pressed={borgSale.challenge_status === 'behouden'} title="Geen geld terug: de borg telt vanaf nu mee in omzet en uitbetaling" style={knopStijl('behouden')}>{tekst('behouden', 'Behouden')}</button>
                         </div>
                       )
                     })()}
