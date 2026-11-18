@@ -158,7 +158,9 @@ export default function VideoTeaser({
   const isBestand = huidig?.soort === 'bestand'
   const vId = isBestand ? null : extractYouTubeId(huidig?.item?.video?.video_url)
   const thumb = isBestand
-    ? (huidig?.item?.preview_url || null)
+    // De eerste pagina van de PDF (coach_files.thumb_url). Stond hier op
+    // preview_url, een veld dat niet bestaat: daardoor kreeg geen enkele PDF een beeld.
+    ? (huidig?.item?.thumb_url || huidig?.item?.preview_url || null)
     // mqdefault is 320x180, dus echt 16:9. hqdefault is 480x360 en heeft bij
     // een breedbeeldvideo zwarte balken boven en onder ingebakken; die werden
     // in een lage balk mee uitvergroot.
@@ -194,9 +196,9 @@ export default function VideoTeaser({
           zIndex: 100,
           overflow: 'hidden',
           display: 'flex', alignItems: 'center',
-          // Hoger dan een regel tekst nodig heeft: een 16:9-beeld in een lage
-          // balk wordt anders tot een uitsnede van het midden.
-          minHeight: 70,
+          // Compact (18 nov 2026, was 70): net hoog genoeg voor twee regels tekst
+          // met een herkenbaar stuk van het beeld ernaast.
+          minHeight: 54,
           background: 'rgba(10,10,10,0.96)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
@@ -211,7 +213,9 @@ export default function VideoTeaser({
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: '42%',
             backgroundImage: `url(${thumb})`,
-            backgroundSize: 'cover', backgroundPosition: 'center',
+            // Een PDF is een staande pagina: de bovenkant (titel) tonen, niet het midden.
+            backgroundSize: 'cover', backgroundPosition: isBestand ? 'center top' : 'center',
+            backgroundColor: isBestand ? '#fff' : 'transparent',
           }} />
         )}
         <div style={{
@@ -225,14 +229,14 @@ export default function VideoTeaser({
             position: 'relative', flex: 1, minWidth: 0,
             display: 'flex', alignItems: 'center', gap: 8,
             paddingLeft: thumb ? '21%' : '0.8rem',
-            paddingRight: '0.4rem', paddingTop: 8, paddingBottom: 8,
+            paddingRight: '0.4rem', paddingTop: 5, paddingBottom: 5,
             background: 'transparent', border: 'none', textAlign: 'left',
             cursor: 'pointer', fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
           <span style={{
-            flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
+            flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
             background: 'rgba(255,255,255,0.12)',
             border: '1px solid rgba(255,255,255,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -268,9 +272,9 @@ export default function VideoTeaser({
             onClick={onBibliotheek}
             title={`Bibliotheek — ${items.length} voor deze pagina`}
             aria-label={`Bibliotheek, ${items.length} voor deze pagina`}
-            style={{ ...balkKnop, width: 38, height: 38 }}
+            style={{ ...balkKnop, width: 34, height: 34 }}
           >
-            <Library size={22} strokeWidth={2.4} />
+            <Library size={19} strokeWidth={2.4} />
             {/* Witte bol met hoeveel er voor deze pagina klaarstaat. */}
             {items.length > 0 && (
               <span style={{

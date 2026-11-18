@@ -6,7 +6,7 @@ In de app: `src/modules/macros/macroRules.js` (knop "Bereken" in Coach Inzicht).
 ## Onderhoud
 - Formule: Mifflin-St Jeor × activiteit, plus 350 kcal per training (gedeeld door 7).
 - Activiteit uit de intake: zittend 1,2 · licht 1,3 · matig 1,4 · actief 1,5. Niet ingevuld = zittend, met een opmerking in de brief.
-- Correctie op trainingservaring, omdat de formule te hoog schat: beginner 350 eraf, gemiddeld 200 eraf, gevorderd 50 eraf
+- Correctie op trainingservaring, omdat de formule te hoog schat: beginner 250 eraf, gemiddeld 200 eraf, gevorderd 50 eraf
   (meer spiermassa = hoger onderhoud). Niet ingevuld = gemiddeld, met een opmerking in de brief.
 
 ## Doel

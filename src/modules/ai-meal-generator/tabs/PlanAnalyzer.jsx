@@ -30,6 +30,7 @@ import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import VoedingPlannenCentrum from './plan-analyzer/VoedingPlannenCentrum'
 import ToevoegVenster, { ZweefVenster } from './plan-analyzer/ToevoegVenster'
+import VoedingConceptBrief from './plan-analyzer/VoedingConceptBrief'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 // Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
 import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
@@ -705,7 +706,7 @@ export default function PlanAnalyzer({
         templateName = tmpl?.name || null
       }
       setSjabloon(null)
-      setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
+      setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName, generation: data.generation_settings || null })
       // Weer de basis; het effect bij datumModus legt de week (laatsteWeekRef)
       // er direct weer overheen.
       setWeekModus(null); setAfwijkendeDagen([]); basisDagenRef.current = null
@@ -2467,6 +2468,12 @@ export default function PlanAnalyzer({
 
         {/* De week in één regel: per dag een mini-ring met de kcal. Tik =
             die dag openen (vanuit de weekagenda terug naar de dag). */}
+        {/* Brief bij een automatisch klaargezet concept uit de intake. */}
+        {planMeta?.generation?.brief && !sjabloon && clientRecord && (
+          <VoedingConceptBrief key={planMeta.id} db={db} planMeta={planMeta} client={clientRecord} isMobile={m}
+            onActiveer={handleActivate}
+            onHerlaad={async (id) => { await loadClientRecord(clientRecord.id); await loadAllPlanCount(clientRecord.id); setSelectedConceptId(id); await loadConceptPlan(id) }} />
+        )}
         {!(viewMode === 'kolommen' && !weekModus) && <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
             {/* Gegeten: dezelfde strook, met wat de klant per dag logde. */}

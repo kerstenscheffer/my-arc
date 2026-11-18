@@ -608,15 +608,19 @@ export default function PublicIntakePage() {
       }
       setPhase(4)
       try { localStorage.removeItem('myarc_intake_email') } catch {}
-      // Intake compleet: concept-voedingsplan laten bouwen op de server
-      // (edge function plan-bouwer). Niet wachten, niets tonen aan de klant;
-      // de coach krijgt een melding als het concept klaarstaat.
+      // Intake compleet: de concepten laten klaarzetten op de server. Niet
+      // wachten, niets tonen aan de klant; de coach krijgt een melding.
+      // Volgorde (18 nov 2026): eerst het concept-trainingsplan (edge function
+      // workout-bouwer), daarna het macro-voorstel en het concept-voedingsplan
+      // (database-functie maak_intake_voedingsconcept): die rekent met het
+      // aantal trainingen. Dit vervangt de aanroep van plan-bouwer hier; die
+      // heeft opgeslagen macro's nodig en een nieuwe klant heeft die nog niet.
       if (res.clientId) {
-        supabase.functions.invoke('plan-bouwer', { body: { client_id: res.clientId } })
-          .then(r => r, e => console.warn('plan-bouwer niet gestart:', e?.message || e))
-        // Idem voor het concept-trainingsplan (edge function workout-bouwer).
         supabase.functions.invoke('workout-bouwer', { body: { client_id: res.clientId } })
           .then(r => r, e => console.warn('workout-bouwer niet gestart:', e?.message || e))
+          .then(() => supabase.rpc('maak_intake_voedingsconcept', { p_client: res.clientId }))
+          .then(r => { if (r?.error || r?.data?.fout) console.warn('voedingsconcept niet gemaakt:', r?.error?.message || r?.data?.fout) },
+                e => console.warn('voedingsconcept niet gestart:', e?.message || e))
       }
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }
     setSaving(false)
