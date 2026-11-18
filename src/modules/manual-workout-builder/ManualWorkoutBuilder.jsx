@@ -26,7 +26,7 @@ import PlannenCentrum from './components/PlannenCentrum'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import KlantAanpassingen from './components/KlantAanpassingen'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, Minus, History, FileClock, ArrowLeftRight } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy, Pencil, BarChart3, Flag, CalendarRange, TrendingUp, Columns3, RectangleVertical, ArrowDownWideNarrow, History, FileClock, ArrowLeftRight } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
@@ -38,7 +38,7 @@ import { useHerstel } from './components/useHerstel'
 import { useVolumeContext } from './components/useVolumeContext'
 import { volumeAdvies, fractioneleSets, maxSetsPerTraining, setsVanTraining, zwaarTeLaat } from './volumeSuggesties'
 import { RANGE, MAX_PER_SESSIE, MAX_PER_SESSIE_40PLUS, LEEFTIJD_40PLUS } from './volumeRegels'
-import { cyclusVan, cyclusVoorOpslaan, cyclusUitOpslag, rustPerSpier, STANDAARD_LENGTE, MAX_LENGTE, WEEKDAG_KORT } from './cyclus'
+import { cyclusVan, cyclusVoorOpslaan, cyclusUitOpslag, rustPerSpier, STANDAARD_LENGTE, WEEKDAG_KORT } from './cyclus'
 
 // Weektotalen per lichaamsdeel (10 nov 2026).
 const SPIER_BLOKKEN = [
@@ -697,15 +697,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     return cyclusVan(workoutPlan, { rooster: trainingInfo?.workout_schedule, actief: !!selectedSchemaId && actiefId === selectedSchemaId, schemaId: selectedSchemaId, keyNaarId })
   }, [workoutPlan, trainingInfo?.workout_schedule, effectiveClient?.assigned_schema_id, clientSchemas, selectedSchemaId])
   const zetCyclus = (lengte, slots) => setWorkoutPlan(prev => ({ ...prev, cyclus: { lengte, volgorde: slots } }))
-  const cyclusLengte = (L) => {
-    const n = workoutPlan.days.length
-    L = Math.max(STANDAARD_LENGTE, n, Math.min(MAX_LENGTE, L))
-    if (L === STANDAARD_LENGTE && cyc.bron !== 'plan') { setWorkoutPlan(prev => ({ ...prev, cyclus: null })); return }
-    let slots = [...cyc.slots]
-    while (slots.length < L) slots.push(null)
-    while (slots.length > L) { const leeg = slots.lastIndexOf(null); if (leeg === -1) break; slots.splice(leeg, 1) }
-    zetCyclus(L, slots)
-  }
   const verschuif = (plek, richting) => {
     const naar = plek + richting
     if (naar < 0 || naar >= cyc.slots.length) return
@@ -1330,7 +1321,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           Alleen zonder klant (een template bouwen). Met een klant is het
           weekrooster de dagkiezer: tik op een training = die dag openen.
           Staan alle dagen naast elkaar, dan zijn de kolomkoppen zelf de
-          dagkiezer en staat "Nieuwe dag" in de cyclusregel (17 nov 2026). */}
+          dagkiezer en staat "Nieuwe dag" als plus achter de laatste kolom (18 nov 2026). */}
       {!effectiveClient && !(!m && alleDagen && !dagenDicht && workoutPlan.days.length > 1) && <div style={{ flexShrink: 0, borderBottom: DUN }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem' : '0.6rem 1rem', display: 'flex', gap: m ? 4 : 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {workoutPlan.days.map((day, index) => {
@@ -1417,26 +1408,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
           )
         })()}
-        {/* Cyclus: lengte kiezen; 7 = de week (volgorde uit het weekrooster). */}
-        {!dagenDicht && (
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0.7rem 1rem 0', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
-            <span style={{ fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Cyclus</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8 }}>
-              <button onClick={() => cyclusLengte(cyc.lengte - 1)} disabled={cyc.lengte <= Math.max(STANDAARD_LENGTE, workoutPlan.days.length)} aria-label="Korter" style={{ ...iconKnop(), width: 26, height: 26, opacity: cyc.lengte <= Math.max(STANDAARD_LENGTE, workoutPlan.days.length) ? 0.3 : 1 }}><Minus size={13} /></button>
-              <span style={{ minWidth: 58, textAlign: 'center', color: '#fff', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{cyc.lengte} dagen</span>
-              <button onClick={() => cyclusLengte(cyc.lengte + 1)} disabled={cyc.lengte >= MAX_LENGTE} aria-label="Langer" style={{ ...iconKnop(), width: 26, height: 26, opacity: cyc.lengte >= MAX_LENGTE ? 0.3 : 1 }}><Plus size={13} /></button>
-            </span>
-            <span>{weekDagen.length} trainingen · {cyc.lengte - weekDagen.length} rust</span>
-            {losIds.length > 0 && <span title="Staat in het plan, maar de klant heeft hem niet in zijn week gezet. Telt niet mee in het weekvolume." style={{ color: '#f59e0b' }}>· {losIds.length} niet ingepland</span>}
-            {cyc.lengte !== STANDAARD_LENGTE && <span title="Volume en frequentie worden omgerekend naar een week">= {String(Math.round(workoutPlan.days.length * cyclusFactor * 10) / 10).replace('.', ',')} trainingen per week</span>}
-            {cyc.bron === 'rooster' && <span title="Bij een week van 7 dagen volgt de volgorde het weekrooster van de klant; pas het daar aan">· volgorde uit weekrooster</span>}
-            {!effectiveClient && bewerk?.soort !== 'dag' && (
-              <button onClick={() => setShowDayPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 0.7rem', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontSize: '0.76rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
-                <Plus size={13} strokeWidth={2.8} /> Nieuwe dag
-              </button>
-            )}
-          </div>
-        )}
         {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} onPointerMove={volgMuis} onPointerLeave={() => { plakDagRef.current = null; setPlakDag(null) }} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'center', height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {/* Eén blok: kolommen tegen elkaar met lijnen ertussen, in de volgorde van de cyclus. */}
@@ -1562,6 +1533,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </div>
               )
             })}
+            {!effectiveClient && bewerk?.soort !== 'dag' && (
+              <button onClick={() => setShowDayPicker(true)} title="Nieuwe dag" aria-label="Nieuwe dag" style={{ width: 56, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '0.9rem', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>
+                <Plus size={18} strokeWidth={2.8} />
+              </button>
+            )}
             </div>
           </div>
         </div>}
