@@ -786,6 +786,7 @@ export default function WeekSchedule({
     const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const uit = {}
+    const gebruikt = new Set() // logs die al bij een ingepland blok horen
     sleutels.forEach((k, i) => {
       const datum = dayDates?.[i] ? iso(dayDates[i]) : null
       const lijst = cardioBlokken.filter(b => b.day === k)
@@ -796,17 +797,29 @@ export default function WeekSchedule({
           const [eh, em] = String(b.end_time || '').split(':').map(Number)
           const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
           const zelfdeSoort = (l) => normaliseerSoort(l.cardio_type) === normaliseerSoort(soort)
-          const dagVanLog = (l) => { const d = new Date(String(l.logged_date).slice(0, 10) + 'T12:00:00'); return sleutels[(d.getDay() + 6) % 7] }
-          // Gedaan: een log op deze dag, of (oudere logs, vóór de datumkoppeling)
-          // een log van deze sport in dezelfde week op een dag zonder eigen blok.
-          const log = !datum ? null : cardioLogs.find(l => zelfdeSoort(l) && (
-            String(l.logged_date).slice(0, 10) === datum ||
-            !cardioBlokken.some(b2 => b2.day === dagVanLog(l) && normaliseerSoort(String(b2.label).replace(/^Cardio\s*·\s*/, '')) === normaliseerSoort(soort))
-          )) || null
+          // Gedaan: alleen een log van deze sport op déze dag, en elke log telt
+          // voor één blok. Er stond een terugval voor oude logs ("een log van deze
+          // sport ergens in de week telt ook"): daardoor zette één losse loop op
+          // dinsdag álle ingeplande hardlopen van die week op afgerond, ook die
+          // van donderdag die nog moest komen (18 nov 2026).
+          const log = !datum ? null : cardioLogs.find(l => !gebruikt.has(l.id) && zelfdeSoort(l) && String(l.logged_date).slice(0, 10) === datum) || null
+          if (log) gebruikt.add(log.id)
           const gedaan = !!log
           return { id: b.id, day: b.day, soort, sublabel: b.sublabel || null, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, log, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
         })
       if (lijst.length) uit[i] = lijst
+    })
+    // Wat gelogd is zonder dat het ingepland stond (of een tweede keer op
+    // dezelfde dag): een eigen, afgeronde tegel op de dag waarop het gedaan is.
+    sleutels.forEach((k, i) => {
+      const datum = dayDates?.[i] ? iso(dayDates[i]) : null
+      if (!datum) return
+      const los = cardioLogs.filter(l => !gebruikt.has(l.id) && String(l.logged_date).slice(0, 10) === datum)
+      if (!los.length) return
+      uit[i] = [...(uit[i] || []), ...los.map(l => ({
+        id: `log-${l.id}`, day: k, soort: l.cardio_type, sublabel: l.distance_km ? `${String(l.distance_km).replace('.', ',')} km` : null,
+        tijd: 'gelogd', duur: l.duration_minutes || null, gedaan: true, log: l, eenmalig: true, skipWeeks: [], los: true,
+      }))]
     })
     return uit
   }
