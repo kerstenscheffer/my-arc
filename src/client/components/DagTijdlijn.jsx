@@ -395,11 +395,10 @@ export default function DagTijdlijn({
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.5 : 0.35 }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                     {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4 + randPad, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
-                    {/* Start: wit en vet, rechts op de kaart. Tikken op de kaart zelf doet hetzelfde. */}
+                    {/* Start: alleen het icoon, wit en vet, zonder vak eromheen. Tikken op de kaart zelf doet hetzelfde. */}
                     {!gedaan && onOpen && (
-                      <span aria-hidden style={{ position: 'absolute', right: 8 + randPad, top: '50%', marginTop: -(GROOT >= 44 ? 16 : 13), width: GROOT >= 44 ? 32 : 26, height: GROOT >= 44 ? 32 : 26, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.6)', zIndex: 2 }}>
-                        <Play size={GROOT >= 44 ? 15 : 12} strokeWidth={3} color="#0a0a0a" fill="#0a0a0a" style={{ marginLeft: 2 }} />
-                      </span>
+                      <Play aria-hidden size={GROOT >= 44 ? 24 : 20} strokeWidth={3} color="#fff" fill="#fff"
+                        style={{ position: 'absolute', right: 10 + randPad, top: '50%', marginTop: -(GROOT >= 44 ? 12 : 10), filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.85))', zIndex: 2 }} />
                     )}
                     <div style={{ position: 'absolute', left: 6, right: (!gedaan && onOpen ? 46 : 6) + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.82rem' : '0.76rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>

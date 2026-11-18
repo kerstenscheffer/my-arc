@@ -54,6 +54,10 @@ export default function VoedingPlannenCentrum({
   const [actiefIds, setActiefIds] = useState(null)
   const [tab, setTab] = useState('templates')
   const [zoek, setZoek] = useState('')
+  const [fKcal, setFKcal] = useState('alle')
+  const [fVariatie, setFVariatie] = useState('alle')
+  const [fMaal, setFMaal] = useState('alle')
+  const [pastBij, setPastBij] = useState(true)
   const [metArchief, setMetArchief] = useState(false)
   const [groepFilter, setGroepFilter] = useState('alle')
   const [openId, setOpenId] = useState(null)
@@ -143,10 +147,23 @@ export default function VoedingPlannenCentrum({
   }, [klanten, plannen])
 
   const q = zoek.trim().toLowerCase()
-  const afstand = (t) => Math.abs((Number(t.daily_calories) || 0) - doelKcal) + (doelEiwit > 0 ? Math.abs((Number(t.daily_protein) || 0) - doelEiwit) * 4 : 0)
+  // Het doel van de klant is de trainingsdag: de pre-workout telt mee.
+  const trainKcal = (t) => (Number(t.daily_calories) || 0) + (Number(t.pre_kcal) || 0)
+  const afstand = (t) => Math.abs(trainKcal(t) - doelKcal) + (doelEiwit > 0 ? Math.abs((Number(t.daily_protein) || 0) - doelEiwit) * 4 : 0)
+  // Filters (18 nov 2026): kcal-trede, variatie en aantal maaltijden, plus
+  // "Past bij klant": zelfde geslacht en binnen 200 kcal van zijn doel.
+  const klantGroep = /^(female|vrouw|v)$/i.test(String(client?.gender || '')) ? 'vrouw' : /^(male|man|m)$/i.test(String(client?.gender || '')) ? 'man' : null
+  const kanPast = !!client && doelKcal > 0
+  const past = kanPast && pastBij
+  const treden = [...new Set(templates.filter(t => !t.is_archived && t.is_canoniek).map(t => Math.round(trainKcal(t) / 100) * 100).filter(Boolean))].sort((a, b) => a - b)
+  const filtersAan = fKcal !== 'alle' || fVariatie !== 'alle' || fMaal !== 'alle' || past
   const zicht = templates
     .filter(t => metArchief || !t.is_archived)
     .filter(t => groepFilter === 'alle' || !t.doelgroep || t.doelgroep === groepFilter)
+    .filter(t => !past || ((!klantGroep || !t.doelgroep || t.doelgroep === klantGroep) && Math.abs(trainKcal(t) - doelKcal) <= 200))
+    .filter(t => fKcal === 'alle' || Math.round(trainKcal(t) / 100) * 100 === Number(fKcal))
+    .filter(t => fVariatie === 'alle' || variatieLabel(t) === fVariatie)
+    .filter(t => fMaal === 'alle' || (fMaal === '3' ? Number(t.meals_per_day) <= 3 : Number(t.meals_per_day) >= 4))
     .filter(t => !q || tNaam(t).toLowerCase().includes(q) || String(t.daily_calories || '').includes(q))
     // Met een klant open: wat het dichtst bij zijn doel zit eerst. Anders: meest gebruikt.
     .sort((a, b) => (doelKcal > 0 ? afstand(a) - afstand(b) : ((actiefBij[b.id]?.length || 0) - (actiefBij[a.id]?.length || 0)) || ((gebruikt[b.id] || 0) - (gebruikt[a.id] || 0))) || (Number(a.daily_calories) || 0) - (Number(b.daily_calories) || 0))
@@ -305,7 +322,7 @@ export default function VoedingPlannenCentrum({
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 800, color: client ? '#fff' : 'rgba(255,255,255,0.5)' }}>
-                {client && onLoad ? <>Laden zet het template in het plan van <span className={PRIVE}>{naam(client)}</span>{doelKcal > 0 ? ` (doel ${doelKcal} kcal)` : ''}.</> : 'Toewijzen zet een kopie als concept bij een klant.'}
+                {client && onLoad ? <>Laden maakt een nieuw concept voor <span className={PRIVE}>{naam(client)}</span>{doelKcal > 0 ? ` (doel ${doelKcal} kcal)` : ''}.</> : 'Toewijzen zet een kopie als concept bij een klant.'}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[['alle', 'Alle', null], ['man', 'Man', GROEP.man], ['vrouw', 'Vrouw', GROEP.vrouw]].map(([id, label, g]) => (
@@ -317,6 +334,27 @@ export default function VoedingPlannenCentrum({
               <button onClick={() => setMetArchief(v => !v)} style={{ ...kaal, minHeight: 30, border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)' }}>
                 {metArchief ? 'Archief verbergen' : `Archief tonen (${templates.filter(t => t.is_archived).length})`}
               </button>
+            </div>
+            {/* Filterrij: snel naar het juiste plan voor deze klant. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 10, flexWrap: 'wrap' }}>
+              {kanPast && (
+                <button onClick={() => setPastBij(v => !v)} aria-pressed={past} title={`Alleen plannen${klantGroep ? ` voor ${klantGroep}` : ''} binnen 200 kcal van ${doelKcal}`} style={{ ...kaal, minHeight: 32, padding: '0 0.75rem', ...(past ? { background: '#fff', color: '#0a0a0a', border: '1px solid #fff' } : {}) }}>
+                  {past && <Check size={13} strokeWidth={3} />} Past bij <span className={PRIVE}>{client.first_name || 'klant'}</span>
+                </button>
+              )}
+              {[
+                { w: fKcal, zet: setFKcal, opties: [['alle', 'Alle kcal'], ...treden.map(k => [String(k), `${k} kcal`])] },
+                { w: fVariatie, zet: setFVariatie, opties: [['alle', 'Alle variatie'], ['Vast', 'Vast (elke dag gelijk)'], ['Afwisselen', 'Afwisselen'], ['Veel variatie', 'Veel variatie']] },
+                { w: fMaal, zet: setFMaal, opties: [['alle', 'Alle maaltijden'], ['3', '3 maaltijden'], ['4', '4 of meer']] },
+              ].map((f, fi) => (
+                <select key={fi} value={f.w} onChange={e => f.zet(e.target.value)} style={{ height: 32, padding: '0 0.6rem', borderRadius: 9, background: f.w !== 'alle' ? '#fff' : 'rgba(255,255,255,0.05)', color: f.w !== 'alle' ? '#0a0a0a' : '#fff', border: '1px solid rgba(255,255,255,0.18)', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', colorScheme: f.w !== 'alle' ? 'light' : 'dark' }}>
+                  {f.opties.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              ))}
+              <span style={{ ...grijs, marginLeft: 'auto' }}>{zicht.filter(t => !t.is_archived).length} van {templates.filter(t => !t.is_archived).length}</span>
+              {filtersAan && (
+                <button onClick={() => { setFKcal('alle'); setFVariatie('alle'); setFMaal('alle'); setPastBij(false) }} style={{ ...kaal, minHeight: 30, border: 'none', padding: 0, color: 'rgba(255,255,255,0.7)' }}>Filters wissen</button>
+              )}
             </div>
             {zicht.length === 0 && <div style={{ ...grijs, padding: '1rem 0' }}>Geen template gevonden.</div>}
             {groepen.map(g => (

@@ -23,10 +23,8 @@ import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
 import StappenPil from '../components/StappenPil'
-import ChallengeProgressTab from '../../modules/challenge-monitor/ChallengeProgressTab'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import BelangrijkeVideo from '../components/BelangrijkeVideo'
-import FocusDezeWeek from '../../modules/client-checkin/FocusDezeWeek'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
 
@@ -117,27 +115,10 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
   // datum-pilletje is weg; die schreeuwde harder dan waar het over ging.
   return (
     <div>
-      {/* Zwarte bovenbalk zoals op maaltijd en workout: midden de
-          challenge-stand (als je meedoet), rechts je stappen van vandaag. */}
-      <div style={{
-        display: 'flex', alignItems: 'stretch',
-        height: isMobile ? 34 : 40,
-        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
-        boxSizing: 'content-box', background: '#0a0a0a',
-      }}>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', alignItems: 'stretch', paddingLeft: isMobile ? '0.4rem' : '0.9rem', minWidth: 0 }}>
-          <FocusDezeWeek db={db} client={client} isMobile={isMobile} compact />
-        </div>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
-          <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
-        </div>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch', paddingRight: isMobile ? '0.4rem' : '0.9rem' }}>
-          {/* Rechtsboven: de schakelaar agenda / lijst (gevuld door de agenda
-              zelf). De stappen met doel stonden hier; die zie je nu in de
-              agenda (17 nov 2026, Kersten). */}
-          {weergaveSlot && <span ref={weergaveSlot} style={{ display: 'inline-flex', alignItems: 'center' }} />}
-        </div>
-      </div>
+      {/* De zwarte bovenbalk (weekdoelen, challenge-stand, schakelaar) is hier
+          weggehaald: ruis (18 nov 2026, Kersten). Alleen de ruimte voor de
+          statusbalk van de telefoon blijft, zodat de foto er niet onder schuift. */}
+      {isMobile && <div style={{ height: 'env(safe-area-inset-top, 0px)', background: '#0a0a0a' }} />}
       <div style={{
         position: 'relative', width: '100%',
         // Lager dan het beeld zelf (1960x600 = 49/15): boven- en onderkant

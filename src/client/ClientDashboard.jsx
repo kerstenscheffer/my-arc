@@ -29,7 +29,6 @@ import WaterFles from './components/WaterFles'
 import { syncStappen, resetStappenCooldown } from '../modules/steps/stappenSync'
 import StappenVerzoek from '../modules/steps/StappenVerzoek'
 import { supabase } from '../lib/supabase'
-import CheckinReminderPopup from './components/CheckinReminderPopup'
 import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
@@ -481,17 +480,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         <ChallengeProgressTab db={db} client={client} isMobile={isMobile} />
       )}
 
-      {/* Weekly check-in nag — center popup on Friday + missed-Friday window.
-          Niet in een meekijk-paneel: die herinnering is aan de klant gericht,
-          en de knop eronder zou een check-in indienen op zijn naam terwijl de
-          coach erachter zit. */}
-      {!ingebed && <CheckinReminderPopup
-        client={client}
-        db={db}
-        isMobile={isMobile}
-        onOpen={() => setShowCheckinModal(true)}
-        version={checkinVersion}
-      />}
+      {/* De herinnering aan de wekelijkse check-in staat als melding in het
+          meldingenpaneel aan de zijkant (NotificationWidget), niet meer als balk
+          onderin (was CheckinReminderPopup, 18 nov 2026). */}
 
       {/* Overkoepelende video-herinnering. Staat los van het blok op de pagina
           zelf: dat zie je alleen als je die pagina bezoekt, en juist bij de
@@ -795,6 +786,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         open={widgetOpen === 'notifications'}
         onOpenChange={(o) => setWidgetOpen(o ? 'notifications' : null)}
         onCountChange={setCount('notifications')}
+        // Niet in een meekijk-paneel: de knop zou een check-in indienen op naam
+        // van de klant terwijl de coach erachter zit.
+        client={client} onCheckin={ingebed ? null : () => setShowCheckinModal(true)} checkinVersie={checkinVersion}
       />
 
       <ClientFAQModal

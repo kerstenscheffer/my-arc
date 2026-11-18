@@ -35,8 +35,11 @@ export function trajectLoopt(client) {
   const status = client.coaching_status || 'active'
   if (status === 'paused' || status === 'ended') return false
 
-  // Geen periode ingesteld = nog niet begonnen.
-  if (!client.coaching_start_date || !client.coaching_total_weeks) return false
+  // Geen periode ingesteld = nog niet begonnen. Een onbeperkt traject
+  // (clients.coaching_onbeperkt) heeft geen aantal weken en loopt wél: zonder
+  // deze uitzondering kregen die klanten nooit de check-in te zien (18 nov 2026).
+  if (!client.coaching_start_date) return false
+  if (!client.coaching_total_weeks && !client.coaching_onbeperkt) return false
 
   // Startdatum in de toekomst = ingepland, nog niet gestart.
   const start = new Date(`${client.coaching_start_date}T00:00:00`)
@@ -46,4 +49,4 @@ export function trajectLoopt(client) {
 
 // Kolommen die trajectLoopt nodig heeft. Wie een smalle select doet moet
 // deze meenemen, anders valt iedereen af omdat de velden ontbreken.
-export const TRAJECT_KOLOMMEN = 'coaching_start_date, coaching_total_weeks, coaching_status'
+export const TRAJECT_KOLOMMEN = 'coaching_start_date, coaching_total_weeks, coaching_status, coaching_onbeperkt'

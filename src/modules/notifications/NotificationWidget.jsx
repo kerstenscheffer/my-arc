@@ -3,12 +3,14 @@ import { openUitMelding } from '../video-feedback/feedbackOpenen'
 import zichtbaarPollen from '../../utils/zichtbaarPollen';
 import FeedbackBlad from '../workout/bouwfase/FeedbackBlad'
 import { zoekNavraag, navraagWeg } from '../workout/bouwfase/trainingNavraag'
+import CheckinService from '../client-checkin/CheckinService'
+import { trajectLoopt } from '../client-checkin/trajectStatus'
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
 const autoGeopend = new Set();
 import { Bell, X, CheckCircle } from 'lucide-react';
 
-export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange }) {
+export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange, client = null, onCheckin = null, checkinVersie = 0 }) {
   const isMobile = window.innerWidth <= 768;
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [dbMeldingen, setNotifications] = useState([]);
@@ -16,11 +18,26 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   // melding die de app zelf bovenaan zet zolang het cijfer ontbreekt.
   const [navraag, setNavraag] = useState(null);
   const [navraagOpen, setNavraagOpen] = useState(false);
-  const notifications = useMemo(() => (navraag ? [{
-    id: `navraag-${navraag.sessie.id}`, _navraag: true, type: 'workout', priority: 'high', status: 'active',
-    title: `Hoe was je training van ${navraag.dag}?`,
-    message: 'Twee tikken: een cijfer en of de lengte goed was. Dan weet je coach het.',
-  }, ...dbMeldingen] : dbMeldingen), [navraag, dbMeldingen]);
+  // De wekelijkse check-in: vanaf vrijdag tot hij is ingevuld. Stond als balk
+  // onderin (CheckinReminderPopup); nu een melding zoals de rest (18 nov 2026).
+  const [checkin, setCheckin] = useState(null); // { dagenLaat }
+  const notifications = useMemo(() => {
+    const eigen = []
+    if (checkin) {
+      const d = checkin.dagenLaat
+      eigen.push({
+        id: 'checkin-week', _checkin: true, _knop: 'Vul in', type: 'checkin', priority: d >= 3 ? 'urgent' : 'high', status: 'active',
+        title: d === 0 ? 'Je wekelijkse check-in staat klaar' : 'Je check-in staat nog open',
+        message: d === 0 ? 'Een paar minuten: hoe ging je week en wat pak je komende week aan.' : `Die was van vrijdag, nu ${d} ${d === 1 ? 'dag' : 'dagen'} geleden. Een paar minuten werk.`,
+      })
+    }
+    if (navraag) eigen.push({
+      id: `navraag-${navraag.sessie.id}`, _navraag: true, _knop: 'Vul in', type: 'workout', priority: 'high', status: 'active',
+      title: `Hoe was je training van ${navraag.dag}?`,
+      message: 'Twee tikken: een cijfer en of de lengte goed was. Dan weet je coach het.',
+    })
+    return eigen.length ? [...eigen, ...dbMeldingen] : dbMeldingen
+  }, [navraag, checkin, dbMeldingen]);
   const [isExpandedInternal, setIsExpandedInternal] = useState(false);
   const isExpanded = controlled ? openProp : isExpandedInternal;
   const setIsExpanded = (val) => {
@@ -28,7 +45,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     if (controlled) onOpenChange(next); else setIsExpandedInternal(next)
   };
   const [hasUnreadDb, setHasUnread] = useState(false);
-  const hasUnread = hasUnreadDb || !!navraag;
+  const hasUnread = hasUnreadDb || !!navraag || !!checkin;
   const [isLoading, setIsLoading] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState(null);
 
@@ -56,6 +73,22 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     return () => { leeft = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
+
+  useEffect(() => {
+    // checkinVersie > 0 = er is zojuist een check-in opgeslagen: melding weg.
+    if (checkinVersie > 0) { setCheckin(null); return }
+    if (!client?.id || !db?.supabase || !onCheckin || !trajectLoopt(client)) { setCheckin(null); return }
+    let leeft = true
+    new CheckinService(db).hasCheckinSinceLastFriday(client.id).then(al => {
+      if (!leeft || al) return
+      const dag = new Date().getDay() // 0 = zondag
+      const dagenLaat = dag === 5 ? 0 : dag === 6 ? 1 : dag + 2
+      setCheckin({ dagenLaat })
+      if (!autoGeopend.has('checkin-week')) { autoGeopend.add('checkin-week'); setTimeout(() => setIsExpanded(true), 800) }
+    }, () => null)
+    return () => { leeft = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id, checkinVersie]);
 
   // Auto-hide effect
   useEffect(() => {
@@ -108,6 +141,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
 
   const handleDismiss = async (e, notificationId) => {
     e.stopPropagation();
+    // Wegtikken verbergt de check-in tot je de app opnieuw opent; hij is pas echt weg na invullen.
+    if (notificationId === 'checkin-week') { setCheckin(null); return }
     if (String(notificationId).startsWith('navraag-')) {
       if (navraag) navraagWeg(navraag.sessie.id)
       setNavraag(null)
@@ -381,6 +416,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                   const isActive = notification.status === 'active';
                   const belangrijk = notification.priority === 'urgent' || notification.priority === 'high';
                   const open = () => {
+                    if (notification._checkin) { setIsExpanded(false); onCheckin?.(); return }
                     if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
                     // Feedback op een techniekvideo: meteen de modal open.
                     if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
@@ -418,15 +454,15 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                         <p style={{ margin: 0, fontSize: isMobile ? '0.82rem' : '0.88rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: 500, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                           {notification.message}
                         </p>
-                        {(notification._navraag || notification.source === 'smart' || notification.status === 'read') && (
+                        {(notification._knop || notification.source === 'smart' || notification.status === 'read') && (
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.7rem' }}>
-                            {notification._navraag && (
+                            {notification._knop && (
                               <button onClick={(e) => { e.stopPropagation(); open() }} style={{
                                 height: 38, padding: '0 1.1rem', borderRadius: 10, background: '#fff', color: '#0a0a0a', border: 'none',
                                 fontFamily: 'inherit', fontSize: '0.84rem', fontWeight: 900, letterSpacing: '-0.01em', cursor: 'pointer',
                                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                               }}>
-                                Vul in
+                                {notification._knop}
                               </button>
                             )}
                             {notification.source === 'smart' && (
