@@ -10,6 +10,7 @@
 // achtergrond, dus je kunt doorwerken op de pagina erachter, en je kunt hem
 // verslepen, vergroten en inklappen. Je leest een intake naast je werk, niet
 // in plaats daarvan.
+import { spierNamen } from '../../../modules/public-intake/spierFocus'
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
@@ -531,6 +532,8 @@ const PART3_SECTIONS = [
       { key: '_huidig_schema', label: 'Schema nu', alleenIngevuld: true },
       { key: '_huidig_toelichting', label: 'Toelichting huidige training', alleenIngevuld: true },
       { key: '_split_focus', label: 'Focus', fmt: fmtArr(), alleenIngevuld: true },
+      { key: '_focus_spieren', label: 'Focusspieren', alleenIngevuld: true },
+      { key: '_niet_groter', label: 'Liever niet groter', alleenIngevuld: true },
       { key: 'emphasize_stretch', label: 'Nadruk op stretch', fmt: fmtBool, alleenIngevuld: true, verbergNee: true },
       { key: 'prioritize_compounds', label: 'Compound-prioriteit', fmt: fmtBool, alleenIngevuld: true, verbergNee: true }
     ]
@@ -567,6 +570,8 @@ const VRAGEN = {
   _huidig_dagen: 'Hoeveel dagen train je nu per week?',
   _huidig_schema: 'Wat doe je op die dagen?',
   _huidig_toelichting: 'Nog iets over je huidige training',
+  _focus_spieren: 'Wat wil je het meest zien groeien?',
+  _niet_groter: 'Is er iets wat je liever niet groter wilt?',
   intake_guidance_level: 'Hoe wil je begeleid worden?',
   intake_macro_targets: 'Heb je macro targets voor jezelf?',
   intake_nu_ontbijt: 'Wat eet je meestal als ontbijt?',
@@ -1072,6 +1077,8 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
           return simpel || fmtMap(MAPS.split)(v)
         })(),
         _split_focus: training?.split_preferences?.focus,
+        _focus_spieren: spierNamen(training?.split_preferences?.focus_spieren) || undefined,
+        _niet_groter: spierNamen(training?.split_preferences?.niet_groter) || undefined,
         // Wat de klant nu doet (sinds 10 nov 2026)
         _huidig_dagen: (() => {
           const sp = training?.split_preferences || {}

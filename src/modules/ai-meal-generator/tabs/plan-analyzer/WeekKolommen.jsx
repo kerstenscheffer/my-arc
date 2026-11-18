@@ -15,7 +15,7 @@
 // die pas je aan in de dagweergave.
 
 import { useEffect, useRef, useState } from 'react'
-import { GripVertical, Plus, X, Trash2, Repeat, Minus, Clock } from 'lucide-react'
+import { GripVertical, Plus, X, Trash2, Repeat, Minus, Clock, ArrowLeftRight, Pencil } from 'lucide-react'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { pctVan, pctKleur } from './weekCijfers'
 
@@ -30,9 +30,30 @@ const SLOT_LABEL = {
 
 const selSleutel = (dag, slot) => `${dag}|${slot}`
 
+// Naam op één regel. Past hij niet, dan schuift de tekst door zodra de muis
+// op de kaart staat, zodat je de rest kunt lezen (18 nov 2026).
+function SchuifNaam({ tekst }) {
+  const vak = useRef(null)
+  const [schuif, setSchuif] = useState(0)
+  useEffect(() => {
+    const kaart = vak.current?.closest('[data-sel], [data-kaart]')
+    if (!kaart) return undefined
+    const in_ = () => { const el = vak.current; if (el) setSchuif(Math.max(0, el.scrollWidth - el.clientWidth)) }
+    const uit = () => setSchuif(0)
+    kaart.addEventListener('mouseenter', in_)
+    kaart.addEventListener('mouseleave', uit)
+    return () => { kaart.removeEventListener('mouseenter', in_); kaart.removeEventListener('mouseleave', uit) }
+  }, [])
+  return (
+    <div ref={vak} style={{ overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '0.74rem', fontWeight: 800, color: '#fff', lineHeight: 1.25 }}>
+      <span style={{ display: 'inline-block', transform: `translateX(-${schuif}px)`, transition: `transform ${schuif ? Math.max(0.6, schuif / 45) : 0.2}s linear` }}>{tekst}</span>
+    </div>
+  )
+}
+
 export default function WeekKolommen({
   dagen, targets = {}, weekStart = null, aangepast = [], actiefDag = null,
-  selectie, setSelectie, onOpenDag, onVoegToe, onVerplaats, isMobile,
+  selectie, setSelectie, onOpenDag, onVoegToe, onVerplaats, onWissel, onVerwijder, isMobile,
 }) {
   const m = isMobile
   const vakRef = useRef(null)
@@ -138,19 +159,28 @@ export default function WeekKolommen({
                   const label = meal.display_label || SLOT_LABEL[slot] || slot
                   return (
                     <div key={slot + (los ? '-los' : '')}
-                      {...(los ? {} : { 'data-sel': sleutel })}
+                      {...(los ? { 'data-kaart': '' } : { 'data-sel': sleutel })}
                       title={los ? 'Pre-workout uit het plan · pas aan in de dagweergave' : `${meal.name || ''}\nKlik = selecteren · slepen over kaarten = meerdere`}
                       style={{
-                        display: 'flex', gap: 6, alignItems: 'stretch', borderRadius: 9, overflow: 'hidden',
+                        display: 'flex', gap: 5, alignItems: 'stretch', borderRadius: 9, overflow: 'hidden',
                         background: gekozen ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
                         border: `1px solid ${gekozen ? '#fff' : 'rgba(255,255,255,0.07)'}`,
                         opacity: los ? 0.5 : sleep && sleep.dag === i && sleep.slot === slot ? 0.4 : 1,
                         cursor: los ? 'default' : 'pointer',
                       }}>
-                      <div style={{ width: 34, flexShrink: 0, backgroundImage: `url(${meal.image_url || foodImageFallback(meal.name, slot, 120)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                      <div style={{ flex: 1, minWidth: 0, padding: '0.3rem 0' }}>
-                        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tijd ? `${label} · ${tijd}` : label}</div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meal.name || 'Maaltijd'}</div>
+                      <div style={{ width: 58, flexShrink: 0, position: 'relative', backgroundImage: `url(${meal.image_url || foodImageFallback(meal.name, slot, 160)})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {/* Soort en tijd in de foto, dik wit met schaduw (18 nov 2026). */}
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 20%, rgba(0,0,0,0.8) 100%)' }} />
+                        <div style={{ position: 'absolute', left: 4, right: 3, bottom: 3, lineHeight: 1.15, color: '#fff', fontWeight: 900, textShadow: '0 1px 4px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.8)' }}>
+                          <div style={{ fontSize: '0.54rem', letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+                          {tijd && <div style={{ ...getallen, fontSize: '0.62rem' }}>{tijd}</div>}
+                        </div>
+                      </div>
+                      {/* Foto volle hoogte links; tekst en knoppen rechts ervan (18 nov 2026). */}
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch' }}>
+                      <div style={{ flex: 1, minWidth: 0, padding: '0.34rem 0 0.28rem 0.1rem' }}>
+                        <SchuifNaam tekst={meal.name || 'Maaltijd'} />
                         <div style={{ ...getallen, fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 1, whiteSpace: 'nowrap' }}>
                           {nl(meal.calories)} · E{nl(meal.protein)} K{nl(meal.carbs)} V{nl(meal.fat)}
                         </div>
@@ -164,6 +194,19 @@ export default function WeekKolommen({
                           <GripVertical size={13} />
                         </span>
                       )}
+                      </div>
+                      {!los && (
+                        <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                          {[
+                            onWissel && { t: 'Wisselen', i: <ArrowLeftRight size={11} />, f: () => onWissel(i, slot, meal) },
+                            { t: 'Bewerken in de dagweergave', i: <Pencil size={11} />, f: () => onOpenDag?.(i) },
+                            onVerwijder && { t: 'Verwijderen', i: <Trash2 size={11} />, f: () => onVerwijder(i, slot), rood: true },
+                          ].filter(Boolean).map((k, ki) => (
+                            <button key={k.t} onClick={k.f} title={k.t} aria-label={k.t} style={{ flex: 1, height: 20, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderLeft: ki ? '1px solid rgba(255,255,255,0.07)' : 'none', color: k.rood ? '#ef4444' : 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>{k.i}</button>
+                          ))}
+                        </div>
+                      )}
+                      </div>
                     </div>
                   )
                 })}

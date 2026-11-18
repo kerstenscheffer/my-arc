@@ -246,12 +246,13 @@ export default function MealCard({
   }
 
   // Zo compact als de maaltijdkaart van de klant (9 okt 2026).
-  const photoSize = m ? 72 : 84
+  // 18 nov 2026: nog lager, zodat een hele dag zonder scrollen past.
+  const photoSize = m ? 64 : 58
 
   return (
     <div style={{
       // Floating card — exact dezelfde stijl als de client meal-card.
-      margin: m ? '0 0.5rem 0.45rem' : '0 0.75rem 0.55rem',
+      margin: m ? '0 0.5rem 0.35rem' : '0 0.75rem 0.35rem',
       background: 'rgba(255,255,255,0.025)',
       border: '1px solid rgba(255,255,255,0.05)',
       borderRadius: 12,
@@ -291,12 +292,12 @@ export default function MealCard({
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            padding: m ? '0.4rem 0.65rem 0.35rem' : '0.45rem 0.85rem 0.4rem',
+            padding: m ? '0.3rem 0.65rem 0.25rem' : '0.28rem 0.85rem 0.22rem',
           }}>
           {/* Naam + kcal */}
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: 6,
-            marginBottom: 4,
+            marginBottom: 1,
           }}>
             {/* Naam: tik = bewerken, daarna kiezen voor deze dag of elke dag
                 waar deze maaltijd staat (9 okt 2026). */}
@@ -722,7 +723,7 @@ function ActionCell({ icon, label, onClick, m, active, danger }) {
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 4,
-        padding: m ? '0.3rem' : '0.34rem',
+        padding: m ? '0.25rem' : '0.15rem',
         background: 'transparent', border: 'none',
         color,
         fontSize: m ? '0.62rem' : '0.66rem',
@@ -730,7 +731,7 @@ function ActionCell({ icon, label, onClick, m, active, danger }) {
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: 30,
+        minHeight: m ? 28 : 22,
       }}
     >
       {icon}

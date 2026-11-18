@@ -205,6 +205,9 @@ function buildWorkoutPrefs(data = {}, personalData = {}) {
     split_preferences: {
       preferred: data.split_preference || null,
       focus: data.training_focus || null,
+      // Focusspieren (18 nov 2026): het plansysteem stuurt hierop.
+      focus_spieren: Array.isArray(data.focus_spieren) ? data.focus_spieren : null,
+      niet_groter: Array.isArray(data.niet_groter) ? data.niet_groter : null,
       huidig_dagen: toInt(data.huidig_dagen),
       huidig_dagen_tekst: toText(data.huidig_dagen_tekst),
       huidig_schema: Array.isArray(data.huidig_schema) ? data.huidig_schema.map(x => String(x || '').trim()) : null,

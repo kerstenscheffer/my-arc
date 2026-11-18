@@ -2694,7 +2694,7 @@ export default function PlanAnalyzer({
             en de bulkbalk zodra er maaltijden geselecteerd zijn. */}
         {viewMode === 'kolommen' && (
           <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: navRuimte }}>
-            <div style={{ maxWidth: 1500, margin: '0 auto', padding: m ? '0.6rem 0.5rem 1rem' : '0.9rem 1rem 1.5rem', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ margin: '0 auto', padding: m ? '0.6rem 0.5rem 1rem' : '0.6rem 0.75rem 1.5rem', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {weekData ? (<>
                 <WeekStats dagen={weekDagen} targets={targets || {}} open={statsOpen} onOpen={setStatsOpen}
                   onKiesDag={(i) => { setActiveDay(i); setViewMode('day') }} isMobile={m} />
@@ -2702,7 +2702,8 @@ export default function PlanAnalyzer({
                   aangepast={afwijkendeDagen.map(id => DAYS.findIndex(d => d.id === id)).filter(i => i >= 0)}
                   actiefDag={activeDay} selectie={selectie} setSelectie={setSelectie}
                   onOpenDag={(i) => { setActiveDay(i); setViewMode('day') }}
-                  onVoegToe={voegToeOpDag} onVerplaats={verplaatsNaarDag} isMobile={m} />
+                  onVoegToe={voegToeOpDag} onVerplaats={verplaatsNaarDag}
+                  onWissel={handleSwap} onVerwijder={handleDelete} isMobile={m} />
                 {!m && (
                   <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                     Sleep over kaarten om meerdere te selecteren (Shift = erbij) · sleep aan het gripje naar een andere dag · klik op een dag om hem te openen
