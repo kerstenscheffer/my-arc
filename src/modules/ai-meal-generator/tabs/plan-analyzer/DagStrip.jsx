@@ -26,7 +26,7 @@ const kort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'shor
 
 // dagen: [{ label: 'Ma', kcal, eiwit, training }] (7 stuks)
 // aangepast: indexen (0 = ma) van dagen die alleen deze week anders zijn
-export default function DagStrip({ dagen, actief, onKies, doelKcal, doelEiwit, isMobile, weekStart = null, onWeek = null, aangepast = [], onTerugzetten = null, bezig = false }) {
+export default function DagStrip({ dagen, actief, onKies, doelKcal, doelEiwit, isMobile, weekStart = null, onWeek = null, aangepast = [], onTerugzetten = null, bezig = false, zonderDagen = false }) {
   const m = isMobile
   const veeg = useRef(null)
   const begin = weekStart ? new Date(`${weekStart}T00:00:00`) : null
@@ -67,7 +67,8 @@ export default function DagStrip({ dagen, actief, onKies, doelKcal, doelEiwit, i
         <button onClick={() => !bezig && onWeek?.(1)} aria-label="Volgende week" style={pijl}><ChevronRight size={16} strokeWidth={2.8} /></button>
       </div>
     )}
-    <div style={{
+    {/* In de weekweergave staan de dagen al als kolommen: alleen de weekkiezer blijft. */}
+    {!zonderDagen && <div style={{
       display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: m ? 4 : 8,
       padding: m ? '0.5rem 0.5rem' : '0.6rem 0',
     }}>
@@ -124,7 +125,7 @@ export default function DagStrip({ dagen, actief, onKies, doelKcal, doelEiwit, i
           </button>
         )
       })}
-    </div>
+    </div>}
     </div>
   )
 }

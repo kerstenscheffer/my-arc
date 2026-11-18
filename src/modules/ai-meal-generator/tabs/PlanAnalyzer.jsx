@@ -38,8 +38,11 @@ import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import { weekplanVoorWeek, lokaleDatum } from '../../meal-plan/DayTemplateService'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import WeekKolommen, { BulkBalk } from './plan-analyzer/WeekKolommen'
+import ClientAgendaService from '../../client-agenda/ClientAgendaService'
+import { minutenVoorOefeningen } from '../../manual-workout-builder/trainingsTijd'
+import { minutenNaarTijd } from '../../meal-plan/utils/preWorkoutMeal'
 import WeekStats from './plan-analyzer/WeekStats'
-import { dagCijfers } from './plan-analyzer/weekCijfers'
+import { dagCijfers, weekSignalen } from './plan-analyzer/weekCijfers'
 import { laadIngredienten, schaalMaaltijd } from './plan-analyzer/schaalPortie'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
 import { openMealPlanForPrint } from '../mealplanhtmlgenerator'
@@ -338,6 +341,10 @@ export default function PlanAnalyzer({
   const [clientIntake, setClientIntake] = useState(null)
   const [clientRecord, setClientRecord] = useState(null)
   const [validSchemaDagKeys, setValidSchemaDagKeys] = useState(null)
+  // Trainingen van het actieve workoutplan, voor de weekweergave (18 nov 2026):
+  // schemaDagen = { dag2: { naam, oef, min } }, trainingStarts = { monday: 1080 }.
+  const [schemaDagen, setSchemaDagen] = useState(null)
+  const [trainingStarts, setTrainingStarts] = useState({})
   // 'day' = één dag, 'kolommen' = de week naast elkaar, 'week' = weekagenda.
   // Dag of kolommen wordt onthouden (10 nov 2026).
   const [viewMode, setViewModeRuw] = useState(() => { try { return localStorage.getItem('pa_weergave') === 'kolommen' ? 'kolommen' : 'day' } catch { return 'day' } })
@@ -543,19 +550,35 @@ export default function PlanAnalyzer({
 
   useEffect(() => {
     const schemaId = clientRecord?.assigned_schema_id
-    if (!schemaId) { setValidSchemaDagKeys(null); return }
+    if (!schemaId) { setValidSchemaDagKeys(null); setSchemaDagen(null); return }
     let cancelled = false
     ;(async () => {
       try {
         const { data } = await db.supabase.from('workout_schemas').select('week_structure').eq('id', schemaId).single()
         if (cancelled) return
         const ws = data?.week_structure
-        if (ws && typeof ws === 'object') setValidSchemaDagKeys(new Set(Object.keys(ws)))
-        else setValidSchemaDagKeys(null)
-      } catch { if (!cancelled) setValidSchemaDagKeys(null) }
+        if (ws && typeof ws === 'object') {
+          setValidSchemaDagKeys(new Set(Object.keys(ws)))
+          setSchemaDagen(Object.fromEntries(Object.entries(ws).filter(([, d]) => d && typeof d === 'object').map(([k, d]) => {
+            const oef = Array.isArray(d.exercises) ? d.exercises : []
+            return [k, { naam: d.name || d.focus || k, oef: oef.length, min: minutenVoorOefeningen(oef) }]
+          })))
+        } else { setValidSchemaDagKeys(null); setSchemaDagen(null) }
+      } catch { if (!cancelled) { setValidSchemaDagKeys(null); setSchemaDagen(null) } }
     })()
     return () => { cancelled = true }
   }, [clientRecord?.assigned_schema_id])
+
+  // Aanvangstijd van de training per weekdag: zelfde bron als de agenda en de
+  // pre-workout van de klant (agenda-blok → intake → standaardtijd).
+  useEffect(() => {
+    if (!resolvedClientId) { setTrainingStarts({}); return undefined }
+    let weg = false
+    new ClientAgendaService(db.supabase).getTrainingStartsPerDag(resolvedClientId)
+      .then(r => { if (!weg) setTrainingStarts(r || {}) }, () => { if (!weg) setTrainingStarts({}) })
+    return () => { weg = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedClientId, clientRecord?.workout_schedule])
 
   const loadFromGeneratedPlan = (plan) => {
     const days = plan.weekPlan.map((day, i) => {
@@ -2048,6 +2071,17 @@ export default function PlanAnalyzer({
     preWorkoutMeal, standaardTijden: SLOT_DEFAULT_TIMES,
     isTraining: (i) => dagStripDagen[i]?.training,
   })
+  // Training per weekdag uit het actieve workoutplan (alleen met een klant).
+  const weekTrainingen = DAYS.map((d) => {
+    if (!workoutSchedule || !schemaDagen) return null
+    const en = d.id.charAt(0).toUpperCase() + d.id.slice(1)
+    let k = String(workoutSchedule[en] || '')
+    if (k.startsWith('plan_')) k = k.startsWith(`plan_${clientRecord?.assigned_schema_id}__`) ? k.split('__')[1] : ''
+    const dag = schemaDagen[k]
+    if (!dag) return null
+    const start = trainingStarts[d.id]
+    return { ...dag, tijd: Number.isFinite(start) ? minutenNaarTijd(start) : null, eind: Number.isFinite(start) && dag.min ? minutenNaarTijd(start + dag.min) : null }
+  })
   // Selectie als lijst, alleen wat er nog echt staat.
   const selectieItems = [...selectie].map(k => {
     const [d, slot] = k.split('|')
@@ -2151,6 +2185,8 @@ export default function PlanAnalyzer({
             onPdf={handlePDF} pdfBezig={loadingPdf}
             onActivate={planMeta ? handleActivate : null} activating={activating}
             weergave={weekData ? viewMode : null}
+            meldingen={weekData && !gegeten ? weekSignalen(weekDagen, targets || {}) : []}
+            onMelding={(i) => { setSelectie(new Set()); setActiveDay(i); setViewMode('day') }}
             onWeergave={(v) => { setSelectie(new Set()); setViewMode(v) }}
             gegeten={gegeten}
             onGegeten={weekData && resolvedClientId ? (v) => { setGegeten(v); if (v && viewMode !== 'day') setViewMode('day') } : null}
@@ -2386,7 +2422,7 @@ export default function PlanAnalyzer({
 
         {/* De week in één regel: per dag een mini-ring met de kcal. Tik =
             die dag openen (vanuit de weekagenda terug naar de dag). */}
-        <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {!(viewMode === 'kolommen' && !weekModus) && <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
             {/* Gegeten: dezelfde strook, met wat de klant per dag logde. */}
             <DagStrip dagen={gegeten ? dagStripDagen.map((d, i) => ({ ...d, kcal: Math.round(gegetenWeek.totalen[i]?.calories || 0), eiwit: Math.round(gegetenWeek.totalen[i]?.protein || 0) })) : dagStripDagen} actief={activeDay}
@@ -2396,9 +2432,9 @@ export default function PlanAnalyzer({
               onWeek={(n) => kiesWeek(n === 0 ? dezeMaandag() : plusWekenIso(weekModus, n))}
               aangepast={afwijkendeDagen.map(id => DAYS.findIndex(d => d.id === id)).filter(i => i >= 0)}
               onTerugzetten={() => { if (window.confirm('Deze week weer gelijk aan elke week maken?')) zetWeekTerug() }}
-              bezig={wisselBezig} />
+              bezig={wisselBezig} zonderDagen={viewMode === 'kolommen'} />
           </div>
-        </div>
+        </div>}
 
         {/* ── WEEK VIEW: rendered agenda ── */}
         {/* De client-agenda heeft de hele week timeline al met meals,
@@ -2703,7 +2739,7 @@ export default function PlanAnalyzer({
                   actiefDag={activeDay} selectie={selectie} setSelectie={setSelectie}
                   onOpenDag={(i) => { setActiveDay(i); setViewMode('day') }}
                   onVoegToe={voegToeOpDag} onVerplaats={verplaatsNaarDag}
-                  onWissel={handleSwap} onVerwijder={handleDelete} isMobile={m} />
+                  onWissel={handleSwap} onVerwijder={handleDelete} trainingen={weekTrainingen} isMobile={m} />
                 {!m && (
                   <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                     Sleep over kaarten om meerdere te selecteren (Shift = erbij) · sleep aan het gripje naar een andere dag · klik op een dag om hem te openen

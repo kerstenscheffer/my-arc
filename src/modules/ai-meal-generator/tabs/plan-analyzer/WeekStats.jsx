@@ -7,8 +7,7 @@
 // Daaronder de signalen: wat valt op in deze week. Klik op een dag of een
 // signaal om die dag te openen.
 
-import { AlertTriangle, Info } from 'lucide-react'
-import { MACROS, pctVan, pctKleur, weekGemiddelde, weekSignalen } from './weekCijfers'
+import { MACROS, pctVan, pctKleur, weekGemiddelde } from './weekCijfers'
 
 const LIJN = '1px solid rgba(255,255,255,0.12)'
 const DUN = '1px solid rgba(255,255,255,0.06)'
@@ -17,11 +16,9 @@ const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 const getallen = { fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }
 // Op het lichte vlak: donkerder tinten voor contrast.
 const DONKER = { '#ef4444': '#b91c1c', '#f59e0b': '#b45309', '#22c55e': '#047857' }
-const ERNST = { rood: '#ef4444', oranje: '#f59e0b', grijs: 'rgba(255,255,255,0.55)' }
 
 export default function WeekStats({ dagen, targets = {}, open, onOpen, onKiesDag, isMobile }) {
   const gem = weekGemiddelde(dagen)
-  const signalen = weekSignalen(dagen, targets)
   const doelVan = (mac) => Number(targets?.[mac.doel]) || 0
   const m = isMobile
 
@@ -70,28 +67,7 @@ export default function WeekStats({ dagen, targets = {}, open, onOpen, onKiesDag
         })}
       </div>
 
-      {/* Signalen: altijd zichtbaar als er iets is, ook dichtgeklapt kort. */}
-      {signalen.length > 0 && (
-        <div style={{ borderTop: LIJN, padding: '0.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {(open ? signalen : signalen.slice(0, 2)).map((s, i) => (
-            <button key={i} onClick={() => s.dagen?.length && onKiesDag?.(s.dagen[0])} style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '0.15rem 0', background: 'none', border: 'none',
-              fontFamily: 'inherit', cursor: s.dagen?.length ? 'pointer' : 'default', textAlign: 'left',
-              fontSize: '0.8rem', fontWeight: 800, color: s.ernst === 'grijs' ? 'rgba(255,255,255,0.7)' : '#fff',
-            }}>
-              {s.ernst === 'grijs'
-                ? <Info size={13} strokeWidth={2.8} color={ERNST.grijs} style={{ flexShrink: 0 }} />
-                : <AlertTriangle size={13} strokeWidth={2.8} color={ERNST[s.ernst]} style={{ flexShrink: 0 }} />}
-              <span>{s.tekst}</span>
-            </button>
-          ))}
-          {!open && signalen.length > 2 && (
-            <button onClick={() => onOpen?.(true)} style={{ alignSelf: 'flex-start', padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)' }}>
-              + {signalen.length - 2} meer
-            </button>
-          )}
-        </div>
-      )}
+      {/* De signalen staan sinds 18 nov 2026 achter het bolletje in de kopbalk. */}
     </div>
   )
 }

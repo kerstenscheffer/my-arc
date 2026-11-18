@@ -15,7 +15,7 @@
 // die pas je aan in de dagweergave.
 
 import { useEffect, useRef, useState } from 'react'
-import { GripVertical, Plus, X, Trash2, Repeat, Minus, Clock, ArrowLeftRight, Pencil } from 'lucide-react'
+import { GripVertical, Plus, X, Trash2, Repeat, Minus, Clock, ArrowLeftRight, Pencil, Dumbbell } from 'lucide-react'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { pctVan, pctKleur } from './weekCijfers'
 
@@ -53,7 +53,7 @@ function SchuifNaam({ tekst }) {
 
 export default function WeekKolommen({
   dagen, targets = {}, weekStart = null, aangepast = [], actiefDag = null,
-  selectie, setSelectie, onOpenDag, onVoegToe, onVerplaats, onWissel, onVerwijder, isMobile,
+  selectie, setSelectie, onOpenDag, onVoegToe, onVerplaats, onWissel, onVerwijder, trainingen = [], isMobile,
 }) {
   const m = isMobile
   const vakRef = useRef(null)
@@ -153,7 +153,28 @@ export default function WeekKolommen({
 
               {/* Maaltijden op tijd. */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, padding: '0.45rem 0.4rem' }}>
-                {dag.maaltijden.map(({ slot, meal, tijd, los }) => {
+                {(() => {
+                  // De training van het actieve workoutplan staat op zijn tijd
+                  // tussen de maaltijden, zodat je ziet wat ervoor en erna komt.
+                  const tr = trainingen[i]
+                  const rij = dag.maaltijden.map(x => ({ ...x }))
+                  if (tr) {
+                    const plek = tr.tijd ? rij.findIndex(x => (x.tijd || '') > tr.tijd) : 0
+                    rij.splice(plek === -1 ? rij.length : plek, 0, { training: tr })
+                  }
+                  return rij
+                })().map(({ slot, meal, tijd, los, training }) => {
+                  if (training) return (
+                    <div key="training" data-geen-sleep title={`Training uit het actieve workoutplan${training.tijd ? '' : ' · tijd onbekend'}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0.32rem 0.5rem', borderRadius: 9, background: '#fff', color: '#0a0a0a' }}>
+                      <Dumbbell size={14} strokeWidth={2.8} style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.74rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{training.naam}</div>
+                        <div style={{ ...getallen, fontSize: '0.64rem', fontWeight: 800, color: 'rgba(0,0,0,0.6)', whiteSpace: 'nowrap' }}>
+                          {training.tijd ? `${training.tijd}${training.eind ? ` – ${training.eind}` : ''}` : 'Tijd onbekend'} · {training.min} min · {training.oef} oef
+                        </div>
+                      </div>
+                    </div>
+                  )
                   const sleutel = selSleutel(i, slot)
                   const gekozen = !los && selectie.has(sleutel)
                   const label = meal.display_label || SLOT_LABEL[slot] || slot

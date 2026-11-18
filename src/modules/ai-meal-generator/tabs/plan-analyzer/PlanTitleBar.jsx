@@ -42,8 +42,13 @@ export default function PlanTitleBar({
   weergave = null, onWeergave = null,
   // Plan of wat de klant echt at (13 nov 2026).
   gegeten = false, onGegeten = null,
+  // Weekmeldingen (18 nov 2026): gloeiend bolletje, klik = lijst. Klik op een
+  // melding opent de eerste dag waar het speelt.
+  meldingen = [], onMelding = null,
 }) {
   const m = isMobile
+  const [meldOpen, setMeldOpen] = useState(false)
+  const meldKleur = meldingen.some(x => x.ernst === 'rood') ? '#ef4444' : meldingen.some(x => x.ernst === 'oranje') ? '#f59e0b' : '#9ca3af'
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(name || '')
   const [status, setStatus] = useState('idle')
@@ -167,6 +172,31 @@ export default function PlanTitleBar({
           ))}
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
         </>)}
+        {meldingen.length > 0 && (
+          <span style={{ position: 'relative', flexShrink: 0, marginRight: 6 }}>
+            <style>{`@keyframes paMeldGloed { 0%, 100% { box-shadow: 0 0 0 0 var(--g), 0 0 10px 1px var(--g) } 50% { box-shadow: 0 0 0 5px transparent, 0 0 18px 4px var(--g) } }`}</style>
+            <button onClick={() => setMeldOpen(v => !v)} aria-expanded={meldOpen} title={`${meldingen.length} ${meldingen.length === 1 ? 'melding' : 'meldingen'} over deze week`} aria-label="Meldingen" style={{
+              '--g': meldKleur, width: 24, height: 24, padding: 0, borderRadius: 999, border: 'none', background: meldKleur, color: '#fff',
+              fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'paMeldGloed 2s ease-in-out infinite', fontVariantNumeric: 'tabular-nums',
+            }}>{meldingen.length}</button>
+            {meldOpen && (<>
+              <div onClick={() => setMeldOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+              <div style={{ position: 'absolute', top: 32, right: 0, zIndex: 201, width: 320, maxWidth: 'calc(100vw - 24px)', background: '#111', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.7)', padding: 6 }}>
+                <div style={{ padding: '0.4rem 0.6rem 0.3rem', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>Deze week</div>
+                {meldingen.map((s, i) => (
+                  <button key={i} onClick={() => { if (s.dagen?.length && onMelding) { setMeldOpen(false); onMelding(s.dagen[0]) } }} style={{
+                    width: '100%', display: 'flex', alignItems: 'flex-start', gap: 9, padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', borderRadius: 8,
+                    fontFamily: 'inherit', textAlign: 'left', cursor: s.dagen?.length && onMelding ? 'pointer' : 'default', color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.3,
+                  }}>
+                    <span style={{ width: 8, height: 8, marginTop: 5, borderRadius: 999, flexShrink: 0, background: s.ernst === 'rood' ? '#ef4444' : s.ernst === 'oranje' ? '#f59e0b' : '#9ca3af' }} />
+                    <span>{s.tekst}</span>
+                  </button>
+                ))}
+              </div>
+            </>)}
+          </span>
+        )}
         {weergave && onWeergave && (<>
           <button onClick={() => onWeergave('day')} title="Eén dag" aria-label="Eén dag" aria-pressed={weergave === 'day'}
             style={{ ...ikoon(false), background: weergave === 'day' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>

@@ -30,6 +30,7 @@ import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Ale
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 import PlanInfo from './components/PlanInfo'
+import ConceptBrief from './components/ConceptBrief'
 import FaseStarter from '../workout/bouwfase/FaseStarter'
 import { minutenVoorOefeningen } from './trainingsTijd'
 import { setsPerSpierDag, spierVan, spierLabel } from './spierGroepen'
@@ -185,6 +186,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     loadTrainingInfo(selectedClient.id)
   }, [selectedClient?.id])
 
+  // "Concept" in Coach Inzicht terwijl de builder al openstaat voor deze klant:
+  // de klant wisselt dan niet, dus hierboven gebeurt niets. Dan hier herladen.
+  useEffect(() => {
+    const open = (e) => {
+      const k = localClient || selectedClient
+      if (k?.id && e?.detail?.clientId === k.id) loadClientSchemas(k)
+    }
+    window.addEventListener('myarc:open-schema', open)
+    return () => window.removeEventListener('myarc:open-schema', open)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localClient?.id, selectedClient?.id])
+
   // Laatste klant waarvoor geladen wordt: snel wisselen mag een trager
   // antwoord van de vorige klant niet over de nieuwe heen zetten.
   const laadVoor = useRef(null)
@@ -225,6 +238,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         schemas.push({ ...p, _label: p.deload_van ? p.name : `${p.name || 'Plan'} (niet actief)` })
       }
     } catch { /* de lijst blijft dan zoals hij was */ }
+    // Conceptplannen uit de intake (workout-bouwer, 18 nov 2026). Die hebben nog
+    // geen client_id (anders ziet de klant ze in de app); de koppeling staat in
+    // generation_options.concept_voor.
+    try {
+      const { data: concepten } = await db.supabase.from('workout_schemas').select('*')
+        .is('client_id', null).eq('generation_options->>concept_voor', client.id).eq('generation_options->>status', 'concept')
+        .order('created_at', { ascending: false })
+        .then(r => r, () => ({ data: [] }))
+      for (const p of concepten || []) {
+        if (!schemas.some(x => x.id === p.id)) schemas.push({ ...p, _label: `${p.name || 'Concept'} (concept)` })
+      }
+    } catch { /* zonder concepten verder */ }
     if (laadVoor.current !== client.id) return
     // Deload-schema's achteraan (16 nov 2026): bij een klant zonder actief plan
     // opende de builder na "Start mesocyclus" het net gemaakte deload-schema,
@@ -232,7 +257,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     schemas = [...schemas.filter(x => !x.deload_van), ...schemas.filter(x => x.deload_van)]
     setClientSchemas(schemas)
     // Het actieve plan van de klant voorop; anders het eerste gewone plan.
-    const actief = schemas.find(x => x.id === client.assigned_schema_id) || schemas[0]
+    // Kwam je hier via "Concept" in Coach Inzicht, dan dat plan openen.
+    let gevraagd = null
+    try {
+      const w = JSON.parse(sessionStorage.getItem('myarc_open_schema') || 'null')
+      if (w?.clientId === client.id) { gevraagd = schemas.find(x => x.id === w.schemaId) || null; sessionStorage.removeItem('myarc_open_schema') }
+    } catch { /* geen opslag: gewoon het actieve plan */ }
+    const actief = gevraagd || schemas.find(x => x.id === client.assigned_schema_id) || schemas[0]
     if (actief) { loadSchemaIntoBuilder(actief); return }
     // Geen plan: leeg beginnen, niet het plan van de vorige klant laten staan
     // (dat zou je bij Opslaan zo bij deze klant zetten).
@@ -1701,6 +1732,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
 
             {faseOpen && effectiveClient && selectedSchemaId && <FaseStarter key={effectiveClient.id} db={db} client={effectiveClient} schemaId={selectedSchemaId} plannen={clientSchemas} onGewijzigd={herlaadKlant} />}
+            {huidigPlan?.generation_options?.brief && effectiveClient && (
+              <ConceptBrief key={huidigPlan.id} db={db} plan={huidigPlan} client={effectiveClient} nietOpgeslagen={nietOpgeslagen} isMobile={isMobile}
+                onKlaar={async (id) => { try { sessionStorage.setItem('myarc_open_schema', JSON.stringify({ clientId: effectiveClient.id, schemaId: id })) } catch { /* niet erg */ } await herlaadKlant() }} />
+            )}
             {infoOpen && <PlanInfo days={workoutPlan.days} />}
 
             {instellingenOpen && (

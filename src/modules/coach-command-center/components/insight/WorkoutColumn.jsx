@@ -4,7 +4,7 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState, useMemo, useEffect } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward, Footprints, Layers, HeartPulse, History } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward, Footprints, Layers, HeartPulse, History, Sparkles } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -219,6 +219,38 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     }, () => setSwappedExercises([]))
   }, [client?.id, workoutData?.schema?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Concept-trainingsplan uit de intake (edge function workout-bouwer). Staat
+  // los van de plannen van de klant tot de coach het goedkeurt.
+  const [concept, setConcept] = useState(null)
+  const [conceptBezig, setConceptBezig] = useState(false)
+  useEffect(() => {
+    setConcept(null)
+    if (!client?.id || !db?.supabase) return
+    let leeft = true
+    db.supabase.from('workout_schemas').select('id, name, generation_options')
+      .is('client_id', null).eq('generation_options->>concept_voor', client.id).eq('generation_options->>status', 'concept')
+      .order('created_at', { ascending: false }).limit(1)
+      .then(r => { if (leeft) setConcept(r?.data?.[0] || null) }, () => null)
+    return () => { leeft = false }
+  }, [client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const openConcept = (id) => {
+    try { sessionStorage.setItem('myarc_open_schema', JSON.stringify({ clientId: client.id, schemaId: id })) } catch { /* de builder opent dan het actieve plan */ }
+    onNavigateWorkout?.(client.id, id)
+    // Stond de builder al open op deze klant, dan wisselt er niets: zelf seinen.
+    setTimeout(() => window.dispatchEvent(new CustomEvent('myarc:open-schema', { detail: { clientId: client.id, schemaId: id } })), 300)
+    if (onClose) onClose()
+  }
+  const maakConcept = async () => {
+    if (conceptBezig || !client?.id) return
+    setConceptBezig(true)
+    try {
+      const { data, error } = await db.supabase.functions.invoke('workout-bouwer', { body: { client_id: client.id } })
+      if (error || data?.error || !data?.schema_id) throw new Error(data?.error || data?.overgeslagen || error?.message || 'mislukt')
+      openConcept(data.schema_id)
+    } catch (e) { alert('Concept maken mislukt: ' + (e?.message || e)) }
+    finally { setConceptBezig(false) }
+  }
+
   // Maandag van een datum, als JJJJ-MM-DD: de week waar een override bij hoort.
   const maandagVan = (datum) => {
     const d = new Date(`${String(datum).slice(0, 10)}T12:00:00`)
@@ -428,6 +460,13 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           >
             <BarChart3 size={12} /> Kracht
           </button>
+          {onNavigateWorkout && client?.id && (
+            <button onClick={() => (concept ? openConcept(concept.id) : maakConcept())} disabled={conceptBezig}
+              title={concept ? 'Conceptplan uit de intake openen in de builder, met de brief erbij' : 'Conceptplan laten maken uit de intake'}
+              style={{ ...kopKnopStijl, ...(concept ? { color: '#10b981', borderColor: 'rgba(16,185,129,0.5)' } : {}) }}>
+              <Sparkles size={11} /> {conceptBezig ? 'Bezig…' : concept ? 'Concept klaar' : 'Maak concept'}
+            </button>
+          )}
           {onNavigateWorkout && (
             <button onClick={() => { onNavigateWorkout(client?.id, workoutData?.schema?.id || null); if (onClose) onClose() }}
               title={workoutData?.schema ? 'Plan openen in de builder' : 'Nieuw plan maken'} style={kopKnopStijl}>

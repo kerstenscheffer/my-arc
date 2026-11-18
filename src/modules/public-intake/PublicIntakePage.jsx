@@ -614,6 +614,9 @@ export default function PublicIntakePage() {
       if (res.clientId) {
         supabase.functions.invoke('plan-bouwer', { body: { client_id: res.clientId } })
           .then(r => r, e => console.warn('plan-bouwer niet gestart:', e?.message || e))
+        // Idem voor het concept-trainingsplan (edge function workout-bouwer).
+        supabase.functions.invoke('workout-bouwer', { body: { client_id: res.clientId } })
+          .then(r => r, e => console.warn('workout-bouwer niet gestart:', e?.message || e))
       }
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }
     setSaving(false)
