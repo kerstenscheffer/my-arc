@@ -32,6 +32,8 @@ export default function FoodLogModal({
   // maar teruggegeven via onKies. `onNaarGerechten` zet de schakelaar bovenin
   // terug naar de gerechtenlijst.
   onKies = null, onNaarGerechten = null,
+  // In een ander scherm ingebed (wisselscherm): dat scherm heeft zelf al een kop en een kruisje.
+  ingebed = false,
   // Op welk tabblad het venster opent. 'meals' = Mijn maaltijden, gebruikt
   // door de knop "Maaltijd aanmaken" in het wisselvenster.
   startTab = 'search',
@@ -379,7 +381,7 @@ export default function FoodLogModal({
         </>
       ) : !successData ? (
         <>
-          <button
+          {!ingebed && <button
             onClick={onClose}
             style={{
               position: 'absolute', top: isMobile ? '0.75rem' : '1rem',
@@ -392,7 +394,7 @@ export default function FoodLogModal({
             }}
           >
             <X size={22} strokeWidth={2.4} />
-          </button>
+          </button>}
 
           {/* Kiesstand: dezelfde schakelaar als in het wisselvenster, hier op Mijn logs. */}
           {onKies && onNaarGerechten && (

@@ -1285,11 +1285,20 @@ export default function AIAlternativesModal({
           {/* Gerechten of het hele zoek- en logvenster: wie liever via zijn logs kiest
               schakelt hier om (15 nov 2026, Kersten). */}
           {!embedded && client?.id && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-              <button type="button" aria-pressed style={{ minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, background: '#fff', color: '#000', border: '1px solid #fff' }}>Gerechten</button>
-              <button type="button" onClick={() => setLogModus(true)} style={{ minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>Zoeken en mijn logs</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: logModus ? 0 : 10 }}>
+              {[[false, 'Gerechten'], [true, 'Mijn maaltijden']].map(([stand, label]) => (
+                <button key={label} type="button" aria-pressed={logModus === stand} onClick={() => setLogModus(stand)} style={{
+                  minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer',
+                  background: logModus === stand ? '#fff' : 'transparent', color: logModus === stand ? '#000' : '#fff',
+                  border: `1px solid ${logModus === stand ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+                  transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{label}</button>
+              ))}
             </div>
           )}
+          {/* Zoekveld en filters horen bij Gerechten; Mijn maaltijden heeft zijn eigen zoekbalk. */}
+          {!logModus && (<>
           <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
             <Search
               size={15}
@@ -1373,17 +1382,25 @@ export default function AIAlternativesModal({
             </div>
           )}
           </>)}
+          </>)}
         </div>
 
         {/* ── Meal List ── */}
         <div style={{
           flex: 1,
           minHeight: 0,
-          overflowY: 'auto',
+          position: 'relative',
+          overflowY: logModus ? 'hidden' : 'auto',
           overscrollBehavior: 'contain',
           WebkitOverflowScrolling: 'touch'
         }}>
-          {waarInhoud ? (
+          {logModus && !waarInhoud && !bewerk ? (
+            // Mijn maaltijden: het zoek- en logvenster, in hetzelfde scherm onder
+            // dezelfde kop en schakelaar (18 nov 2026). Geen tweede venster meer.
+            <FoodLogModal isOpen inVenster ingebed client={client} db={db} startTab="search"
+              defaultMealMoment={basisMoment(moment !== 'alles' ? moment : slotKey)}
+              onClose={() => setLogModus(false)} onKies={kiesUitLog} />
+          ) : waarInhoud ? (
             <div style={{ padding: isMobile ? '0.9rem 1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
               {waarInhoud}
             </div>
@@ -1466,11 +1483,6 @@ export default function AIAlternativesModal({
                   const eerste = !String(kopVan(filteredMeals[idx - 1]) || '').startsWith('zm:')
                   return (
                     <div style={{ padding: `${eerste ? '0.3rem' : '1rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.4rem` }}>
-                      {eerste && (
-                        <div style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#10b981', marginBottom: '0.6rem' }}>
-                          Zelfde macro's als je maaltijd · hele porties
-                        </div>
-                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: isMobile ? '1.15rem' : '1.25rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
                         <Icoon size={isMobile ? 20 : 22} strokeWidth={2.6} color={GROEP_KLEUR[groep] || '#fff'} />
                         {groep}
@@ -1886,13 +1898,7 @@ export default function AIAlternativesModal({
   )
   if (embedded) return inhoud
   return (<>
-    {/* In de logstand toont alleen het logvenster zich: dat ligt anders onder dit venster. */}
-    {!logModus && createPortal(inhoud, document.body)}
-    {logModus && (
-      <FoodLogModal isOpen client={client} db={db} startTab="search"
-        defaultMealMoment={basisMoment(moment !== 'alles' ? moment : slotKey)}
-        onClose={() => setLogModus(false)} onNaarGerechten={() => setLogModus(false)} onKies={kiesUitLog} />
-    )}
+    {createPortal(inhoud, document.body)}
   </>)
 }
 
