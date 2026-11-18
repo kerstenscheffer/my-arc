@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { openUitMelding } from '../video-feedback/feedbackOpenen'
 import zichtbaarPollen from '../../utils/zichtbaarPollen';
+import FeedbackBlad from '../workout/bouwfase/FeedbackBlad'
+import { zoekNavraag, navraagWeg } from '../workout/bouwfase/trainingNavraag'
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
 const autoGeopend = new Set();
@@ -9,14 +11,24 @@ import { Bell, X, TrendingUp, Award, Utensils, AlertCircle, Sparkles, CheckCircl
 export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange }) {
   const isMobile = window.innerWidth <= 768;
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
-  const [notifications, setNotifications] = useState([]);
+  const [dbMeldingen, setNotifications] = useState([]);
+  // "Hoe was je training van gisteren?": geen rij in de database maar een
+  // melding die de app zelf bovenaan zet zolang het cijfer ontbreekt.
+  const [navraag, setNavraag] = useState(null);
+  const [navraagOpen, setNavraagOpen] = useState(false);
+  const notifications = useMemo(() => (navraag ? [{
+    id: `navraag-${navraag.sessie.id}`, _navraag: true, type: 'workout', priority: 'high', status: 'active',
+    title: `Hoe was je training van ${navraag.dag}?`,
+    message: 'Twee tikken: een cijfer en of de lengte goed was. Dan weet je coach het.',
+  }, ...dbMeldingen] : dbMeldingen), [navraag, dbMeldingen]);
   const [isExpandedInternal, setIsExpandedInternal] = useState(false);
   const isExpanded = controlled ? openProp : isExpandedInternal;
   const setIsExpanded = (val) => {
     const next = typeof val === 'function' ? val(isExpanded) : val
     if (controlled) onOpenChange(next); else setIsExpandedInternal(next)
   };
-  const [hasUnread, setHasUnread] = useState(false);
+  const [hasUnreadDb, setHasUnread] = useState(false);
+  const hasUnread = hasUnreadDb || !!navraag;
   const [isLoading, setIsLoading] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState(null);
 
@@ -31,6 +43,19 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       return zichtbaarPollen(loadNotifications, 120000);
     }
   }, [clientId, currentPage, db]);
+
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let leeft = true
+    zoekNavraag(db.supabase, clientId).then(n => {
+      if (!leeft || !n) return
+      setNavraag(n)
+      const id = `navraag-${n.sessie.id}`
+      if (!autoGeopend.has(id)) { autoGeopend.add(id); setTimeout(() => setIsExpanded(true), 800) }
+    }, () => null)
+    return () => { leeft = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
 
   // Auto-hide effect
   useEffect(() => {
@@ -83,6 +108,11 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
 
   const handleDismiss = async (e, notificationId) => {
     e.stopPropagation();
+    if (String(notificationId).startsWith('navraag-')) {
+      if (navraag) navraagWeg(navraag.sessie.id)
+      setNavraag(null)
+      return
+    }
     
     // Fade out animation
     const element = document.getElementById(`notification-${notificationId}`);
@@ -374,6 +404,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                     key={notification.id}
                     id={`notification-${notification.id}`}
                     onClick={() => {
+                      if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
                       // Feedback op een techniekvideo: meteen de modal open.
                       if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
                       if (isActive) handleMarkAsRead(notification.id)
@@ -592,6 +623,11 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
           }
         }
       `}</style>
+      {navraag && (
+        <FeedbackBlad open={navraagOpen} soort="workout" client={{ id: clientId }} db={db} fase={navraag.fase}
+          datum={navraag.sessie.workout_date} dagTekst={navraag.dag}
+          onOpgeslagen={() => setNavraag(null)} onClose={() => setNavraagOpen(false)} />
+      )}
     </>
   );
 }

@@ -553,10 +553,13 @@ export default function DagTijdlijn({
         })()}
         {/* (De kaarten links rekenen met dezelfde hoogtes als deze balken: zie rechtsVan.) */}
         {/* Voeding: één brede balk, kcal tegen het doel, met kcal en eiwit bovenin de vulling. */}
-        <div onClick={() => setOverOpen(v => !v)} title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit · ${fmt(kh)} g koolh · ${fmt(vet)} g vet` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden', cursor: 'pointer', ...tik }}>
-          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: vulPx(kDeel), background: kcal > 0 ? kKleur : 'rgba(255,255,255,0.35)', opacity: 0.55, transition: 'height 0.3s ease' }} />
+        <div title={voeding ? `${fmt(kcal)} / ${fmt(doelKcal)} kcal · ${fmt(eiwit)} / ${fmt(doelEiwit)} g eiwit · ${fmt(kh)} g koolh · ${fmt(vet)} g vet` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: WATER_BREED, width: VOEDING_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden', pointerEvents: 'none' }}>
+          {/* Alleen de vulling en de knoppen vangen een tik. De lege ruimte erboven
+              laat hem door: daar lopen de kaarten door tot de rand (rechtsVan). */}
+          <div onClick={() => setOverOpen(v => !v)} style={{ pointerEvents: 'auto', cursor: 'pointer', ...tik, position: 'absolute', left: 0, right: 0, bottom: 0, height: vulPx(kDeel), background: kcal > 0 ? kKleur : 'rgba(255,255,255,0.35)', opacity: 0.55, transition: 'height 0.3s ease' }} />
           {/* Ring met bestek precies op de rand van de vulling (zelfde vorm als
-              het flesje bij water); tik = naar je voeding. De stand staat eronder,
+              het flesje bij water); tik op de ring of het plusje = loggen, tik op
+              de balk zelf = wat je nog over hebt. De stand staat eronder,
               of erboven als de balk nog bijna leeg is. */}
           {(() => {
             const KNOP = 30
@@ -566,15 +569,15 @@ export default function DagTijdlijn({
             const tekstOnder = knopOnder >= 68 + onderRuimte ? knopOnder - 64 : knopOnder + KNOP + 4 // vijf regels: kcal, getal, eiwit, koolhydraten, vet
             return (
               <>
-                <button onClick={(e) => { e.stopPropagation(); setOverOpen(v => !v) }} aria-label="Wat je vandaag nog over hebt" aria-expanded={overOpen}
-                  style={{ position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: `2px solid ${kcal > 0 ? kKleur : 'rgba(255,255,255,0.5)'}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
+                <button onClick={(e) => { e.stopPropagation(); if (onVoeding) { setOverOpen(false); onVoeding() } else setOverOpen(v => !v) }} aria-label={onVoeding ? 'Iets loggen' : 'Wat je vandaag nog over hebt'} title={onVoeding ? 'Loggen' : undefined}
+                  style={{ pointerEvents: 'auto', position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: `2px solid ${kcal > 0 ? kKleur : 'rgba(255,255,255,0.5)'}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
                   <Utensils size={14} strokeWidth={2.6} />
                 </button>
                 {/* Klein plusje op de ring: direct naar loggen. */}
                 {onVoeding && (
                   <button onClick={(e) => { e.stopPropagation(); onVoeding() }} aria-label="Iets loggen" title="Loggen"
-                    style={{ position: 'absolute', left: 'calc(50% + 2px)', bottom: knopOnder + KNOP - 11, width: 16, height: 16, padding: 0, borderRadius: '50%', background: '#fff', border: 'none', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, boxShadow: '0 1px 4px rgba(0,0,0,0.7)', transition: 'bottom 0.3s ease', ...tik }}>
-                    <Plus size={11} strokeWidth={3.4} />
+                    style={{ pointerEvents: 'auto', position: 'absolute', left: 'calc(50% + 1px)', bottom: knopOnder + KNOP - 12, width: 20, height: 20, padding: 0, borderRadius: '50%', background: '#fff', border: 'none', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, boxShadow: '0 1px 4px rgba(0,0,0,0.7)', transition: 'bottom 0.3s ease', ...tik }}>
+                    <Plus size={13} strokeWidth={3.4} />
                   </button>
                 )}
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: tekstOnder, textAlign: 'center', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', pointerEvents: 'none', transition: 'bottom 0.3s ease' }}>
@@ -598,8 +601,8 @@ export default function DagTijdlijn({
           const balkHoogte = tijdHoogte - BALK_BODEM
           const vul = vulPx(wDeel)
           return (
-            <div onClick={onWater ? () => onWater() : undefined} title={water ? `Water ${l(ml)} / ${l(doel)} L · tik: 100 ml erbij` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: 0, width: WATER_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden', cursor: onWater ? 'pointer' : 'default', ...tik }}>
-              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: vulPx(wDeel), background: '#38bdf8', opacity: 0.55, transition: 'height 0.3s ease' }} />
+            <div title={water ? `Water ${l(ml)} / ${l(doel)} L · tik: 100 ml erbij` : undefined} style={{ position: 'absolute', top: BAND, bottom: BALK_BODEM, right: 0, width: WATER_BREED, background: 'transparent', zIndex: 85, overflow: 'hidden', pointerEvents: 'none' }}>
+              <div onClick={onWater ? () => onWater() : undefined} style={{ pointerEvents: 'auto', cursor: onWater ? 'pointer' : 'default', position: 'absolute', left: 0, right: 0, bottom: 0, height: vulPx(wDeel), background: '#38bdf8', opacity: 0.55, transition: 'height 0.3s ease' }} />
               {/* Het flesje staat precies op de rand van de vulling: half erin,
                   half erboven. De stand staat eronder, of erboven als de balk
                   nog bijna leeg is. */}
@@ -614,13 +617,13 @@ export default function DagTijdlijn({
                       onPointerUp={() => clearTimeout(waterDruk.current.timer)} onPointerLeave={() => clearTimeout(waterDruk.current.timer)} onPointerCancel={() => clearTimeout(waterDruk.current.timer)}
                       onContextMenu={(e) => e.preventDefault()}
                       onClick={(e) => { e.stopPropagation(); if (waterDruk.current.lang) { waterDruk.current.lang = false; return } onWater?.() }}
-                      style={{ position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: '2px solid #38bdf8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onWater ? 'pointer' : 'default', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
+                      style={{ pointerEvents: 'auto', position: 'absolute', left: '50%', marginLeft: -KNOP / 2, bottom: knopOnder, width: KNOP, height: KNOP, padding: 0, borderRadius: '50%', background: 'transparent', border: '2px solid #38bdf8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onWater ? 'pointer' : 'default', zIndex: 2, transition: 'bottom 0.3s ease', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', ...tik }}>
                       <Milk size={15} strokeWidth={2.6} />
                     </button>
                     {/* Klein minnetje op de ring: 100 ml eraf (tik te veel, of verkeerd geteld). */}
                     {onWaterMin && ml > 0 && (
                       <button onClick={(e) => { e.stopPropagation(); onWaterMin() }} aria-label="100 ml water eraf" title="100 ml eraf"
-                        style={{ position: 'absolute', left: 'calc(50% + 2px)', bottom: knopOnder + KNOP - 11, width: 16, height: 16, padding: 0, borderRadius: '50%', background: '#fff', border: 'none', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, boxShadow: '0 1px 4px rgba(0,0,0,0.7)', transition: 'bottom 0.3s ease', ...tik }}>
+                        style={{ pointerEvents: 'auto', position: 'absolute', left: 'calc(50% + 2px)', bottom: knopOnder + KNOP - 11, width: 16, height: 16, padding: 0, borderRadius: '50%', background: '#fff', border: 'none', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, boxShadow: '0 1px 4px rgba(0,0,0,0.7)', transition: 'bottom 0.3s ease', ...tik }}>
                         <Minus size={11} strokeWidth={3.4} />
                       </button>
                     )}
