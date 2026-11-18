@@ -43,19 +43,16 @@ export default function Login({ onLoginSuccess }) {
 function LoginFooter() {
   const linkStyle = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '8px 14px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    color: 'rgba(255,255,255,0.85)',
+    // Zonder pil eromheen (18 nov 2026, Kersten): alleen icoon en tekst.
+    padding: '8px 10px',
+    background: 'none',
+    color: 'rgba(255,255,255,0.55)',
     textDecoration: 'none',
     fontSize: '0.78rem',
     fontWeight: 700,
     letterSpacing: '0.01em',
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
   }
   return (
     <>
@@ -79,11 +76,11 @@ function LoginFooter() {
       }}
     >
       <a href="/support" style={{ ...linkStyle, pointerEvents: 'auto' }}>
-        <LifeBuoy size={14} strokeWidth={2.4} color="rgba(255,255,255,0.7)" />
+        <LifeBuoy size={14} strokeWidth={2.4} color="rgba(255,255,255,0.45)" />
         Support
       </a>
       <a href="/privacy" style={{ ...linkStyle, pointerEvents: 'auto' }}>
-        <Shield size={14} strokeWidth={2.4} color="rgba(255,255,255,0.7)" />
+        <Shield size={14} strokeWidth={2.4} color="rgba(255,255,255,0.45)" />
         Privacy
       </a>
     </div>

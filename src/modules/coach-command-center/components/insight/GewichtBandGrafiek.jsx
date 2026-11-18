@@ -585,10 +585,12 @@ export default function GewichtBandGrafiek({
                 lijnstukjes tekenen zou hetzelfde doen maar vier keer zo traag. */}
             <defs>
               <linearGradient id={`trend-${kleurId}`} x1="0" y1="0" x2="1" y2="0">
-                {punten.map((p, i) => (
+                {/* Alleen de gemeten punten: het verloop loopt over de trendlijn,
+                    en die stopt bij de laatste weging (niet bij het plan vooruit). */}
+                {punten.filter(p => !p.vooruit).map((p, i, gemeten) => (
                   <stop
                     key={p.datum}
-                    offset={punten.length > 1 ? `${(i / (punten.length - 1)) * 100}%` : '0%'}
+                    offset={gemeten.length > 1 ? `${(i / (gemeten.length - 1)) * 100}%` : '0%'}
                     stopColor={kleurVoorErnst(p.ernst)}
                   />
                 ))}

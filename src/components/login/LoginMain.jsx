@@ -14,6 +14,7 @@
 // stond; op een telefoon leest dat als drie losse blokjes in plaats van één
 // formulier.
 
+import { LaadLogo } from '../LaadScherm'
 import { useState, useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
@@ -110,27 +111,18 @@ export default function LoginMain() {
     <Wrapper slide={slide}>
       <div style={{ width: '100%', maxWidth: 360, textAlign: 'center' }}>
 
-        <img
-          src="/ma-coaching-logo.png"
-          alt="MY ARC Coaching"
-          style={{
-            maxWidth: 200, width: '100%', height: 'auto',
-            margin: '0 auto 1.75rem', display: 'block',
-          }}
-        />
+        {/* Zelfde logo met glans als het laadscherm, zonder de boog
+            (18 nov 2026, Kersten). */}
+        <div role="img" aria-label="MY ARC Coaching" style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 1.6rem' }}>
+          <LaadLogo boog={false} />
+        </div>
 
         <h1 style={{
           fontSize: '1.65rem', fontWeight: 900, color: '#fff',
-          margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1,
+          margin: '0 0 1.4rem', letterSpacing: '-0.03em', lineHeight: 1.1,
         }}>
           Welkom terug
         </h1>
-        <p style={{
-          fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
-          margin: '0.4rem 0 1.6rem',
-        }}>
-          Log in om verder te gaan
-        </p>
 
         {error && <ErrorBox>{error}</ErrorBox>}
 
@@ -277,7 +269,7 @@ function Veld({ style, ...props }) {
     <input
       {...props}
       style={{
-        width: '100%', minHeight: 52, padding: '0 1rem',
+        width: '100%', minHeight: 44, padding: '0 1rem',
         background: 'rgba(255,255,255,0.05)',
         border: '1px solid rgba(255,255,255,0.09)',
         borderRadius: 12,
@@ -308,13 +300,13 @@ function Wrapper({ children, slide }) {
         <div key={src} style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center',
-          opacity: i === slide ? 0.14 : 0, transition: 'opacity 1.8s ease', zIndex: 0,
+          opacity: i === slide ? 0.24 : 0, // was 0,14; iets lichter (18 nov 2026, Kersten) transition: 'opacity 1.8s ease', zIndex: 0,
           transform: 'scale(1.04)',
         }} />
       ))}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at 50% 35%, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.8) 55%, rgba(0,0,0,0.97) 100%)',
+        background: 'radial-gradient(ellipse at 50% 35%, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.7) 55%, rgba(0,0,0,0.95) 100%)',
       }} />
 
       {/* Scrollen mag, maar pas als het moet.
@@ -335,7 +327,9 @@ function Wrapper({ children, slide }) {
         <div style={{
           minHeight: '100%', boxSizing: 'border-box',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: `calc(env(safe-area-inset-top, 0px) + 2rem) 1.5rem calc(env(safe-area-inset-bottom, 0px) + 6rem)`,
+          // Onderin meer ruimte dan bovenin: het blok staat zo iets boven het
+          // midden (18 nov 2026, Kersten: "alles iets hoger").
+          padding: `calc(env(safe-area-inset-top, 0px) + 1.5rem) 1.5rem calc(env(safe-area-inset-bottom, 0px) + 9rem)`,
         }}>
           {children}
         </div>
@@ -349,7 +343,7 @@ function Wrapper({ children, slide }) {
 function WitteKnop({ children, disabled, style, ...props }) {
   return (
     <button disabled={disabled} style={{
-      width: '100%', minHeight: 52, padding: '0 1rem',
+      width: '100%', minHeight: 46, padding: '0 1rem',
       background: disabled ? 'rgba(255,255,255,0.35)' : '#fff',
       border: 'none', borderRadius: 12,
       color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900,

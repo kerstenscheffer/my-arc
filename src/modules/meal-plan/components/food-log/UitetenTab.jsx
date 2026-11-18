@@ -15,8 +15,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer,
-  Utensils, ChevronLeft, Minus, Plus, Check, Hand,
+  Utensils, ChevronLeft, Minus, Plus, Check, Hand, Info,
 } from 'lucide-react'
+import MealCard from '../day-schedule/MealCard'
 import VAST from './uitetenGerechten.json'
 
 const GROEN = '#10b981'
@@ -39,6 +40,7 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
   const [soort, setSoort] = useState(null)
   const [gekozen, setGekozen] = useState({}) // id -> { aantal, deel }
   const [hulp, setHulp] = useState(false)
+  const [info, setInfo] = useState(null) // id van het gerecht waarvan de details open staan
   const [bezig, setBezig] = useState(false)
   const [eigen, setEigen] = useState([])
 
@@ -139,6 +141,29 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
         </button>
       </div>
 
+      {/* Je hele etentje in één blik: bovenaan, blijft staan bij het scrollen. Eén knop logt alles. */}
+      {regels.length > 0 && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 12,
+          padding: `0.55rem ${zij}`, marginTop: '0.3rem', background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>{Math.round(totaal.kcal)}<span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>KCAL</span></span>
+              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>{Math.round(totaal.eiwit)}<span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>G EIWIT</span></span>
+            </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {regels.reduce((n, x) => n + x.k.aantal, 0)} gekozen · {Math.round(totaal.koolh)} g koolh · {Math.round(totaal.vet)} g vet
+            </div>
+          </div>
+          <button onClick={log} disabled={bezig} style={{
+            minHeight: 44, padding: '0 1.1rem', borderRadius: 12, background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
+            fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', cursor: bezig ? 'wait' : 'pointer', opacity: bezig ? 0.6 : 1, flexShrink: 0,
+          }}>{bezig ? 'Bezig…' : 'Log alles'}</button>
+        </div>
+      )}
+
       {hulp && (
         <div style={{ padding: `0.5rem ${zij} 0.2rem`, fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.55 }}>
           <div>Je vuist = een portie rijst, pasta of aardappel (ongeveer 200 kcal). Een restaurantbord pasta is 2 tot 3 vuisten.</div>
@@ -159,27 +184,42 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
               {lijst.map(r => {
                 const k = gekozen[r.id]
                 const f = k ? k.aantal * k.deel : 1
+                const hoek = { width: 34, height: 30, padding: 0, background: 'transparent', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
                 return (
-                  <div key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '0.5rem 0' }}>
-                    <div onClick={() => tik(r.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
-                      <span style={{
-                        width: 24, height: 24, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: k ? GROEN : 'transparent', border: `2px solid ${k ? GROEN : 'rgba(255,255,255,0.3)'}`,
-                      }}>{k && <Check size={14} strokeWidth={3.5} color="#fff" />}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', lineHeight: 1.25 }}>
-                          {r.naam}
-                          {r.keuze === 'top' && <span style={{ marginLeft: 7, fontSize: '0.66rem', fontWeight: 900, color: GROEN, whiteSpace: 'nowrap' }}>SLIMME KEUZE</span>}
+                  <div key={r.id} style={{ margin: `0 -${zij}` }}>
+                    {/* Dezelfde kaart als overal in de app: foto, naam, macro's; rechts info en toevoegen. */}
+                    <MealCard
+                      meal={{ name: r.naam, calories: r.kcal * f, protein: r.eiwit * f, carbs: r.koolh * f, fat: r.vet * f }}
+                      momentLabel=""
+                      naNaam={r.portie}
+                      label={r.keuze === 'top' ? <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.04em', color: GROEN }}>SLIMME KEUZE</span> : null}
+                      compact isMobile={isMobile} geselecteerd={!!k}
+                      onTik={() => tik(r.id)} onCheck={() => tik(r.id)}
+                      rechts={
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginRight: -6 }}>
+                          <button onClick={(e) => { e.stopPropagation(); setInfo(v => (v === r.id ? null : r.id)) }} aria-label="Info" style={{ ...hoek, opacity: info === r.id ? 1 : 0.6 }}>
+                            <Info size={17} strokeWidth={2.6} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); tik(r.id) }} aria-label={k ? 'Weghalen' : 'Toevoegen'} style={hoek}>
+                            <span style={{ width: 24, height: 24, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: k ? GROEN : '#fff', color: k ? '#fff' : '#0a0a0a' }}>
+                              {k ? <Check size={15} strokeWidth={3.5} /> : <Plus size={16} strokeWidth={3.2} />}
+                            </span>
+                          </button>
                         </div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{r.portie}</div>
+                      }
+                      acties={[]}
+                    />
+                    {info === r.id && (
+                      <div style={{ margin: `-0.1rem ${zij} 0.5rem`, fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                        <div><span style={{ color: '#fff', fontWeight: 900 }}>Portie:</span> {r.portie}</div>
+                        <div>{Math.round(r.kcal)} kcal · {Math.round(r.eiwit)} g eiwit · {Math.round(r.koolh)} g koolhydraten · {Math.round(r.vet)} g vet</div>
+                        <div style={{ color: r.keuze === 'top' ? GROEN : 'rgba(255,255,255,0.6)' }}>
+                          {r.keuze === 'top' ? 'Slimme keuze: veel eiwit of weinig kcal voor wat je krijgt.' : r.keuze === 'zwaar' ? 'Zwaar: veel kcal. Prima af en toe; kies Half als je deelt of laat staan.' : 'Gewone keuze. Let op de portie.'}
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{Math.round(r.kcal * f)}<span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 2 }}>KCAL</span></div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{Math.round(r.eiwit * f)} g eiwit</div>
-                      </div>
-                    </div>
+                    )}
                     {k && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0.45rem 0 0.1rem 34px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: `0 ${zij} 0.6rem` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <button onClick={() => (k.aantal <= 1 ? tik(r.id) : zet(r.id, { aantal: k.aantal - 1 }))} aria-label="Minder" style={kleinKnop}><Minus size={15} strokeWidth={3} /></button>
                           <span style={{ minWidth: 18, textAlign: 'center', fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{k.aantal}</span>
@@ -209,24 +249,6 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
         </div>
       </div>
 
-      {regels.length > 0 && (
-        <div style={{
-          position: 'sticky', bottom: 0, display: 'flex', alignItems: 'center', gap: 12,
-          padding: `0.6rem ${zij} calc(0.7rem + env(safe-area-inset-bottom, 0px))`, background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(8px)',
-          borderTop: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{Math.round(totaal.kcal)} kcal</div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
-              {Math.round(totaal.eiwit)} g eiwit · {Math.round(totaal.koolh)} g koolh · {Math.round(totaal.vet)} g vet
-            </div>
-          </div>
-          <button onClick={log} disabled={bezig} style={{
-            minHeight: 46, padding: '0 1.2rem', borderRadius: 12, background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
-            fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: bezig ? 'wait' : 'pointer', opacity: bezig ? 0.6 : 1, flexShrink: 0,
-          }}>{bezig ? 'Bezig…' : 'Log etentje'}</button>
-        </div>
-      )}
     </div>
   )
 }
