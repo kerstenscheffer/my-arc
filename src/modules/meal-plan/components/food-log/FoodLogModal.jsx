@@ -409,12 +409,13 @@ export default function FoodLogModal({
               Plannen voor {new Date(`${planDatum}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })} · telt pas mee als je hem eet
             </div>
           )}
-          <FoodLogHeader
+          {/* Ingebed in het wisselscherm: geen eigen titel en geen Zoek/Scan/Snel; de kop daar zegt al genoeg. */}
+          {!ingebed && <FoodLogHeader
             weergave={weergave}
             onWeergave={setWeergave}
             isMobile={isMobile}
             titel={coachModus ? 'Coach snel toevoegen' : undefined}
-          />
+          />}
 
           {/* Ingrediënt zoeken voor een eigen maaltijd: vaste balk met de
               maaltijd die je bouwt, in plaats van de filters. Zonder dit zag

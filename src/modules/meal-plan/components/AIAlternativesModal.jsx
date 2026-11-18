@@ -1285,15 +1285,22 @@ export default function AIAlternativesModal({
           {/* Gerechten of het hele zoek- en logvenster: wie liever via zijn logs kiest
               schakelt hier om (15 nov 2026, Kersten). */}
           {!embedded && client?.id && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: logModus ? 0 : 10 }}>
-              {[[false, 'Gerechten'], [true, 'Mijn maaltijden']].map(([stand, label]) => (
+            // Eén schuifknop, zelfde stijl als Zoek / Scan / Snel in het logvenster: het witte blokje schuift mee.
+            <div style={{ position: 'relative', display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: logModus ? 0 : 10 }}>
+              <div style={{
+                position: 'absolute', top: 3, bottom: 3, left: logModus ? '50%' : 3, width: 'calc(50% - 3px)',
+                background: '#fff', borderRadius: 999, transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              }} />
+              {[[false, 'Gerechten', Utensils], [true, 'Mijn maaltijden', Heart]].map(([stand, label, Icoon]) => (
                 <button key={label} type="button" aria-pressed={logModus === stand} onClick={() => setLogModus(stand)} style={{
-                  minHeight: 38, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer',
-                  background: logModus === stand ? '#fff' : 'transparent', color: logModus === stand ? '#000' : '#fff',
-                  border: `1px solid ${logModus === stand ? '#fff' : 'rgba(255,255,255,0.2)'}`,
-                  transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+                  position: 'relative', zIndex: 1, flex: 1, minWidth: 0, minHeight: 34,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  background: 'transparent', border: 'none', borderRadius: 999,
+                  color: logModus === stand ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                  fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: logModus === stand ? 900 : 800,
+                  fontFamily: 'inherit', cursor: 'pointer', transition: 'color 0.15s ease',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>{label}</button>
+                }}><Icoon size={15} strokeWidth={2.6} />{label}</button>
               ))}
             </div>
           )}
