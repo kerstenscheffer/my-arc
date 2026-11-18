@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer,
+  Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer, Wine,
   Utensils, ChevronLeft, ChevronDown, BadgeCheck, Minus, Plus, Check, Hand, Info, Search, X,
 } from 'lucide-react'
 import MealCard from '../day-schedule/MealCard'
@@ -42,8 +42,11 @@ const SOORT_ICOON = {
   Indiaas: [Flame, '#f59e0b'], Thais: [Soup, '#a78bfa'], Mexicaans: [Wheat, '#eab308'], Burger: [Hamburger, '#d97706'],
   'Shoarma en doner': [Drumstick, '#fb923c'], 'Steak en grill': [Beef, '#ef4444'], 'Tapas en delen': [Grape, '#c084fc'],
   Pokebowl: [Salad, '#34d399'], Snackbar: [Popcorn, '#facc15'], Lunchroom: [Sandwich, '#d97706'], 'Ontbijt en brunch': [Croissant, '#fbbf24'],
-  Borrel: [Beer, '#f59e0b'],
+  Borrel: [Beer, '#f59e0b'], Drinken: [Wine, '#f472b6'],
 }
+// De tegel Drinken toont alle drankjes, in deze groepen.
+const DRINKEN = 'Drinken'
+const DRANK_GROEPEN = ['Bier', 'Wijn', 'Cocktails', 'Sterk en mix', 'Fris en water', 'Koffie en thee', 'Sap en shakes']
 // Foto op de tegel van elke soort: het gerecht dat die keuken het best laat zien.
 const SOORT_FOTO = {
   Italiaans: 'Pizza margherita', Sushi: 'California roll', Grieks: 'Griekse salade', 'Chinees en wok': 'Bami goreng',
@@ -51,7 +54,7 @@ const SOORT_FOTO = {
   'Shoarma en doner': 'Broodje shoarma', 'Steak en grill': 'Ribeye', 'Tapas en delen': "Gamba's in knoflookolie",
   Pokebowl: 'Pokebowl zalm', Snackbar: 'Friet', Lunchroom: 'Clubsandwich', 'Ontbijt en brunch': 'American pancakes', Borrel: 'Bitterballen',
 }
-const tegelFoto = (soort) => (FOTOS[SOORT_FOTO[soort]] ? `${FOTOS[SOORT_FOTO[soort]]}?w=500&h=320&fit=crop&q=70` : null)
+const tegelFoto = (soort) => (soort === DRINKEN && FOTOS.Drinken ? `${FOTOS.Drinken}?w=500&h=320&fit=crop&q=70` : FOTOS[SOORT_FOTO[soort]] ? `${FOTOS[SOORT_FOTO[soort]]}?w=500&h=320&fit=crop&q=70` : null)
 const GANGEN = [['voor', 'Voorgerecht'], ['hoofd', 'Hoofdgerecht'], ['bij', 'Erbij'], ['na', 'Dessert'], ['drank', 'Drinken']]
 // Hoeveel at je ervan? Geen grammen: een deel van het bord.
 const DELEN = [[0.7, 'Klein'], [1, 'Middel'], [1.3, 'Groot'], [1.7, 'Enorm']]
@@ -78,12 +81,12 @@ const gramVan = (r) => {
   return Math.max(25, Math.round(r.kcal / d / 25) * 25)
 }
 
-const vasteLijst = VAST.flatMap(([soort, rijen]) => rijen.map(([gang, naam, portie, kcal, eiwit, koolh, vet, keuze], i) => {
+const vasteLijst = VAST.flatMap(([soort, rijen]) => rijen.map(([gang, naam, portie, kcal, eiwit, koolh, vet, keuze, zoek = '', groep = null, kort = 1], i) => {
   const id = `${soort}|${gang}|${naam}`
   const delen = Array.isArray(OPBOUW[id]) && OPBOUW[id].length ? OPBOUW[id] : null
   // Met een opbouw is de som van de onderdelen het getal: dan klopt de kaart met het detailscherm.
   const t = delen ? somDelen(delen) : { kcal, eiwit, koolh, vet }
-  return { id, soort, gang, naam, portie, kcal: Math.round(t.kcal), eiwit: Math.round(t.eiwit), koolh: Math.round(t.koolh), vet: Math.round(t.vet), keuze, positie: i, delen }
+  return { id, soort, gang, naam, portie, kcal: Math.round(t.kcal), eiwit: Math.round(t.eiwit), koolh: Math.round(t.koolh), vet: Math.round(t.vet), keuze, positie: i, delen, zoek, groep, kort: !!kort }
 }))
 
 export default function UitetenTab({ db, client = null, onLog, isMobile, defaultMealMoment }) {
@@ -110,7 +113,8 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
   const soorten = useMemo(() => {
     const eerst = ['Borrel', 'Steak en grill', 'Shoarma en doner', 'Burger', 'Snackbar']
     const lijst = [...new Set(alle.map(r => r.soort))].filter(s => s !== 'alle')
-    return [...eerst.filter(s => lijst.includes(s)), ...lijst.filter(s => !eerst.includes(s))]
+    // Drinken is een eigen tegel met alle drankjes, direct na de vijf bovenaan.
+    return [...eerst.filter(s => lijst.includes(s)), DRINKEN, ...lijst.filter(s => !eerst.includes(s))]
   }, [alle])
   const opId = useMemo(() => new Map(alle.map(r => [r.id, r])), [alle])
 
@@ -121,7 +125,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     if (!zoekWoorden.length) return []
     const gezien = new Set()
     return alle.filter(r => {
-      const t = plat(`${r.naam} ${r.soort} ${r.portie}`)
+      const t = plat(`${r.naam} ${r.soort} ${r.portie} ${r.zoek || ''} ${r.groep || ''}`)
       if (!zoekWoorden.every(w => t.includes(w))) return false
       const sleutel = `${plat(r.naam)}|${r.kcal}`
       if (gezien.has(sleutel)) return false
@@ -161,7 +165,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     try {
       const deelTekst = (d, k) => (k?.zelf ? ' (aangepast)' : d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
       await onLog({
-        name: soort ? `Uit eten: ${soort}` : 'Uit eten',
+        name: soort === DRINKEN ? 'Drankjes' : soort ? `Uit eten: ${soort}` : 'Uit eten',
         type: 'custom', source: 'uiteten', per100g: false, amount: 1, per_unit: 'portion',
         calories: Math.round(totaal.kcal), protein: Math.round(totaal.eiwit), carbs: Math.round(totaal.koolh), fat: Math.round(totaal.vet),
         meal_type: defaultMealMoment || 'dinner',
@@ -379,9 +383,17 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
 
   // ── Stap 2: wat at je? ──
   const [SoortIcoon, soortKleur] = SOORT_ICOON[soort] || [Utensils, '#fff']
+  const isDrinken = soort === DRINKEN
   const vanSoort = zoekActief
     ? zoekTreffers
-    : alle.filter(r => r.soort === soort || r.soort === 'alle')
+    : isDrinken
+      // Alle drankjes, ook die bij één keuken horen (mango lassi, margarita); elk één keer.
+      ? alle.filter(r => r.gang === 'drank').filter((r, i, l) => l.findIndex(x => x.naam === r.naam) === i)
+      // Bij een etentje alleen de gewone drankjes; de rest staat onder de tegel Drinken.
+      : alle.filter(r => r.soort === soort || (r.soort === 'alle' && (r.gang !== 'drank' || r.kort)))
+  const groepen = isDrinken && !zoekActief
+    ? [...DRANK_GROEPEN, 'Overig'].map(g => [g, g, (r) => (r.groep || 'Overig') === g])
+    : GANGEN.map(([gang, titel]) => [gang, titel, (r) => r.gang === gang])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -447,13 +459,19 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
             <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>Kies voor nu iets wat erop lijkt, of log het via Producten.</div>
           </div>
         )}
-        {GANGEN.map(([gang, titel]) => {
-          const lijst = vanSoort.filter(r => r.gang === gang)
+        {groepen.map(([sleutel, titel, hoort]) => {
+          const lijst = vanSoort.filter(hoort)
           if (!lijst.length) return null
           return (
-            <div key={gang}>
+            <div key={sleutel}>
               <div style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', margin: '1.1rem 0 0.2rem' }}>{titel}</div>
-              {lijst.map(r => kaart(r, gang))}
+              {lijst.map(r => kaart(r, r.gang))}
+              {/* Bij een etentje staan alleen de gewone drankjes; de volledige kaart zit achter deze knop. */}
+              {sleutel === 'drank' && !isDrinken && !zoekActief && (
+                <button onClick={() => setSoort(DRINKEN)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.35rem 0', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                  <Wine size={16} strokeWidth={2.6} color="#f472b6" /> Alle drankjes
+                </button>
+              )}
             </div>
           )
         })}

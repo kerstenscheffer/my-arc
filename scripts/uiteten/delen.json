@@ -7165,10 +7165,10 @@
   {
    "n": "Bier",
    "g": 250,
-   "k": 44,
+   "k": 44.0,
    "e": 0.4,
    "kh": 3.2,
-   "v": 0,
+   "v": 0.0,
    "st": [
     "glas",
     250
@@ -7178,12 +7178,12 @@
  ],
  "alle|drank|Bier groot": [
   {
-   "n": "Bier (groot)",
+   "n": "Bier groot",
    "g": 500,
-   "k": 43,
+   "k": 43.0,
    "e": 0.4,
    "kh": 3.2,
-   "v": 0,
+   "v": 0.0,
    "st": [
     "glas",
     500
@@ -7195,10 +7195,10 @@
   {
    "n": "Speciaalbier",
    "g": 330,
-   "k": 64,
-   "e": 0.6,
-   "kh": 4.8,
-   "v": 0,
+   "k": 63.6,
+   "e": 0.61,
+   "kh": 4.85,
+   "v": 0.0,
    "st": [
     "glas",
     330
@@ -7210,24 +7210,24 @@
   {
    "n": "Alcoholvrij bier",
    "g": 300,
-   "k": 23,
-   "e": 0.3,
-   "kh": 5,
-   "v": 0,
+   "k": 23.3,
+   "e": 0.33,
+   "kh": 5.0,
+   "v": 0.0,
    "st": [
-    "flesje",
+    "glas",
     300
    ]
   }
  ],
  "alle|drank|Wijn rood of wit": [
   {
-   "n": "Wijn",
+   "n": "Wijn rood of wit",
    "g": 150,
-   "k": 83,
-   "e": 0.1,
-   "kh": 2,
-   "v": 0,
+   "k": 83.3,
+   "e": 0.0,
+   "kh": 2.0,
+   "v": 0.0,
    "st": [
     "glas",
     150
@@ -7239,10 +7239,10 @@
   {
    "n": "Prosecco of cava",
    "g": 120,
-   "k": 75,
-   "e": 0.1,
-   "kh": 1.5,
-   "v": 0,
+   "k": 75.0,
+   "e": 0.0,
+   "kh": 1.67,
+   "v": 0.0,
    "st": [
     "glas",
     120
@@ -7345,12 +7345,12 @@
  ],
  "alle|drank|Whisky, rum of wodka puur": [
   {
-   "n": "Sterke drank (whisky, rum of wodka)",
+   "n": "Whisky, rum of wodka puur",
    "g": 40,
-   "k": 235,
-   "e": 0,
-   "kh": 0,
-   "v": 0,
+   "k": 237.5,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
    "st": [
     "glas",
     40
@@ -7362,10 +7362,10 @@
   {
    "n": "Frisdrank",
    "g": 250,
-   "k": 42,
-   "e": 0,
-   "kh": 10.5,
-   "v": 0,
+   "k": 42.0,
+   "e": 0.0,
+   "kh": 10.4,
+   "v": 0.0,
    "st": [
     "glas",
     250
@@ -7376,10 +7376,10 @@
   {
    "n": "Frisdrank zero of light",
    "g": 250,
-   "k": 1,
-   "e": 0,
-   "kh": 0,
-   "v": 0,
+   "k": 0.8,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
    "st": [
     "glas",
     250
@@ -7390,10 +7390,10 @@
   {
    "n": "Water of spa rood",
    "g": 250,
-   "k": 0,
-   "e": 0,
-   "kh": 0,
-   "v": 0,
+   "k": 0.0,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
    "st": [
     "glas",
     250
@@ -7448,12 +7448,12 @@
   {
    "n": "Koffie of thee zwart",
    "g": 150,
-   "k": 1,
-   "e": 0.1,
-   "kh": 0.2,
-   "v": 0,
+   "k": 1.3,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
    "st": [
-    "kop",
+    "glas",
     150
    ]
   }
@@ -7612,85 +7612,85 @@
   {
    "n": "Weizen of witbier",
    "g": 300,
-   "k": 45,
+   "k": 45.0,
    "e": 0.5,
-   "kh": 3.7,
-   "v": 0,
-   "alcohol": true,
+   "kh": 3.67,
+   "v": 0.0,
    "st": [
     "glas",
     300
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Weizen of witbier groot": [
   {
-   "n": "Weizen of witbier",
+   "n": "Weizen of witbier groot",
    "g": 500,
-   "k": 45,
+   "k": 45.0,
    "e": 0.5,
-   "kh": 3.7,
-   "v": 0,
-   "alcohol": true,
+   "kh": 3.6,
+   "v": 0.0,
    "st": [
     "glas",
     500
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|IPA of blond bier": [
   {
    "n": "IPA of blond bier",
    "g": 330,
-   "k": 56,
-   "e": 0.6,
-   "kh": 4.2,
-   "v": 0,
-   "alcohol": true,
+   "k": 56.1,
+   "e": 0.61,
+   "kh": 4.24,
+   "v": 0.0,
    "st": [
     "glas",
     330
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Tripel of dubbel": [
   {
    "n": "Tripel of dubbel",
    "g": 330,
-   "k": 76,
-   "e": 0.6,
-   "kh": 4.8,
-   "v": 0,
-   "alcohol": true,
+   "k": 75.8,
+   "e": 0.61,
+   "kh": 4.85,
+   "v": 0.0,
    "st": [
     "glas",
     330
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Radler": [
   {
    "n": "Radler",
    "g": 300,
-   "k": 40,
-   "e": 0.2,
-   "kh": 7,
-   "v": 0,
-   "alcohol": true,
+   "k": 40.0,
+   "e": 0.17,
+   "kh": 7.0,
+   "v": 0.0,
    "st": [
     "glas",
     300
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Radler 0.0": [
   {
    "n": "Radler 0.0",
    "g": 300,
-   "k": 23,
-   "e": 0.2,
-   "kh": 5.4,
-   "v": 0,
+   "k": 23.3,
+   "e": 0.17,
+   "kh": 5.33,
+   "v": 0.0,
    "st": [
     "glas",
     300
@@ -7701,60 +7701,60 @@
   {
    "n": "Rosé",
    "g": 150,
-   "k": 80,
-   "e": 0,
-   "kh": 2.7,
-   "v": 0,
-   "alcohol": true,
+   "k": 80.0,
+   "e": 0.0,
+   "kh": 2.67,
+   "v": 0.0,
    "st": [
     "glas",
     150
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Zoete witte wijn": [
   {
    "n": "Zoete witte wijn",
    "g": 150,
-   "k": 100,
-   "e": 0,
-   "kh": 8,
-   "v": 0,
-   "alcohol": true,
+   "k": 100.0,
+   "e": 0.0,
+   "kh": 8.0,
+   "v": 0.0,
    "st": [
     "glas",
     150
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Fles wijn gedeeld, jouw helft": [
   {
-   "n": "Wijn",
+   "n": "Fles wijn gedeeld, jouw helft",
    "g": 375,
-   "k": 83,
-   "e": 0,
-   "kh": 2.1,
-   "v": 0,
-   "alcohol": true,
+   "k": 82.7,
+   "e": 0.0,
+   "kh": 2.13,
+   "v": 0.0,
    "st": [
     "glas",
-    150
-   ]
+    375
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Cider": [
   {
    "n": "Cider",
    "g": 330,
-   "k": 50,
-   "e": 0,
-   "kh": 6,
-   "v": 0,
-   "alcohol": true,
+   "k": 50.0,
+   "e": 0.0,
+   "kh": 6.06,
+   "v": 0.0,
    "st": [
     "glas",
     330
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Aperol spritz": [
@@ -7823,32 +7823,32 @@
  ],
  "alle|drank|Shotje (sterke drank)": [
   {
-   "n": "Sterke drank",
+   "n": "Shotje (sterke drank)",
    "g": 30,
-   "k": 231,
-   "e": 0,
-   "kh": 1,
-   "v": 0,
-   "alcohol": true,
+   "k": 233.3,
+   "e": 0.0,
+   "kh": 3.33,
+   "v": 0.0,
    "st": [
-    "shot",
+    "glas",
     30
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Likeur (Licor 43, Baileys)": [
   {
-   "n": "Likeur",
+   "n": "Likeur (Licor 43, Baileys)",
    "g": 40,
-   "k": 325,
-   "e": 1,
-   "kh": 30,
-   "v": 7,
-   "alcohol": true,
+   "k": 325.0,
+   "e": 1.25,
+   "kh": 30.0,
+   "v": 7.5,
    "st": [
     "glas",
     40
-   ]
+   ],
+   "alcohol": true
   }
  ],
  "alle|drank|Rum of wodka cola": [
@@ -7891,12 +7891,12 @@
  ],
  "alle|drank|IJsthee of appelsap": [
   {
-   "n": "IJsthee",
+   "n": "IJsthee of appelsap",
    "g": 250,
-   "k": 40,
-   "e": 0,
+   "k": 40.0,
+   "e": 0.0,
    "kh": 9.6,
-   "v": 0,
+   "v": 0.0,
    "st": [
     "glas",
     250
@@ -7905,14 +7905,14 @@
  ],
  "alle|drank|Tonic of bitter lemon": [
   {
-   "n": "Tonic",
+   "n": "Tonic of bitter lemon",
    "g": 200,
-   "k": 37,
-   "e": 0,
-   "kh": 9,
-   "v": 0,
+   "k": 37.5,
+   "e": 0.0,
+   "kh": 9.0,
+   "v": 0.0,
    "st": [
-    "flesje",
+    "glas",
     200
    ]
   }
@@ -7951,6 +7951,570 @@
    "e": 0.3,
    "kh": 82,
    "v": 0
+  }
+ ],
+ "alle|drank|Bier flesje": [
+  {
+   "n": "Bier flesje",
+   "g": 300,
+   "k": 43.3,
+   "e": 0.33,
+   "kh": 3.33,
+   "v": 0.0,
+   "st": [
+    "glas",
+    300
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Corona of Desperados": [
+  {
+   "n": "Corona of Desperados",
+   "g": 330,
+   "k": 45.5,
+   "e": 0.3,
+   "kh": 3.64,
+   "v": 0.0,
+   "st": [
+    "glas",
+    330
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Port of sherry": [
+  {
+   "n": "Port of sherry",
+   "g": 60,
+   "k": 158.3,
+   "e": 0.0,
+   "kh": 11.67,
+   "v": 0.0,
+   "st": [
+    "glas",
+    60
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Glühwein": [
+  {
+   "n": "Glühwein",
+   "g": 200,
+   "k": 95.0,
+   "e": 0.0,
+   "kh": 11.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Sangria": [
+  {
+   "n": "Sangria",
+   "g": 200,
+   "k": 80.0,
+   "e": 0.0,
+   "kh": 8.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Mojito": [
+  {
+   "n": "Mojito",
+   "g": 250,
+   "k": 80.0,
+   "e": 0.0,
+   "kh": 8.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Pornstar martini": [
+  {
+   "n": "Pornstar martini",
+   "g": 150,
+   "k": 153.3,
+   "e": 0.0,
+   "kh": 14.67,
+   "v": 0.0,
+   "st": [
+    "glas",
+    150
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Moscow mule": [
+  {
+   "n": "Moscow mule",
+   "g": 250,
+   "k": 76.0,
+   "e": 0.0,
+   "kh": 7.2,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Piña colada": [
+  {
+   "n": "Piña colada",
+   "g": 250,
+   "k": 128.0,
+   "e": 0.4,
+   "kh": 13.6,
+   "v": 3.6,
+   "st": [
+    "glas",
+    250
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Cosmopolitan": [
+  {
+   "n": "Cosmopolitan",
+   "g": 120,
+   "k": 158.3,
+   "e": 0.0,
+   "kh": 10.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    120
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Long Island iced tea": [
+  {
+   "n": "Long Island iced tea",
+   "g": 300,
+   "k": 96.7,
+   "e": 0.0,
+   "kh": 7.33,
+   "v": 0.0,
+   "st": [
+    "glas",
+    300
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Negroni": [
+  {
+   "n": "Negroni",
+   "g": 90,
+   "k": 222.2,
+   "e": 0.0,
+   "kh": 13.33,
+   "v": 0.0,
+   "st": [
+    "glas",
+    90
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Whiskey sour": [
+  {
+   "n": "Whiskey sour",
+   "g": 120,
+   "k": 158.3,
+   "e": 0.0,
+   "kh": 11.67,
+   "v": 0.0,
+   "st": [
+    "glas",
+    120
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Hugo": [
+  {
+   "n": "Hugo",
+   "g": 200,
+   "k": 85.0,
+   "e": 0.0,
+   "kh": 8.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Mocktail of virgin mojito": [
+  {
+   "n": "Mocktail of virgin mojito",
+   "g": 250,
+   "k": 44.0,
+   "e": 0.0,
+   "kh": 10.8,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Jägermeister of likeurshot": [
+  {
+   "n": "Jägermeister of likeurshot",
+   "g": 30,
+   "k": 250.0,
+   "e": 0.0,
+   "kh": 13.33,
+   "v": 0.0,
+   "st": [
+    "glas",
+    30
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Jenever of vieux": [
+  {
+   "n": "Jenever of vieux",
+   "g": 35,
+   "k": 214.3,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    35
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Wodka met energydrink": [
+  {
+   "n": "Wodka met energydrink",
+   "g": 290,
+   "k": 65.5,
+   "e": 0.0,
+   "kh": 7.59,
+   "v": 0.0,
+   "st": [
+    "glas",
+    290
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Irish coffee": [
+  {
+   "n": "Irish coffee",
+   "g": 200,
+   "k": 105.0,
+   "e": 0.5,
+   "kh": 6.0,
+   "v": 5.0,
+   "st": [
+    "glas",
+    200
+   ],
+   "alcohol": true
+  }
+ ],
+ "alle|drank|Ginger beer of ginger ale": [
+  {
+   "n": "Ginger beer of ginger ale",
+   "g": 200,
+   "k": 40.0,
+   "e": 0.0,
+   "kh": 10.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ]
+  }
+ ],
+ "alle|drank|Energydrink": [
+  {
+   "n": "Energydrink",
+   "g": 250,
+   "k": 46.0,
+   "e": 0.0,
+   "kh": 11.2,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Energydrink zero": [
+  {
+   "n": "Energydrink zero",
+   "g": 250,
+   "k": 2.0,
+   "e": 0.0,
+   "kh": 0.0,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Sportdrank": [
+  {
+   "n": "Sportdrank",
+   "g": 330,
+   "k": 25.8,
+   "e": 0.0,
+   "kh": 6.36,
+   "v": 0.0,
+   "st": [
+    "glas",
+    330
+   ]
+  }
+ ],
+ "alle|drank|Chocomel": [
+  {
+   "n": "Chocomel",
+   "g": 250,
+   "k": 84.0,
+   "e": 3.2,
+   "kh": 12.0,
+   "v": 2.6,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Fristi": [
+  {
+   "n": "Fristi",
+   "g": 250,
+   "k": 60.0,
+   "e": 2.8,
+   "kh": 10.4,
+   "v": 0.6,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Cappuccino met havermelk": [
+  {
+   "n": "Cappuccino met havermelk",
+   "g": 180,
+   "k": 50.0,
+   "e": 1.11,
+   "kh": 6.67,
+   "v": 2.22,
+   "st": [
+    "glas",
+    180
+   ]
+  }
+ ],
+ "alle|drank|Flat white": [
+  {
+   "n": "Flat white",
+   "g": 180,
+   "k": 61.1,
+   "e": 3.33,
+   "kh": 5.0,
+   "v": 3.33,
+   "st": [
+    "glas",
+    180
+   ]
+  }
+ ],
+ "alle|drank|IJskoffie of iced latte": [
+  {
+   "n": "IJskoffie of iced latte",
+   "g": 300,
+   "k": 50.0,
+   "e": 2.0,
+   "kh": 6.0,
+   "v": 2.0,
+   "st": [
+    "glas",
+    300
+   ]
+  }
+ ],
+ "alle|drank|Frappuccino of ijskoffie met slagroom": [
+  {
+   "n": "Frappuccino of ijskoffie met slagroom",
+   "g": 400,
+   "k": 87.5,
+   "e": 1.25,
+   "kh": 12.5,
+   "v": 3.5,
+   "st": [
+    "glas",
+    400
+   ]
+  }
+ ],
+ "alle|drank|Chai latte": [
+  {
+   "n": "Chai latte",
+   "g": 300,
+   "k": 63.3,
+   "e": 2.0,
+   "kh": 10.0,
+   "v": 1.67,
+   "st": [
+    "glas",
+    300
+   ]
+  }
+ ],
+ "alle|drank|Warme chocolademelk": [
+  {
+   "n": "Warme chocolademelk",
+   "g": 250,
+   "k": 76.0,
+   "e": 3.2,
+   "kh": 11.2,
+   "v": 2.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Thee met suiker": [
+  {
+   "n": "Thee met suiker",
+   "g": 200,
+   "k": 10.0,
+   "e": 0.0,
+   "kh": 2.5,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ]
+  }
+ ],
+ "alle|drank|Verse jus d'orange": [
+  {
+   "n": "Verse jus d'orange",
+   "g": 250,
+   "k": 44.0,
+   "e": 0.8,
+   "kh": 9.6,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Appelsap of ander vruchtensap": [
+  {
+   "n": "Appelsap of ander vruchtensap",
+   "g": 250,
+   "k": 46.0,
+   "e": 0.0,
+   "kh": 11.2,
+   "v": 0.0,
+   "st": [
+    "glas",
+    250
+   ]
+  }
+ ],
+ "alle|drank|Tomatensap": [
+  {
+   "n": "Tomatensap",
+   "g": 200,
+   "k": 17.5,
+   "e": 0.75,
+   "kh": 3.5,
+   "v": 0.0,
+   "st": [
+    "glas",
+    200
+   ]
+  }
+ ],
+ "alle|drank|Smoothie": [
+  {
+   "n": "Smoothie",
+   "g": 300,
+   "k": 73.3,
+   "e": 1.33,
+   "kh": 15.33,
+   "v": 0.67,
+   "st": [
+    "glas",
+    300
+   ]
+  }
+ ],
+ "alle|drank|Milkshake": [
+  {
+   "n": "Milkshake",
+   "g": 375,
+   "k": 128.0,
+   "e": 2.93,
+   "kh": 19.2,
+   "v": 4.27,
+   "st": [
+    "glas",
+    375
+   ]
+  }
+ ],
+ "alle|drank|Proteïneshake met water": [
+  {
+   "n": "Proteïneshake met water",
+   "g": 330,
+   "k": 36.4,
+   "e": 7.27,
+   "kh": 0.91,
+   "v": 0.45,
+   "st": [
+    "glas",
+    330
+   ]
+  }
+ ],
+ "alle|drank|Kokoswater": [
+  {
+   "n": "Kokoswater",
+   "g": 330,
+   "k": 19.7,
+   "e": 0.0,
+   "kh": 4.55,
+   "v": 0.0,
+   "st": [
+    "glas",
+    330
+   ]
   }
  ]
 }
