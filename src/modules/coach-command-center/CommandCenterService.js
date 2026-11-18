@@ -112,9 +112,9 @@ export default class CommandCenterService {
         else if (daysSinceWeighin <= 3) weightStatus = 'recent'
         else if (daysSinceWeighin <= 7) weightStatus = 'warning'
         else weightStatus = 'overdue'
-        const today = new Date()
-        const todayStr = today.toISOString().split('T')[0]
-        const fridayMissing = today.getDay() === 5 && !logs.some(l => l.date === todayStr)
+        // Geen vaste weeg-vrijdag meer (18 nov 2026): dit signaal staat uit. De
+        // naam blijft, zodat de schermen die hem lezen niets hoeven te weten.
+        const fridayMissing = false
         return {
           ...client,
           // Was begrensd op 56 entries — te weinig voor volledige

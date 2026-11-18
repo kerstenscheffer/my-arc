@@ -61,6 +61,7 @@ const AppVersiesPaneel = lazy(() => import('../modules/app-update/AppVersiesPane
 const NotificationHub = lazy(() => import('../modules/notifications/NotificationHub'))
 const TemplateManager = lazy(() => import('../modules/meal-templates/TemplateManager'))
 const IngredientPhotoManager = lazy(() => import('../modules/ingredient-photos/IngredientPhotoManager'))
+const ProductFotoKeuring = lazy(() => import('../modules/ingredient-photos/ProductFotoKeuring'))
 const MealGuideManager = lazy(() => import('../modules/meal-plan/MealGuideManager'))
 const SalesSection = lazy(() => import('../modules/sales/SalesSection'))
 const SupplementsTab = lazy(() => import('../modules/supplements/SupplementsTab'))
@@ -138,7 +139,9 @@ const MORE_CATEGORIES = [
       { id: 'client-agenda', label: 'Agenda', icon: Calendar },
       { id: 'ai-meals', label: 'Meal Builder', icon: Utensils },
       { id: 'workout-builder', label: 'Workout Builder', icon: Dumbbell },
-      { id: 'coachvids', label: "Video's", icon: Video }
+      { id: 'coachvids', label: "Video's", icon: Video },
+      // Productfoto's die klanten na het scannen maakten keuren (18 nov 2026)
+      { id: 'productfotos', label: "Productfoto's", icon: ImageIcon }
     ]
   },
   {
@@ -155,7 +158,7 @@ const MORE_CATEGORIES = [
 // Meekijken staat als oogje naast de titel Coaching. Een tab die hier niet
 // genoemd is, valt vanzelf onderaan Coaching, zodat er nooit een verdwijnt.
 const MEER_BUSINESS = ['output', 'productivity', 'notifications-hub', 'app-versies']
-const MEER_COACHING = ['client-agenda', 'ai-meals', 'workout-builder', 'coachvids', 'week-review', 'checkins', 'challenge-hub', 'results']
+const MEER_COACHING = ['client-agenda', 'ai-meals', 'workout-builder', 'coachvids', 'productfotos', 'week-review', 'checkins', 'challenge-hub', 'results']
 const MEER_OOGJE = 'client-view'
 
 // De zwevende navbalk staat fixed op bottom:14 en is ~50px hoog.
@@ -683,6 +686,8 @@ export default function CoachHub() {
         return <TemplateManager db={db} isMobile={isMobile} />
       case 'ingredient-photos':
         return <IngredientPhotoManager db={db} isMobile={isMobile} />
+      case 'productfotos':
+        return <ProductFotoKeuring db={db} isMobile={isMobile} />
       case 'meal-guide':
         return <MealGuideManager db={db} isMobile={isMobile} />
       case 'supplements':

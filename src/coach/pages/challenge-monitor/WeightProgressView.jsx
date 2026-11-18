@@ -69,7 +69,10 @@ export default function WeightProgressView({ client, db, challengeData }) {
       const byWeek = {}
       weights.forEach(entry => {
         const entryDate = new Date(entry.date)
-        const daysSinceStart = Math.floor((entryDate - startDate) / (1000 * 60 * 60 * 24))
+        // Gewone weken (maandag t/m zondag): tellen vanaf de maandag van de startweek.
+        const startMaandag = new Date(startDate); startMaandag.setHours(0, 0, 0, 0)
+        startMaandag.setDate(startMaandag.getDate() - ((startMaandag.getDay() + 6) % 7))
+        const daysSinceStart = Math.floor((entryDate - startMaandag) / (1000 * 60 * 60 * 24))
         const weekNum = Math.min(challengeData.totalWeeks || 8, Math.max(1, Math.floor(daysSinceStart / 7) + 1))
         
         if (!byWeek[weekNum]) {

@@ -6,6 +6,8 @@
 // categorie voor wat lokaal (nog) niet bestaat. Bewust GEEN random/keyword-
 // image-service (gaf irrelevante foto's).
 
+import { eigenProductFoto } from '../ingredient-photos/productFotoInzenden'
+
 // ── Lokale foto's (/public/food) — NL-keyword(s) -> bestandsnaam.
 // Volgorde = prioriteit: specifiek boven generiek (bv. "zoete aardappel" vóór
 // "aardappel", "magere kwark" matcht op "kwark").
@@ -317,6 +319,12 @@ const onbetrouwbaar = (item) => {
 
 export function resolveFoodImage(item, { size = 200 } = {}) {
   const naam = item?.name || item?.title || item?.product_name || item?.meal_name
+  // Zelf gefotografeerd (nog niet gekeurd door de coach): die ziet de klant
+  // meteen, zolang het product geen echte foto heeft (productFotoInzenden.js).
+  if (!item?.image_url || item?.image_source === 'merk_voorbeeld') {
+    const eigen = eigenProductFoto(item)
+    if (eigen) return eigen
+  }
   const oordeel = onbetrouwbaar(item)
   if (!oordeel) return item.image_url
   if (oordeel === 'zwak') return matchFoodImage(naam, size) || item.image_url

@@ -78,7 +78,7 @@ function Balk({ label, waarde, doel, eenheid = '', kleur = '#fff', onKlik = null
 // `naamVoorSessie(w)` = naam van de training; `sessieTelling(w)` =
 // { sets, oefeningen, notities, wissels }; `tijdVan(w)` = 'uu:mm' of null;
 // `toonSessie(w)` geeft de oefeningkaarten van die sessie terug.
-export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [], naamVoorSessie, sessieTelling, toonSessie, tijdVan, voeding = null, acties = null }) {
+export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [], naamVoorSessie, sessieTelling, toonSessie, tijdVan, voeding = null, acties = null, aanwijzing = null }) {
   const clientId = client?.id
   const vandaagSleutel = sleutel(new Date())
   const [gekozen, setGekozen] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })
@@ -826,6 +826,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
             {dag.toekomst ? 'Nog niet geweest' : dag.gepland.length || dag.cardioPlan.length ? (dag.k === vandaagSleutel ? 'Nog niets gedaan' : 'Niet gedaan') : 'Rustdag'}
           </span>
         )}
+        {/* Bv. "Concept klaar" na de intake (ConceptHint). */}
+        {aanwijzing}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexShrink: 0 }}>
           {stats.map(x => (
             <button key={x.id} onClick={() => setStatInfo(v => (v === x.id ? null : x.id))} title={x.uitleg}

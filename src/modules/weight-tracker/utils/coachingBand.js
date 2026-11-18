@@ -241,8 +241,27 @@ export function bepaalStart(client, reeks) {
 }
 
 // Hele weken sinds de start — alleen om een oordeel een weeknummer te geven.
+// De maandag van de week waarin deze datum valt (zondag hoort bij de week ervoor).
+const maandagVanIso = (datum) => {
+  const d = new Date(`${String(datum).slice(0, 10)}T12:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// Weeknummer binnen het traject, in GEWONE weken (maandag t/m zondag): week 0
+// is de week waarin de start valt. Was: blokken van zeven dagen vanaf de
+// startdag, waardoor "week 3" bij een start op donderdag van donderdag t/m
+// woensdag liep en niet gelijk liep met de weektegels (18 nov 2026).
 export const weekVan = (datum, startDatum) =>
-  Math.max(0, Math.floor((new Date(`${String(datum).slice(0, 10)}T00:00:00`) - new Date(`${String(startDatum).slice(0, 10)}T00:00:00`)) / (7 * dagInMs)))
+  Math.max(0, Math.round((maandagVanIso(datum) - maandagVanIso(startDatum)) / (7 * dagInMs)))
+
+// De dagen van trajectweek n: { van: maandag, tot: zondag } als Date.
+export function weekBereikVan(n, startDatum) {
+  const van = maandagVanIso(startDatum)
+  van.setDate(van.getDate() + n * 7)
+  const tot = new Date(van); tot.setDate(tot.getDate() + 6)
+  return { van, tot }
+}
 
 // Waar de band op dít moment loopt, in weken met cijfers achter de komma.
 //

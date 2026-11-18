@@ -73,7 +73,6 @@ export default function ProgressMain({ db, client }) {
   const entryVoorDatum = weegDatum === vandaagLokaal
     ? todayEntry
     : (weightHistory.find(r => String(r.date).slice(0, 10) === weegDatum) || null)
-  const isWeegVrijdag = new Date(`${weegDatum}T12:00:00`).getDay() === 5
 
   // Andere dag gekozen: de slider springt naar de weging van die dag, of
   // anders naar de laatste weging daarvóór, zodat je niet vanaf 70 hoeft te vegen.
@@ -310,7 +309,7 @@ export default function ProgressMain({ db, client }) {
           key={weegDatum}
           weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
           saving={saving} todayEntry={entryVoorDatum} progressPercent={progressPercent}
-          isFriday={isWeegVrijdag} isMobile={isMobile}
+          isFriday={false} isMobile={isMobile}
           extraKnop={(
             // Zelfde vorm als het vaste 'Sinds'-blok naast de tempo-strook:
             // eigen vlak met een lijn links, witte titel.
@@ -336,19 +335,8 @@ export default function ProgressMain({ db, client }) {
       )}
 
       {/* ═══ ZONE 1: FRIDAY ALERT ═══ */}
-      {!photosOpen && isFriday && !todayEntry && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.625rem',
-          padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
-          background: 'rgba(139, 92, 246, 0.06)',
-          borderBottom: '1px solid rgba(139, 92, 246, 0.1)'
-        }}>
-          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 2s infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '700', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Vrijdag weegmoment vereist
-          </span>
-        </div>
-      )}
+      {/* De balk 'Vrijdag weegmoment vereist' is weg (18 nov 2026): de week sluit
+          op zondag, er is geen vaste weeg-vrijdag meer. */}
 
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}

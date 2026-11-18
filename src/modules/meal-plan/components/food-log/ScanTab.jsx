@@ -1,7 +1,8 @@
 // src/modules/meal-plan/components/food-log/ScanTab.jsx
 // 🎯 v4.0 - Back button, clean manual entry, name correction
 import React, { useState } from 'react'
-import { Scan, Keyboard, AlertCircle, Check, X, ArrowLeft } from 'lucide-react'
+import { Scan, Keyboard, AlertCircle, Check, X, ArrowLeft, Camera } from 'lucide-react'
+import { heeftEchteFoto, magFotoVragen, markeerGevraagd, stuurProductFotoIn } from '../../../ingredient-photos/productFotoInzenden'
 
 // Gewicht van één stuk of portie uit de etiketdata, zelfde regel als de
 // database (stuk_gewicht/stuk_eenheid): "1 portion (57 g)" -> 57, "4 x 70 g" -> 70.
@@ -35,6 +36,20 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
   const [manualProduct, setManualProduct] = useState({ name: '', brand: '', calories: '', protein: '', carbs: '', fat: '' })
   // True when OFF found the product but had no nutritional values (different message than "not found")
   const [offProductFoundNoMacros, setOffProductFoundNoMacros] = useState(false)
+  // Product gevonden maar zonder echte foto: eerst één vraag of de klant de
+  // voorkant wil fotograferen (18 nov 2026). { item, ingredientId, barcode }
+  const [fotoVraag, setFotoVraag] = useState(null)
+  const [fotoBezig, setFotoBezig] = useState(false)
+
+  // Door naar loggen, of eerst de fotovraag als het product geen echte foto
+  // heeft. Eén keer per product per maand; Overslaan gaat altijd door.
+  const kies = (item, rij, ingredientId) => {
+    if (ingredientId && !heeftEchteFoto(rij) && magFotoVragen(ingredientId)) {
+      setFotoVraag({ item, ingredientId, barcode: item.barcode || null })
+      return
+    }
+    onSelect(item)
+  }
 
   const isNameSuspicious = (name) => {
     if (!name || name.length < 3) return true
@@ -73,7 +88,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           setLookupLoading(false)
           return
         }
-        onSelect({
+        kies({
           id: existing.id, name: existing.name, brand: existing.brand || null,
           calories: existing.calories_per_100g || 0, protein: existing.protein_per_100g || 0,
           carbs: existing.carbs_per_100g || 0, fat: existing.fat_per_100g || 0,
@@ -82,7 +97,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           defaultPortion: existing.default_portion_gram || 100, image_url: existing.image_url,
           barcode, ...portieVan(existing),
           type: 'ingredient', source: 'barcode', per100g: true
-        })
+        }, existing, existing.id)
         return
       }
 
@@ -204,8 +219,9 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
   }
 
   const saveAndSelect = async (product, barcode) => {
+    let nieuwId = null
     try {
-      await db.supabase.from('ai_ingredients').insert({
+      const { data: nieuw } = await db.supabase.from('ai_ingredients').insert({
         name: product.name, name_en: product.name_en || product.name, category: 'other',
         calories_per_100g: product.calories_per_100g || 0, protein_per_100g: product.protein_per_100g || 0,
         carbs_per_100g: product.carbs_per_100g || 0, fat_per_100g: product.fat_per_100g || 0,
@@ -215,11 +231,12 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         barcode: barcode || product.barcode, image_url: product.image_url,
         default_portion_gram: 100, min_portion_gram: 10, max_portion_gram: 500,
         unit_type: 'gram', scalable: true, source: 'openfoodfacts', log_count: 0
-      }).select().maybeSingle()
+      }).select('id').maybeSingle()
+      nieuwId = nieuw?.id || null
     } catch (saveErr) {
       console.warn('Could not save to DB:', saveErr)
     }
-    onSelect({
+    kies({
       id: product._existingId || barcode, name: product.name, brand: product.brands,
       calories: product.calories_per_100g || 0, protein: product.protein_per_100g || 0,
       carbs: product.carbs_per_100g || 0, fat: product.fat_per_100g || 0,
@@ -227,7 +244,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
       // Gescand, ook als het product al in de database stond: de coach wil
       // zien dat de klant de scanner gebruikte (logBron.js).
       type: 'product', source: 'barcode', per100g: true
-    })
+    }, product, product._existingId || nieuwId)
   }
 
   const handleConfirmName = async () => {
@@ -235,7 +252,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
     setLookupLoading(true)
     const corrected = { ...pendingProduct, name: editedName.trim() }
     if (corrected._isExisting && corrected._existingId) {
-      try { await db.supabase.from('ai_ingredients').update({ name: editedName.trim() }).eq('id', corrected._existingId) } catch {}
+      try { await db.supabase.from('ai_ingredients').update({ name: editedName.trim() }).eq('id', corrected._existingId) } catch { /* naam niet bijgewerkt: loggen gaat door */ }
       onSelect({
         id: corrected._existingId, name: editedName.trim(), brand: corrected.brand || null,
         calories: corrected.calories_per_100g || 0, protein: corrected.protein_per_100g || 0,
@@ -276,6 +293,56 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
     } finally {
       setLookupLoading(false)
     }
+  }
+
+  // ── FOTO VAN DE VOORKANT? ──
+  if (fotoVraag) {
+    const { item, ingredientId, barcode } = fotoVraag
+    const door = (url) => { setFotoVraag(null); setFotoBezig(false); onSelect(url ? { ...item, image_url: url } : item) }
+    const overslaan = () => { markeerGevraagd(ingredientId); door(null) }
+    const gekozen = async (e) => {
+      const bestand = e.target.files?.[0]
+      e.target.value = ''
+      if (!bestand) return
+      setFotoBezig(true)
+      markeerGevraagd(ingredientId)
+      try {
+        door(await stuurProductFotoIn(db.supabase, { ingredientId, barcode, bestand }))
+      } catch (err) {
+        console.warn('Productfoto insturen mislukt:', err)
+        door(null) // loggen gaat altijd door
+      }
+    }
+    return (
+      <div style={{ padding: isMobile ? '1.5rem 1rem' : '2rem 1.5rem' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+          Gevonden
+        </div>
+        <div style={{ fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem', lineHeight: 1.25 }}>
+          {item.name}
+        </div>
+        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+          Dit product heeft nog geen foto. Maak een foto van de voorkant, dan zie je straks het echte product.
+        </div>
+        <label style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          width: '100%', minHeight: 52, borderRadius: 12, background: '#fff', color: '#0a0a0a',
+          fontSize: '0.95rem', fontWeight: 900, cursor: fotoBezig ? 'default' : 'pointer',
+          opacity: fotoBezig ? 0.6 : 1, marginBottom: '0.625rem', touchAction: 'manipulation',
+        }}>
+          <Camera size={18} strokeWidth={2.6} />
+          {fotoBezig ? 'Foto opslaan…' : 'Foto van de voorkant'}
+          <input type="file" accept="image/*" capture="environment" onChange={gekozen} disabled={fotoBezig} style={{ display: 'none' }} />
+        </label>
+        <button onClick={overslaan} disabled={fotoBezig} style={{
+          width: '100%', minHeight: 48, borderRadius: 12, background: 'transparent',
+          border: '1.5px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.85)',
+          fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation',
+        }}>
+          Overslaan
+        </button>
+      </div>
+    )
   }
 
   // ── PRODUCT NOT FOUND — MANUAL ENTRY ──

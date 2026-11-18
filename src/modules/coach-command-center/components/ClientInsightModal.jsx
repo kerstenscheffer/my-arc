@@ -9,6 +9,7 @@ import MealsColumn from './insight/MealsColumn'
 import ClientDataColumn from './insight/ClientDataColumn'
 import CheckinsColumn from './insight/CheckinsColumn'
 import DoelVenster from './insight/DoelVenster'
+import ConceptenWachten from './insight/ConceptenWachten'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
@@ -550,6 +551,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </>
           )}
 
+
+          {/* Concepten uit de intake die nog nagekeken moeten worden (18 nov 2026). */}
+          <ConceptenWachten client={effectiveClient} db={db} isMobile={isMobile}
+            onNavigatePlan={onNavigatePlan} onNavigateWorkout={onNavigateWorkout} onClose={onClose} />
 
           {/* ═══ DESKTOP CONTENT — gekozen secties naast elkaar, gecentreerd ═══ */}
           {/* De rail van 78px langs de rand is weg; die keuzes staan nu als

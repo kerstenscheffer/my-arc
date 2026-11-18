@@ -12,6 +12,7 @@ import TrainingWeekInzicht from './TrainingWeekInzicht'
 import { leesFeedbackVanDag, GEVOEL, spierWoord } from '../../../workout/bouwfase/bouwfaseData'
 import { rirLabel, POMP, WERKDRUK, spierpijnVan } from '../../../workout/bouwfase/rir'
 import { spierVan } from '../../../manual-workout-builder/spierGroepen'
+import { ConceptHint } from './ConceptenWachten'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
@@ -504,6 +505,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <TrainingWeekInzicht
             client={client} db={db} isMobile={isMobile}
             voeding={voeding}
+            aanwijzing={<ConceptHint soort="workout" client={client} db={db} onNavigateWorkout={onNavigateWorkout} onClose={onClose} />}
             acties={{
               stappen: () => setVenster('stappen'),
               bouwfase: () => setVenster('bouwfase'),

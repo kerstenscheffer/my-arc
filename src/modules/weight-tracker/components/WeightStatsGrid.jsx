@@ -302,9 +302,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const targetWeightNum = Number.isFinite(parseFloat(client?.target_weight))
     ? parseFloat(client.target_weight) : null
   
-  const CustomDot = (p) => p.payload.isFriday
-    ? <circle cx={p.cx} cy={p.cy} r={3} fill="#8b5cf6" stroke="#000" strokeWidth={1} />
-    : <circle cx={p.cx} cy={p.cy} r={1.5} fill="#FFD700" />
+  // Geen aparte paarse stip meer voor vrijdag: er is geen vaste weegdag (18 nov 2026).
+  const CustomDot = (p) => <circle cx={p.cx} cy={p.cy} r={1.5} fill="#FFD700" />
   
   const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null
@@ -772,11 +771,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             display: 'flex', gap: '0.9rem', justifyContent: 'center', flexWrap: 'wrap',
             marginTop: '0.4rem', fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 700,
           }}>
-            {fridayData?.friday_count > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#8b5cf6' }} /> Vrijdag
-              </span>
-            )}
             <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
               <div style={{ width: 10, height: 2, background: '#fff' }} /> Gemeten
             </span>

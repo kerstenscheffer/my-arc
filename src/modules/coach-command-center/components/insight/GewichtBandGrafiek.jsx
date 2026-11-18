@@ -19,7 +19,7 @@ import { Info } from 'lucide-react'
 import KopKeuze from './KopKeuze'
 import {
   maakConfig, trendReeks, bepaalStart, lijnenOpDatum, planSegmenten,
-  weekBeoordelingen, advies, ernstVan, kleurVoorErnst, weergaveStatus, STATUS_TEKST, STATUS_KLEUR,
+  weekBeoordelingen, weekBereikVan, advies, ernstVan, kleurVoorErnst, weergaveStatus, STATUS_TEKST, STATUS_KLEUR,
   bereikTekst,
 } from '../../../weight-tracker/utils/coachingBand'
 
@@ -86,10 +86,8 @@ const KOLOMMEN = '4.4rem 1fr 3.4rem 3.2rem 1fr'
 // bijstuurt.
 function WeekTabel({ weken, startDatum, isMobile }) {
   const bereik = (n) => {
-    const van = new Date(`${String(startDatum).slice(0, 10)}T00:00:00`)
-    van.setDate(van.getDate() + n * 7)
-    const tot = new Date(van)
-    tot.setDate(tot.getDate() + 6)
+    // Gewone weken, maandag t/m zondag: dezelfde indeling als het oordeel zelf.
+    const { van, tot } = weekBereikVan(n, startDatum)
     const f = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     return `${f(van)} – ${f(tot)}`
   }

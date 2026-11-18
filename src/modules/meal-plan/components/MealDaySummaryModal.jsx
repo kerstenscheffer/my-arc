@@ -118,6 +118,8 @@ export default function MealDaySummaryModal({
   ingebed = false,
   // Waterdoel in liters (alleen ingebed): de strook rechts in elke dagstaaf.
   waterDoelL = null,
+  // Coach Inzicht: een regel boven het blok Gepland (bv. "Concept klaar").
+  aanwijzing = null,
   // Gecombineerde week in Coach Inzicht: de kaart Training toont de week en
   // kiest de dag; dit onderdeel toont dan alleen de dag zelf en meldt de
   // weekcijfers terug. { gekozen, setGekozen, meldWeek }
@@ -596,6 +598,8 @@ export default function MealDaySummaryModal({
   const toonGepland = !!nogGepland && gekozenSleutel >= vandaagSleutel && (nogGepland.length > 0 || maaltijden.length === 0)
   const dagGeplandBlok = (
     <>
+              {/* Coach Inzicht: bv. "Concept klaar" na de intake. */}
+              {aanwijzing && <div style={{ margin: '0.5rem 0 0.2rem' }}>{aanwijzing}</div>}
 
               {/* ── Gepland (vandaag en later) ── */}
               {toonGepland && (<>

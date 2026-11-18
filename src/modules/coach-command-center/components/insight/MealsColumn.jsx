@@ -8,6 +8,7 @@
 // Wissel, Barcode, Eigen maaltijd…) en het Inzicht-scherm van de klant opent
 // hier ook.
 
+import { ConceptHint } from './ConceptenWachten'
 import React, { useEffect, useState } from 'react'
 import {
   UtensilsCrossed, ChevronRight, ChevronLeft, ArrowLeft, Zap, ExternalLink, Droplet, Info,
@@ -576,6 +577,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               waterDoelL={waterDoelL}
               onWaterKlik={() => setVenster('water')}
               onPlan={onNavigatePlan ? () => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() } : null}
+              aanwijzing={<ConceptHint soort="voeding" client={client} db={db} onNavigatePlan={onNavigatePlan} onClose={onClose} />}
               onClose={() => {}}
               db={db}
               clientId={client.id}
