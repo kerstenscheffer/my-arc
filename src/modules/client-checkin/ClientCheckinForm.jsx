@@ -276,7 +276,7 @@ const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ 
 const VRAGEN_BASIS = platteVragen(SECTIES)
 const VRAGEN_MET_COACHING = platteVragen([...SECTIES, COACHING_SECTIE])
 
-export default function ClientCheckinForm({ db, client, onSubmitted, onClose, titel }) {
+export default function ClientCheckinForm({ db, client, onSubmitted, onClose, titel, altijdFormulier = false }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -373,7 +373,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         service.hasCheckinSinceLastFriday(client.id),
         service.coachingVraagAanDeBeurt(client.id, client.coaching_start_date),
       ])
-      setSubmitted(hasCheckin)
+      // altijdFormulier: lokaal bekijken van het formulier, ook als er al een check-in is.
+      setSubmitted(altijdFormulier ? false : hasCheckin)
       setCoachingRonde(coachingBeurt)
     } catch (error) {
       console.error('Error checking existing check-in:', error)

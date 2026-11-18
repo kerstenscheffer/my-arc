@@ -44,3 +44,11 @@ Eén perfect plan als stam (geïnspireerd op Kerstens eigen plan), daarvan takke
 - Lunch: 2 volkoren wraps met ei, kaas en kipfilet.
 - Diner: 200 g kipfilet, 400 g zoete aardappel, 200 g broccoli, olijfolie, avocado.
 - Pre-workout: wrap met jam.
+
+## Gebouwd (18 nov 2026)
+30 plannen: 10 treden (man 2000 t/m 3000, vrouw 1600 t/m 2200) × Vast, Vast 3 maaltijden en Afwisselen.
+Naam `Man | 2200 | Vast`. Opnieuw bouwen: `scripts/canonieke-voeding/plannen.py` (porties) en `bouw.sql` (database).
+- Eiwit per trede: man 170 / 175 / 180 (cut en bulk), vrouw 130 / 135 / 140 / 140.
+- Vet per trede: man cut 62 / 64 / 68, man bulk 78 / 84 / 90, vrouw 50 / 54 / 60 / 66.
+- Vet komt eerst uit olijfolie (maximaal 15 g per maaltijd), daarna uit een extra ei.
+- Bulk (man vanaf 2600): avocado bij het avondeten en cottage cheese met cracker als tweede tussendoortje.

@@ -21,7 +21,7 @@ const periodeLabel = () => {
   return `wk ${week} · ${kort(van)} t/m ${kort(tot)}`
 }
 
-export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db }) {
+export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db, altijdFormulier = false }) {
   // The "Sluiten"-button in the top bar is always available, so the user can
   // dismiss the modal at any time. The underlying ClientCheckinForm shows a
   // thank-you screen after submit; if/when we want auto-close, we'd need to
@@ -86,6 +86,7 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db 
           db={db}
           client={client}
           titel={`Wekelijkse check-in · ${periodeLabel()}`}
+          altijdFormulier={altijdFormulier}
           onClose={onClose}
           onSubmitted={() => {
             onSubmitted?.()

@@ -153,7 +153,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   const [opSlot, setOpSlot] = useState(false)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showCheckinModal, setShowCheckinModal] = useState(false)
+  // Alleen lokaal (npm run dev): ?checkin=1 opent de check-in buiten het
+  // vrijdagvenster, ?checkin=nieuw toont ook het lege formulier als er deze week
+  // al een is ingediend. Om het formulier te kunnen bekijken en bijwerken.
+  const checkinVoorbeeld = import.meta.env.DEV ? (() => { try { return new URLSearchParams(window.location.search).get('checkin') } catch { return null } })() : null
+  const [showCheckinModal, setShowCheckinModal] = useState(!!checkinVoorbeeld)
   // Versie-counter die we bumpen zodra een check-in binnenkomt. De
   // CheckinReminderPopup luistert hierop om direct te re-evalueren en
   // de pill weg te halen — geen pageload meer nodig.
@@ -841,6 +845,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* Om dezelfde reden ook het formulier zelf niet. */}
       {!ingebed && <CheckinModal
         isOpen={showCheckinModal}
+        altijdFormulier={checkinVoorbeeld === 'nieuw'}
         onClose={() => setShowCheckinModal(false)}
         onSubmitted={() => setCheckinVersion(v => v + 1)}
         client={client}
