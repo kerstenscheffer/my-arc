@@ -471,12 +471,19 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config, segme
 // maandagochtend met een zondagavond. Zo hoeft er ook niet per se óp zaterdag
 // gewogen te worden — de zaterdag is alleen het moment waarop je kijkt.
 
-export function laatsteZaterdag(datum = new Date()) {
+// Sinds 18 nov 2026 sluit de week op ZONDAG (gewone weken, maandag t/m zondag),
+// niet meer op zaterdag. De som is dezelfde; alleen het kijkmoment schuift een
+// dag. De namen hieronder (zaterdagTempo, zaterdagReeks, de velden `zaterdag`
+// en `vorigeZaterdag`) zijn blijven staan omdat veel schermen ze gebruiken:
+// lees ze als "het einde van de week".
+export function laatsteWeekEinde(datum = new Date()) {
   const d = new Date(datum)
   d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - ((d.getDay() + 1) % 7))   // 6=za → 0 terug, 0=zo → 1 terug
+  d.setDate(d.getDate() - d.getDay())   // 0=zo → 0 terug, 1=ma → 1 terug … 6=za → 6 terug
   return iso(d)
 }
+// Oude naam, zelfde functie: het einde van de laatste afgesloten week (nu zondag).
+export const laatsteZaterdag = laatsteWeekEinde
 
 // Gemiddelde van alle wegingen in het venster dat op `eindIso` eindigt.
 export function vensterGemiddelde(history, eindIso, dagen = STANDAARD.venster_dagen) {

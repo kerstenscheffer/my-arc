@@ -235,14 +235,14 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
             <Uitleg>
               <strong style={{ color: colors.textPrimary }}>
                 {gewicht.soort === 'week'
-                  ? `Sinds vorige zaterdag: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
+                  ? `Tegen vorige week: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
                   : `Sinds je start: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
                 {gewicht.doelBereik && `. Goed tempo is ${gewicht.doelBereik} kg per week`}
               </strong>
               {gewicht.soort === 'week' ? (
                 <>
                   <div style={{ marginTop: space[2] }}>
-                    Het gemiddelde van de week tot zaterdag, tegen dat van de week ervoor.
+                    Het gemiddelde van deze week (maandag t/m zondag), tegen dat van de week ervoor.
                     Twee losse wegingen schelen een kilo of twee per ochtend.
                   </div>
                   <WeekRegel tot={gewicht.zaterdag} gemiddelde={gewicht.nu} lijst={gewicht.wegingenNu} />

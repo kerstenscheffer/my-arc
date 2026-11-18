@@ -279,7 +279,7 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
       fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null,
     ).map((z, i) => ({
       sleutel: z.zaterdag,
-      kort: i === 0 ? (dagenSindsZa === 0 ? 'Deze week' : 'Zaterdag') : `za ${fmtDag(z.zaterdag)}`,
+      kort: i === 0 ? (dagenSindsZa === 0 ? 'Deze week' : 'Vorige week') : `zo ${fmtDag(z.zaterdag)}`,
       val: fmtV(z.verschil),
       color: tempoKleur(z.verschil, z.nu.metingen >= 3 && (z.vorige.vanStart || z.vorige.metingen >= 3)),
     })),
@@ -596,9 +596,9 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
                 }}
               >
                 {[
-                  { label: 'Deze week', sub: weekDiff !== null ? `gem. ${lopendNu.gemiddelde} vs ${lopendVorig.gemiddelde} kg · ${lopendVorig.metingen} en ${lopendNu.metingen} wegingen` : (lopendNu.metingen === 0 ? 'nog geen weging sinds zaterdag' : 'vorige week geen wegingen'), val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: tempoKleur(weekDiff, weekGenoeg) },
-                  { label: 'Laatste zaterdag', sub: za.verschil != null ? `za ${fmtDag(za.zaterdag)} · gem. ${za.nu.gemiddelde} vs ${za.vorige.gemiddelde} kg` : `za ${fmtDag(za.zaterdag)} · te weinig wegingen`, val: za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—', color: tempoKleur(za.verschil, zaGenoeg) },
-                  { label: 'Zaterdag ervoor', sub: `za ${fmtDag(za.vorigeZaterdag)}`, val: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return v.verschil != null ? `${v.verschil > 0 ? '+' : ''}${v.verschil}` : '—' })(), color: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return tempoKleur(v.verschil, v.nu.metingen >= 3 && v.vorige.metingen >= 3) })() },
+                  { label: 'Deze week', sub: weekDiff !== null ? `gem. ${lopendNu.gemiddelde} vs ${lopendVorig.gemiddelde} kg · ${lopendVorig.metingen} en ${lopendNu.metingen} wegingen` : (lopendNu.metingen === 0 ? 'nog geen weging sinds maandag' : 'vorige week geen wegingen'), val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: tempoKleur(weekDiff, weekGenoeg) },
+                  { label: 'Vorige week', sub: za.verschil != null ? `t/m zo ${fmtDag(za.zaterdag)} · gem. ${za.nu.gemiddelde} vs ${za.vorige.gemiddelde} kg` : `t/m zo ${fmtDag(za.zaterdag)} · te weinig wegingen`, val: za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—', color: tempoKleur(za.verschil, zaGenoeg) },
+                  { label: 'Week ervoor', sub: `t/m zo ${fmtDag(za.vorigeZaterdag)}`, val: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return v.verschil != null ? `${v.verschil > 0 ? '+' : ''}${v.verschil}` : '—' })(), color: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return tempoKleur(v.verschil, v.nu.metingen >= 3 && v.vorige.metingen >= 3) })() },
                   { label: fase ? 'Sinds start fase' : 'Sinds start', sub: startDateLabel ? `${fase ? 'fase vanaf' : 'eerste meting ·'} ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)' },
                 ].map((s, i) => (
                   <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>

@@ -5,6 +5,7 @@ import FeedbackBlad from '../workout/bouwfase/FeedbackBlad'
 import { zoekNavraag, navraagWeg } from '../workout/bouwfase/trainingNavraag'
 import CheckinService from '../client-checkin/CheckinService'
 import { trajectLoopt } from '../client-checkin/trajectStatus'
+import { checkinWeek } from '../client-checkin/checkinWeek'
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
 const autoGeopend = new Set();
@@ -18,7 +19,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   // melding die de app zelf bovenaan zet zolang het cijfer ontbreekt.
   const [navraag, setNavraag] = useState(null);
   const [navraagOpen, setNavraagOpen] = useState(false);
-  // De wekelijkse check-in: vanaf vrijdag tot hij is ingevuld. Stond als balk
+  // De wekelijkse check-in: open op zaterdag en zondag, daarna te laat tot en met donderdag. Stond als balk
   // onderin (CheckinReminderPopup); nu een melding zoals de rest (18 nov 2026).
   const [checkin, setCheckin] = useState(null); // { dagenLaat }
   const notifications = useMemo(() => {
@@ -26,9 +27,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     if (checkin) {
       const d = checkin.dagenLaat
       eigen.push({
-        id: 'checkin-week', _checkin: true, _knop: 'Vul in', type: 'checkin', priority: d >= 3 ? 'urgent' : 'high', status: 'active',
+        id: 'checkin-week', _checkin: true, _knop: 'Vul in', type: 'checkin', priority: d >= 2 ? 'urgent' : 'high', status: 'active',
         title: d === 0 ? 'Je wekelijkse check-in staat klaar' : 'Je check-in staat nog open',
-        message: d === 0 ? 'Een paar minuten: hoe ging je week en wat pak je komende week aan.' : `Die was van vrijdag, nu ${d} ${d === 1 ? 'dag' : 'dagen'} geleden. Een paar minuten werk.`,
+        message: d === 0 ? 'Dit weekend invullen: hoe ging je week en wat pak je komende week aan.' : `Die was van afgelopen weekend, nu ${d} ${d === 1 ? 'dag' : 'dagen'} te laat. Een paar minuten werk.`,
       })
     }
     if (navraag) eigen.push({
@@ -81,9 +82,10 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     let leeft = true
     new CheckinService(db).hasCheckinSinceLastFriday(client.id).then(al => {
       if (!leeft || al) return
-      const dag = new Date().getDay() // 0 = zondag
-      const dagenLaat = dag === 5 ? 0 : dag === 6 ? 1 : dag + 2
-      setCheckin({ dagenLaat })
+      // Open op zaterdag en zondag; maandag t/m donderdag te laat; vrijdag stil.
+      const week = checkinWeek()
+      if (!week.open && week.dagenLaat === 0) return
+      setCheckin({ dagenLaat: week.dagenLaat })
       if (!autoGeopend.has('checkin-week')) { autoGeopend.add('checkin-week'); setTimeout(() => setIsExpanded(true), 800) }
     }, () => null)
     return () => { leeft = false }

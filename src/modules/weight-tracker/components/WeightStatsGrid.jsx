@@ -419,7 +419,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         kleur: kleurVoor(verschil, genoeg),
         kop: 'Deze week',
         onder: verschil == null
-          ? (nu.metingen === 0 ? 'nog geen weging sinds zaterdag' : 'vorige week geen wegingen')
+          ? (nu.metingen === 0 ? 'nog geen weging sinds maandag' : 'vorige week geen wegingen')
           : genoeg ? `gem. ${nu.gemiddelde} vs ${vorig.vanStart ? 'start ' : ''}${vorig.gemiddelde} kg`
             : vorig.vanStart ? `vanaf start, ${nu.metingen} wegingen` : `${vorig.metingen} en ${nu.metingen} wegingen`,
       })
@@ -436,7 +436,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         // ('18–24 okt', over een maandgrens '28 sep–4 okt').
         kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week' : weekBereik(z.zaterdag),
         onder: genoeg
-          ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+          ? `t/m zo ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
           : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
       }
     })
@@ -445,7 +445,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     // Nog geen wegingen: de strook staat er al, grijs en leeg, zodat je ziet
     // waar je weektempo komt te staan.
     const grijs = 'rgba(255,255,255,0.3)'
-    return ['Deze week', 'Laatste zaterdag', 'Zaterdag ervoor', '3 zaterdagen terug'].map((kop, i) => ({
+    return ['Deze week', 'Vorige week', 'Week ervoor', '3 weken terug'].map((kop, i) => ({
       sleutel: `leeg-${i}`, waarde: null, genoeg: false, kleur: grijs, kop,
       onder: i === 0 ? 'nog geen wegingen' : '—',
     }))
@@ -1004,8 +1004,8 @@ const UITLEG_FOTO = (id) => `https://images.unsplash.com/${id}?w=640&h=360&fit=c
 const UITLEG_THUMB = (id) => `https://images.unsplash.com/${id}?w=160&h=160&fit=crop&q=70`
 function UitlegModal({ isMobile, coach, onClose }) {
   const regels = [
-    { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde sinds de laatste zaterdag (zondag tot nu) min het gemiddelde van de 7 dagen tot en met die zaterdag. Loopt mee tot het komende zaterdag vast staat.' },
-    { kop: 'Laatste zaterdag', foto: 'photo-1626794174544-c3200f10e32b', tekst: 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.' },
+    { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde van deze week (maandag tot nu) min het gemiddelde van vorige week, maandag t/m zondag. Loopt mee tot de week op zondag vast staat.' },
+    { kop: 'Vorige week', foto: 'photo-1626794174544-c3200f10e32b', tekst: 'Het vaste weekpunt. Gemiddelde van maandag t/m zondag, min het gemiddelde van de week ervoor. Daarachter: de weken daarvoor.' },
     { kop: 'Sinds start', foto: 'photo-1561570121-c8219daec12b', tekst: 'Je laatste weging tegenover je startgewicht. Het grote plaatje.' },
     { kop: 'Kleur', kleuren: [['#10b981', 'op je doeltempo'], ['#f59e0b', 'ernaast: te langzaam of te snel'], ['#ef4444', 'ver ernaast, of de verkeerde kant op'], ['rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis']] },
     { kop: 'Wat je ermee doet', foto: 'photo-1543352632-5a4b24e4d2a6', tekst: 'De kleur loopt door: hoe dichter bij je doeltempo, hoe groener. Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : '') },

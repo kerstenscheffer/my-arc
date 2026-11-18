@@ -15,6 +15,7 @@
 // horen niet twee verschillende antwoorden te krijgen over dezelfde week.
 
 import { trendReeks, maakConfig } from '../weight-tracker/utils/coachingBand'
+import { checkinWeek } from './checkinWeek'
 
 const isoDag = (d) => {
   const p = (n) => String(n).padStart(2, '0')
@@ -37,9 +38,12 @@ const geplandPerWeek = (client) => {
 export async function laadWeekCijfers(db, client) {
   if (!db?.supabase || !client?.id) return null
 
-  const eind = new Date()
-  const start = new Date()
-  start.setDate(start.getDate() - 6)          // zeven dagen, vandaag meegeteld
+  // De week van de check-in: maandag t/m zondag (checkinWeek.js). Dit waren de
+  // laatste zeven dagen vanaf vandaag; daardoor telde een doel van 5 trainingen
+  // midden in de week als 3 van de 5 (18 nov 2026).
+  const week = checkinWeek()
+  const start = new Date(`${week.start}T12:00:00`)
+  const eind = new Date(`${week.totNu}T12:00:00`)
 
   // Let op: een query-builder heeft geen .catch(). Het tweede argument van
   // .then() vangt de afwijzing; anders sloopt één mislukte query de Promise.all

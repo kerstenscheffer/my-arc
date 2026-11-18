@@ -21,7 +21,8 @@
 //   de gewicht-header in coach insight.
 
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
-import { dezeWeekTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst, tempoOordeel, tempoKleurVanDoel } from '../weight-tracker/utils/coachingBand'
+import { checkinWeek } from './checkinWeek'
+import { dezeWeekTempo, vensterGemiddelde, maakConfig, bereikTekst, tempoOordeel, tempoKleurVanDoel } from '../weight-tracker/utils/coachingBand'
 import { lokaleDatum } from '../../utils/tijd'
 
 const dagInMs = 86400000
@@ -118,8 +119,15 @@ export async function laadProgressie(db, client) {
   if (!db?.supabase || !client?.id) return null
   const sb = db.supabase
 
-  const zaterdag = laatsteZaterdag()
-  const weekStart = minDagen(zaterdag, 6)      // de week die op die zaterdag eindigt
+  // De week van de check-in: maandag t/m zondag (checkinWeek.js). `zaterdag`
+  // heet hier nog zo, maar is het einde van die week: zondag, of vandaag als
+  // de week nog loopt.
+  const week = checkinWeek()
+  const zaterdag = week.totNu
+  const weekStart = week.start
+  // Loopt de week nog, dan vergelijken we tot en met vandaag; bij een late
+  // check-in (ma t/m do) de afgesloten week die op zondag eindigde.
+  const peil = week.lopend ? new Date() : new Date(`${week.eind}T12:00:00`)
   const vorigeWeekStart = minDagen(weekStart, 7)
 
   // Let op: een Supabase query-builder heeft geen .catch(). Het tweede
@@ -195,14 +203,14 @@ export async function laadProgressie(db, client) {
   }
 
   return {
-    periode: { van: weekStart, tot: zaterdag },
+    periode: { van: weekStart, tot: week.eind },
     weken: wekenBezig(client),
-    gewicht: bouwGewicht(wegingen, fase, client),
+    gewicht: bouwGewicht(wegingen, fase, client, peil),
     training: bouwTraining(sessies, oefeningen, weekStart, s),
     voeding: bouwVoeding(s, maaltijdenRes.data || [], plan),
     // Gewogen dagen over dezelfde dagen als het gewicht hierboven (deze week
     // zoals de coach hem ziet), niet over de vorige afgesloten week.
-    wegingen: weegTeller(wegingen, fase),
+    wegingen: weegTeller(wegingen, fase, peil),
   }
 }
 
@@ -277,9 +285,9 @@ function tempoWoord(verschil, config) {
   return TEMPO_TEKST[o] || null
 }
 
-function weegTeller(wegingen, fase) {
+function weegTeller(wegingen, fase, peil = new Date()) {
   const faseStart = fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null
-  const dw = dezeWeekTempo(wegingen, new Date(), faseStart)
+  const dw = dezeWeekTempo(wegingen, peil, faseStart)
   const eind = new Date(`${dw.eind}T00:00:00`).getTime()
   const begin = eind - (dw.dagen - 1) * dagInMs
   const dagen = [...new Set(wegingen
@@ -289,7 +297,7 @@ function weegTeller(wegingen, fase) {
   return { dezeWeek: dagen.length, van: dw.dagen, dagen }
 }
 
-function bouwGewicht(wegingen, fase, client) {
+function bouwGewicht(wegingen, fase, client, peil = new Date()) {
   if (!wegingen.length) return null
 
   // De losse wegingen binnen een venster, voor het uitlegvenster: welke
@@ -307,7 +315,7 @@ function bouwGewicht(wegingen, fase, client) {
 
   // Zelfde "deze week" als de coach (dezeWeekTempo): zondag t/m vandaag.
   const faseStart = fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null
-  const tempo = dezeWeekTempo(wegingen, new Date(), faseStart)
+  const tempo = dezeWeekTempo(wegingen, peil, faseStart)
   const config = maakConfig(client, fase)
   if (tempo.verschil !== null) {
     return {
