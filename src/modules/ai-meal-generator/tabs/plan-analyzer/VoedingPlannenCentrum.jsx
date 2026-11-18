@@ -64,6 +64,16 @@ export default function VoedingPlannenCentrum({
   const [bezig, setBezig] = useState(null)
   const [naamNieuw, setNaamNieuw] = useState(() => planMeta?.name || (clientName ? `Plan ${clientName}` : ''))
   const [opgeslagen, setOpgeslagen] = useState(false)
+  // Variatieniveau per template (RPC template_variatie, 18 nov 2026).
+  const [variatie, setVariatie] = useState({})
+  // Vast = elke dag hetzelfde; anders op gerechten per eetmoment.
+  const variatieLabel = (t) => {
+    const x = variatie[t.id]
+    if (!x || !x.gerechten) return null
+    if (x.dagmenus <= 1) return 'Vast'
+    const perMoment = x.gerechten / Math.max(1, Number(t.meals_per_day) || 4)
+    return perMoment < 2.5 ? 'Afwisselen' : 'Veel variatie'
+  }
 
   const laad = useCallback(async () => {
     setFout(null)
@@ -71,16 +81,18 @@ export default function VoedingPlannenCentrum({
       let tq = sb.from('meal_plan_templates').select(TEMPLATE_KOLOMMEN).eq('plan_type', 'full_week').order('created_at', { ascending: false })
       // Ook de plannen zonder coach: een deel is opgeslagen via een pad dat coach_id nooit invulde.
       if (coachId) tq = tq.or(`coach_id.eq.${coachId},coach_id.is.null`)
-      const [t, p, k, a] = await Promise.all([
+      const [t, p, k, a, v] = await Promise.all([
         veilig(tq),
         veilig(sb.from('client_meal_plans').select('id, client_id, template_name, template_id, is_active, daily_calories, daily_protein, created_at, updated_at').order('created_at', { ascending: false }).limit(3000)),
         veilig(sb.from('clients').select('id, first_name, last_name').order('first_name', { ascending: true }).limit(2000)),
         veilig(sb.rpc('actieve_betalende_klanten')),
+        veilig(sb.rpc('template_variatie')),
       ])
       if (t.error) throw t.error
       setTemplates(t.data || [])
       setPlannen(p.data || [])
       setKlanten(k.data || [])
+      setVariatie(Object.fromEntries((v.error ? [] : v.data || []).map(x => [x.id, x])))
       setActiefIds(a.error || !a.data ? null : new Set(a.data.map(x => x.client_id)))
     } catch (e) { console.error('Voedingsplannen laden:', e); setFout(e?.message || 'Laden mislukt') }
     finally { setLaden(false) }
@@ -325,6 +337,7 @@ export default function VoedingPlannenCentrum({
                           <span style={{ position: 'absolute', top: 8, left: 12, right: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 900, color: bij.length > 0 ? GROEN : '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                             {gr && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: gr.kleur }}><gr.Icoon size={13} strokeWidth={3} />{gr.label}</span>}
                             {t.is_archived ? 'Archief' : bij.length > 0 ? `Actief bij ${bij.length}` : gebruikt[t.id] ? 'Nergens actief' : 'Nooit gebruikt'}
+                            {variatieLabel(t) && <span title={`${variatie[t.id].gerechten} verschillende gerechten in de week`} style={{ color: '#fff', padding: '1px 7px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.5)', textShadow: 'none' }}>{variatieLabel(t)}</span>}
                             {dv && <span style={{ marginLeft: 'auto', color: '#fff' }}>{dv}</span>}
                           </span>
                           <div style={{ position: 'absolute', left: 12, right: 12, bottom: 8, textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}>

@@ -36,7 +36,7 @@ const chip = (aan) => ({
 })
 
 // rirDoel: het weekdoel "herhalingen over" (rir.js). Gevuld = eerst de vraag hoeveel je over had.
-export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null, rirGelogd = null }) {
+export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null, rirGelogd = null, datum = null, dagTekst = null }) {
   const [score, setScore] = useState(7)
   const [gevoel, setGevoel] = useState('goed')
   const [opmerking, setOpmerking] = useState('')
@@ -81,6 +81,8 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         opmerking: opmerking.trim() || null,
         ...(metRir ? { rir } : {}),
         ...(soort === 'workout' && duur ? { duur } : {}),
+        // Navraag van een eerdere dag (TrainingNavraag): op die datum bewaren, niet op vandaag.
+        ...(datum ? { datum } : {}),
         ...extra,
       })
       onOpgeslagen?.(rij)
@@ -188,7 +190,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
             {(soort === 'workout' || stap === 1) && (
               <>
                 <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
-                  {soort === 'oefening' ? 'Hoe goed voelde deze oefening?' : 'Hoe goed voelde de training vandaag?'}
+                  {soort === 'oefening' ? 'Hoe goed voelde deze oefening?' : `Hoe goed voelde de training ${dagTekst ? `van ${dagTekst}` : 'vandaag'}?`}
                 </div>
                 <HorizontaleSlider waarden={Array.from({ length: 10 }, (_, k) => k + 1)} waarde={score} onChange={setScore} itemBreedte={64} />
                 <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kleurScore(score), marginTop: 2 }}>{scoreWoord(score)}</div>

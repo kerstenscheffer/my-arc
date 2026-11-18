@@ -22,6 +22,7 @@ import {
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
+import TrainingNavraag from '../../modules/workout/bouwfase/TrainingNavraag'
 import StappenPil from '../components/StappenPil'
 import ChallengeProgressTab from '../../modules/challenge-monitor/ChallengeProgressTab'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
@@ -690,6 +691,8 @@ export default function ClientHome({ client, db, setCurrentView }) {
           week staan compact linksboven in de zwarte balk (FocusDezeWeek
           compact), niet meer als losse kaarten ertussen. Geen FadeOnScroll:
           het eerste wat je ziet hoort er meteen te staan. */}
+      {/* Niet afgerond na de training? Dan hier één keer de vraag (18 nov 2026). */}
+      <TrainingNavraag client={client} db={db} isMobile={isMobile} />
       <div style={{ marginTop: isMobile ? '0.6rem' : '0.9rem' }}>
         <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
           <DagAgenda

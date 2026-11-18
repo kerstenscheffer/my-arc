@@ -30,7 +30,7 @@ export default function PlanTitleBar({
   name, isActive, clientName = '', templateName = null,
   canEdit = true, onRename, weekSaveState = 'idle', isMobile,
   clients = [], selectedClient = null, onSelectClient = null,
-  onSwitch = null, onNew = null, onDelete = null, onClear = null, onSaveTemplate = null,
+  onSwitch = null, onBeheer = null, onNew = null, onDelete = null, onClear = null, onSaveTemplate = null,
   heeftPlan = true,
   // Eén-regel-kop: midden (week-keuze), ongedaan maken, PDF, activeren.
   midden = null,
@@ -96,7 +96,7 @@ export default function PlanTitleBar({
     fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
   })
   const menuItems = [
-    onSwitch && { t: 'Ander plan openen', i: <RefreshCw size={15} />, f: onSwitch },
+    onSwitch && { t: 'Plannen en templates', i: <RefreshCw size={15} />, f: onSwitch },
     onNew && { t: 'Nieuw leeg plan', i: <Plus size={15} />, f: onNew },
     onSaveTemplate && heeftPlan && { t: 'Opslaan als template', i: <Save size={15} />, f: onSaveTemplate },
     onPdf && heeftPlan && { t: pdfBezig ? 'PDF maken…' : 'PDF downloaden', i: pdfBezig ? <Loader size={15} style={{ animation: 'ptbSpin 1s linear infinite' }} /> : <Download size={15} />, f: onPdf },
@@ -155,7 +155,7 @@ export default function PlanTitleBar({
             klant, het actieve bovenaan, en je wisselt met één klik. */}
         {heeftPlan && (
           <span style={{ position: 'relative', flexShrink: 0 }}>
-            <button onClick={() => plannen.length > 1 || onSwitch ? setPlanMenu(v => !v) : null} aria-expanded={planMenu}
+            <button onClick={() => plannen.length > 1 || onBeheer ? setPlanMenu(v => !v) : null} aria-expanded={planMenu}
               title={isActive ? 'Actief: de klant ziet dit plan. Klik om van plan te wisselen.' : 'Concept: alleen jij ziet dit. Klik om van plan te wisselen.'}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 0.6rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.16)', background: planMenu ? 'rgba(255,255,255,0.1)' : 'transparent', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 900, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: isActive ? GREEN : 'rgba(255,255,255,0.4)' }} />
@@ -184,9 +184,9 @@ export default function PlanTitleBar({
                     </button>
                   )
                 })}
-                {onSwitch && (
-                  <button onClick={() => { setPlanMenu(false); onSwitch() }} style={{ width: '100%', marginTop: 4, padding: '0.55rem 0.6rem', borderRadius: 8, border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
-                    Alle plannen beheren
+                {onBeheer && (
+                  <button onClick={() => { setPlanMenu(false); onBeheer() }} style={{ width: '100%', marginTop: 4, padding: '0.55rem 0.6rem', borderRadius: 8, border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+                    Plannen van deze klant beheren
                   </button>
                 )}
               </div>

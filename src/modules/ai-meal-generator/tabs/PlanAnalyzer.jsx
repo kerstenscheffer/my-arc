@@ -1502,7 +1502,6 @@ export default function PlanAnalyzer({
     if (!ws) return
     const hydrated = await hydrateWeekStructure(ws)
     if (!hydrated) return
-    const planId = actievePlanId
     // Oudere sjablonen hebben de pre-workout niet in een eigen kolom maar als
     // slot op de trainingsdagen van de klant waar ze van gemaakt zijn (bij
     // Patrick: alleen di en do, terwijl hij 5x traint). Haal hem eruit en zet
@@ -1528,10 +1527,12 @@ export default function PlanAnalyzer({
         }
       } catch (e) { console.error('❌ Supplementen uit sjabloon toepassen mislukt:', e) }
     }
-    // Geen open plan maar wél een client (bv. een sjabloon toepassen op een verse
-    // klant zoals Lisa) → maak direct een nieuw client_meal_plans-plan aan, zodat
-    // het geladen sjabloon ook écht opslaat (persistWeekData no-opt zonder plan-id).
-    if (!planId && resolvedClientId) {
+    // Met een klant: altijd een NIEUW conceptplan met de naam van de template
+    // (18 nov 2026). Eerst schreef Laden over het plan dat open stond heen, ook
+    // als dat het actieve plan was: de klant zag dan meteen andere maaltijden
+    // onder de oude plannaam. Nu blijft het open plan zoals het was en opent
+    // het nieuwe concept; activeren doet de coach zelf.
+    if (resolvedClientId) {
       const wsToSave = {}
       days.forEach(d => { wsToSave[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
       setWeekSaveState('saving')
@@ -2181,7 +2182,7 @@ export default function PlanAnalyzer({
             isMobile={m}
             clients={clients} selectedClient={selectedClient || clientRecord} onSelectClient={onSelectClient}
             heeftPlan={!!(planMeta || selectedConceptId)}
-            onSwitch={() => setShowPlanSwitcher(true)}
+            onSwitch={() => setShowPlanLibrary(true)} onBeheer={() => setShowPlanSwitcher(true)}
             plannen={sjabloon ? [] : allClientPlans} huidigPlanId={planMeta?.id || selectedConceptId || null}
             onKiesPlan={(id) => { setSelectie(new Set()); setSelectedConceptId(id); loadAllPlanCount(resolvedClientId) }}
             onNew={handleStartBlanco}
