@@ -20,7 +20,9 @@ const LABEL_GROUPS = [
   { label: 'Smaak',     color: '#a855f7', options: ['comfort_food','sweet','savory','spicy','creamy','fresh','warm','indulgent'] },
 ]
 
-export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false, clientMode = false }) {
+// `inVenster`: in het zwevende venster van de Plan Analyzer (18 nov 2026). Vult
+// het venster, met de macro's als rij bovenaan in plaats van een kolom rechts.
+export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false, clientMode = false, inVenster = false }) {
   const modalHost = useModalHost()
   const m = isMobile
   const [activeTab, setActiveTab] = useState('ingredients')
@@ -249,25 +251,27 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
   const modal = (
     <div onClick={embedded ? undefined : onClose} style={embedded
-      ? {}
+      ? (inVenster ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : {})
       : { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={e => e.stopPropagation()} style={embedded
-        ? { background: '#0a0a0a', width: '100%', maxHeight: m ? '68vh' : '58vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid rgba(255,255,255,0.12)' }
+        ? (inVenster
+          ? { background: '#0a0a0a', width: '100%', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+          : { background: '#0a0a0a', width: '100%', maxHeight: m ? '68vh' : '58vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid rgba(255,255,255,0.12)' })
         : { background: '#0a0a0a', borderRadius: m ? '16px 16px 0 0' : '12px', width: '100%', maxWidth: '620px', maxHeight: m ? '95vh' : '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', ...(m?{}:{margin:'auto',alignSelf:'center'}) }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m ? '0.45rem 0.7rem' : '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: inVenster ? '0.3rem 0.85rem 0.1rem' : m ? '0.45rem 0.7rem' : '0.5rem 0.85rem', borderBottom: inVenster ? 'none' : '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <input value={mealName} onChange={e => setMealName(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, width: '100%', fontFamily: 'inherit', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.15rem' }} />
           </div>
-          <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '6px', flexShrink: 0, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
+          {!inVenster && <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '6px', flexShrink: 0, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>}
         </div>
 
         {/* Body: ingrediënten links, macro-totalen rechts */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: inVenster ? 'column' : 'row', overflow: 'hidden', minHeight: 0 }}>
 
           {/* LINKS — ingrediënten (scrollt) */}
-          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
           {/* INGREDIËNTEN */}
           {(
@@ -275,7 +279,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
               <div style={{ padding: '2rem', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Laden...</div>
             ) : (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: inVenster ? '0.25rem 0.85rem' : m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ingrediënten ({ingredients.length})</span>
                   <button onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: showSearch?'#fff':'rgba(255,255,255,0.06)', border: `1px solid ${showSearch?'#fff':'rgba(255,255,255,0.14)'}`, borderRadius: 8, color: showSearch?'#0a0a0a':'#fff', fontSize: m?'0.72rem':'0.78rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <Plus size={13} /> Toevoegen
@@ -409,7 +413,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                 {ingredients.length === 0 && <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Geen ingrediënten — voeg er een toe</div>}
 
                 {ingredients.map((ing, idx) => (
-                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: m?'0.6rem 0.75rem':'0.7rem 0.95rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: inVenster ? '0.32rem 0.85rem' : m?'0.6rem 0.75rem':'0.7rem 0.95rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ width: m?38:42, height: m?38:42, flexShrink: 0, borderRadius: 10, background: `url(${resolveFoodImage(ing, { size: 80 })}) center/cover`, border: '1px solid rgba(255,255,255,0.1)' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: m?'0.85rem':'0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em' }}>{ing.name}</div>
@@ -420,12 +424,12 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
-                        <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m)}>−</button>
+                        <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m, inVenster)}>−</button>
                         <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
                           <input type="number" value={ing.amount} min={ing.min} max={ing.max} onChange={e => updateAmount(idx, e.target.value)} onBlur={() => commitAmount(idx)} onFocus={e => e.target.select()} style={{ width: m?'40px':'46px', textAlign: 'right', padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: m?'0.95rem':'1.05rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none' }} />
                           <span style={{ fontSize: m?'0.72rem':'0.78rem', color: '#fff', fontWeight: 800, marginLeft: 1 }}>g</span>
                         </span>
-                        <button onClick={() => stepAmount(idx, 1)} style={stepAmtBtn(m)}>+</button>
+                        <button onClick={() => stepAmount(idx, 1)} style={stepAmtBtn(m, inVenster)}>+</button>
                       </div>
                       {ing.portie && (
                         // Wit als het een hele portie is, gedimd als de grammen
@@ -445,7 +449,9 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
           </div>
 
           {/* RECHTS — macro-totalen, live update via liveMacros */}
-          <div style={{ width: m?78:96, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+          <div style={inVenster
+            ? { order: -1, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'row' }
+            : { width: m?78:96, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
             {[
               { label: 'kcal',  val: liveMacros.calories, orig: origMacros.calories, unit: ''  },
               { label: 'Eiwit', val: liveMacros.protein,  orig: origMacros.protein,  unit: 'g' },
@@ -455,7 +461,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
               const diff = s.val - s.orig
               const hasDiff = Math.abs(diff) >= 1
               return (
-                <div key={i} style={{ flex: 1, padding: m?'0.35rem 0.5rem':'0.45rem 0.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: i<3?'1px solid rgba(255,255,255,0.05)':'none' }}>
+                <div key={i} style={{ flex: 1, padding: inVenster ? '0.15rem 0.85rem 0.3rem' : m?'0.35rem 0.5rem':'0.45rem 0.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', ...(inVenster ? { borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none' } : { borderBottom: i<3?'1px solid rgba(255,255,255,0.05)':'none' }) }}>
                   <span style={{ fontSize: m?'0.52rem':'0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>{s.label}</span>
                   <span style={{ fontSize: m?'1.05rem':'1.2rem', fontWeight: 900, color: '#fff', lineHeight: 1.15, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                     {Math.round(s.val)}<span style={{ fontSize: '0.55em', opacity: 0.6 }}>{s.unit}</span>
@@ -478,9 +484,9 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
             </div>
           ) : (
             <div style={{ display: 'flex' }}>
-              <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>Plan</span></button>
-              <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'secundair',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
-              <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'secundair',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
+              <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>{inVenster ? 'Alleen dit plan' : 'Plan'}</span></button>
+              <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'secundair',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>{inVenster ? 'Ook in database' : 'Overschrijf'}</span></button>
+              <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'secundair',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>{inVenster ? 'Als nieuwe maaltijd' : 'Kopie'}</span></button>
             </div>
           )}
         </div>
@@ -493,10 +499,12 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
   return createPortal(modal, modalHost)
 }
 
-function stepAmtBtn(m) {
+function stepAmtBtn(m, kaal = false) {
   // Een omlijnd vlak in plaats van een los teken: je moet kunnen zien dat het
   // een knop is, en er met een duim op kunnen mikken.
   const s = m ? 28 : 30
+  // In het zwevende venster zonder kader (18 nov 2026): alleen het teken, dik wit.
+  if (kaal) return { width: 26, height: 26, flexShrink: 0, padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }
   return { width: s, height: s, flexShrink: 0, padding: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, color: '#fff', fontSize: m?'1.1rem':'1.15rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }
 }
 

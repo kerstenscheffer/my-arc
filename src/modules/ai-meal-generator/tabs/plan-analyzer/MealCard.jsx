@@ -11,6 +11,7 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X, BookOpen, MoreHorizontal } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
+import { ZweefVenster } from './ToevoegVenster'
 import ReceptBlad from './ReceptBlad'
 import Keuze from '../../../meal-plan/components/Keuze'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
@@ -592,7 +593,7 @@ export default function MealCard({
       )}
 
       {/* ── INGREDIËNTEN toggle + uitklap ── */}
-      {ingredientList.length > 0 && !showScaler && !showEditModal && (
+      {ingredientList.length > 0 && !showScaler && !(m && showEditModal) && (
         <>
           {expanded && (
             <div style={{
@@ -655,14 +656,27 @@ export default function MealCard({
       )}
 
       {/* Edit — inline paneel ONDER de card (zelfde plek/stijl als de scaler). */}
-      {showEditModal && (
+      {/* Bewerken: op desktop een zwevend venster naast het plan (18 nov 2026),
+          op mobiel nog uitgeklapt in de kaart. */}
+      {showEditModal && (m ? (
         <MealEditModal
           embedded
           db={db} meal={meal} slot={slot} dayIndex={dayIndex}
           onSave={(updatedMeal) => (onEditSave || onUpdateMeal)(dayIndex, slot, updatedMeal)}
           onClose={() => setShowEditModal(false)} isMobile={m}
         />
-      )}
+      ) : (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: 'contents' }}>
+          <ZweefVenster sleutel="pa_bewerkvenster" breed={460} maxHoog={470} titel={`Bewerken · ${meal.name || meal.meal_name || 'maaltijd'}`} onClose={() => setShowEditModal(false)}>
+            <MealEditModal
+              embedded inVenster
+              db={db} meal={meal} slot={slot} dayIndex={dayIndex}
+              onSave={(updatedMeal) => (onEditSave || onUpdateMeal)(dayIndex, slot, updatedMeal)}
+              onClose={() => setShowEditModal(false)} isMobile={m}
+            />
+          </ZweefVenster>
+        </div>
+      ))}
     </div>
   )
 }

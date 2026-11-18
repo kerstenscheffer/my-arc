@@ -96,6 +96,10 @@ export const recurringIdFor = (block) => {
   if (block.type === 'training') return `training-${block.day}-default`
   if (block.type === 'sleep')    return `sleep-${block.day}-default`
   if (block.type === 'work')     return `work-${block.day}-default`
+  // Supplementen: op de tijd uit het plan, niet op waar hij vandaag toevallig
+  // staat. Anders krijgt een al verzet blok bij de tweede keer slepen een ander
+  // id en blijft de eerste uitzondering winnen.
+  if (block.type === 'supplement' && block.meta?.basisStart != null) return `custom-${block.day}-${block.meta.basisStart}`
   return `custom-${block.day}-${block.start}`
 }
 export const DAY_LABELS_NL = { monday: 'Ma', tuesday: 'Di', wednesday: 'Wo', thursday: 'Do', friday: 'Vr', saturday: 'Za', sunday: 'Zo' }
@@ -856,6 +860,7 @@ export class ClientAgendaService {
             editable: false,
             meta: {
               supplement: true,
+              basisStart: moment.minuten,
               aantal: moment.items.length,
               emojis: moment.items.map(x => x.emoji).filter(Boolean).join(''),
               items: moment.items.map(x => ({
@@ -1476,6 +1481,9 @@ export class ClientAgendaService {
         await this.swapMealSlot({ mealPlanId, fromDay: block.day, toDay: targetDay, slot: block.meta.slot })
       }
       await this.updateMealTiming({ mealPlanId, day: targetDay, slot: block.meta.slot, newStartMin })
+      // Heeft de klant een weekplan (datum-dagen), dan wint dát van het basisplan.
+      // Zonder dit bleef de maaltijd na 'Altijd' gewoon op de oude tijd staan (18 nov 2026).
+      if (block.clientId) await this.zetMaaltijdtijdInDatumDagen({ clientId: block.clientId, day: targetDay, slot: block.meta.slot, newStartMin })
       return true
     }
 
@@ -1697,6 +1705,33 @@ export class ClientAgendaService {
       .eq('id', mealPlanId)
     if (saveErr) throw saveErr
     return true
+  }
+
+  // De dagen die de coach per datum heeft ingepland (client_day_overrides, het
+  // weekplan) hebben hun eigen kopie van elke maaltijd, met eigen tijd. 'Altijd'
+  // moet daar ook in: vanaf vandaag, elke datum op deze weekdag.
+  async zetMaaltijdtijdInDatumDagen({ clientId, day, slot, newStartMin }) {
+    if (!clientId || !day || !slot) return 0
+    const { data: rijen, error } = await this.supabase
+      .from('client_day_overrides')
+      .select('id, datum, dag')
+      .eq('client_id', clientId)
+      .gte('datum', toIsoDate(new Date()))
+    if (error) throw error
+    const timing = `${String(Math.floor(newStartMin / 60)).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
+    let n = 0
+    for (const r of rijen || []) {
+      const weekdag = DAYS[(new Date(`${r.datum}T12:00:00`).getDay() + 6) % 7]
+      const huidig = r.dag?.[slot]
+      if (weekdag !== day || !huidig || typeof huidig !== 'object' || Array.isArray(huidig)) continue
+      const { data: bij, error: fout } = await this.supabase
+        .from('client_day_overrides')
+        .update({ dag: { ...r.dag, [slot]: { ...huidig, timing } }, updated_at: new Date().toISOString() })
+        .eq('id', r.id).select('id')
+      if (fout) throw fout
+      if (bij?.length) n++
+    }
+    return n
   }
 
   // ── Vaste tijden: dezelfde wijziging over meerdere dagen ──

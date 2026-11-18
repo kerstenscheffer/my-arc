@@ -539,9 +539,16 @@ export default function DagAgenda({
     const duur = Math.max(5, (blok.end || 0) - (blok.start || 0))
     setVerzetBezig(true); setVerzetFout(null)
     try {
-      if (altijd) await service.shiftBlock({ block: { ...blok, clientId: client.id }, newStartMin: start, mealPlanId: data?.mealPlan?.id || null })
+      if (altijd) {
+        await service.shiftBlock({ block: { ...blok, clientId: client.id }, newStartMin: start, mealPlanId: data?.mealPlan?.id || null })
+        // Stond er voor vandaag nog een losse uitzondering ('alleen vandaag'), dan
+        // zou die blijven winnen van de nieuwe vaste tijd. Die mag dus weg.
+        try { await service.deleteOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(blok) }) } catch { /* er was er geen */ }
+      }
       else await service.upsertOverride({ clientId: client.id, dateIso: dagIso, recurringId: recurringIdFor(blok), startMin: start, endMin: Math.min(24 * 60, start + duur) })
       setVerzetVraag(null)
+      // Stil herladen: de dag blijft staan, alleen het blok springt naar zijn nieuwe tijd.
+      stilTerug.current = true
       setVersie(v => v + 1)
     } catch (e) {
       console.error('Blok verzetten mislukt:', e)
@@ -1220,7 +1227,7 @@ export default function DagAgenda({
               <button onClick={() => voerVerzetUit(false)} disabled={verzetBezig} style={{ flex: 1, minHeight: 52, borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff', fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer', opacity: verzetBezig ? 0.6 : 1, touchAction: 'manipulation' }}>Alleen deze dag</button>
               <button onClick={() => voerVerzetUit(true)} disabled={verzetBezig} style={{ flex: 1, minHeight: 52, borderRadius: 14, background: '#fff', border: '1px solid #fff', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer', opacity: verzetBezig ? 0.6 : 1, touchAction: 'manipulation' }}>Altijd</button>
             </div>
-            <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Altijd = elke {DAY_LABELS_NL_LONG[verzetVraag.blok.day]?.toLowerCase() || 'week'}, ook de weken hierna.</div>
+            <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{verzetVraag.blok.type === 'supplement' ? 'Altijd = elke dag, ook de weken hierna.' : `Altijd = elke ${DAY_LABELS_NL_LONG[verzetVraag.blok.day]?.toLowerCase() || 'week'}, ook de weken hierna.`}</div>
             {verzetFout && <div style={{ marginTop: 8, fontSize: '0.76rem', fontWeight: 800, color: '#ef4444' }}>{verzetFout}</div>}
           </div>
         </div>,

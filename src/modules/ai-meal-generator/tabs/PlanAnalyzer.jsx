@@ -29,7 +29,7 @@ import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import VoedingPlannenCentrum from './plan-analyzer/VoedingPlannenCentrum'
-import ToevoegVenster from './plan-analyzer/ToevoegVenster'
+import ToevoegVenster, { ZweefVenster } from './plan-analyzer/ToevoegVenster'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 // Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
 import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
@@ -2244,7 +2244,8 @@ export default function PlanAnalyzer({
           ~40% van de breedte; de bouwer (dag+maaltijden) neemt de rest. Op
           mobiel ligt het paneel als overlay over de bouwer. De transform maakt
           de fixed-modals binnen dit paneel relatief hieraan i.p.v. het scherm. */}
-      {(dockedSection || swapState || applyDaysState || makerState) && (
+      {/* Wisselen zweeft op desktop in een eigen venster (18 nov 2026); alleen op mobiel nog in dit vak. */}
+      {(dockedSection || (m && swapState) || applyDaysState || makerState) && (
         <div style={{
           flexShrink: 0, minWidth: 0, background: '#0a0a0a',
           borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -2297,7 +2298,7 @@ export default function PlanAnalyzer({
             <MealMakerModal embedded db={db} slot={makerState.slot} isMobile={m}
               onSaved={handleMakerSaved}
               onClose={() => setMakerState(null)} />
-          ) : swapState ? (
+          ) : (m && swapState) ? (
             <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
               clientId={resolvedClientId || null}
               dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
@@ -2361,7 +2362,7 @@ export default function PlanAnalyzer({
               voorwaarde — een geselecteerde klant, geladen weekdata. Klopt
               die niet, dan bleef dit vak zwart en was er niets te zien of te
               lezen. Nu staat er wát er ontbreekt. */}
-          {dockedSection && !makerState && !swapState && !(
+          {dockedSection && !makerState && !(m && swapState) && !(
             (dockedSection === 'client' && resolvedClientId) ||
             (dockedSection === 'timing' && weekData) ||
             (dockedSection === 'dagen' && weekData) ||
@@ -2437,7 +2438,7 @@ export default function PlanAnalyzer({
       )}
 
       {/* Sleep-handvat om het dock-paneel breder/smaller te maken (desktop). */}
-      {(dockedSection || swapState || applyDaysState) && !m && (
+      {(dockedSection || applyDaysState) && !m && (
         <div
           onPointerDown={startDockResize}
           title="Sleep om het paneel groter/kleiner te maken"
@@ -2834,6 +2835,24 @@ export default function PlanAnalyzer({
           />
         )}
       </BladModal>
+
+      {swapState && !m && (
+        <ZweefVenster sleutel="pa_wisselvenster" breed={460} startLinks onClose={() => setSwapState(null)}
+          titel={swapState.bulk ? `Wisselen · ${swapState.bulk.length} maaltijden`
+            : swapState.meal ? `Wisselen · ${swapState.meal.name || 'maaltijd'}`
+            : `Maaltijd kiezen · ${DAYS[swapState.dayIndex]?.full?.toLowerCase() || 'pre-workout'}`}>
+          <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
+            clientId={resolvedClientId || null}
+            dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
+            dagIndex={swapState.dayIndex ?? null}
+            weekStart={weekModus}
+            tijd={swapState.timing || null}
+            plekken={swapState.slot === PRE_WORKOUT_SLOT || swapState.bulk ? undefined : plekkenVanMaaltijd(swapState.meal)}
+            targetCalories={targets?.calories || clientRecord?.target_calories || null}
+            onSelect={handleSwapSelect}
+            onClose={() => setSwapState(null)} isMobile={m} />
+        </ZweefVenster>
+      )}
 
       {toevoegVenster && viewMode === 'day' && weekData && (
         <ToevoegVenster db={db} dagNaam={DAYS[activeDay]?.full || ''}

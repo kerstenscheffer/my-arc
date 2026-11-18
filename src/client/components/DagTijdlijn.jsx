@@ -146,7 +146,9 @@ export default function DagTijdlijn({
     el.addEventListener('touchmove', blok, { passive: false })
     return () => el.removeEventListener('touchmove', blok)
   }, [])
-  const magSlepen = (b) => !!onVerzet && b.editable !== false && !b.meta?.los && !b.meta?.virtueel && b.type !== 'weging' && b.type !== 'checkin'
+  // Supplementen uit het plan staan op 'niet bewerkbaar' (ze hebben geen eigen
+  // agendablok), maar verzetten kan wel: vandaag via een uitzondering, altijd via het plan.
+  const magSlepen = (b) => !!onVerzet && (b.editable !== false || (b.type === 'supplement' && b.source === 'supplement_plan')) && !b.meta?.los && !b.meta?.virtueel && b.type !== 'weging' && b.type !== 'checkin'
   const beginSleep = (e, b) => {
     if (!magSlepen(b) || (e.pointerType === 'mouse' && e.button !== 0)) return
     const startY = e.clientY
