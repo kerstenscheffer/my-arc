@@ -522,7 +522,7 @@ export default function PlanAnalyzer({
   }, [clientRecord])
 
   const loadAllPlanCount = async (cId) => {
-    try { const { data } = await db.supabase.from('client_meal_plans').select('id, is_active').eq('client_id', cId); setAllClientPlans(data || []) } catch {}
+    try { const { data } = await db.supabase.from('client_meal_plans').select('id, is_active, template_name, daily_calories, created_at').eq('client_id', cId).order('created_at', { ascending: false }); setAllClientPlans(data || []) } catch {}
   }
 
   const loadIntakeData = async (cId) => {
@@ -2182,6 +2182,8 @@ export default function PlanAnalyzer({
             clients={clients} selectedClient={selectedClient || clientRecord} onSelectClient={onSelectClient}
             heeftPlan={!!(planMeta || selectedConceptId)}
             onSwitch={() => setShowPlanSwitcher(true)}
+            plannen={sjabloon ? [] : allClientPlans} huidigPlanId={planMeta?.id || selectedConceptId || null}
+            onKiesPlan={(id) => { setSelectie(new Set()); setSelectedConceptId(id); loadAllPlanCount(resolvedClientId) }}
             onNew={handleStartBlanco}
             onDelete={verwijderHuidigPlan}
             onClear={leegWeek}
@@ -2190,6 +2192,7 @@ export default function PlanAnalyzer({
             onPdf={handlePDF} pdfBezig={loadingPdf}
             onActivate={planMeta ? handleActivate : null} activating={activating}
             weergave={weekData ? viewMode : null}
+            agendaKan={!!(clientRecord || resolvedClientId) && !sjabloon}
             meldingen={weekData && !gegeten ? weekSignalen(weekDagen, targets || {}) : []}
             onMelding={(i) => { setSelectie(new Set()); setActiveDay(i); setViewMode('day') }}
             onWeergave={(v) => { setSelectie(new Set()); setViewMode(v) }}

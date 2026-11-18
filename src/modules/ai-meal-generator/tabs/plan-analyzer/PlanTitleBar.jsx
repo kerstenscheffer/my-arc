@@ -9,7 +9,7 @@
 // Was tot 24 okt 2026 vier gecentreerde regels (~190 px hoog).
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader, AlertTriangle, RefreshCw, Plus, Trash2, Users, ChevronDown, Search, X, Save, Eraser, MoreHorizontal, RotateCcw, RotateCw, Download, RectangleVertical, Columns3 } from 'lucide-react'
+import { Check, Loader, AlertTriangle, RefreshCw, Plus, Trash2, Users, ChevronDown, Search, X, Save, Eraser, MoreHorizontal, RotateCcw, RotateCw, Download, RectangleVertical, Columns3, CalendarRange } from 'lucide-react'
 
 const GREEN = '#22c55e'
 const RED = '#ef4444'
@@ -39,14 +39,17 @@ export default function PlanTitleBar({
   onActivate = null, activating = false,
   // Weergave (10 nov 2026): 'day' of 'kolommen' (de week naast elkaar). Klik
   // op de actieve knop = terug naar de andere, zoals in de workout builder.
-  weergave = null, onWeergave = null,
+  weergave = null, onWeergave = null, agendaKan = false,
   // Plan of wat de klant echt at (13 nov 2026).
   gegeten = false, onGegeten = null,
   // Weekmeldingen (18 nov 2026): gloeiend bolletje, klik = lijst. Klik op een
   // melding opent de eerste dag waar het speelt.
   meldingen = [], onMelding = null,
+  // Plannen van de klant voor de wisselaar achter de status.
+  plannen = [], huidigPlanId = null, onKiesPlan = null,
 }) {
   const m = isMobile
+  const [planMenu, setPlanMenu] = useState(false)
   const [meldOpen, setMeldOpen] = useState(false)
   const meldKleur = meldingen.some(x => x.ernst === 'rood') ? '#ef4444' : meldingen.some(x => x.ernst === 'oranje') ? '#f59e0b' : '#9ca3af'
   const [editing, setEditing] = useState(false)
@@ -148,10 +151,46 @@ export default function PlanTitleBar({
             {heeftPlan ? (name || 'Naamloos plan') : 'Nog geen plan'}
           </button>
         )}
+        {/* Status = planwisselaar (18 nov 2026): klik toont alle plannen van de
+            klant, het actieve bovenaan, en je wisselt met één klik. */}
         {heeftPlan && (
-          <span title={isActive ? 'Actief: de klant ziet dit plan' : 'Concept: alleen jij ziet dit'} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', fontWeight: 900, color: isActive ? GREEN : 'rgba(255,255,255,0.5)' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: isActive ? GREEN : 'rgba(255,255,255,0.35)' }} />
-            {isActive ? 'Actief' : 'Concept'}
+          <span style={{ position: 'relative', flexShrink: 0 }}>
+            <button onClick={() => plannen.length > 1 || onSwitch ? setPlanMenu(v => !v) : null} aria-expanded={planMenu}
+              title={isActive ? 'Actief: de klant ziet dit plan. Klik om van plan te wisselen.' : 'Concept: alleen jij ziet dit. Klik om van plan te wisselen.'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 0.6rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.16)', background: planMenu ? 'rgba(255,255,255,0.1)' : 'transparent', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 900, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: isActive ? GREEN : 'rgba(255,255,255,0.4)' }} />
+              {isActive ? 'Actief' : 'Concept'}
+              {plannen.length > 1 && <span style={{ color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>· {plannen.length} plannen</span>}
+              <ChevronDown size={13} strokeWidth={2.8} />
+            </button>
+            {planMenu && (<>
+              <div onClick={() => setPlanMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+              <div style={{ position: 'absolute', top: 34, left: 0, zIndex: 201, width: 340, maxWidth: 'calc(100vw - 24px)', maxHeight: '60vh', overflowY: 'auto', background: '#111', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.7)', padding: 6 }}>
+                {[...plannen].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0)).map(p => {
+                  const open = p.id === huidigPlanId
+                  return (
+                    <button key={p.id} onClick={() => { setPlanMenu(false); if (!open) onKiesPlan?.(p.id) }} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.55rem 0.6rem', borderRadius: 8, border: 'none',
+                      background: open ? 'rgba(255,255,255,0.1)' : 'transparent', fontFamily: 'inherit', textAlign: 'left', cursor: open ? 'default' : 'pointer', color: '#fff',
+                    }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: p.is_active ? GREEN : 'rgba(255,255,255,0.35)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.template_name || 'Naamloos plan'}</span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: p.is_active ? GREEN : 'rgba(255,255,255,0.5)' }}>
+                          {p.is_active ? 'Actief · de klant ziet dit' : 'Concept'}{p.daily_calories ? ` · ${Math.round(p.daily_calories)} kcal` : ''}
+                        </span>
+                      </span>
+                      {open && <Check size={15} strokeWidth={3} />}
+                    </button>
+                  )
+                })}
+                {onSwitch && (
+                  <button onClick={() => { setPlanMenu(false); onSwitch() }} style={{ width: '100%', marginTop: 4, padding: '0.55rem 0.6rem', borderRadius: 8, border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+                    Alle plannen beheren
+                  </button>
+                )}
+              </div>
+            </>)}
           </span>
         )}
         {heeftPlan && <SaveState kort state={status === 'saved' ? 'saved' : weekSaveState} />}
@@ -206,6 +245,13 @@ export default function PlanTitleBar({
             style={{ ...ikoon(false), background: weergave === 'kolommen' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>
             <Columns3 size={16} strokeWidth={2.4} />
           </button>
+          {/* Derde weergave (18 nov 2026): de weekagenda op tijd, zoals in Coach Inzicht. Alleen met een klant. */}
+          {agendaKan && (
+            <button onClick={() => onWeergave(weergave === 'week' ? 'day' : 'week')} title="Weekagenda op tijd: maaltijden en trainingen slepen en bewerken" aria-label="Weekagenda" aria-pressed={weergave === 'week'}
+              style={{ ...ikoon(false), background: weergave === 'week' ? 'rgba(255,255,255,0.12)' : 'transparent' }}>
+              <CalendarRange size={16} strokeWidth={2.4} />
+            </button>
+          )}
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
         </>)}
         {onUndo && <button onClick={onUndo} disabled={!canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={ikoon(!canUndo)}><RotateCcw size={16} strokeWidth={2.4} /></button>}

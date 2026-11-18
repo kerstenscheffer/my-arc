@@ -116,8 +116,6 @@ export default function WeekKolommen({
         {dagen.map((dag) => {
           const i = dag.index
           const doel = dagDoel(dag, targets)
-          const pK = pctVan(dag.kcal, doel.calories)
-          const pE = pctVan(dag.protein, doel.protein)
           const leeg = dag.maaltijden.length === 0
           const isDoel = doelDag === i && sleep && sleep.dag !== i
           return (
@@ -141,14 +139,18 @@ export default function WeekKolommen({
                   {aangepast.includes(i) && <span title="Alleen deze week anders" style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }} />}
                   {dag.training && <span title="Trainingsdag" style={{ marginLeft: 'auto', fontSize: '0.56rem', fontWeight: 900, color: '#0a0a0a', background: '#fff', borderRadius: 3, padding: '0 4px', lineHeight: '14px' }}>TRAINING</span>}
                 </span>
-                <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
-                  <span style={{ ...getallen, fontSize: '0.98rem', fontWeight: 900, color: leeg ? 'rgba(255,255,255,0.3)' : pK == null ? '#fff' : pctKleur(pK) }}>{nl(dag.kcal)}</span>
-                  {doel.calories > 0 && <span title={dag.pre ? 'Doel inclusief de pre-workout van deze dag' : undefined} style={{ ...getallen, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>/ {nl(doel.calories)}</span>}
-                </span>
-                <span style={{ display: 'flex', gap: 7, marginTop: 2, ...getallen, fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
-                  <span style={{ color: pE != null && !leeg ? pctKleur(pE) : undefined }}>E {nl(dag.protein)}</span>
-                  <span>K {nl(dag.carbs)}</span>
-                  <span>V {nl(dag.fat)}</span>
+                {/* Per macro: wat het nu is, met het doel van die dag eronder (18 nov 2026). */}
+                <span style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr 1fr', gap: 4, marginTop: 6 }}>
+                  {[['Kcal', dag.kcal, doel.calories], ['Eiwit', dag.protein, doel.protein], ['Koolh', dag.carbs, doel.carbs], ['Vet', dag.fat, doel.fat]].map(([naam, nu, d]) => {
+                    const p = pctVan(nu, d)
+                    return (
+                      <span key={naam} style={{ display: 'block', minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>{naam}</span>
+                        <span style={{ display: 'block', ...getallen, fontSize: '0.9rem', fontWeight: 900, lineHeight: 1.15, color: leeg ? 'rgba(255,255,255,0.3)' : p == null ? '#fff' : pctKleur(p) }}>{nl(nu)}</span>
+                        {d > 0 && <span style={{ display: 'block', ...getallen, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>van {nl(d)}</span>}
+                      </span>
+                    )
+                  })}
                 </span>
               </button>
 
