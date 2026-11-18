@@ -12,7 +12,7 @@
 // 2 = dit). De coach-weergave leest dat om te weten welke velden gevuld zijn.
 
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, ChevronDown } from 'lucide-react'
+import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
 import { laadProgressie, haalFase } from './progressieWeek'
@@ -20,7 +20,7 @@ import ProgressieScherm from './ProgressieScherm'
 import { TEVREDEN_OPTIES, SECTIES, COACHING_SECTIE } from './checkinVragen'
 import {
   DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor, gemetenRegel, kleurVoorBehaald,
-  BEHAALD_OPTIES, leegDoel,
+  BEHAALD_OPTIES, leegDoel, voorstelBehaald,
 } from './doelen'
 
 // Reviewvraag in de coachingronde (eens per 4 weken): geeft de klant een 8 of
@@ -559,53 +559,61 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
             return <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>Je doelen worden opgehaald…</div>
           }
           return (
-            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+            <div style={{ marginTop: 10, textAlign: 'left' }}>
               {vorigeAnders && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ color: GRIJS, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Dit ging je anders doen</div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: GRIJS, fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Dit ging je anders doen</div>
                   <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{vorigeAnders}</div>
                 </div>
               )}
-              {lijst.map((d, i) => (
+              {/* Geen kaarten: per doel één regel met een lijn eronder. Links het doel
+                  en wat de app mat, rechts de keuze als dropdown in zijn eigen kleur,
+                  zonder kader en met een smiley ervoor. */}
+              {lijst.map((d, i) => {
+                // De gemeten regel kleurt op wat er gemeten is (5 van 5 = groen), niet
+                // op wat er in de dropdown staat.
+                const gemetenKleur = d.gemeten != null ? kleurVoorBehaald(voorstelBehaald(d, d.gemeten)) : GRIJS
+                const keuzeKleur = d.behaald ? kleurVoorBehaald(d.behaald) : 'rgba(255,255,255,0.5)'
+                return (
                 <div key={i} style={{
-                  padding: '12px 14px', marginBottom: 8,
-                  background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '13px 0', borderBottom: `1px solid ${RAND}`,
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
-                    {doelTekst(d)}
-                  </div>
-                  {/* Wat de app zag, in de kleur van het voorstel: "4 van 7
-                      dagen gehaald" zegt meer dan een kaal getal. */}
-                  {gemetenRegel(d) && (
-                    <div style={{ marginTop: 4, fontSize: 14, fontWeight: 800, color: d.behaald ? kleurVoorBehaald(d.behaald) : GRIJS, fontVariantNumeric: 'tabular-nums' }}>
-                      {gemetenRegel(d)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                      {doelTekst(d)}
                     </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                    {BEHAALD_OPTIES.map(o => {
-                      const aan = d.behaald === o.key
-                      return (
-                        <button
-                          key={o.key}
-                          type="button"
-                          onClick={() => zetBehaald(i, o.key)}
-                          style={{
-                            flex: 1, minHeight: 40, borderRadius: 10,
-                            background: aan ? o.kleur : 'transparent',
-                            border: `1px solid ${aan ? o.kleur : RAND}`,
-                            color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                            fontSize: 14, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                          }}
-                        >
-                          {o.label}
-                        </button>
-                      )
-                    })}
+                    {gemetenRegel(d) && (
+                      <div style={{ marginTop: 3, fontSize: 13.5, fontWeight: 800, color: gemetenKleur, fontVariantNumeric: 'tabular-nums' }}>
+                        {gemetenRegel(d)}
+                      </div>
+                    )}
+                  </div>
+                  {/* Geen kader: een smiley in de kleur van de keuze, het woord en een pijltje. */}
+                  <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    {(() => { const Smiley = d.behaald === 'ja' ? Smile : d.behaald === 'deels' ? Meh : d.behaald === 'nee' ? Frown : Meh
+                      return <Smiley size={22} strokeWidth={2.6} color={keuzeKleur} style={{ position: 'absolute', left: 0, top: '50%', marginTop: -11, pointerEvents: 'none' }} /> })()}
+                    <select
+                      className="ci-lijn"
+                      value={d.behaald || ''}
+                      onChange={e => zetBehaald(i, e.target.value)}
+                      aria-label={`${doelTekst(d)}: gelukt?`}
+                      style={{
+                        appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                        height: 44, minWidth: 108, padding: '0 22px 0 30px', borderRadius: 0,
+                        background: 'transparent', border: 'none', color: keuzeKleur,
+                        fontSize: 15, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+                      }}
+                    >
+                      {!d.behaald && <option value="" disabled>Kies</option>}
+                      {BEHAALD_OPTIES.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                    </select>
+                    <ChevronDown size={16} strokeWidth={3} color={keuzeKleur} style={{ position: 'absolute', right: 0, top: '50%', marginTop: -8, pointerEvents: 'none' }} />
                   </div>
                 </div>
-              ))}
-              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 6, lineHeight: 1.5 }}>
+                )
+              })}
+              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 12, lineHeight: 1.5 }}>
                 Wat de app kon meten staat al ingevuld. Klopt het niet met hoe jouw week
                 ging, zet het gerust om.
               </div>
@@ -958,7 +966,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   const magVerder = ingevuld(vraag)
   // Voortgang telt de vraag waar je nu op staat mee, zodat de balk direct
   // beweegt als je begint in plaats van pas na de eerste stap.
-  const voortgang = ((stap + 1) / vragen.length) * 100
+  // De balk begint al op 15%: je bent begonnen, dus er staat iets. De rest
+  // verdeelt zich over de vragen tot 100% bij de laatste.
+  const voortgang = vragen.length > 1 ? 15 + (stap / (vragen.length - 1)) * 85 : 100
 
   return (
     <div style={{
@@ -974,23 +984,44 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
         width: '100%', maxWidth: 560, margin: '0 auto', padding: '2vh 0',
       }}>
-      {/* Zacht: de titel en de balk zijn context, de vraag eronder is het
-          enige dat moet opvallen. Geen sectiekop, geen teller. */}
+      {/* De titel in vet wit, met de voortgangsband eronder. */}
       {titel && (
-        <div style={{ fontSize: 14, fontWeight: 700, color: GRIJS, marginBottom: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', marginBottom: 8 }}>
           {titel}
         </div>
       )}
-      {/* Groen, en richting het eind steeds voller groen: het verloop staat
-          over de hele balk en de vulling knipt er een stuk van af. */}
-      <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden', marginBottom: 32 }}>
-        <div style={{ width: `${voortgang}%`, height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
-          <div style={{
-            width: `${10000 / voortgang}%`, height: '100%',
-            background: 'linear-gradient(90deg, rgba(34,197,94,0.35), #22c55e)',
-          }} />
-        </div>
-      </div>
+      {/* Voortgang in dezelfde vorm als de slaap- en stappenbalk op Home: een
+          gevulde band met een ring op het eind van de vulling, hier met een vinkje. */}
+      {(() => {
+        const HOOG = 30, R = HOOG - 2
+        const plek = `clamp(${R / 2 + 2}px, ${voortgang}%, calc(100% - ${R / 2 + 2}px))`
+        const links = voortgang > 60
+        const klaar = stap + 1 >= vragen.length
+        return (
+          <div role="progressbar" aria-valuemin={1} aria-valuemax={vragen.length} aria-valuenow={stap + 1}
+            // Van rand tot rand van het scherm, zoals de balken op Home. Alleen de
+            // vulling is zichtbaar; het stuk dat nog komt heeft geen eigen baan.
+            style={{ position: 'relative', height: HOOG, marginBottom: 28, width: '100vw', maxWidth: '100vw', marginLeft: 'calc(50% - 50vw)' }}>
+            <div style={{ position: 'absolute', left: 0, top: 3, bottom: 3, width: `max(${voortgang}%, ${R / 2 + 2}px)`, background: 'linear-gradient(90deg, #047857 0%, #10b981 55%, #34d399 100%)', boxShadow: '0 0 14px rgba(16,185,129,0.35)', transition: 'width 0.3s ease' }} />
+            <span style={{
+              position: 'absolute', top: 1, left: plek, width: R, height: R, marginLeft: -R / 2, boxSizing: 'border-box',
+              borderRadius: '50%', border: '2px solid #34d399', background: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: klaar ? '0 0 12px rgba(16,185,129,0.7)' : 'none', transition: 'left 0.3s ease',
+            }}>
+              <Check size={14} strokeWidth={3.2} color={klaar ? '#10b981' : '#fff'} />
+            </span>
+            <span style={{
+              position: 'absolute', top: 0, bottom: 0, display: 'flex', alignItems: 'center',
+              fontSize: 12, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+              transition: 'left 0.3s ease, right 0.3s ease',
+              ...(links ? { right: `calc(100% - ${plek} + ${R / 2 + 6}px)` } : { left: `calc(${plek} + ${R / 2 + 6}px)` }),
+            }}>
+              {stap + 1} / {vragen.length}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* De vraag */}
       {renderVeld(vraag)}

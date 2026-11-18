@@ -17,8 +17,13 @@ export const DOEL_TYPES = [
   {
     key: 'trainen', label: 'Trainen', eenheid: 'keer',
     standaard: 3, max: 14,
-    // Uit week_cijfers zoals weekCijfers.js die oplevert.
-    meet: (c) => c?.trainingen?.gedaan ?? null,
+    // Uit week_cijfers zoals weekCijfers.js die oplevert. Telt hoe vaak je
+    // getraind hebt (`gestart`), net als het progressiescherm. Dit stond op
+    // `gedaan`: alleen trainingen waarin minstens 70% van de geplande sets is
+    // gelogd. Dat is de drempel van de challenge-stand; voor "5x trainen" gaf
+    // het 2 of 3 van de 5 bij iemand die vijf keer in de sportschool stond
+    // (18 nov 2026).
+    meet: (c) => c?.trainingen?.gestart ?? c?.trainingen?.gedaan ?? null,
     zin: (n) => `${n}× trainen`,
     meetTekst: (m, doel) => `${m} van ${doel.doel_getal}× getraind`,
   },

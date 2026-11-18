@@ -68,6 +68,8 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db,
       <div style={{
         flex: 1,
         overflowY: 'auto',
+        // De voortgangsband loopt van rand tot rand (100vw); niet zijwaarts laten schuiven.
+        overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingTop: 'env(safe-area-inset-top)',

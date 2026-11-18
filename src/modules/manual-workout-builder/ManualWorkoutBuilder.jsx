@@ -1441,6 +1441,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </div>
       )}
       {!m && alleDagen && workoutPlan.days.length > 1 ? (<>
+        {/* De brief zweeft over de pagina (BriefZweef); in de dagweergave wordt
+            hij verderop gerenderd, hier voor de weekweergave. */}
+        {huidigPlan?.generation_options?.brief && effectiveClient && (
+          <ConceptBrief key={huidigPlan.id} db={db} plan={huidigPlan} client={effectiveClient} nietOpgeslagen={nietOpgeslagen} isMobile={isMobile}
+            onKlaar={async (id) => { try { sessionStorage.setItem('myarc_open_schema', JSON.stringify({ clientId: effectiveClient.id, schemaId: id })) } catch { /* niet erg */ } await herlaadKlant() }} />
+        )}
         {/* Totaal van de hele week boven de kolommen (10 nov 2026). */}
         {(() => {
           const alle = weekDagen.flatMap(d => d.exercises || [])

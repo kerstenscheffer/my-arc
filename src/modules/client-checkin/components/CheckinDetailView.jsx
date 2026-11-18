@@ -100,8 +100,15 @@ export default function CheckinDetailView({
   // was afgesproken. Dit is waar de klant naar keek toen hij zijn antwoorden
   // gaf.
   const v3Cijfers = wc ? [
-    { label: 'Trainingen', waarde: nietLeeg(wc.trainingen?.gedaan)
-        ? `${wc.trainingen.gedaan}${nietLeeg(wc.trainingen?.gepland) ? ` van ${wc.trainingen.gepland} gepland` : ''}` : null },
+    // Hoe vaak er getraind is (gestart), net als bij de klant. Erachter hoeveel
+    // daarvan volledig gelogd zijn, als dat er minder zijn: dat is de strenge
+    // telling van de challenge (70% van de geplande sets).
+    { label: 'Trainingen', waarde: (() => {
+        const n = nietLeeg(wc.trainingen?.gestart) ? wc.trainingen.gestart : wc.trainingen?.gedaan
+        if (!nietLeeg(n)) return null
+        const vol = wc.trainingen?.gedaan
+        return `${n}${nietLeeg(wc.trainingen?.gepland) ? ` van ${wc.trainingen.gepland} gepland` : ''}${nietLeeg(vol) && vol < n ? ` · ${vol} volledig gelogd` : ''}`
+      })() },
     { label: 'Dagen gewogen', waarde: nietLeeg(wc.wegingen?.gedaan) ? `${wc.wegingen.gedaan} van 7` : null },
     { label: 'Dagen op plan', waarde: nietLeeg(wc.voeding?.dagen) ? `${wc.voeding.dagen} van 7` : null },
     { label: 'Gewicht (7-daags gem.)', waarde: nietLeeg(wc.gewicht?.verschil)
