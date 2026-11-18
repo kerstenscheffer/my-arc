@@ -119,6 +119,8 @@ declare
   heel text[];
   stam text[];
   anders boolean := false;
+  bw text;
+  rest text;
   maat constant text := '\m(zakje|zak|bakje|bak|pakje|pak|stukje|stuk|stuks|portie|handje|handvol|beetje|glaasje|glas|kopje|kop|bordje|bord|schaaltje|schaal|blikje|blik|flesje|fles|plakje|plak|sneetje|snee|eetlepel|theelepel|lepel|schepje|schep|een|paar|wat|kleine|klein|grote|groot|halve|half|hele)\M';
   ruis constant text := '\m(jumbo|ah|albert heijn|lidl|aldi|plus|dirk|vomar|hoogvliet|picnic|spar|coop|poiesz|ekoplaza|deen|tesco|met|en|van|de|het|in|op|zonder|voor)\M';
 begin
@@ -157,6 +159,43 @@ begin
   end if;
 
   -- ── Meer woorden ───────────────────────────────────────────────────────
+  -- Bereidingswoord erbij ("gebakken kipfilet", "pasta gekookt"): zoeken op de
+  -- rest en de variant met die bereiding bovenaan (Kersten, 18 nov 2026).
+  -- Niet als de hele zoekterm een eigen synoniem heeft ("gebakken ei" → spiegelei).
+  bw := substring(qn from '\m(gekookte?|gebakken|gegrilde?|gebraden|gestoomde?|rauwe?|ongekookte?)\M');
+  if bw is not null then
+    rest := btrim(regexp_replace(regexp_replace(qn, '\m' || bw || '\M', ' '), '\s+', ' ', 'g'));
+    bw := regexp_replace(bw, '(te?|ken|de?|en|e)$', '');
+    -- Een synoniem dat naar iets anders wijst ("gebakken ei" → spiegelei) gaat voor.
+    if length(rest) >= 2 and not exists (
+         select 1 from zoek_synoniemen z where public.zoek_norm(z.van) = qn
+           and public.zoek_norm(z.naar) !~ ('(^| )' || public.zoek_stam(split_part(rest, ' ', 1)))) then
+      return query
+      select r.id, r.name, r.name_en, r.calories_per_100g, r.protein_per_100g, r.carbs_per_100g, r.fat_per_100g,
+             r.default_portion_gram, r.category, r.image_url, r.brand, r.log_count, r.barcode, r.source,
+             (100 - r.groep * 40 - r.o)::numeric, r.bereiding, r.eenheid, r.gram_per_eenheid, r.labels
+      -- Twee lijsten samen: de hele zoekterm (groep 0, daar zitten de synoniemen
+      -- in) en zoeken op de rest (groep 1). Raak = juiste bereiding én het
+      -- product zelf; die staan bovenaan in de volgorde van de hele zoekterm.
+      -- De rest volgt in de volgorde van zoeken op de rest.
+      from (
+        select distinct on (a.id) a.*, min(case when a.groep = 0 then a.o end) over (partition by a.id) as o0, min(case when a.groep = 1 then a.o end) over (partition by a.id) as o1 from (
+          select k.*, 0 as groep from public.zoek_ingredienten_kern(p_q, p_client, p_limit) with ordinality as k(id, name, name_en, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, default_portion_gram, category, image_url, brand, log_count, barcode, source, score, bereiding, eenheid, gram_per_eenheid, labels, o)
+          union all
+          select z.*, 1 from public.zoek_ingredienten(rest, p_client, p_limit) with ordinality as z(id, name, name_en, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, default_portion_gram, category, image_url, brand, log_count, barcode, source, score, bereiding, eenheid, gram_per_eenheid, labels, o)
+        ) a order by a.id, a.groep, a.o
+      ) r
+      cross join lateral (select
+          (public.zoek_norm(r.name) ~ ('(^| )' || bw) or coalesce(r.bereiding, '') ~ ('^' || bw))
+          and (public.zoek_norm(r.name) ~ ('(^| )' || public.zoek_stam(split_part(rest, ' ', 1)))
+               or (length(split_part(rest, ' ', 1)) >= 5 and position(public.zoek_stam(split_part(rest, ' ', 1)) in public.zoek_norm(r.name)) > 0)) as raak) f
+      order by f.raak desc, case when f.raak then coalesce(r.o0, 100 + r.o1) else coalesce(r.o1, 100 + r.o0) end
+      limit p_limit;
+      get diagnostics n = row_count;
+      if n > 0 then return; end if;
+    end if;
+  end if;
+
   basis := array(select k.id from public.zoek_ingredienten_kern(p_q, p_client, p_limit) k);
 
   -- Maatwoord ervoor ("zakje snoep"): ook zonder dat woord zoeken.

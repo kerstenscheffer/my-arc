@@ -9,7 +9,8 @@
 // Wordt getoond in SlaapLogBlad (SlaapKnop.jsx), dus op home en op tracking.
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Lightbulb, ChevronDown, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Lightbulb, ChevronDown, MessageCircle, CalendarClock, Check } from 'lucide-react'
+import { leesAgendaSlaap, ritmeVoorstellen, zetInAgenda } from './slaapRitme'
 import { ALGEMENE_TIPS, cijfers, persoonlijkeTips, maandagVan, plusDagen, klokTekst, nl, lokaalIso } from './slaapTips'
 
 const WEKEN = 8
@@ -35,6 +36,19 @@ export default function SlaapInzicht({ db, client, logDatum, versie = 0, onAanpa
   const [gekozen, setGekozen] = useState(logDatum)
   const [meerTips, setMeerTips] = useState(false)
   const [alleTips, setAlleTips] = useState(false)
+  // Agenda-slaap: wijkt je vaste ritme af van je agenda, dan één tik om hem
+  // gelijk te zetten (slaapRitme.js).
+  const [agenda, setAgenda] = useState(null)
+  const [agendaVersie, setAgendaVersie] = useState(0)
+  const [gezet, setGezet] = useState({}) // { werk: true } na 'Zet in agenda'
+  const [agendaBezig, setAgendaBezig] = useState(null)
+  const [agendaFout, setAgendaFout] = useState(null)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    leesAgendaSlaap(db, client.id).then(a => { if (!weg) setAgenda(a) }, () => {})
+    return () => { weg = true }
+  }, [db, client?.id, agendaVersie])
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
@@ -68,6 +82,19 @@ export default function SlaapInzicht({ db, client, logDatum, versie = 0, onAanpa
     .map(ma => ({ ma, c: cijfers(nachtenVan(ma)) })), [perDag, logDatum]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (nachten === null) return <div style={{ height: 260 }} />
+
+  const voorstellen = ritmeVoorstellen(nachten, agenda, logDatum)
+  const zet = async (v) => {
+    setAgendaBezig(v.sleutel); setAgendaFout(null)
+    try {
+      await zetInAgenda(db, client.id, agenda, v)
+      setGezet(g => ({ ...g, [v.sleutel]: `${klokTekst(v.bed)} – ${klokTekst(v.op)}` }))
+      setAgendaVersie(x => x + 1)
+    } catch (e) {
+      console.error('Slaap in agenda zetten mislukt:', e)
+      setAgendaFout('Opslaan in je agenda lukte niet')
+    } finally { setAgendaBezig(null) }
+  }
 
   const nacht = perDag[gekozen]
   const huidigeMa = maandagVan(logDatum)
@@ -144,6 +171,39 @@ export default function SlaapInzicht({ db, client, logDatum, versie = 0, onAanpa
         <ul style={{ margin: '-6px 0 16px', padding: '0 0 0 1rem', fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
           {ALGEMENE_TIPS.map(t => <li key={t} style={{ marginBottom: 4 }}>{t}</li>)}
         </ul>
+      )}
+
+      {/* Vast ritme dat afwijkt van de agenda */}
+      {(voorstellen.length > 0 || Object.keys(gezet).length > 0) && (
+        <div style={{ ...scheiding, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Object.entries(gezet).map(([k, tijden]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', fontWeight: 800, color: '#c084fc' }}>
+              <Check size={16} strokeWidth={3} /> {k === 'werk' ? 'Doordeweeks' : 'Weekend'} staat in je agenda: {tijden}
+            </div>
+          ))}
+          {voorstellen.filter(v => !gezet[v.sleutel]).map(v => (
+            <div key={v.sleutel}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', fontWeight: 900, color: '#c084fc', letterSpacing: '0.1em' }}>
+                  <CalendarClock size={15} strokeWidth={2.6} /> AGENDA
+                </span>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff' }}>Je vaste ritme</span>
+              </div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 10 }}>
+                {v.naam} ga je rond <b style={{ color: '#fff' }}>{klokTekst(v.bed)}</b> naar bed en sta je om <b style={{ color: '#fff' }}>{klokTekst(v.op)}</b> op.
+                {' '}In je agenda staat {klokTekst(v.huidigBed)} – {klokTekst(v.huidigOp)}.
+              </div>
+              <button onClick={() => zet(v)} disabled={!!agendaBezig} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 1rem', borderRadius: 12,
+                background: '#fff', color: '#0a0a0a', border: 'none', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 900,
+                cursor: agendaBezig ? 'default' : 'pointer', opacity: agendaBezig ? 0.6 : 1, touchAction: 'manipulation',
+              }}>
+                <CalendarClock size={15} strokeWidth={2.6} /> {agendaBezig === v.sleutel ? 'Opslaan…' : `Zet ${klokTekst(v.bed)} – ${klokTekst(v.op)} in agenda`}
+              </button>
+            </div>
+          ))}
+          {agendaFout && <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444' }}>{agendaFout}</div>}
+        </div>
       )}
 
       {/* Week */}

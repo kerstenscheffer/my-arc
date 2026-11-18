@@ -86,14 +86,17 @@ const macrosVan = (rijen: any[]) => {
 // Zoekt hele porties die zo dicht mogelijk bij het doel komen. Kleine stappen
 // vanaf de hoeveelheden die de klant ongeveer noemde: één ingrediënt een stap
 // op of af, of twee tegen elkaar in, zolang het beter wordt.
-function schaal(rijen: any[], doelKcal: number, doelEiwit: number) {
+// doelVet: het vet van het gerecht dat hij vervangt. Alleen een tekort telt,
+// zodat de dag niet onder het vetminimum van de klant zakt.
+function schaal(rijen: any[], doelKcal: number, doelEiwit: number, doelVet = 0) {
   const fout = () => {
     const m = macrosVan(rijen)
     const dk = (m.kcal - doelKcal) / doelKcal
     const dp = (m.eiwit - doelEiwit) / Math.max(doelEiwit, 1)
     // Te weinig eiwit telt zwaarder dan te veel; ver van de start afwijken een beetje.
     const afstand = rijen.reduce((s, r) => s + Math.abs(r.gram - r.start) / Math.max(r.start, 1), 0) / rijen.length
-    return dk * dk + (dp < 0 ? dp * dp * 1.5 : dp * dp * 0.4) + afstand * 0.002
+    const dv = doelVet > 0 ? Math.min(0, (m.vet - doelVet) / Math.max(doelVet, 8)) : 0
+    return dk * dk + (dp < 0 ? dp * dp * 1.5 : dp * dp * 0.4) + dv * dv * 0.6 + afstand * 0.002
   }
   const vrij = rijen.map((r, i) => (r.vast ? -1 : i)).filter(i => i >= 0)
   const zet = (i: number, d: number) => {
@@ -361,9 +364,25 @@ Deno.serve(async (req) => {
         if (geplaatst.some(g => g.slot === slot)) continue
         opDagen = doel.dagen
       }
-      const mac = doel ? schaal(rijen, Number(doel.m.calories), Number(doel.m.protein)) : macrosVan(rijen)
-
       const wens = m.soort === 'uitdrukkelijke_wens'
+      const doelVet = doel ? Number(doel.m.fat) || 0 : 0
+      let mac = doel ? schaal(rijen, Number(doel.m.calories), Number(doel.m.protein), doelVet) : macrosVan(rijen)
+      // Vetminimum (0,7 g per kg, Kersten 18 nov 2026): komt de maaltijd met
+      // hele porties ruim onder het vet van het gerecht dat hij vervangt, dan
+      // komt er een gewone vetbron bij: olijfolie bij warm en hartig, walnoten
+      // bij ontbijt en snack. Niet bij een uitdrukkelijke wens.
+      if (doel && !wens && doelVet >= 8 && mac.vet < doelVet - 5) {
+        const zoek = ['ontbijt', 'snack'].includes(m.moment) ? 'walnoten' : 'olijfolie'
+        const kand = (await kandidaten(sb, zoek)).filter((k: any) => Number(k.fat_per_100g) >= 40)
+        const vetbron = kand.find((k: any) => k.source === 'coach' && !k.brand) || kand[0]
+        if (vetbron && !rijen.some(r => r.ing.id === vetbron.id)) {
+          const ing = { ...vetbron, rol: 'vet' }, regel = portieRegel(ing)
+          rijen.push({ ing, regel, vast: false, start: regel.min, gram: regel.min, toegevoegd: false, vetErbij: true, was: null, naam: vetbron.name })
+          for (const r of rijen) if (!r.vast) r.gram = r.start
+          mac = schaal(rijen, Number(doel.m.calories), Number(doel.m.protein), doelVet)
+        }
+      }
+
       if (doel) {
         const K = Number(doel.m.calories), P = Number(doel.m.protein)
         const kcalOk = Math.abs(mac.kcal - K) <= K * KCAL_MARGE
@@ -404,9 +423,10 @@ Deno.serve(async (req) => {
       }
       const porties = rijen.map(r => `${hoeveel(r)} ${r.naam.toLowerCase()}`).join(', ')
       const erbij = rijen.filter(r => r.toegevoegd).map(r => r.naam.toLowerCase())
+      const vetbij = rijen.filter(r => r.vetErbij).map(r => r.naam.toLowerCase())
       const beter = rijen.filter(r => r.was && !r.toegevoegd).map(r => `${r.was} werd ${r.naam.toLowerCase()}`)
       const waar = opDagen.length === dagen.length ? 'elke dag' : `${opDagen.length} dagen`
-      keuzes.push(`${label} uit de intake${wens ? ' (uitdrukkelijke wens)' : ''}: ${m.naam}, ${waar}${doel ? `, in plaats van ${doel.m.name}` : ''}. ${porties}: ${Math.round(mac.kcal)} kcal, ${Math.round(mac.eiwit)} g eiwit${doel ? ` (was ${Math.round(doel.m.calories)} kcal, ${Math.round(doel.m.protein)} g)` : ''}.${erbij.length ? ` Toegevoegd voor het eiwit: ${erbij.join(', ')}.` : ''}${beter.length ? ` Aangepast: ${beter.join(', ')}.` : ''} De klant schreef: "${String(m.citaat).slice(0, 140)}".`)
+      keuzes.push(`${label} uit de intake${wens ? ' (uitdrukkelijke wens)' : ''}: ${m.naam}, ${waar}${doel ? `, in plaats van ${doel.m.name}` : ''}. ${porties}: ${Math.round(mac.kcal)} kcal, ${Math.round(mac.eiwit)} g eiwit${doel ? ` (was ${Math.round(doel.m.calories)} kcal, ${Math.round(doel.m.protein)} g)` : ''}.${erbij.length ? ` Toegevoegd voor het eiwit: ${erbij.join(', ')}.` : ''}${beter.length ? ` Aangepast: ${beter.join(', ')}.` : ''}${vetbij.length ? ` Toegevoegd voor het vet: ${vetbij.join(', ')}.` : ''} De klant schreef: "${String(m.citaat).slice(0, 140)}".`)
       if (m.moment === 'extra') nakijken.push(`Extra uit de intake toegevoegd: ${m.naam} (${Math.round(mac.kcal)} kcal per dag). Dat komt bovenop het plan; haal het ergens anders weg als het dagtotaal te hoog wordt.`)
       geplaatst.push({ slot: extraSlot, moment: m.moment, naam: m.naam, kcal: Math.round(mac.kcal), eiwit: Math.round(mac.eiwit), dagen: opDagen.length, id: nieuw.id })
     }
@@ -419,6 +439,12 @@ Deno.serve(async (req) => {
       const som = (f: string) => ms.reduce((s: number, x: any) => s + (Number(x[f]) || 0), 0)
       ws[k].totals = { kcal: Math.round(som('calories')), protein: r1(som('protein')), carbs: r1(som('carbs')), fat: r1(som('fat')) }
       tk += ws[k].totals.kcal; te += ws[k].totals.protein; tkh += ws[k].totals.carbs; tv += ws[k].totals.fat; n++
+    }
+    // Vetminimum van de klant per dag bewaken.
+    const vetMin = Number(mv.target_fat) || 0
+    if (vetMin > 0 && geplaatst.length) {
+      const laag = dagen.filter(k => ws[k].totals.fat < vetMin * 0.95)
+      if (laag.length) nakijken.push(`Vet onder het minimum op ${laag.length} ${laag.length === 1 ? 'dag' : 'dagen'}: laagste dag ${Math.round(Math.min(...laag.map(k => ws[k].totals.fat)))} g, minimum ${Math.round(vetMin)} g.`)
     }
     const gem = n ? { daily_calories: Math.round(tk / n), daily_protein: Math.round(te / n), daily_carbs: Math.round(tkh / n), daily_fat: Math.round(tv / n) } : {}
     await klaar({ op: new Date().toISOString(), overgenomen: geplaatst.length, maaltijden: geplaatst }, { keuzes, nakijken }, geplaatst.length ? ws : null, geplaatst.length ? gem : {})

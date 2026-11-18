@@ -70,7 +70,7 @@ Werkwijze:
 - Verander niets wat de feedback niet raakt. Geen verbeteringen op eigen initiatief.
 
 Training: 'vervang' en 'verwijder' werken op één oefening op één dag (of dag 'alle'). 'sets' zet het aantal sets. 'verplaats' zet de oefening op een plek in de dag. 'voeg_toe' zet een oefening uit "toegestaan" achteraan de dag.
-Voeding: 'vervang' vervangt de maaltijd in een slot door een gerecht uit "toegestaan". 'verwijder' haalt de maaltijd uit het slot. 'ingredient_gram' zet de grammen van één ingrediënt in die maaltijd (0 = weghalen). Houd bij voeding rekening met het kcal- en eiwitdoel: compenseer een grote wijziging zo nodig met een tweede actie.`
+Voeding: 'vervang' vervangt de maaltijd in een slot door een gerecht uit "toegestaan". 'verwijder' haalt de maaltijd uit het slot. 'ingredient_gram' zet de grammen van één ingrediënt in die maaltijd (0 = weghalen). Houd bij voeding rekening met het kcal- en eiwitdoel: compenseer een grote wijziging zo nodig met een tweede actie. Het vetdoel in "doel_trainingsdag" is een minimum: haal je een vetbron weg of verklein je hem (ei, kaas, olie, noten), zet er dan in dezelfde maaltijd een andere vetbron tegenover of vergroot een bestaande, zodat geen dag onder dat minimum komt. Lukt dat niet met deze acties, zet het punt dan in "niet_opgelost".`
 
 // ── Training ────────────────────────────────────────────────────────────────
 function groepeerOpSpier(oef: any[]) {
@@ -277,10 +277,14 @@ Deno.serve(async (req) => {
     const brief = { ...(ctx.opties.brief || {}) }
     const toegepast = res.gedaan.length ? (uit.toegepast || []) : []
     brief.keuzes = [...(brief.keuzes || []), ...toegepast.map((t: any) => `Aangepast door eerdere feedback ("${String(t.feedback).slice(0, 90)}"): ${t.uitleg}`)]
+    // Vetminimum (0,7 g per kg): na de aanpassingen per dag controleren.
+    const vetMin = soort === 'voeding' ? Number(ctx.opties.macro_voorstel?.target_fat) || 0 : 0
+    const vetLaag = vetMin > 0 ? DAGEN.filter(k => res.week_structure?.[k]?.totals && Number(res.week_structure[k].totals.fat) < vetMin * 0.95) : []
     brief.nakijken = [
+      ...(vetLaag.length ? [`Vet onder het minimum op ${vetLaag.length} ${vetLaag.length === 1 ? 'dag' : 'dagen'}: laagste dag ${Math.round(Math.min(...vetLaag.map(k => Number(res.week_structure[k].totals.fat))))} g, minimum ${Math.round(vetMin)} g.`] : []),
       ...(uit.niet_opgelost || []).map((t: any) => `Feedback niet automatisch opgelost ("${String(t.feedback).slice(0, 90)}"): ${t.reden}`),
       ...(res.mislukt.length ? [`De nakijker wilde iets aanpassen dat niet kon: ${res.mislukt.join('; ')}.`] : []),
-      ...(brief.nakijken || []),
+      ...(brief.nakijken || []).filter((t: string) => !/^Vet onder het minimum/.test(String(t))),
     ]
     const opties = { ...ctx.opties, brief, nagekeken: { op: new Date().toISOString(), feedback: feedback.length, acties: res.gedaan.length, model } }
     const { error } = await sb.from(tabel).update({ week_structure: res.week_structure, ...(res.gem || {}), [kolom]: opties, updated_at: new Date().toISOString() }).eq('id', ctx.plan.id)

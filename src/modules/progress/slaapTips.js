@@ -169,14 +169,22 @@ export function persoonlijkeTips(nachten) {
   // 6. Wat de klant zelf schreef
   const tekst = nachten.map(n => String(n.struggles || '').toLowerCase()).join(' ')
   const telt = (re) => (tekst.match(re) || []).length
+  // Teksten uit de keuzelijst (NachtOpmerking.jsx) en eigen tekst.
   const opmerkingen = [
-    [/pieker|stress|hoofd|onrust|gedacht/g, 'Hoofd vol', 'Je schreef een paar keer over piekeren. Schrijf voor het slapen op wat er morgen moet gebeuren. Dan hoeft je hoofd het niet vast te houden.'],
+    [/moeilijk in slaap|inslapen|niet in slaap/g, 'Moeilijk in slaap', 'Kom je moeilijk in slaap? Een vast avondritueel helpt: zelfde tijd, licht dimmen, scherm weg, warme douche. Lig je na 20 minuten nog wakker, sta dan even op.'],
+    [/(vaak|veel) wakk|wakker gelegen|lag wakker/g, 'Vaak wakker', 'Word je vaak wakker? Check je slaapkamer (koel, donker, stil) en drink geen alcohol of cafeïne in de avond. Kijk niet op je telefoon als je wakker wordt.'],
+    [/te vroeg wakker/g, 'Te vroeg wakker', 'Te vroeg wakker? Houd je kamer donker tot je wekker gaat en sta wel op je vaste tijd op, ook als de nacht kort was.'],
+    [/pieker|stress|hoofd|onrust|gedacht/g, 'Hoofd vol', 'Je schreef over piekeren. Schrijf voor het slapen op wat er morgen moet gebeuren. Dan hoeft je hoofd het niet vast te houden.'],
     [/koffie|cafe|cola|energy|pre.?workout/g, 'Cafeïne', 'Cafeïne werkt 6 tot 8 uur door. Je laatste koffie of pre-workout uiterlijk om 14:00.'],
-    [/telefoon|scherm|netflix|serie|gamen|game|tiktok|insta/g, 'Scherm', 'Je noemde je scherm. Leg je telefoon 45 minuten voor bedtijd weg, het liefst buiten de slaapkamer.'],
+    [/telefoon|scherm|netflix|serie|gamen|game|tiktok|insta/g, 'Scherm', 'Leg je telefoon 45 minuten voor bedtijd weg, het liefst buiten de slaapkamer.'],
+    [/gegeten|zwaar eten|laat eten/g, 'Laat gegeten', 'Eet je laatste maaltijd 2 tot 3 uur voor bedtijd. Een volle maag houdt je lichaam bezig als het zou moeten herstellen.'],
+    [/alcohol|bier|wijn|drank/g, 'Alcohol', 'Alcohol helpt inslapen, maar breekt je diepe slaap en REM-slaap op. Stop 3 uur voor bedtijd, of houd het bij één glas.'],
     [/plas|wc|toilet/g, 'Wakker om te plassen', 'Drink je water vooral overdag en minder in de 2 uur voor bedtijd.'],
     [/warm|heet|zweet/g, 'Te warm', 'Te warm slaapt ondiep. Raam open of een dunner dekbed; 17-19 °C is ideaal.'],
+    [/lawaai|geluid|licht/g, 'Lawaai of licht', 'Oordopjes en een slaapmasker zijn de goedkoopste upgrade voor je slaap. Probeer ze een week.'],
     [/kind|baby|zoon|dochter/g, 'Kinderen', 'Gebroken nachten door de kinderen? Bescherm dan vooral het begin: zo vroeg mogelijk naar bed, want die eerste uren zijn het diepst.'],
-    [/wakker/g, 'Wakker liggen', "Lig je langer dan 20 minuten wakker? Sta even op, doe iets saais bij gedimd licht en ga terug als je moe bent."],
+    [/pijn|spierpijn|blessure/g, 'Pijn', 'Pijn houdt je wakker. Een warme douche voor bed en een extra kussen ter ondersteuning helpen. Houdt het aan, meld het dan bij je coach.'],
+    [/laat getraind|laat trainen|avondtraining/g, 'Laat getraind', 'Train je laat, plan dan minstens 2 tot 3 uur tussen je training en bedtijd, en neem daarna geen pre-workout of cafeïne.'],
   ]
   for (const [re, titel, uitleg] of opmerkingen) {
     const n = telt(re)

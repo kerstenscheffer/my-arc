@@ -21,6 +21,8 @@ import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 import HorizontaleSlider from '../../client/components/HorizontaleSlider'
 import SlaapInzicht from './SlaapInzicht'
 import { ALGEMENE_TIPS as TIPS } from './slaapTips'
+import { leesAgendaSlaap, agendaTijdenVoor } from './slaapRitme'
+import NachtOpmerking from './NachtOpmerking'
 
 // De tips staan sinds 18 nov in slaapTips.js (gedeeld met SlaapInzicht).
 
@@ -41,13 +43,6 @@ const urenTussen = (bed, op) => {
   let minuten = (ou * 60 + om) - (bu * 60 + bm)
   if (minuten <= 0) minuten += 24 * 60
   return Math.round((minuten / 60) * 10) / 10
-}
-
-const veld = {
-  width: '100%', minHeight: 46, padding: '0 0.75rem',
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-  borderRadius: 12, color: '#fff', fontSize: '0.95rem', fontWeight: 800,
-  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 }
 
 const linkKnop = {
@@ -114,19 +109,16 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
     setGewicht(null); setGewogen(false)
     // Intake-planning: toon hem, en gebruik hem als startwaarde als de
     // aanroeper (bv. de maan-knop op tracking) zelf geen tijden meegaf.
-    db.supabase.from('clients').select('work_schedule').eq('id', client.id).maybeSingle()
-      .then(({ data }) => {
-        if (weg) return
-        const ws = data?.work_schedule || {}
-        const vorige = new Date(`${logDatum}T12:00:00`); vorige.setDate(vorige.getDate() - 1)
-        const sleutel = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][vorige.getDay()]
-        const slaap = (Array.isArray(ws[sleutel]) ? ws[sleutel] : []).find(b => b?.type === 'slaap')
-        if (slaap?.start && slaap?.end) {
-          const g = { bed: String(slaap.start).slice(0, 5), op: String(slaap.end).slice(0, 5) }
-          if (!voorBed || !eigenDag) setBed(g.bed)
-          if (!voorOpstaan || !eigenDag) setOpstaan(g.op)
-        }
-      }, () => {})
+    // Startwaarden uit de agenda (vaste slaaprij > intake > 23:00-07:00),
+    // zodat loggen opent op de tijden die in je agenda staan (slaapRitme.js).
+    let vanLog = false // al gelogde tijden winnen, ook als de agenda later binnenkomt
+    leesAgendaSlaap(db, client.id).then(agenda => {
+      if (weg || vanLog) return
+      const g = agendaTijdenVoor(agenda, logDatum)
+      if (!g) return
+      if (!voorBed || !eigenDag) setBed(g.bed)
+      if (!voorOpstaan || !eigenDag) setOpstaan(g.op)
+    }, () => {})
     // Laatste weging tot en met deze ochtend.
     db.supabase.from('weight_challenge_logs').select('date, weight').eq('client_id', client.id)
       .lte('date', logDatum).order('date', { ascending: false }).limit(1)
@@ -153,6 +145,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
           setStap(naar)
         }
         if (!data) return
+        vanLog = true
         setAlGelogd(true)
         if (data.bedtime) setBed(String(data.bedtime).slice(0, 5))
         if (data.wake_time) setOpstaan(String(data.wake_time).slice(0, 5))
@@ -245,7 +238,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   const urenNu = Number.isFinite(urenWaarde) ? urenWaarde : 0
   const zetUren = (v) => { setUren(String(Math.max(0, Math.min(16, Math.round(v * 2) / 2)))); setUrenAangeraakt(true) }
   const nlUren = (n) => String(n).replace('.', ',')
-  const kwaliteitKleur = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
+  const kwaliteitKleur = (n) => (n >= 7 ? '#c084fc' : n >= 5 ? 'rgba(192,132,252,0.75)' : '#ef4444') // slaap = paars
 
   const rondKnop = {
     width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -253,7 +246,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
     fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
-  const kleinKnop = { ...rondKnop, width: 40, height: 40, borderRadius: 12, fontSize: '1rem' }
+  const kleinKnop = { ...rondKnop, width: 40, height: 40, borderRadius: 12, fontSize: '1rem', background: 'none', border: 'none' }
   const primair = {
     width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
@@ -417,29 +410,22 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
 
         {stap === 5 && (
           <>
-            {vraag('Geef je slaapkwaliteit een score')}
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 4, letterSpacing: '-0.015em' }}>Geef je slaapkwaliteit een score</div>
             {/* Slider zoals de andere stappen; staat op 7 tot je hem verschuift. */}
             <HorizontaleSlider
               waarden={Array.from({ length: 10 }, (_, k) => k + 1)}
               waarde={kwaliteit ?? 7}
               onChange={setKwaliteit}
               itemBreedte={64}
+              hoogte={64}
             />
-            <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kwaliteitKleur(kwaliteit ?? 7), marginTop: 2 }}>
+            <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kwaliteitKleur(kwaliteit ?? 7), margin: '-6px 0 14px' }}>
               {(() => { const k = kwaliteit ?? 7; return k <= 3 ? 'slecht' : k <= 5 ? 'matig' : k <= 7 ? 'goed' : k <= 9 ? 'heel goed' : 'top' })()}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 14px' }}>
-              <span>1 = slecht</span><span>10 = top</span>
-            </div>
-            <textarea
-              value={struggles}
-              onChange={e => setStruggles(e.target.value)}
-              placeholder="Wat ging er mis of juist goed? (mag leeg)"
-              rows={2}
-              style={{ ...veld, minHeight: 60, padding: '0.6rem 0.75rem', fontSize: '0.85rem', fontWeight: 600, resize: 'none', marginBottom: 14 }}
-            />
+            {/* Verplicht: kiezen wat er speelde (of 'Goed geslapen'), plus eigen tekst. */}
+            <NachtOpmerking waarde={struggles} onChange={setStruggles} />
             {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
-            <button onClick={bewaar} disabled={bezig} style={primair}>
+            <button onClick={bewaar} disabled={bezig || !struggles.trim()} style={{ ...primair, opacity: bezig || !struggles.trim() ? 0.45 : 1 }}>
               <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : alGelogd ? 'Bijwerken' : 'Opslaan'}
             </button>
 

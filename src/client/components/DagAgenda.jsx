@@ -204,6 +204,12 @@ export default function DagAgenda({
   const [bewerk, setBewerk] = useState(null)
   const [dagindeling, setDagindeling] = useState(false)
   const [versie, setVersie] = useState(0)
+  // Slaaptijden vanuit het slaapinzicht in de agenda gezet: week opnieuw ophalen.
+  useEffect(() => {
+    const h = () => setVersie(v => v + 1)
+    window.addEventListener('myarc:agenda-slaap-gewijzigd', h)
+    return () => window.removeEventListener('myarc:agenda-slaap-gewijzigd', h)
+  }, [])
   const roosterRef = useRef(null)
   // Terug op Home (de pagina bleef verborgen staan): alles stil opnieuw
   // ophalen, want op Voeding of Workout kan intussen iets zijn afgevinkt of
