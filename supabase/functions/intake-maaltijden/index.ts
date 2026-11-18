@@ -45,7 +45,7 @@ const KCAL_MARGE = 0.10, EIWIT_MARGE = 5, DAG_EIWIT = 0.95
 // De eerste regel die past wint; volgorde is dus van specifiek naar algemeen.
 const PORTIE: [RegExp, number, number, number, number?][] = [
   [/rucola|\bsla\b|veldsla|ijsbergsla|spinazie|kruiden|koffie|espresso/, 10, 10, 60],
-  [/\b(ei|eieren)\b|gekookt ei|gebakken ei|ei \(heel\)/, 0, 1, 4, 60],
+  [/\b(ei|eieren)\b|gekookt ei|gebakken ei|ei \(heel\)/, 0, 1, 5, 60],
   [/wrap|tortilla|pita|bagel|broodje|pistolet|bolletje/, 0, 1, 2, 60],
   [/cracker|beschuit|rijstwafel|knäckebröd|knackebrod|maiswafel|linzenwafel/, 0, 1, 5, 10],
   [/brood|boterham/, 35, 35, 140],

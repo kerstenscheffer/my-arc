@@ -297,18 +297,24 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
     ? new Date(`${logDatum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
     : null
 
+  // Op de telefoon schermvullend (Kersten, 18 nov): het inzicht heeft de ruimte nodig.
+  const telefoon = typeof window !== 'undefined' && window.innerWidth <= 768
   return createPortal(
     <div
       onClick={() => setOpen(false)}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483100,
-        background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        background: telefoon ? '#0a0a0a' : 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: telefoon ? 0 : '1rem',
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
+        style={telefoon ? {
+          width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          background: '#0a0a0a', boxSizing: 'border-box',
+          padding: 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+        } : {
           width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto',
           background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
           padding: '1.1rem 1rem 1.2rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)',

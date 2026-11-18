@@ -184,7 +184,7 @@ export function persoonlijkeTips(nachten) {
   }
 
   if (!tips.length) {
-    tips.push({ titel: 'Goed bezig', tekst: `Gemiddeld ${nl(c.uren)} uur, een ${nl(c.kwaliteit)} en vaste tijden. Zo houden.`, gewicht: 0 })
+    tips.push({ titel: 'Geen tip, je bent goed bezig', tekst: `Gemiddeld ${nl(c.uren)} uur, een ${nl(c.kwaliteit)} en vaste tijden. Zo houden.`, gewicht: 0 })
   }
   return tips.sort((a, b) => b.gewicht - a.gewicht)
 }

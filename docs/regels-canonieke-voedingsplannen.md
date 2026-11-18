@@ -58,7 +58,10 @@ Code: `supabase/functions/intake-maaltijden/index.ts`. Draait in de intake-keten
 - Doel: zoveel mogelijk van wat de klant al eet in het plan. Persoonlijker, makkelijker op te pakken.
 - Overnemen als de klant een concrete maaltijd beschrijft die goed is (eiwitbron erin of logisch erbij, schaalbaar met normale porties), of als hij iets uitdrukkelijk wil houden (ook een cappuccino; die komt er als extra bij).
 - Niet overnemen: vaag of wisselend, en matige keuzes zonder uitdrukkelijke wens (brood met pindakaas, koek, afhaal).
-- Schalen doet de code, in hele porties: eieren per stuk (max 4), brood per snee (max 4), whey per halve schep, kwark per 50 g (max 500), havermout en muesli per 10 g, rijst en pasta per 10 g rauw, vlees en vis per 25 g (max 250), honing en pindakaas per 5 g. Smaakmakers blijven vast.
+- Schalen doet de code, in hele porties: eieren per stuk (max 5), brood per snee (max 4), whey per halve schep, kwark per 50 g (max 500), havermout en muesli per 10 g, rijst en pasta per 10 g rauw, vlees en vis per 25 g (max 250), honing en pindakaas per 5 g. Smaakmakers blijven vast.
 - Doel van het schalen: de kcal en het eiwit van het gerecht dat hij vervangt. Geaccepteerd bij kcal binnen 10% en eiwit hooguit 5 g lager, of als de dag het eiwitdoel van de klant nog voor 95% haalt.
 - De maaltijd wordt een eigen maaltijd van de klant (`ai_custom_meals`, `personal_notes = 'uit_intake'`) en komt op de dagen waar het vervangen gerecht stond.
 - De brief zegt per moment wat is overgenomen (met porties en macro's) en wat niet, met de reden.
+- Betere versie: een herkenbare maaltijd die net niet goed genoeg is komt erin als betere variant (wit brood wordt volkoren, kaas wordt 30+, één eiwitbron erbij). Algemeen met een duidelijke vorm (aardappelen, groente, vlees) wordt ingevuld met gewone keuzes. De brief zegt wat is aangepast.
+- Afwisselend plan: de variatiekeuze van de klant is leidend, ook als hij schrijft dat hij iets elke dag eet. Zijn maaltijd wisselt dan af met een gerecht van ons.
+- Proefstand: body `{ client_id, proef: { ontbijt, lunch, diner, snack } }` rekent een tekst door zonder iets weg te schrijven.
