@@ -2838,11 +2838,6 @@ export default function PlanAnalyzer({
       {toevoegVenster && viewMode === 'day' && weekData && (
         <ToevoegVenster db={db} dagNaam={DAYS[activeDay]?.full || ''}
           onKies={voegUitLogToe}
-          onNieuweMaaltijd={() => {
-            const vrij = SLOTS.find(sl => sl !== PRE_WORKOUT_SLOT && !weekData[activeDay]?.meals?.[sl])
-            if (!vrij) { alert('Alle maaltijd-slots van deze dag zijn gevuld.'); return }
-            setMakerState({ dayIndex: activeDay, slot: vrij })
-          }}
           onClose={() => setToevoegVenster(false)} />
       )}
 

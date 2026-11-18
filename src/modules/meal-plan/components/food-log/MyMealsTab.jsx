@@ -37,7 +37,33 @@ const sectieVan = (ruw) => MOMENT_SECTIE[String(ruw || '').toLowerCase()] || nul
 // met 15 okt 2026 kent alleen 'snack' (sectieVan leest beide).
 const sectieOpslag = (sectie) => (sectie === 'snacks' ? 'snack' : (sectie || null))
 
-export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
+// Coach-stand (Plan Analyzer, 18 nov 2026): dezelfde bouwer, maar de maaltijden
+// gaan naar de gerechtendatabase (ai_meals) in plaats van naar de eigen
+// maaltijden van een klant. Wat de coach hier maakt krijgt het label
+// 'coach_eigen' en staat daarmee in zijn lijst.
+const COACH_LABEL = 'coach_eigen'
+const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ''))
+const coachRij = (mealData, sectie) => {
+  const { client_id: _c, is_active: _a, section: _s, ...rest } = mealData
+  const moment = SECTION_MOMENT[sectieVan(sectie)] || 'snack'
+  return {
+    ...rest,
+    // ai_meals verwijst naar het product via ingredient_id; naam en macro's
+    // blijven erbij zodat de maaltijd hier weer te bewerken is.
+    // Alleen bij grammen: de database rekent de macro's na als gram × waarde
+    // per 100 g (trigger_recompute_meal_macros). Een regel in porties of een
+    // product van buiten krijgt geen verwijzing; dan blijven onze macro's staan.
+    ingredients_list: (mealData.ingredients_list || []).map(i => {
+      const { ingredient_id: _oud, ...kaal } = i
+      const gram = ['g', 'gram'].includes(String(i.unit || '').toLowerCase())
+      return gram && isUuid(i.ingredient_id || i.id) ? { ...kaal, ingredient_id: i.ingredient_id || i.id } : kaal
+    }),
+    // meal_type is in ai_meals vast/vloeibaar/gemengd; het moment staat in timing.
+    timing: [moment],
+  }
+}
+
+export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile, coachModus = false }) {
   const [myMeals, setMyMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPrep, setShowPrep] = useState(false)
@@ -53,12 +79,24 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   const [appBezig, setAppBezig] = useState(false)
 
   useEffect(() => {
-    if (client?.id) loadMyMeals()
-  }, [client?.id])
+    if (client?.id || coachModus) loadMyMeals()
+  }, [client?.id, coachModus])
 
   const loadMyMeals = async () => {
     setLoading(true)
     try {
+      if (coachModus) {
+        const { data, error } = await db.supabase
+          .from('ai_meals')
+          .select('id, name, calories, protein, carbs, fat, image_url, ingredients_list, timing, meal_type, labels, updated_at')
+          // labels is jsonb: de waarde moet als JSON mee, niet als Postgres-array.
+          .contains('labels', JSON.stringify([COACH_LABEL]))
+          .order('updated_at', { ascending: false })
+          .limit(200)
+        if (error) throw error
+        setMyMeals((data || []).map(r => ({ ...r, section: sectieOpslag(sectieVan(Array.isArray(r.timing) ? r.timing[0] : r.meal_type)) })))
+        return
+      }
       const { data, error } = await db.supabase
         .from('ai_custom_meals')
         .select('*')
@@ -102,7 +140,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   const logAppMaaltijd = (meal) => {
     const moment = Array.isArray(meal.timing) ? meal.timing[0] : (meal.meal_type || 'snack')
     onLog({
-      name: meal.name, sourceId: meal.id, type: 'ai_meal',
+      name: meal.name, sourceId: meal.id, type: coachModus ? 'meal' : 'ai_meal',
       calories: Math.round(meal.calories || 0), protein: parseFloat(meal.protein) || 0,
       carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
       ingredients: meal.ingredients_list || [], source: 'app_meals',
@@ -113,7 +151,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 
   const handleQuickLog = (meal) => {
     onLog({
-      name: meal.name, sourceId: meal.id, type: 'custom_meal',
+      name: meal.name, sourceId: meal.id, type: coachModus ? 'meal' : 'custom_meal',
       calories: meal.calories || 0, protein: parseFloat(meal.protein) || 0,
       carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
       ingredients: meal.ingredients_list || [], source: 'my_meals',
@@ -142,7 +180,13 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
     setVerwijderBezig(true)
     const id = verwijderMeal.id
     setMyMeals(prev => prev.filter(m => m.id !== id))
-    const { error } = await db.supabase
+    // Coach: de maaltijd blijft in de database (plannen verwijzen ernaar),
+    // alleen het label gaat eraf zodat hij uit deze lijst verdwijnt.
+    const { error } = coachModus
+      ? await db.supabase.from('ai_meals')
+          .update({ labels: (Array.isArray(verwijderMeal.labels) ? verwijderMeal.labels : []).filter(l => l !== COACH_LABEL), updated_at: new Date().toISOString() })
+          .eq('id', id)
+      : await db.supabase
       .from('ai_custom_meals')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -171,6 +215,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
         meal={buildingMeal}
         setMeal={setBuildingMeal}
         client={client}
+        coachModus={coachModus}
         db={db}
         isMobile={isMobile}
         onBack={() => { setBuildingMeal(null); loadMyMeals() }}
@@ -344,7 +389,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
       {gefilterd.length === 0 ? (
         <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-            {myMeals.length === 0 ? 'Nog geen eigen maaltijden' : 'Niets in dit filter'}
+            {myMeals.length === 0 ? (coachModus ? 'Nog geen coach-maaltijden gemaakt' : 'Nog geen eigen maaltijden') : 'Niets in dit filter'}
           </div>
           <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
             {myMeals.length === 0
@@ -432,7 +477,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 // MEAL DETAIL VIEW
 // ═══════════════════════════════════════════
 
-function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequestAddIngredient, onLog }) {
+function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequestAddIngredient, onLog, coachModus = false }) {
   const [saving, setSaving] = useState(false)
   // Log-moment: standaard uit de gekozen sectie (bv. pre-workout → snack).
   // Je kiest de sectie ("Mijn diner"); het log-moment volgt daaruit. Eerder
@@ -473,7 +518,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   const uploadMealPhoto = async (file) => {
     if (!file) return null
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-    const fileName = `${client.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const fileName = `${client?.id || 'coach'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
     const { error } = await db.supabase.storage
       .from('meal-photos')
       .upload(fileName, file, { contentType: file.type || 'image/jpeg', upsert: false })
@@ -572,7 +617,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     try {
       const imageUrl = await resolveImageUrl()
       const mealData = {
-        client_id: client.id, name: meal.name.trim(),
+        client_id: client?.id, name: meal.name.trim(),
         calories: Math.round(totals.calories), protein: Math.round(totals.protein),
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
@@ -580,7 +625,13 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         section: sectieOpslag(sectie),
         updated_at: new Date().toISOString()
       }
-      if (meal.id) {
+      if (coachModus) {
+        const rij = coachRij(mealData, sectie)
+        const r = meal.id
+          ? await db.supabase.from('ai_meals').update(rij).eq('id', meal.id)
+          : await db.supabase.from('ai_meals').insert({ ...rij, labels: [COACH_LABEL] })
+        if (r.error) throw r.error
+      } else if (meal.id) {
         await db.supabase.from('ai_custom_meals').update(mealData).eq('id', meal.id)
         vergeetMaaltijd(meal.id)
       } else {
@@ -598,10 +649,11 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     // First save to ai_custom_meals, then log to consumed_meals
     setSaving(true)
     let imageUrl = null
+    let coachId = null
     try {
       imageUrl = await resolveImageUrl()
       const mealData = {
-        client_id: client.id, name: meal.name.trim() || 'Mijn maaltijd',
+        client_id: client?.id, name: meal.name.trim() || 'Mijn maaltijd',
         calories: Math.round(totals.calories), protein: Math.round(totals.protein),
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
@@ -609,7 +661,14 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         section: sectieOpslag(sectie),
         updated_at: new Date().toISOString()
       }
-      if (meal.id) {
+      if (coachModus) {
+        const rij = coachRij(mealData, sectie)
+        const r = meal.id
+          ? await db.supabase.from('ai_meals').update(rij).eq('id', meal.id).select('id').single()
+          : await db.supabase.from('ai_meals').insert({ ...rij, labels: [COACH_LABEL] }).select('id').single()
+        if (r.error) throw r.error
+        coachId = r.data?.id || meal.id || null
+      } else if (meal.id) {
         await db.supabase.from('ai_custom_meals').update(mealData).eq('id', meal.id)
         vergeetMaaltijd(meal.id)
       } else {
@@ -618,11 +677,14 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       console.log('✅ Meal saved to ai_custom_meals')
     } catch (err) {
       console.warn('⚠️ Could not save to custom meals:', err)
+      // Coach: zonder rij in de database mag hij niet in een plan komen.
+      if (coachModus) { alert(`Opslaan in de database mislukt: ${err?.message || 'onbekende fout'}`); setSaving(false); return }
     }
 
     // Then log
     onLog({
-      name: meal.name || 'Mijn maaltijd', type: 'custom_meal',
+      name: meal.name || 'Mijn maaltijd', type: coachModus ? 'meal' : 'custom_meal',
+      ...(coachModus && coachId ? { sourceId: coachId } : {}),
       calories: Math.round(totals.calories), protein: Math.round(totals.protein),
       carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
       ingredients: meal.ingredients_list || [], source: 'my_meals',
@@ -630,6 +692,8 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       image_url: imageUrl
     })
     setSaving(false)
+    // Coach: terug naar de lijst, anders maakt een tweede klik een dubbele.
+    if (coachModus) onBack()
   }
 
   return (
@@ -878,7 +942,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             }}
           >
             <Check size={16} strokeWidth={3} />
-            Opslaan en loggen
+            {coachModus ? 'Opslaan en in plan' : 'Opslaan en loggen'}
           </button>
         </div>
       </div>

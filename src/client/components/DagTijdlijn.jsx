@@ -256,7 +256,8 @@ export default function DagTijdlijn({
     const onder = top + h - scrol
     if (onder > voedingVanaf) return BALKEN + 8
     if (onder > waterVanaf) return WATER_BREED + 8
-    return U
+    // Vrij van de balken: de kaart loopt door tot de rechterrand (18 nov 2026).
+    return 0
   }
   // Het eerstvolgende wat er vandaag nog te doen is: krijgt een rand en "over 40 min".
   const volgende = nuMin == null ? null : [...dingen].sort((a, b) => a.start - b.start)
@@ -327,22 +328,32 @@ export default function DagTijdlijn({
             const hoog = Math.max(0, (b.end - b.start) * pxPerMin)
             const sl = slaapt ? slaapVan(b) : null
             const pauze = isPauze(b)
-            // Het label zoekt een plek in het vlak waar geen kaart staat. Is die er
-            // niet, dan staat het bovenaan op een donker plaatje, zodat het leesbaar blijft.
-            let labelY = Math.max(0, boven) + 2
-            for (const g of geplaatst) { if (!g.mee && g.top < labelY + 20 && g.top + g.h > labelY) labelY = g.top + g.h + 2 }
-            const past = labelY + 20 <= boven + hoog
-            if (!past) labelY = Math.max(0, boven) + 2
+            // Het label staat links in de marge, verticaal langs het vlak: daar staan
+            // geen kaarten, dus het zit nooit in de weg (18 nov 2026). De tekst is
+            // te tikken over de hele urenkolom, zodat je niet op de rand hoeft te mikken.
+            // Een vlak dat ín een ander vlak valt (pauze in kantoor) krijgt een donker plaatje
+            // achter zijn naam, zodat die niet wegvalt tegen de strepen.
+            const labelTekst = slaapt ? (sl?.gelogd ? `Slaap · ${String(sl.gelogd.uren).replace('.', ',')}u` : 'Slaap') : (b.label || 'Werk')
+            const zichtbaarBoven = Math.max(0, boven)
+            const zichtbaarHoog = boven + hoog - zichtbaarBoven
             const vlak = slaapt ? { background: 'rgba(168,85,247,0.07)' }
               : pauze ? { background: 'repeating-linear-gradient(135deg, #0a0a0a 0, #0a0a0a 6px, #1c1c1c 6px, #1c1c1c 12px)' }
               : { background: 'rgba(255,255,255,0.055)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(255,255,255,0.28)' }
             return (
               <div key={b.id} style={{ position: 'absolute', left: 0, right: 0, top: boven, height: hoog, ...vlak }}>
-                {hoog >= 14 && (
-                  <span role={onTijd ? 'button' : undefined} onClick={onTijd ? () => onTijd(b) : undefined} title={onTijd ? 'Tijden aanpassen' : undefined}
-                    style={{ position: 'absolute', top: labelY - boven, right: BALKEN + 8, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 4, padding: past ? '4px 0 4px 8px' : '3px 7px', borderRadius: past ? 0 : 7, background: past ? 'transparent' : 'rgba(10,10,10,0.88)', fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: slaapt ? '#e9d5ff' : pauze ? '#fff' : '#d4d4d4', cursor: onTijd ? 'pointer' : 'default', ...tik }}>
-                    {slaapt ? <Moon size={11} strokeWidth={2.6} /> : pauze ? <Coffee size={11} strokeWidth={2.6} /> : <Briefcase size={11} strokeWidth={2.6} />}
-                    {slaapt ? (sl?.gelogd ? `Slaap · ${String(sl.gelogd.uren).replace('.', ',')}u` : 'Slaap') : (b.label || 'Werk')}
+                {zichtbaarHoog >= 14 && (
+                  <span role={onTijd ? 'button' : undefined} onClick={onTijd ? () => onTijd(b) : undefined} title={onTijd ? `${labelTekst} · tijden aanpassen` : labelTekst}
+                    style={{ position: 'absolute', top: zichtbaarBoven - boven, left: 0, width: U + UREN_BREED - 6, boxSizing: 'border-box',
+                      paddingLeft: U >= 12 ? 3 : UREN_BREED - 14, paddingTop: 4, zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
+                      color: slaapt ? '#e9d5ff' : pauze ? '#fff' : '#d4d4d4', cursor: onTijd ? 'pointer' : 'default', ...tik }}>
+                    {slaapt ? <Moon size={11} strokeWidth={2.6} style={{ flexShrink: 0 }} /> : pauze ? <Coffee size={11} strokeWidth={2.6} style={{ flexShrink: 0 }} /> : <Briefcase size={11} strokeWidth={2.6} style={{ flexShrink: 0 }} />}
+                    {/* Ook bij een kort vlak (een pauze van een half uur) staat de naam erbij:
+                        hij mag onder het vlak uit lopen, in de marge staat verder niets. */}
+                    {(
+                      <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '0.54rem', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.9)', ...(pauze ? { background: 'rgba(10,10,10,0.9)', borderRadius: 4, padding: '3px 1px' } : {}) }}>
+                        {labelTekst}
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
@@ -366,6 +377,10 @@ export default function DagTijdlijn({
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: U + UREN_BREED - 4, right: 0 }}>
             {geplaatst.map(({ b, groot, top, h, mee }) => {
               const rechts = rechtsVan(top, h)
+              // Tegen de schermrand: rechts geen ronde hoek, en wat je kunt aantikken
+              // (het vinkje) blijft de paginamarge van de rand af.
+              const aanRand = rechts === 0 && U > 0
+              const randPad = aanRand ? U : 0
               const gedaan = !!isGedaan(b)
               const vink = afronden(b)
               if (groot) {
@@ -374,11 +389,11 @@ export default function DagTijdlijn({
                 const foto = cardio ? cardioFoto(naam) : getWorkoutImage({ name: naam })
                 const sub = cardio ? `${Math.max(0, b.end - b.start)} min` : (b.meta?.exercise_count > 0 ? `${b.meta.exercise_count} oefeningen` : null)
                 return (
-                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: 9, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1.5px rgba(255,255,255,0.85)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
+                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: aanRand ? '9px 0 0 9px' : 9, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1.5px rgba(255,255,255,0.85)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.5 : 0.35 }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
-                    {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
-                    <div style={{ position: 'absolute', left: 6, right: 6, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4 + randPad, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
+                    <div style={{ position: 'absolute', left: 6, right: 6 + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.82rem' : '0.76rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>
                         {cardio && <HeartPulse size={11} strokeWidth={2.8} style={{ flexShrink: 0 }} />}
                         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>
@@ -410,7 +425,7 @@ export default function DagTijdlijn({
                 return (
                   <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
-                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
+                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
                     background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
                     border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
@@ -449,7 +464,7 @@ export default function DagTijdlijn({
                 return (
                   <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
-                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 10,
+                    display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
                     background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
                     border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
@@ -479,7 +494,7 @@ export default function DagTijdlijn({
                 )
               }
               return (
-                <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{ ...sleepStijl(b), background: mee ? '#141414' : undefined, borderRadius: mee ? 6 : undefined, position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KLEIN, display: 'flex', alignItems: 'center', gap: 5, opacity: klaar && !b.meta?.los ? 0.6 : 1 }}>
+                <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{ ...sleepStijl(b), background: mee ? '#141414' : undefined, borderRadius: mee ? 6 : undefined, position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KLEIN, boxSizing: 'border-box', paddingRight: randPad, display: 'flex', alignItems: 'center', gap: 5, opacity: klaar && !b.meta?.los ? 0.6 : 1 }}>
                   <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', gap: 5, cursor: openen ? 'pointer' : 'default', ...tik }}>
                     {maaltijd ? (
                       <span style={{ width: KLEIN, height: KLEIN, flexShrink: 0, borderRadius: 5, backgroundImage: `url(${resolveFoodImage({ image_url: b.meta?.image_url, name: naam }) || foodImageFallback(naam, b.meta?.slot, 80)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }} />

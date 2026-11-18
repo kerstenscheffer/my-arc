@@ -450,12 +450,11 @@ export default function FoodLogModal({
               <FotoTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} initialValues={quickAddInitialValues} />
-            ) : coachModus && filter !== 'coach' ? (
+            ) : coachModus && filter !== 'coach' && filter !== 'maaltijden' ? (
               <SearchTab
-                key={filter === 'gerechten' ? 'gerechten' : 'producten'}
                 db={db} onSelect={handleSelectItem} isMobile={isMobile} client={null}
                 onQuickLog={handleLog} defaultMealMoment={defaultMealMoment}
-                modus={filter === 'gerechten' ? 'meals' : 'products'} zonderLog
+                zonderLog
               />
             ) : filter === 'coach' ? (
               <AIAlternativesModal
@@ -481,7 +480,7 @@ export default function FoodLogModal({
               />
             ) : filter === 'maaltijden' ? (
               <MyMealsTab
-                client={client} db={db} onLog={handleLog} isMobile={isMobile}
+                client={client} db={db} onLog={handleLog} isMobile={isMobile} coachModus={coachModus}
                 buildingMeal={buildingMeal} setBuildingMeal={setBuildingMeal}
                 onRequestAddIngredient={() => {
                   setAddIngredientCallback(true)
@@ -561,7 +560,7 @@ function BouwBalk({ maaltijd, isMobile, onTerug }) {
 function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = null }) {
   const knoppen = coachModus ? [
     { id: 'producten', label: 'Producten' },
-    { id: 'gerechten', label: 'Coach maaltijden' },
+    { id: 'maaltijden', label: 'Coach maaltijden' },
     { id: 'coach', label: 'Recepten' },
   ] : [
     { id: 'producten', label: 'Producten' },

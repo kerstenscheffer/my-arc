@@ -404,7 +404,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                       <span style={{
                         position: 'absolute', top: -9, right: isMobile ? 12 : 14,
                         height: 17, padding: '0 0.5rem', display: 'inline-flex', alignItems: 'center',
-                        borderRadius: 6, background: '#0a0a0a', border: `1px solid ${pc}`, color: pc,
+                        borderRadius: 6, background: '#0a0a0a', border: 'none', color: pc,
                         fontSize: '0.56rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em',
                       }}>
                         {notification.priority === 'urgent' ? 'Urgent' : 'Belangrijk'}
