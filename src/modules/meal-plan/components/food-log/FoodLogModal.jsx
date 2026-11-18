@@ -455,7 +455,7 @@ export default function FoodLogModal({
             ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} initialValues={quickAddInitialValues} />
             ) : filter === 'uiteten' ? (
-              <UitetenTab db={db} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
+              <UitetenTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : coachModus && filter !== 'coach' && filter !== 'maaltijden' ? (
               <SearchTab
                 db={db} onSelect={handleSelectItem} isMobile={isMobile} client={null}

@@ -15,13 +15,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer,
-  Utensils, ChevronLeft, Minus, Plus, Check, Hand, Info, Search, X,
+  Utensils, ChevronLeft, ChevronDown, Minus, Plus, Check, Hand, Info, Search, X,
 } from 'lucide-react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
 import VAST from './uitetenGerechten.json'
 // Vaste Unsplash-foto per gerecht (naam -> foto). Ontbreekt er een, dan kiest de app zelf een foto bij de naam.
 import FOTOS from './uitetenFotos.json'
+// Waar elk gerecht uit bestaat (brood, vlees, saus…), voor het detailscherm. Sleutel = soort|gang|naam.
+import OPBOUW from './uitetenDelen.json'
+import UitetenDetail, { somDelen } from './UitetenDetail'
+import useZoekLog from './useZoekLog'
+
+const plat = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 const fotoVan = (naam) => (FOTOS[naam] ? `${FOTOS[naam]}?w=300&h=300&fit=crop&q=70` : null)
 
@@ -33,6 +39,14 @@ const SOORT_ICOON = {
   Pokebowl: [Salad, '#34d399'], Snackbar: [Popcorn, '#facc15'], Lunchroom: [Sandwich, '#d97706'], 'Ontbijt en brunch': [Croissant, '#fbbf24'],
   Borrel: [Beer, '#f59e0b'],
 }
+// Foto op de tegel van elke soort: het gerecht dat die keuken het best laat zien.
+const SOORT_FOTO = {
+  Italiaans: 'Pizza margherita', Sushi: 'California roll', Grieks: 'Griekse salade', 'Chinees en wok': 'Bami goreng',
+  Indiaas: 'Chicken tikka masala', Thais: 'Pad thai kip', Mexicaans: "Taco's", Burger: 'Hamburger',
+  'Shoarma en doner': 'Broodje shoarma', 'Steak en grill': 'Ribeye', 'Tapas en delen': "Gamba's in knoflookolie",
+  Pokebowl: 'Pokebowl zalm', Snackbar: 'Friet', Lunchroom: 'Clubsandwich', 'Ontbijt en brunch': 'American pancakes', Borrel: 'Bitterballen',
+}
+const tegelFoto = (soort) => (FOTOS[SOORT_FOTO[soort]] ? `${FOTOS[SOORT_FOTO[soort]]}?w=500&h=320&fit=crop&q=70` : null)
 const GANGEN = [['voor', 'Voorgerecht'], ['hoofd', 'Hoofdgerecht'], ['bij', 'Erbij'], ['na', 'Dessert'], ['drank', 'Drinken']]
 // Hoeveel at je ervan? Geen grammen: een deel van het bord.
 const DELEN = [[0.7, 'Klein'], [1, 'Middel'], [1.3, 'Groot'], [1.7, 'Enorm']]
@@ -59,16 +73,21 @@ const gramVan = (r) => {
   return Math.max(25, Math.round(r.kcal / d / 25) * 25)
 }
 
-const vasteLijst = VAST.flatMap(([soort, rijen]) => rijen.map(([gang, naam, portie, kcal, eiwit, koolh, vet, keuze], i) => (
-  { id: `${soort}|${gang}|${naam}`, soort, gang, naam, portie, kcal, eiwit, koolh, vet, keuze, positie: i }
-)))
+const vasteLijst = VAST.flatMap(([soort, rijen]) => rijen.map(([gang, naam, portie, kcal, eiwit, koolh, vet, keuze], i) => {
+  const id = `${soort}|${gang}|${naam}`
+  const delen = Array.isArray(OPBOUW[id]) && OPBOUW[id].length ? OPBOUW[id] : null
+  // Met een opbouw is de som van de onderdelen het getal: dan klopt de kaart met het detailscherm.
+  const t = delen ? somDelen(delen) : { kcal, eiwit, koolh, vet }
+  return { id, soort, gang, naam, portie, kcal: Math.round(t.kcal), eiwit: Math.round(t.eiwit), koolh: Math.round(t.koolh), vet: Math.round(t.vet), keuze, positie: i, delen }
+}))
 
-export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
+export default function UitetenTab({ db, client = null, onLog, isMobile, defaultMealMoment }) {
   const [soort, setSoort] = useState(null)
   const [gekozen, setGekozen] = useState({}) // id -> { aantal, deel }
   const [hulp, setHulp] = useState(false)
   const [zoek, setZoek] = useState('')
-  const [info, setInfo] = useState(null) // id van het gerecht waarvan de details open staan
+  const [uitgeklapt, setUitgeklapt] = useState(false) // het stapeltje bovenaan open: je keuzes als kaarten
+  const [detail, setDetail] = useState(null) // id van het gerecht waarvan het detailscherm open staat
   const [bezig, setBezig] = useState(false)
   const [eigen, setEigen] = useState([])
 
@@ -81,17 +100,49 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
   }, [db])
 
   const alle = useMemo(() => [...vasteLijst, ...eigen.map(r => ({ ...r, kcal: Number(r.kcal) || 0, eiwit: Number(r.eiwit) || 0, koolh: Number(r.koolh) || 0, vet: Number(r.vet) || 0 }))], [eigen])
-  const soorten = useMemo(() => [...new Set(alle.map(r => r.soort))].filter(s => s !== 'alle'), [alle])
+  // Wat klanten het vaakst doen staat bovenaan (Kersten, 18 nov 2026); de rest in de volgorde van de lijst.
+  const soorten = useMemo(() => {
+    const eerst = ['Borrel', 'Steak en grill', 'Shoarma en doner', 'Burger', 'Snackbar']
+    const lijst = [...new Set(alle.map(r => r.soort))].filter(s => s !== 'alle')
+    return [...eerst.filter(s => lijst.includes(s)), ...lijst.filter(s => !eerst.includes(s))]
+  }, [alle])
   const opId = useMemo(() => new Map(alle.map(r => [r.id, r])), [alle])
+
+  // Zoeken gaat door alle soorten heen: "friet", "wijn", "carbonara". Elk gerecht één keer (Friet staat bij vier soorten).
+  const zoekWoorden = useMemo(() => plat(zoek).split(/\s+/).filter(w => w.length >= 2), [zoek])
+  const zoekActief = zoekWoorden.length > 0
+  const zoekTreffers = useMemo(() => {
+    if (!zoekWoorden.length) return []
+    const gezien = new Set()
+    return alle.filter(r => {
+      const t = plat(`${r.naam} ${r.soort} ${r.portie}`)
+      if (!zoekWoorden.every(w => t.includes(w))) return false
+      const sleutel = `${plat(r.naam)}|${r.kcal}`
+      if (gezien.has(sleutel)) return false
+      gezien.add(sleutel); return true
+    })
+  }, [zoekWoorden, alle])
+  // Elke zoekpoging gaat naar zoek_log (modus 'uiteten'): wat klanten zoeken en
+  // niet vinden is wat er nog in de lijst moet (18 nov 2026: "weizen" gaf niets).
+  const zoekLog = useZoekLog({ db, client, modus: 'uiteten', context: 'uiteten' })
+  useEffect(() => {
+    if (zoek.trim().length >= 2) zoekLog.noteer(zoek, zoekTreffers.map(r => ({ name: r.naam })))
+  }, [zoek, zoekTreffers]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const regels = Object.entries(gekozen).map(([id, k]) => {
     const r = opId.get(id); if (!r) return null
-    const f = k.aantal * k.deel
-    return { r, k, kcal: r.kcal * f, eiwit: r.eiwit * f, koolh: r.koolh * f, vet: r.vet * f }
+    // Zelf aangepast in het detailscherm: dan tellen die onderdelen, zonder maat erbovenop.
+    const basis = k.delen ? somDelen(k.delen) : r
+    const f = k.aantal * (k.delen ? 1 : k.deel)
+    return { r, k, kcal: basis.kcal * f, eiwit: basis.eiwit * f, koolh: basis.koolh * f, vet: basis.vet * f }
   }).filter(Boolean)
   const totaal = regels.reduce((t, x) => ({ kcal: t.kcal + x.kcal, eiwit: t.eiwit + x.eiwit, koolh: t.koolh + x.koolh, vet: t.vet + x.vet }), { kcal: 0, eiwit: 0, koolh: 0, vet: 0 })
 
-  const tik = (id) => setGekozen(prev => {
+  const tik = (id) => {
+    if (zoekActief && !gekozen[id]) { const r = opId.get(id); zoekLog.gekozen({ name: r?.naam, id, source: 'uiteten' }, zoekTreffers.findIndex(x => x.id === id)) }
+    tikStil(id)
+  }
+  const tikStil = (id) => setGekozen(prev => {
     const n = { ...prev }
     if (n[id]) delete n[id]; else n[id] = { aantal: 1, deel: 1 }
     return n
@@ -102,7 +153,7 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
     if (!regels.length || bezig) return
     setBezig(true)
     try {
-      const deelTekst = (d) => (d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
+      const deelTekst = (d, k) => (k?.delen ? ' (aangepast)' : d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
       await onLog({
         name: soort ? `Uit eten: ${soort}` : 'Uit eten',
         type: 'custom', source: 'uiteten', per100g: false, amount: 1, per_unit: 'portion',
@@ -110,7 +161,7 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
         meal_type: defaultMealMoment || 'dinner',
         notes: 'Geschat uit de lijst Uiteten',
         ingredients: regels.map(({ r, k, kcal, eiwit, koolh, vet }) => ({
-          name: `${r.naam}${deelTekst(k.deel)}`, amount: k.aantal, unit: 'portie',
+          name: `${r.naam}${deelTekst(k.deel, k)}`, amount: k.aantal, unit: 'portie',
           calories: Math.round(kcal), protein: Math.round(eiwit * 10) / 10, carbs: Math.round(koolh * 10) / 10, fat: Math.round(vet * 10) / 10,
         })),
       })
@@ -125,13 +176,14 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
   // Eén gerecht als kaart, met eronder aantal en maat als hij gekozen is. `gang` bepaalt of de maat getoond wordt.
   const kaart = (r, gang = r.gang) => {
     const k = gekozen[r.id]
-    const f = k ? k.aantal * k.deel : 1
+    const basis = k?.delen ? somDelen(k.delen) : r
+    const f = k ? k.aantal * (k.delen ? 1 : k.deel) : 1
     const hoek = { width: 34, height: 30, padding: 0, background: 'transparent', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
     return (
       <div key={r.id} style={{ margin: `0 -${zij}` }}>
         {/* Dezelfde kaart als overal in de app: foto, naam, macro's; rechts info en toevoegen. */}
         <MealCard
-          meal={{ name: r.naam, image_url: r.image_url || fotoVan(r.naam), calories: r.kcal * f, protein: r.eiwit * f, carbs: r.koolh * f, fat: r.vet * f }}
+          meal={{ name: r.naam, image_url: r.image_url || fotoVan(r.naam), calories: basis.kcal * f, protein: basis.eiwit * f, carbs: basis.koolh * f, fat: basis.vet * f }}
           momentLabel=""
           naNaam={zoekActief && r.soort !== 'alle' ? `${r.soort} · ${r.portie}` : r.portie}
           label={r.keuze === 'top' ? <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.04em', color: GROEN }}>SLIMME KEUZE</span> : null}
@@ -139,7 +191,7 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
           onTik={() => tik(r.id)} onCheck={() => tik(r.id)}
           rechts={
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginRight: -6 }}>
-              <button onClick={(e) => { e.stopPropagation(); setInfo(v => (v === r.id ? null : r.id)) }} aria-label="Info" style={{ ...hoek, opacity: info === r.id ? 1 : 0.6 }}>
+              <button onClick={(e) => { e.stopPropagation(); setDetail(r.id) }} aria-label="Wat zit erin en aanpassen" style={{ ...hoek, opacity: 0.75 }}>
                 <Info size={17} strokeWidth={2.6} />
               </button>
               <button onClick={(e) => { e.stopPropagation(); tik(r.id) }} aria-label={k ? 'Weghalen' : 'Toevoegen'} style={hoek}>
@@ -151,15 +203,6 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
           }
           acties={[]}
         />
-        {info === r.id && (
-          <div style={{ margin: `-0.1rem ${zij} 0.5rem`, fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-            <div><span style={{ color: '#fff', fontWeight: 900 }}>Portie:</span> {r.portie}</div>
-            <div>{Math.round(r.kcal)} kcal · {Math.round(r.eiwit)} g eiwit · {Math.round(r.koolh)} g koolhydraten · {Math.round(r.vet)} g vet</div>
-            <div style={{ color: r.keuze === 'top' ? GROEN : 'rgba(255,255,255,0.6)' }}>
-              {r.keuze === 'top' ? 'Slimme keuze: veel eiwit of weinig kcal voor wat je krijgt.' : r.keuze === 'zwaar' ? 'Zwaar: veel kcal. Prima af en toe; kies Klein als je deelt of laat staan.' : 'Gewone keuze. Let op de portie.'}
-            </div>
-          </div>
-        )}
         {k && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: `0 ${zij} 0.6rem` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -167,7 +210,10 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
               <span style={{ minWidth: 18, textAlign: 'center', fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{k.aantal}</span>
               <button onClick={() => zet(r.id, { aantal: Math.min(12, k.aantal + 1) })} aria-label="Meer" style={kleinKnop}><Plus size={15} strokeWidth={3} /></button>
             </div>
-            {gang !== 'drank' && (
+            {k.delen && (
+              <button onClick={() => setDetail(r.id)} style={{ padding: 0, background: 'transparent', border: 'none', color: GROEN, fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>Aangepast · wijzig</button>
+            )}
+            {gang !== 'drank' && !k.delen && (
               <div style={{ display: 'flex', gap: 16 }}>
                 {DELEN.map(([d, label]) => (
                   <button key={d} onClick={() => zet(r.id, { deel: d })} style={{
@@ -195,7 +241,7 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
           {/* Wat je koos als stapeltje foto's: laatste bovenop. Tik op het stapeltje om naar boven te scrollen is niet nodig; weghalen doe je op de kaart. */}
-          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: 4 }}>
+          <button onClick={() => setUitgeklapt(v => !v)} aria-expanded={uitgeklapt} aria-label="Bekijk en wijzig wat je koos" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, padding: '0 0 0 4px', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
             {regels.slice(-4).map(({ r }, i, lijst) => (
               <span key={r.id} title={r.naam} style={{
                 width: 40, height: 40, borderRadius: 12, marginLeft: i === 0 ? 0 : -18, flexShrink: 0, overflow: 'hidden',
@@ -209,7 +255,8 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
             {regels.length > 4 && (
               <span style={{ marginLeft: 6, fontSize: '0.78rem', fontWeight: 900, color: '#fff' }}>+{regels.length - 4}</span>
             )}
-          </div>
+            <ChevronDown size={16} strokeWidth={3} color="#fff" style={{ marginLeft: 5, transition: 'transform 0.15s ease', transform: uitgeklapt ? 'rotate(180deg)' : 'none' }} />
+          </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>{Math.round(totaal.kcal)}<span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginLeft: 3 }}>KCAL</span></span>
@@ -226,10 +273,13 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
         </div>
   )
 
-  // Zoeken gaat door alle soorten heen: "friet", "wijn", "carbonara".
-  const plat = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const zoekWoorden = plat(zoek).split(/\s+/).filter(w => w.length >= 2)
-  const zoekActief = zoekWoorden.length > 0
+  // Uitgeklapt: wat je koos als kaarten, om aantal en maat te wijzigen of iets weg te halen.
+  const gekozenLijst = uitgeklapt && regels.length > 0 && (
+    <div style={{ padding: `0.5rem ${zij} 0.3rem`, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      {regels.map(x => kaart(x.r))}
+    </div>
+  )
+
   const zoekBalk = (
     <div style={{ position: 'relative', margin: `0.2rem ${zij} 0.5rem` }}>
       <Search size={15} strokeWidth={2.6} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
@@ -243,35 +293,61 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
     </div>
   )
 
+  // ── Detailscherm: wat zit erin, en aanpassen voor je toevoegt ──
+  if (detail && opId.get(detail)) {
+    const r = opId.get(detail)
+    const k = gekozen[r.id]
+    // Geen opbouw bekend (eigen gerecht van de coach): dan het gerecht zelf als één onderdeel.
+    const g = gramVan(r)
+    const standaard = r.delen || [{ n: r.naam, g, k: Math.round(r.kcal / g * 100), e: Math.round(r.eiwit / g * 1000) / 10, kh: Math.round(r.koolh / g * 1000) / 10, v: Math.round(r.vet / g * 1000) / 10 }]
+    return (
+      <UitetenDetail key={r.id} gerecht={r} start={k?.delen || standaard} alGekozen={!!k} db={db} isMobile={isMobile}
+        foto={r.image_url || fotoVan(r.naam)}
+        onTerug={() => setDetail(null)}
+        onKlaar={(delen, aangepast) => {
+          setGekozen(prev => {
+            const oud = prev[r.id]
+            const nieuw = { aantal: oud?.aantal || 1, deel: aangepast || oud?.delen ? 1 : (oud?.deel || 1) }
+            if (aangepast || oud?.delen) nieuw.delen = delen
+            return { ...prev, [r.id]: nieuw }
+          })
+          setDetail(null)
+        }} />
+    )
+  }
+
   // ── Stap 1: wat voor etentje? ──
   if (!soort && !zoekActief) {
     return (
       <div>
       {zoekBalk}
       {totaalBalk}
-      {/* Wat je al koos blijft staan, ook als je terug bent bij de soorten: zo stapel je uit meerdere keukens. */}
-      {regels.length > 0 && (
-        <div style={{ padding: `0.6rem ${zij} 0.2rem` }}>
-          <div style={{ ...kopje, marginBottom: '0.45rem' }}>Jouw etentje</div>
-          {regels.map(x => kaart(x.r))}
-        </div>
-      )}
+      {gekozenLijst}
       <div style={{ padding: `0.2rem ${zij} 1.5rem` }}>
         <div style={{ ...kopje, margin: '0.2rem 0 0.2rem' }}>{regels.length > 0 ? 'Nog iets erbij?' : 'Waar eet je?'}</div>
         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.9rem' }}>
           Kies het soort etentje en tik aan wat je at. Wegen hoeft niet.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 4 }}>
+        {/* Fototegels: de foto iets donkerder, de naam dik wit in het midden. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
           {soorten.map(s => {
             const [Icoon, kleur] = SOORT_ICOON[s] || [Utensils, '#fff']
+            const foto = tegelFoto(s)
             return (
               <button key={s} onClick={() => setSoort(s)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, minHeight: 52, padding: '0 0.4rem', background: 'transparent', border: 'none',
-                color: '#fff', fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                position: 'relative', aspectRatio: '16 / 10', padding: 0, borderRadius: 14, overflow: 'hidden', border: 'none', background: '#161616',
+                cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
-                <Icoon size={22} strokeWidth={2.5} color={kleur} style={{ flexShrink: 0 }} />
-                <span style={{ minWidth: 0 }}>{s}</span>
+                {foto && <img src={foto} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                <span style={{ position: 'absolute', inset: 0, background: foto ? 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.6) 100%)' : 'transparent' }} />
+                <span style={{
+                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '0 0.5rem',
+                  color: '#fff', fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.15, textAlign: 'center',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.7)',
+                }}>
+                  {!foto && <Icoon size={24} strokeWidth={2.5} color={kleur} />}
+                  {s}
+                </span>
               </button>
             )
           })}
@@ -283,16 +359,8 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
 
   // ── Stap 2: wat at je? ──
   const [SoortIcoon, soortKleur] = SOORT_ICOON[soort] || [Utensils, '#fff']
-  // Zoekend: alle treffers, elk gerecht één keer (Friet staat bij vier soorten).
-  const gezien = new Set()
   const vanSoort = zoekActief
-    ? alle.filter(r => {
-        const t = plat(`${r.naam} ${r.soort}`)
-        if (!zoekWoorden.every(w => t.includes(w))) return false
-        const sleutel = `${plat(r.naam)}|${r.kcal}`
-        if (gezien.has(sleutel)) return false
-        gezien.add(sleutel); return true
-      })
+    ? zoekTreffers
     : alle.filter(r => r.soort === soort || r.soort === 'alle')
 
   return (
@@ -302,31 +370,62 @@ export default function UitetenTab({ db, onLog, isMobile, defaultMealMoment }) {
         <button onClick={() => { setSoort(null); setZoek('') }} aria-label="Ander etentje" style={{ ...kleinKnop, border: 'none', width: 32, height: 36, marginLeft: -8 }}>
           <ChevronLeft size={22} strokeWidth={2.8} />
         </button>
-        {!zoekActief && <SoortIcoon size={22} strokeWidth={2.5} color={soortKleur} />}
+        {!zoekActief && (tegelFoto(soort)
+          ? <img src={tegelFoto(soort)} alt="" style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: '#1a1a1a' }} />
+          : <SoortIcoon size={22} strokeWidth={2.5} color={soortKleur} />)}
         <span style={{ ...kopje, flex: 1, minWidth: 0 }}>{zoekActief ? `${vanSoort.length} gevonden` : soort}</span>
-        <button onClick={() => setHulp(v => !v)} aria-expanded={hulp} style={{
+        <span style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => setHulp(v => !v)} aria-expanded={hulp} style={{
           display: 'inline-flex', alignItems: 'center', gap: 5, height: 30, padding: '0 0.3rem', background: 'transparent', border: 'none',
           color: hulp ? GROEN : '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
         }}>
           <Hand size={15} strokeWidth={2.6} /> Portie schatten
-        </button>
+          </button>
+          {/* Klein venster onder de knop, over de lijst heen: vier handmaten en de maten. */}
+          {hulp && (<>
+            <div onClick={() => setHulp(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 21, width: 'min(300px, calc(100vw - 32px))',
+              padding: '0.8rem 0.9rem', borderRadius: 14, background: '#161616', boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
+            }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {[
+                  ['Vuist', 'rijst, pasta of aardappel · ±200 kcal'],
+                  ['Bord pasta', '2 tot 3 vuisten'],
+                  ['Handpalm', 'vlees of vis · 120 tot 150 g'],
+                  ['Duim', 'saus, olie of mayo · ±100 kcal'],
+                  ['Handje', 'noten of chips · ±200 kcal'],
+                ].map(([wat, uitleg]) => (
+                  <li key={wat} style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: GROEN, flexShrink: 0, transform: 'translateY(-2px)' }} />
+                    <span style={{ fontSize: '0.84rem', lineHeight: 1.3 }}>
+                      <span style={{ fontWeight: 900, color: '#fff' }}>{wat}</span>
+                      <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}> {uitleg}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', marginTop: 11, lineHeight: 1.35 }}>
+                Middel = normale portie. Niet alles op: Klein. Royaal bord: Groot of Enorm.
+              </div>
+            </div>
+          </>)}
+        </span>
       </div>
 
       {/* Je hele etentje in één blik: bovenaan, blijft staan bij het scrollen. Eén knop logt alles. */}
       {totaalBalk}
+      {gekozenLijst}
 
 
-      {hulp && (
-        <div style={{ padding: `0.5rem ${zij} 0.2rem`, fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.55 }}>
-          <div>Je vuist = een portie rijst, pasta of aardappel (ongeveer 200 kcal). Een restaurantbord pasta is 2 tot 3 vuisten.</div>
-          <div>Je handpalm = een stuk vlees of vis van 120 tot 150 g.</div>
-          <div>Je duim = een eetlepel saus, olie, mayo of pindakaas (ongeveer 100 kcal).</div>
-          <div>Een handje = noten of chips (ongeveer 200 kcal).</div>
-          <div style={{ color: '#fff', fontWeight: 900, marginTop: 4 }}>Middel is een normale restaurantportie. Niet alles opgegeten? Kies Klein. Royaal bord of extra saus? Kies Groot of Enorm.</div>
-        </div>
-      )}
 
       <div style={{ flex: 1, padding: `0 ${zij} 1rem` }}>
+        {zoekActief && vanSoort.length === 0 && (
+          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', margin: '1rem 0 0', lineHeight: 1.45 }}>
+            "{zoek.trim()}" staat nog niet in de lijst. We hebben je zoekopdracht bewaard en vullen de lijst ermee aan.
+            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>Kies voor nu iets wat erop lijkt, of log het via Producten.</div>
+          </div>
+        )}
         {GANGEN.map(([gang, titel]) => {
           const lijst = vanSoort.filter(r => r.gang === gang)
           if (!lijst.length) return null
