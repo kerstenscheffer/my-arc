@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Pizza, Fish, Salad, CookingPot, Flame, Soup, Wheat, Hamburger, Drumstick, Beef, Grape, Popcorn, Sandwich, Croissant, Beer,
-  Utensils, ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Check, Hand, Info, Search, X,
+  Utensils, ChevronLeft, ChevronDown, BadgeCheck, Minus, Plus, Check, Hand, Info, Search, X,
 } from 'lucide-react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
@@ -28,6 +28,11 @@ import UitetenDetail, { somDelen } from './UitetenDetail'
 import useZoekLog from './useZoekLog'
 
 const plat = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+// Welke maat koos je de vorige keer bij dit gerecht? Per toestel onthouden; lukt het niet, dan zonder.
+const VORIGE_SLEUTEL = 'myarc_uiteten_maat'
+const leesVorige = () => { try { return JSON.parse(localStorage.getItem(VORIGE_SLEUTEL) || '{}') || {} } catch { return {} } }
+const bewaarVorige = (id, deel) => { try { localStorage.setItem(VORIGE_SLEUTEL, JSON.stringify({ ...leesVorige(), [id]: deel })) } catch { /* privévenster of vol: dan geen suggestie */ } }
 
 const fotoVan = (naam) => (FOTOS[naam] ? `${FOTOS[naam]}?w=300&h=300&fit=crop&q=70` : null)
 
@@ -86,6 +91,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
   const [gekozen, setGekozen] = useState({}) // id -> { aantal, deel }
   const [hulp, setHulp] = useState(false)
   const [zoek, setZoek] = useState('')
+  const [maatOpen, setMaatOpen] = useState(null) // id van het net toegevoegde gerecht: daaronder staat kort de maatkeuze
   const [uitgeklapt, setUitgeklapt] = useState(false) // het stapeltje bovenaan open: je keuzes als kaarten
   const [detail, setDetail] = useState(null) // id van het gerecht waarvan het detailscherm open staat
   const [bezig, setBezig] = useState(false)
@@ -186,15 +192,16 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
           momentLabel=""
           naNaam={zoekActief && r.soort !== 'alle' ? `${r.soort} · ${r.portie}` : r.portie}
           label={r.keuze === 'top' ? <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.04em', color: GROEN }}>SLIMME KEUZE</span> : null}
-          compact isMobile={isMobile} geselecteerd={!!k}
+          compact lageActies isMobile={isMobile} geselecteerd={!!k}
           // Tik op de kaart: eerst kijken wat erin zit, daar kies je of je hem toevoegt. De plus rechts voegt direct toe.
           onTik={() => setDetail(r.id)} onCheck={() => setDetail(r.id)}
           // Onderaan de kaart dezelfde knoppenrij als op een planmaaltijd: links direct toevoegen, rechts naar de info.
           acties={[
             k
-              ? { icon: <Check size={13} strokeWidth={3.2} />, label: 'Toegevoegd, tik om weg te halen', onClick: () => tik(r.id), kleur: GROEN }
-              : { icon: <Plus size={13} strokeWidth={3} />, label: 'Toevoegen', onClick: () => tik(r.id) },
-            { icon: <ChevronRight size={13} strokeWidth={3} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
+              ? { icon: <Check size={13} strokeWidth={3.2} />, label: 'Toegevoegd, tik om weg te halen', onClick: () => { tik(r.id); setMaatOpen(null) }, kleur: GROEN }
+// Plus = de maatkeuze klapt onder de kaart uit; pas na je keuze zit het gerecht in je etentje. Een drankje gaat er direct in.
+              : { icon: <Plus size={13} strokeWidth={3} />, label: 'Toevoegen', onClick: () => (gang === 'drank' ? tik(r.id) : setMaatOpen(v => (v === r.id ? null : r.id))) },
+            { icon: <Info size={13} strokeWidth={2.8} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
           ]}
         />
       </div>
@@ -247,6 +254,50 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     </div>
   )
 
+  // Na de plus: een klein venster dat over de pagina zweeft met de maatkeuze.
+  // Pas na je keuze zit het gerecht in je etentje; ernaast tikken sluit het zonder toe te voegen.
+  const maatGerecht = maatOpen ? opId.get(maatOpen) : null
+  const maatVenster = maatGerecht && !gekozen[maatGerecht.id] && (
+    <div onClick={() => setMaatOpen(null)} style={{ position: 'fixed', inset: 0, zIndex: 10020, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14, animation: 'uitetenIn 0.15s ease' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(460px, 100%)', padding: '1rem 0 0', borderRadius: 18, background: '#161616', boxShadow: '0 24px 60px rgba(0,0,0,0.8)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 1rem 0.8rem' }}>
+          <img src={maatGerecht.image_url || fotoVan(maatGerecht.naam) || resolveFoodImage({ name: maatGerecht.naam }, { size: 120 })} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: '#1a1a1a' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{maatGerecht.naam}</div>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Hoe groot was het?</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)' }}>
+          {DELEN.map(([d, label]) => {
+            const gram = (maatGerecht.delen ? maatGerecht.delen.reduce((n, x) => n + x.g, 0) : gramVan(maatGerecht)) * d
+            // Suggestie: wat jij hier de vorige keer koos; anders Middel, de gewone restaurantportie.
+            const vorige = leesVorige()[maatGerecht.id]
+            const tip = vorige === d ? 'jouw vorige' : (vorige == null && d === 1 ? 'meestal' : null)
+            return (
+              <button key={d} onClick={() => { tik(maatGerecht.id); zet(maatGerecht.id, { deel: d }); bewaarVorige(maatGerecht.id, d); setMaatOpen(null) }} style={{
+                position: 'relative', flex: 1, minWidth: 0, minHeight: 88, padding: '0.7rem 0 0.6rem', borderRadius: 0, border: 'none', fontFamily: 'inherit', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: tip ? 'rgba(255,255,255,0.12)' : 'transparent', color: '#fff',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, lineHeight: 1.15 }}>{label}</span>
+                <span style={{ fontSize: '0.74rem', fontWeight: 900, lineHeight: 1.25, marginTop: 3, whiteSpace: 'nowrap' }}>{Math.round(maatGerecht.kcal * d)} kcal</span>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.6, lineHeight: 1.25, whiteSpace: 'nowrap' }}>±{Math.round(gram / 5) * 5} g</span>
+                {/* De suggestie: blauw vinkje linksboven, half over de rand van de balk. */}
+                {tip && (
+                  <span title={tip === 'meestal' ? 'Meestal gekozen' : 'Jouw vorige keuze'} style={{ position: 'absolute', top: -10, left: 8, display: 'flex', borderRadius: 999, background: '#161616' }}>
+                    <BadgeCheck size={20} strokeWidth={2.6} color="#3b82f6" fill="#161616" />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <style>{'@keyframes uitetenIn { from { opacity: 0 } to { opacity: 1 } }'}</style>
+      </div>
+    </div>
+  )
+
   const zoekBalk = (
     <div style={{ position: 'relative', margin: `0.2rem ${zij} 0.5rem` }}>
       <Search size={15} strokeWidth={2.6} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
@@ -291,6 +342,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
       {zoekBalk}
       {totaalBalk}
       {gekozenLijst}
+      {maatVenster}
       <div style={{ padding: `0.2rem ${zij} 1.5rem` }}>
         <div style={{ ...kopje, margin: '0.2rem 0 0.2rem' }}>{regels.length > 0 ? 'Nog iets erbij?' : 'Waar eet je?'}</div>
         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.9rem' }}>
@@ -384,6 +436,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
       {/* Je hele etentje in één blik: bovenaan, blijft staan bij het scrollen. Eén knop logt alles. */}
       {totaalBalk}
       {gekozenLijst}
+      {maatVenster}
 
 
 

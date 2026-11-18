@@ -87,6 +87,8 @@ export default function MealCard({
   // Tik op het moment/de tijd op de foto: moment aanpassen (krijgt de
   // positie mee voor het venstertje).
   onMoment = null,
+  // Lagere knoppenrij onderaan (lijsten met veel kaarten, zoals Uiteten).
+  lageActies = false,
 }) {
   const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -291,6 +293,7 @@ export default function MealCard({
               isMobile={isMobile}
               checked={actie.checked}
               kleur={actie.kleur}
+              laag={lageActies}
             />
           </React.Fragment>
         ))}
@@ -317,7 +320,7 @@ export default function MealCard({
 // kaart maakten de lijst rumoerig, terwijl de iconen op zichzelf duidelijk
 // zijn. Het label blijft wel als title/aria-label staan: voor wie het niet
 // meteen ziet, en voor schermlezers.
-function ActionCell({ icon, label, onClick, isMobile, checked, kleur }) {
+function ActionCell({ icon, label, onClick, isMobile, checked, kleur, laag = false }) {
   const color = kleur || (checked ? '#10b981' : 'rgba(255,255,255,0.7)')
   return (
     <button
@@ -327,14 +330,14 @@ function ActionCell({ icon, label, onClick, isMobile, checked, kleur }) {
       style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: isMobile ? '0.3rem' : '0.35rem 0.4rem',
+        padding: laag ? '0.1rem 0.3rem' : isMobile ? '0.3rem' : '0.35rem 0.4rem',
         background: 'transparent',
         border: 'none',
         color,
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: isMobile ? 28 : 30,
+        minHeight: laag ? 22 : isMobile ? 28 : 30,
       }}
     >
       {icon}
