@@ -12,8 +12,8 @@
 // Alleen tekenen: wat er op de dag staat en wat er gebeurt bij een tik komt
 // van DagAgenda, die de gegevens en de vensters al heeft.
 
-import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight, Info, Plus, Minus, Play } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight, ChevronUp, Info, Plus, Minus, Play } from 'lucide-react'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
@@ -227,16 +227,47 @@ export default function DagTijdlijn({
   const KAART = isMobile ? 38 : 34
   const KLEIN = isMobile ? 34 : 28
   // Elk ding op zijn tijd; wat zou overlappen schuift net onder het vorige.
+  //
+  // Maaltijden die elkaar zouden wegduwen worden één stapel (18 nov 2026,
+  // Kersten): drie logs rond 12:30 vulden de dag tot 16:00. De stapel toont
+  // één kaart met "+2"; tikken daarop klapt hem uit, en dan duwen ze weer.
+  // Vooraan staat wat nog gedaan moet worden, anders de laatste.
+  const [stapelOpen, setStapelOpen] = useState(() => new Set())
+  const wisselStapel = (sleutel) => setStapelOpen(v => { const n = new Set(v); if (n.has(sleutel)) n.delete(sleutel); else n.add(sleutel); return n })
+  const STAPEL_RAND = 4
   let onder = -Infinity
-  const geplaatst = [...dingen].sort((a, b) => a.start - b.start).map(b => {
+  let groep = null
+  const geplaatst = []
+  for (const b of [...dingen].sort((a, b) => a.start - b.start)) {
     const groot = b.type === 'training' || isCardio(b)
     const h = groot ? GROOT : (b.type === 'meal' || b.type === 'supplement') ? KAART : KLEIN
     // Het blok dat je sleept volgt je hand en duwt niets opzij.
-    const mee = sleep?.id === b.id
-    const top = mee ? (b.start + sleep.delta - asStart) * pxPerMin : Math.max((b.start - asStart) * pxPerMin, onder)
-    if (!mee) onder = top + h + 2
-    return { b, groot, top, h, mee }
-  })
+    if (sleep?.id === b.id) { geplaatst.push({ b, groot, top: (b.start + sleep.delta - asStart) * pxPerMin, h, mee: true }); continue }
+    const eigen = (b.start - asStart) * pxPerMin
+    if (b.type === 'meal' && groep && eigen < onder) {
+      groep.leden.push(b)
+      if (stapelOpen.has(groep.sleutel)) {
+        geplaatst.push({ b, groot, top: onder, h, mee: false })
+        onder += h + 2
+      } else {
+        onder = groep.rij.top + h + 2 + STAPEL_RAND * Math.min(2, groep.leden.length - 1)
+      }
+      continue
+    }
+    const top = Math.max(eigen, onder)
+    onder = top + h + 2
+    const rij = { b, groot, top, h, mee: false }
+    geplaatst.push(rij)
+    groep = b.type === 'meal' ? { sleutel: b.id, leden: [b], rij } : null
+    if (groep) rij.groep = groep
+  }
+  for (const rij of geplaatst) {
+    const g = rij.groep
+    if (!g || g.leden.length < 2) continue
+    const open = stapelOpen.has(g.sleutel)
+    rij.stapel = { n: g.leden.length, sleutel: g.sleutel, open }
+    if (!open) rij.b = g.leden.find(x => !x.meta?.los && !isGedaan(x)) || g.leden[g.leden.length - 1]
+  }
 
   const st = Number(stappen?.steps) || 0
   const stDoel = Number(stappen?.doel) || 0
@@ -410,7 +441,7 @@ export default function DagTijdlijn({
           </div>
         ) : (
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: U + UREN_BREED - 4, right: 0 }}>
-            {geplaatst.map(({ b, groot, top, h, mee }) => {
+            {geplaatst.map(({ b, groot, top, h, mee, stapel }) => {
               const rechts = rechtsVan(top, h)
               // Tegen de schermrand: rechts geen ronde hoek, en wat je kunt aantikken
               // (het vinkje) blijft de paginamarge van de rand af.
@@ -502,7 +533,12 @@ export default function DagTijdlijn({
                 ].filter(Boolean)
                 const knop = { flexShrink: 0, width: isMobile ? 38 : 32, alignSelf: 'stretch', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }
                 return (
-                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
+                  <Fragment key={b.id}>
+                  {/* Dichte stapel: de randen van de kaarten eronder. */}
+                  {stapel && !stapel.open && Array.from({ length: Math.min(2, stapel.n - 1) }, (_, k) => k + 1).reverse().map(k => (
+                    <div key={k} aria-hidden style={{ position: 'absolute', left: 7 * k, right: rechts + (aanRand ? 0 : 7 * k), top: top + STAPEL_RAND * k, height: KAART, boxSizing: 'border-box', borderRadius: aanRand ? '10px 0 0 10px' : 10, background: k === 1 ? '#242424' : '#1b1b1b', border: '1px solid rgba(255,255,255,0.08)', transition: 'right 0.18s ease' }} />
+                  ))}
+                  <div onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
                     background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
@@ -524,6 +560,13 @@ export default function DagTijdlijn({
                         </span>
                       </span>
                     </div>
+                    {stapel && (
+                      <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); wisselStapel(stapel.sleutel) }}
+                        aria-label={stapel.open ? 'Stapel inklappen' : `Nog ${stapel.n - 1} tonen`}
+                        style={{ flexShrink: 0, alignSelf: 'center', minWidth: 34, height: 26, padding: '0 8px', borderRadius: 999, border: 'none', background: '#fff', color: '#0a0a0a', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }}>
+                        {stapel.open ? <ChevronUp size={15} strokeWidth={3} /> : `+${stapel.n - 1}`}
+                      </button>
+                    )}
                     {b.meta?.los && <span style={{ ...knop, cursor: 'default' }}><CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /></span>}
                     {vink && (
                       <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
@@ -531,6 +574,7 @@ export default function DagTijdlijn({
                       </button>
                     )}
                   </div>
+                  </Fragment>
                 )
               }
               return (
