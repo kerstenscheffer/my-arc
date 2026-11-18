@@ -443,6 +443,11 @@ export default function DagTijdlijn({
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: U + UREN_BREED - 4, right: 0 }}>
             {geplaatst.map(({ b, groot, top, h, mee, stapel }) => {
               const rechts = rechtsVan(top, h)
+              // "Volgende" linksboven de kaart, als losse tekst zonder vakje (18 nov
+              // 2026, Kersten: geen dikke witte rand en geen container om het woord).
+              const volgendeLabel = volgende?.id === b.id && !mee ? (
+                <span aria-hidden style={{ position: 'absolute', top: top - 11, left: 2, zIndex: 4, color: '#fff', fontSize: '0.54rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: '10px', textShadow: '0 0 4px #0a0a0a, 0 0 4px #0a0a0a', pointerEvents: 'none' }}>Volgende</span>
+              ) : null
               // Tegen de schermrand: rechts geen ronde hoek, en wat je kunt aantikken
               // (het vinkje) blijft de paginamarge van de rand af.
               const aanRand = rechts === 0 && U > 0
@@ -455,16 +460,19 @@ export default function DagTijdlijn({
                 const foto = cardio ? cardioFoto(naam) : getWorkoutImage({ name: naam })
                 const sub = cardio ? `${Math.max(0, b.end - b.start)} min` : (b.meta?.exercise_count > 0 ? `${b.meta.exercise_count} oefeningen` : null)
                 return (
-                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: aanRand ? '9px 0 0 9px' : 9, overflow: 'hidden', background: '#121212', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1.5px rgba(255,255,255,0.85)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
+                  <Fragment key={b.id}>
+                  {volgendeLabel}
+                  <div onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: aanRand ? '9px 0 0 9px' : 9, overflow: 'hidden', background: '#121212', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1px rgba(255,255,255,0.22)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.5 : 0.35 }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
-                    {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4 + randPad, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
+                    {/* Zelfde maat en plek als het vinkje op een maaltijdkaart. */}
+                    {gedaan && <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: '50%', marginTop: isMobile ? -11 : -9, right: (isMobile ? 8 : 7) + randPad, zIndex: 2, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
                     {/* Start: alleen het icoon, wit en vet, zonder vak eromheen. Tikken op de kaart zelf doet hetzelfde. */}
                     {!gedaan && onOpen && (
                       <Play aria-hidden size={GROOT >= 44 ? 24 : 20} strokeWidth={3} color="#fff" fill="#fff"
                         style={{ position: 'absolute', right: 10 + randPad, top: '50%', marginTop: -(GROOT >= 44 ? 12 : 10), filter: 'drop-shadow(0 1px 6px rgba(0,0,0,0.85))', zIndex: 2 }} />
                     )}
-                    <div style={{ position: 'absolute', left: 6, right: (!gedaan && onOpen ? 46 : 6) + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', left: 6, right: (gedaan ? 38 : onOpen ? 46 : 6) + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.82rem' : '0.76rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>
                         {cardio && <HeartPulse size={11} strokeWidth={2.8} style={{ flexShrink: 0 }} />}
                         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>
@@ -474,6 +482,7 @@ export default function DagTijdlijn({
                       </div>
                     </div>
                   </div>
+                  </Fragment>
                 )
               }
               const maaltijd = b.type === 'meal'
@@ -494,11 +503,13 @@ export default function DagTijdlijn({
                 const onder = items.length === 1 ? eerste.dosering : (items.length > 1 ? `${items.length} supplementen` : null)
                 const knop = { flexShrink: 0, width: isMobile ? 38 : 32, alignSelf: 'stretch', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }
                 return (
-                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
+                  <Fragment key={b.id}>
+                  {volgendeLabel}
+                  <div onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
                     background: klaar ? '#070707' : mee ? '#1a1a1a' : '#121212',
-                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`,
+                    border: `1px solid ${klaar ? 'rgba(255,255,255,0.05)' : volgende?.id === b.id ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(info)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: info ? 'pointer' : 'default', ...tik }}>
                       <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#fff', opacity: klaar ? 0.28 : 1 }}>
@@ -521,6 +532,7 @@ export default function DagTijdlijn({
                       </button>
                     )}
                   </div>
+                  </Fragment>
                 )
               }
               // Maaltijd: een kaart zoals op de maaltijdpagina, met een i (openen) en het vinkje.
@@ -534,6 +546,7 @@ export default function DagTijdlijn({
                 const knop = { flexShrink: 0, width: isMobile ? 38 : 32, alignSelf: 'stretch', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', ...tik }
                 return (
                   <Fragment key={b.id}>
+                  {volgendeLabel}
                   {/* Dichte stapel: de randen van de kaarten eronder. */}
                   {stapel && !stapel.open && Array.from({ length: Math.min(2, stapel.n - 1) }, (_, k) => k + 1).reverse().map(k => (
                     <div key={k} aria-hidden style={{ position: 'absolute', left: 7 * k, right: rechts + (aanRand ? 0 : 7 * k), top: top + STAPEL_RAND * k, height: KAART, boxSizing: 'border-box', borderRadius: aanRand ? '10px 0 0 10px' : 10, background: k === 1 ? '#242424' : '#1b1b1b', border: '1px solid rgba(255,255,255,0.08)', transition: 'right 0.18s ease' }} />
@@ -542,7 +555,7 @@ export default function DagTijdlijn({
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
                     background: klaar ? '#070707' : mee ? '#1a1a1a' : '#121212',
-                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`,
+                    border: `1px solid ${klaar ? 'rgba(255,255,255,0.05)' : volgende?.id === b.id ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: openen ? 'pointer' : 'default', ...tik }}>
                       <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: klaar ? 0.28 : 1 }}>
