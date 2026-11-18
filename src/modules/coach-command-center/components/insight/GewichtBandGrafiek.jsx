@@ -279,12 +279,12 @@ export default function GewichtBandGrafiek({
       ? { startGewicht: Number(actief.start_gewicht), startDatum: actief.started_on, herijkt: false }
       : null
 
-    // Nog niets gewogen, maar er ligt wel een afspraak? Dan tekenen we alvast
-    // waar het heen zou moeten. Dat is precies wat je aan het begin van een
-    // fase wil zien: dit is het plan, hier hoort je gewicht te lopen. Wachten
-    // tot de eerste weging levert een leeg scherm op het moment dat de
-    // verwachting het meest waard is.
-    if (reeks.length === 0) {
+    // Nog niets gewogen of slechts één meting — te weinig voor een zichtbare
+    // lijn (recharts Line met dot={false} tekent niets voor één datapunt).
+    // Dan tekenen we alvast waar het heen zou moeten. Dat is precies wat je
+    // aan het begin van een fase wil zien: dit is het plan, hier hoort je
+    // gewicht te lopen. Bij één echte meting zetten we die als dot erbij.
+    if (reeks.length < 2) {
       if (!uitFase) return { config, leeg: true }
       const segmentenLeeg = planSegmenten(client, actief)
       const start = new Date(`${String(uitFase.startDatum).slice(0, 10)}T00:00:00`)
@@ -309,6 +309,19 @@ export default function GewichtBandGrafiek({
           doel: Math.round(l.doel * 10) / 10,
           band: [Math.round(Math.min(l.traag, l.snel) * 10) / 10, Math.round(Math.max(l.traag, l.snel) * 10) / 10],
         })
+      }
+      // Eén echte meting: als dot zichtbaar maken in de verwachtingsgrafiek.
+      if (reeks.length === 1) {
+        const met = reeks[0]
+        const bestaand = vooruit.find(p => p.datum === met.datum)
+        if (bestaand) {
+          bestaand.meting = met.meting
+        } else {
+          const item = { datum: met.datum, label: kort(met.datum), meting: met.meting }
+          const idx = vooruit.findIndex(p => p.datum > met.datum)
+          if (idx === -1) vooruit.push(item)
+          else vooruit.splice(idx, 0, item)
+        }
       }
       return {
         config, punten: vooruit, weken: [], laatste: null,

@@ -1016,9 +1016,10 @@ const SwapModal = ({ isOpen, onClose, currentMeal, onSelectMeal, allMeals = [], 
                     </div>
                     <div style={{
                       display: 'flex',
-                      gap: '0.75rem',
-                      fontSize: '0.75rem',
-                      color: 'rgba(255, 255, 255, 0.5)'
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      fontSize: '0.85rem',
+                      color: 'rgba(255, 255, 255, 0.75)'
                     }}>
                       <span>{meal.kcal} kcal</span>
                       <span>{meal.protein}g eiwit</span>

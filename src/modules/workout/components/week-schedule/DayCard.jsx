@@ -95,10 +95,10 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
       {kanSchuiven && (
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
           <button onClick={(e) => { e.stopPropagation(); if (kanLinks && onLinks) { onLinks(); if (navigator.vibrate) navigator.vibrate(25) } }} disabled={!kanLinks} aria-label="Naar vorige dag" style={pijl(isMobile, kanLinks)}>
-            <ChevronLeft size={isMobile ? 13 : 15} strokeWidth={3} />
+            <ChevronLeft size={isMobile ? 16 : 15} strokeWidth={3} />
           </button>
           <button onClick={(e) => { e.stopPropagation(); if (kanRechts && onRechts) { onRechts(); if (navigator.vibrate) navigator.vibrate(25) } }} disabled={!kanRechts} aria-label="Naar volgende dag" style={pijl(isMobile, kanRechts)}>
-            <ChevronRight size={isMobile ? 13 : 15} strokeWidth={3} />
+            <ChevronRight size={isMobile ? 16 : 15} strokeWidth={3} />
           </button>
         </div>
       )}
@@ -107,7 +107,7 @@ function Tegel({ foto, eyebrow, titel, soortTraining = null, sub, klaar, kanSchu
 }
 
 const pijl = (isMobile, aan) => ({
-  width: isMobile ? 26 : 30, height: isMobile ? 20 : 22, padding: 0,
+  width: isMobile ? 36 : 30, height: isMobile ? 28 : 22, padding: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(0,0,0,0.35)', border: 'none', color: '#fff',
   opacity: aan ? 0.95 : 0.2, cursor: aan ? 'pointer' : 'not-allowed', pointerEvents: 'auto',
