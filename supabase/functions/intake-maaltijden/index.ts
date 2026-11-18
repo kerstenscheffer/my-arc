@@ -44,6 +44,7 @@ const KCAL_MARGE = 0.10, EIWIT_MARGE = 5, DAG_EIWIT = 0.95
 // één stuk komt uit ai_ingredients (gram_per_eenheid), min/max zijn dan stuks.
 // De eerste regel die past wint; volgorde is dus van specifiek naar algemeen.
 const PORTIE: [RegExp, number, number, number, number?][] = [
+  [/rucola|\bsla\b|veldsla|ijsbergsla|spinazie|kruiden|koffie|espresso/, 10, 10, 60],
   [/\b(ei|eieren)\b|gekookt ei|gebakken ei|ei \(heel\)/, 0, 1, 4, 60],
   [/wrap|tortilla|pita|bagel|broodje|pistolet|bolletje/, 0, 1, 2, 60],
   [/cracker|beschuit|rijstwafel|knäckebröd|knackebrod|maiswafel|linzenwafel/, 0, 1, 5, 10],
@@ -125,7 +126,7 @@ const hoeveel = (r: any) => {
   const e = String(r.ing.eenheid || ''), g = Number(r.ing.gram_per_eenheid) || 0
   if (g > 0 && /stuk|snee|plak|schep|wrap/.test(e) && Math.abs(r.gram / g - Math.round(r.gram / g * 2) / 2) < 0.02) {
     const n = Math.round(r.gram / g * 2) / 2
-    return `${String(n).replace('.', ',')} ${e}`
+    return `${String(n).replace('.', ',')} ${e === 'stuk' && n !== 1 ? 'stuks' : e}`
   }
   if (/brood|boterham/.test(String(r.ing.name || '').toLowerCase()) && r.gram % 35 === 0) return `${r.gram / 35} ${r.gram === 35 ? 'snee' : 'sneetjes'}`
   return `${Math.round(r.gram)} g`
@@ -163,13 +164,14 @@ const SCHEMA_LEES = {
           ingredienten: {
             type: 'array',
             items: {
-              type: 'object', additionalProperties: false, required: ['naam', 'zoek', 'rol', 'gram', 'toegevoegd'],
+              type: 'object', additionalProperties: false, required: ['naam', 'zoek', 'rol', 'gram', 'toegevoegd', 'was'],
               properties: {
                 naam: { type: 'string' },
                 zoek: { type: 'string', description: 'Eén of twee kale zoekwoorden voor de ingrediëntenlijst, zoals "magere kwark", "havermout", "whey".' },
                 rol: { type: 'string', enum: ['eiwit', 'koolhydraat', 'vet', 'groente', 'fruit', 'smaak'] },
                 gram: { type: 'number', description: 'Normale portie in gram (rauw gewogen) als startpunt.' },
                 toegevoegd: { type: 'boolean', description: 'true als de klant dit niet noemde en jij het toevoegt om aan eiwit te komen.' },
+                was: { type: ['string', 'null'], description: 'Alleen als je wat de klant noemde vervangt door een betere variant of invult wat hij algemeen liet: wat de klant schreef ("wit brood", "kaas", "vlees"). Anders null.' },
               },
             },
           },
@@ -196,8 +198,12 @@ Niet overnemen, met een korte reden in niet_overgenomen:
 - Alles wat botst met wat de klant niet lust of niet mag.
 De aangevinkte standaardopties achter de eigen tekst (losse trefwoorden als "Brood met kaas, Pindakaas, Kwark met fruit") zijn geen beschrijving van een maaltijd; lees ze alleen als voorkeur. Noemt de klant in zijn eigen tekst een tweede optie die wel goed is ("soms kwark met muesli"), dan mag je die nemen.
 
+Een herkenbare maaltijd die net niet goed genoeg is, neem je wél over in een betere versie. De klant moet zijn eigen maaltijd erin herkennen. Voorbeeld: "3 eitjes op wit brood met kaas en tomaat" wordt volkoren brood met ei, 30+ kaas, kipfilet en tomaat. Dat is iets anders dan brood met alleen pindakaas of chocopasta: daar blijft na verbeteren niets van de maaltijd over, dus die neem je niet over.
+Ook een algemeen genoemde maaltijd met een duidelijke vorm neem je over, en je vult hem in met gewone keuzes: "aardappelen, groente en vlees" wordt aardappelen met kipfilet of mager rundvlees en een gewone groente (broccoli, sperziebonen), tenzij de klant zelf iets specifieks noemt of iets niet lust. Een rij verschillende gerechten ("pasta of rijst, soms pizza") blijft vaag.
+
 Ingrediënten:
-- Neem wat de klant noemt. Voeg hooguit één eiwitbron toe (toegevoegd: true) als de maaltijd anders duidelijk te weinig eiwit heeft voor zijn moment: whey of magere kwark bij zuivel en havermout, kipfilet of ei bij brood, wrap en salade. Bij een uitdrukkelijke wens voeg je niets toe.
+- Neem wat de klant noemt, in de betere variant waar die bestaat: wit brood wordt volkoren, volvette kaas wordt 30+, volle zuivel wordt mager of halfvol, vet vlees wordt mager, frisdrank en sauzen laat je weg. Zet dan in "was" wat de klant schreef. Vul je iets algemeens in ("vlees" wordt kipfilet), zet dan ook in "was" wat hij schreef.
+- Voeg hooguit één eiwitbron toe (toegevoegd: true) als de maaltijd anders duidelijk te weinig eiwit heeft voor zijn moment: whey of magere kwark bij zuivel en havermout, kipfilet of ei bij brood, wrap en salade. Bij een uitdrukkelijke wens verander je niets en voeg je niets toe.
 - Hooguit zes ingrediënten. Smaakmakers in een vaste kleine hoeveelheid krijgen rol "smaak" (honing, kaneel, saus); die worden niet geschaald.
 - Hoeveelheden rauw gewogen, als normale portie. Het exacte schalen doet het systeem daarna.
 - Gebruik gewone productnamen zonder merk.
@@ -229,7 +235,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
   try {
-    const { client_id, opnieuw } = await req.json()
+    // proef: { ontbijt, lunch, diner, snack } met eigen tekst. Rekent alles door tegen het concept van de klant, maar schrijft niets weg (alleen coach of testsleutel).
+    const { client_id, opnieuw, proef } = await req.json()
     if (!client_id) return json({ error: 'client_id is nodig' }, 400)
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -255,7 +262,8 @@ Deno.serve(async (req) => {
     const dagen = DAGEN.filter(k => ws[k] && typeof ws[k] === 'object')
     const maaltijdenVan = (dag: any) => Object.entries(dag).filter(([s, m]: any) => s !== 'totals' && m && typeof m === 'object' && m.name) as [string, any][]
     const heeftEigen = dagen.some(k => maaltijdenVan(ws[k]).some(([, m]) => m.bron === BRON))
-    if (al && (!opnieuw || heeftEigen)) return json({ ok: true, overgeslagen: heeftEigen ? 'eigen maaltijden staan er al in; maak het concept eerst opnieuw' : 'al verwerkt', eigen_maaltijden: al })
+    const droog = !!proef && typeof proef === 'object' && isCoach
+    if (!droog && al && (!opnieuw || heeftEigen)) return json({ ok: true, overgeslagen: heeftEigen ? 'eigen maaltijden staan er al in; maak het concept eerst opnieuw' : 'al verwerkt', eigen_maaltijden: al })
 
     const { data: np } = await sb.from('nutrition_preferences').select('current_habits, wishes, wat_werkt_goed, allergens')
       .eq('client_id', client_id).order('updated_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle()
@@ -265,10 +273,14 @@ Deno.serve(async (req) => {
       const t = [ch[m], ch.per_moment?.[m]?.werkt_goed ? `(werkt goed omdat: ${ch.per_moment[m].werkt_goed})` : ''].filter(Boolean).join(' ').trim()
       if (t) teksten[m] = t.slice(0, 900)
     }
+    if (droog) { for (const m of Object.keys(teksten)) delete teksten[m]; for (const m of ['ontbijt', 'lunch', 'diner', 'snack']) if (proef[m]) teksten[m] = String(proef[m]).slice(0, 900) }
     const klaar = async (eigen: any, extraBrief: { keuzes?: string[]; nakijken?: string[] } = {}, wsNieuw: any = null, gem: any = {}) => {
+      if (droog) return
       const brief = { ...(gs.brief || {}) }
       brief.keuzes = [...(extraBrief.keuzes || []), ...(brief.keuzes || [])]
-      brief.nakijken = [...(extraBrief.nakijken || []), ...(brief.nakijken || [])]
+      // De standaardregel "nog niet aangepast op wat de klant eet" klopt niet meer zodra er iets is overgenomen.
+      const oud = (brief.nakijken || []).filter((t: string) => !(Number(eigen?.overgenomen) > 0 && /nog niet aangepast op wat de klant nu eet/i.test(String(t))))
+      brief.nakijken = [...(extraBrief.nakijken || []), ...oud]
       const { error } = await sb.from('client_meal_plans').update({
         ...(wsNieuw ? { week_structure: wsNieuw, ...gem } : {}),
         generation_settings: { ...gs, brief, eigen_maaltijden: eigen }, updated_at: new Date().toISOString(),
@@ -326,7 +338,7 @@ Deno.serve(async (req) => {
     const mv = gs.macro_voorstel || {}
     const keuzes: string[] = [], nakijken: string[] = [], geplaatst: any[] = []
     // Eerdere eigen maaltijden uit een vorig concept niet meer tonen.
-    await sb.from('ai_custom_meals').update({ is_active: false }).eq('client_id', client_id).eq('personal_notes', BRON)
+    if (!droog) await sb.from('ai_custom_meals').update({ is_active: false }).eq('client_id', client_id).eq('personal_notes', BRON)
 
     for (const [mi, m] of gelezen.entries()) {
       const label = MOMENT_NL[m.moment] || m.moment
@@ -339,7 +351,7 @@ Deno.serve(async (req) => {
         const vast = v.ing.rol === 'smaak' || m.moment === 'extra'
         const start = vast ? Math.max(1, Math.round(Number(v.ing.gram) || regel.min))
           : Math.min(regel.max, Math.max(regel.min, Math.round((Number(v.ing.gram) || regel.min) / regel.stap) * regel.stap))
-        return { ing, regel, vast, start, gram: start, toegevoegd: !!v.ing.toegevoegd, naam: v.gekozen.name }
+        return { ing, regel, vast, start, gram: start, toegevoegd: !!v.ing.toegevoegd, was: v.ing.was ? String(v.ing.was).trim() : null, naam: v.gekozen.name }
       })
 
       let slot: string | null = null, doel: any = null, opDagen: string[] = dagen
@@ -371,7 +383,7 @@ Deno.serve(async (req) => {
       }))
       const foto = [...rijen].sort((x, y) => y.ing.calories_per_100g * y.gram - x.ing.calories_per_100g * x.gram).map(r => r.ing.image_url).find(Boolean) || null
       const sectie = m.moment === 'extra' ? 'snack' : m.moment
-      const { data: nieuw, error: ce } = await sb.from('ai_custom_meals').insert({
+      const { data: nieuw, error: ce } = droog ? { data: { id: crypto.randomUUID() }, error: null } : await sb.from('ai_custom_meals').insert({
         client_id, name: m.naam, calories: Math.round(mac.kcal), protein: r1(mac.eiwit), carbs: r1(mac.koolh), fat: r1(mac.vet),
         ingredients_list: lijst, preparation_steps: (m.bereiding || []).slice(0, 4), serving_size: 1, is_active: true,
         image_url: foto, section: sectie, personal_notes: BRON,
@@ -392,8 +404,9 @@ Deno.serve(async (req) => {
       }
       const porties = rijen.map(r => `${hoeveel(r)} ${r.naam.toLowerCase()}`).join(', ')
       const erbij = rijen.filter(r => r.toegevoegd).map(r => r.naam.toLowerCase())
+      const beter = rijen.filter(r => r.was && !r.toegevoegd).map(r => `${r.was} werd ${r.naam.toLowerCase()}`)
       const waar = opDagen.length === dagen.length ? 'elke dag' : `${opDagen.length} dagen`
-      keuzes.push(`${label} uit de intake${wens ? ' (uitdrukkelijke wens)' : ''}: ${m.naam}, ${waar}${doel ? `, in plaats van ${doel.m.name}` : ''}. ${porties}: ${Math.round(mac.kcal)} kcal, ${Math.round(mac.eiwit)} g eiwit${doel ? ` (was ${Math.round(doel.m.calories)} kcal, ${Math.round(doel.m.protein)} g)` : ''}.${erbij.length ? ` Toegevoegd voor het eiwit: ${erbij.join(', ')}.` : ''} De klant schreef: "${String(m.citaat).slice(0, 140)}".`)
+      keuzes.push(`${label} uit de intake${wens ? ' (uitdrukkelijke wens)' : ''}: ${m.naam}, ${waar}${doel ? `, in plaats van ${doel.m.name}` : ''}. ${porties}: ${Math.round(mac.kcal)} kcal, ${Math.round(mac.eiwit)} g eiwit${doel ? ` (was ${Math.round(doel.m.calories)} kcal, ${Math.round(doel.m.protein)} g)` : ''}.${erbij.length ? ` Toegevoegd voor het eiwit: ${erbij.join(', ')}.` : ''}${beter.length ? ` Aangepast: ${beter.join(', ')}.` : ''} De klant schreef: "${String(m.citaat).slice(0, 140)}".`)
       if (m.moment === 'extra') nakijken.push(`Extra uit de intake toegevoegd: ${m.naam} (${Math.round(mac.kcal)} kcal per dag). Dat komt bovenop het plan; haal het ergens anders weg als het dagtotaal te hoog wordt.`)
       geplaatst.push({ slot: extraSlot, moment: m.moment, naam: m.naam, kcal: Math.round(mac.kcal), eiwit: Math.round(mac.eiwit), dagen: opDagen.length, id: nieuw.id })
     }
@@ -410,7 +423,7 @@ Deno.serve(async (req) => {
     const gem = n ? { daily_calories: Math.round(tk / n), daily_protein: Math.round(te / n), daily_carbs: Math.round(tkh / n), daily_fat: Math.round(tv / n) } : {}
     await klaar({ op: new Date().toISOString(), overgenomen: geplaatst.length, maaltijden: geplaatst }, { keuzes, nakijken }, geplaatst.length ? ws : null, geplaatst.length ? gem : {})
 
-    return json(isCoach ? { ok: true, overgenomen: geplaatst, keuzes, nakijken, gelezen: gelezen.map(m => ({ moment: m.moment, naam: m.naam, soort: m.soort })), usage: [lees.usage, kiesUsage] } : { ok: true, overgenomen: geplaatst.length })
+    return json(isCoach ? { ok: true, ...(droog ? { proef: true } : {}), overgenomen: geplaatst, keuzes, nakijken, gelezen: gelezen.map(m => ({ moment: m.moment, naam: m.naam, soort: m.soort })), usage: [lees.usage, kiesUsage] } : { ok: true, overgenomen: geplaatst.length })
   } catch (e) {
     console.error('intake-maaltijden', e)
     return json({ error: String((e as any)?.message || e) }, 500)

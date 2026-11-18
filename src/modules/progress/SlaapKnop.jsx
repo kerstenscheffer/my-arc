@@ -14,24 +14,15 @@
 // want dat is het getal waar de coach op stuurt: acht uur slecht slapen zegt
 // meer dan zeven uur goed.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale, History } from 'lucide-react'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 import HorizontaleSlider from '../../client/components/HorizontaleSlider'
+import SlaapInzicht from './SlaapInzicht'
+import { ALGEMENE_TIPS as TIPS } from './slaapTips'
 
-// Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
-// waren het enige eraan dat niet in dit blad zat.
-const TIPS = [
-  'Ga elke dag op dezelfde tijd naar bed en sta op dezelfde tijd op, ook in het weekend.',
-  'Houd je slaapkamer koel. Tussen 17 en 19 °C slaap je het diepst.',
-  'Zorg voor volledige duisternis. Gebruik een slaapmasker of verduisteringsgordijnen.',
-  'Leg je scherm 45 minuten voor bedtijd weg. Blauw licht remt melatonine.',
-  "Neem 's avonds een warme douche: de afkoeling daarna versnelt het inslapen.",
-  'Eet je laatste maaltijd 2 tot 3 uur voor bedtijd.',
-  'Sta op zodra je wekker gaat. Snoozen verstoort je ritme.',
-  'Ga binnen 30 minuten na het opstaan naar buiten voor daglicht.',
-]
+// De tips staan sinds 18 nov in slaapTips.js (gedeeld met SlaapInzicht).
 
 // Gewichten voor de slider: 30,0 t/m 200,0 kg per 0,1.
 const GEWICHTEN = Array.from({ length: 1701 }, (_, i) => Math.round((300 + i)) / 10)
@@ -75,7 +66,18 @@ const linkKnop = {
 // `alleenGewicht`: alleen de weegstap, als los scherm (regel 'Wegen' in de
 // agenda). Opslaan of overslaan sluit het blad.
 export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = null, voorOpstaan = null, onOpgeslagen, onStatus, alleenGewicht = false, onGewicht }) {
-  const logDatum = datum || vandaagIso()
+  // Een nacht die al gelogd is, opent in het inzicht (SlaapInzicht), niet
+  // opnieuw in de stappen (Kersten, 18 nov 2026). Vanuit het inzicht kun je
+  // die nacht, of een andere uit de week, aanpassen; na opslaan kom je terug.
+  const startDatum = datum || vandaagIso()
+  const [dag, setDag] = useState(startDatum)
+  const logDatum = dag
+  const volgende = useRef('auto') // stap na het laden: 'auto' = inzicht als gelogd, anders 1
+  const [vanInzicht, setVanInzicht] = useState(false)
+  const [versie, setVersie] = useState(0)
+  useEffect(() => {
+    if (open) { volgende.current = 'auto'; setVanInzicht(false); setDag(startDatum) }
+  }, [open, startDatum])
   const setOpen = (v) => { if (!v) onClose?.() }
   const [bed, setBed] = useState(voorBed || '23:00')
   const [opstaan, setOpstaan] = useState(voorOpstaan || '07:00')
@@ -107,7 +109,8 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   useEffect(() => {
     if (!open || !client?.id || !db?.supabase) return
     let weg = false
-    setBed(voorBed || '23:00'); setOpstaan(voorOpstaan || '07:00'); setUren(''); setUrenAangeraakt(false)
+    const eigenDag = logDatum === startDatum
+    setBed((eigenDag && voorBed) || '23:00'); setOpstaan((eigenDag && voorOpstaan) || '07:00'); setUren(''); setUrenAangeraakt(false)
     setGewicht(null); setGewogen(false)
     // Intake-planning: toon hem, en gebruik hem als startwaarde als de
     // aanroeper (bv. de maan-knop op tracking) zelf geen tijden meegaf.
@@ -120,8 +123,8 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         const slaap = (Array.isArray(ws[sleutel]) ? ws[sleutel] : []).find(b => b?.type === 'slaap')
         if (slaap?.start && slaap?.end) {
           const g = { bed: String(slaap.start).slice(0, 5), op: String(slaap.end).slice(0, 5) }
-          if (!voorBed) setBed(g.bed)
-          if (!voorOpstaan) setOpstaan(g.op)
+          if (!voorBed || !eigenDag) setBed(g.bed)
+          if (!voorOpstaan || !eigenDag) setOpstaan(g.op)
         }
       }, () => {})
     // Laatste weging tot en met deze ochtend.
@@ -133,7 +136,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         if (r?.weight) { setGewicht(Number(r.weight)); setGewogen(String(r.date).slice(0, 10) === logDatum) }
         else setGewicht(80)
       }, () => { if (!weg) setGewicht(80) })
-    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(alleenGewicht ? 3 : 1); setToonEerdere(false); setToonTips(false)
+    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(alleenGewicht ? 3 : null); setToonEerdere(false); setToonTips(false)
     db.supabase
       .from('sleep_logs')
       .select('id, bedtime, wake_time, hours_slept, quality, struggles')
@@ -141,17 +144,25 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       .eq('log_date', logDatum)
       .maybeSingle()
       .then(({ data }) => {
-        if (weg || !data) return
+        if (weg) return
+        if (!alleenGewicht) {
+          const v = volgende.current
+          volgende.current = 'auto'
+          const naar = v === 'auto' ? (data ? 'inzicht' : 1) : v
+          if (naar === 'inzicht') setVanInzicht(true)
+          setStap(naar)
+        }
+        if (!data) return
         setAlGelogd(true)
         if (data.bedtime) setBed(String(data.bedtime).slice(0, 5))
         if (data.wake_time) setOpstaan(String(data.wake_time).slice(0, 5))
         if (data.hours_slept != null) { setUren(String(data.hours_slept)); setUrenAangeraakt(true) }
         if (data.quality != null) setKwaliteit(Number(data.quality))
         if (data.struggles) setStruggles(data.struggles)
-      })
+      }, () => { if (!weg && !alleenGewicht) setStap(1) })
     return () => { weg = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, db, client?.id, logDatum])
+  }, [open, db, client?.id, logDatum, versie])
 
   // De lijst halen we pas op als je hem opent: meestal kom je hier om te
   // loggen, niet om terug te kijken.
@@ -205,9 +216,11 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       if (error) throw error
 
       setAlGelogd(true)
-      onStatus?.(true)
-      setOpen(false)
+      if (logDatum === startDatum) onStatus?.(true)
       onOpgeslagen?.({ datum: logDatum, uren: rij.hours_slept, kwaliteit: rij.quality })
+      // Kwam je uit het inzicht, dan terug naar het inzicht (bijgewerkt).
+      if (vanInzicht) terugNaarInzicht()
+      else setOpen(false)
     } catch (e) {
       console.error('Slaap opslaan mislukt:', e)
       setFout(e.message || 'Opslaan mislukt')
@@ -217,6 +230,17 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   }
 
   if (!client?.id || !open) return null
+
+  const terugNaarInzicht = () => {
+    volgende.current = 'inzicht'
+    if (logDatum !== startDatum) setDag(startDatum)
+    else setVersie(v => v + 1)
+  }
+  const pasAan = (iso) => {
+    if (iso === logDatum) { setStap(1); return }
+    volgende.current = 1
+    setDag(iso)
+  }
 
   const urenNu = Number.isFinite(urenWaarde) ? urenWaarde : 0
   const zetUren = (v) => { setUren(String(Math.max(0, Math.min(16, Math.round(v * 2) / 2)))); setUrenAangeraakt(true) }
@@ -292,22 +316,28 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       >
         {/* Kop: terug, titel met stap, sluiten */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-          {stap > 1 && !alleenGewicht
-            ? <button onClick={() => setStap(n => (n === 4 ? 2 : n - 1))} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+          {typeof stap === 'number' && !alleenGewicht && (stap > 1 || vanInzicht)
+            ? <button onClick={() => (stap === 1 ? terugNaarInzicht() : setStap(n => (n === 4 ? 2 : n - 1)))} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
             : <div style={{ width: 40 }} />}
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              {alleenGewicht ? 'Gewicht loggen' : `Slaap loggen · stap ${stap <= 2 ? stap : stap - 1} van 4`}
+              {alleenGewicht ? 'Gewicht loggen' : stap === 'inzicht' ? 'Inzicht' : typeof stap === 'number' ? `Slaap ${alGelogd ? 'aanpassen' : 'loggen'} · stap ${stap <= 2 ? stap : stap - 1} van 4` : ' '}
             </div>
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {alleenGewicht
                 ? <><Scale size={15} strokeWidth={2.6} /> Je weging</>
-                : <><Moon size={15} strokeWidth={2.6} /> Je nacht</>}
-              {datumTekst && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
+                : stap === 'inzicht' ? <><Moon size={15} strokeWidth={2.6} /> Je slaap</> : <><Moon size={15} strokeWidth={2.6} /> Je nacht</>}
+              {datumTekst && stap !== 'inzicht' && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
             </div>
           </div>
           <button onClick={() => setOpen(false)} aria-label="Sluiten" style={kleinKnop}><X size={18} strokeWidth={2.8} /></button>
         </div>
+
+        {stap === null && <div style={{ height: 180 }} />}
+
+        {stap === 'inzicht' && (
+          <SlaapInzicht db={db} client={client} logDatum={startDatum} versie={versie} onAanpassen={pasAan} />
+        )}
 
         {stap === 1 && (
           <>

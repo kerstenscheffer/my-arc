@@ -13,9 +13,9 @@
 --    - één woord, niets gevonden: woorden die één of twee letters afwijken
 --      ("keark" → kwark, "zppel" → appel).
 --    - meer woorden: staat er bovenaan niets waar alle woorden in zitten, dan
---      eerst de producten met de meeste woorden; is dat er niet, dan het
---      laatste woord dat zelf een basisproduct is ("petite france kwark" →
---      kwark). De oude uitkomst blijft erachter staan.
+--      komen de producten met alle woorden bovenaan en die met twee of meer
+--      net onder de eerste oude treffer. Blijft het weinig, dan komt het
+--      laatste woord dat zelf een basisproduct is erachter.
 
 create extension if not exists fuzzystrmatch with schema extensions;
 
@@ -52,7 +52,7 @@ begin
   execute replace(d, oud, 'where not exists (select 1 from public.zoek_verborgen zv where zv.id = i.id) and coalesce(i.calories_per_100g, 0) <= 900');
 end $do$;
 
-create or replace function public.zoek_ingredienten_woorden(p_woorden text[], p_limit integer default 15)
+create or replace function public.zoek_ingredienten_woorden(p_woorden text[], p_limit integer default 15, p_alle boolean default false)
 returns uuid[]
 language plpgsql
 set search_path to 'public'
@@ -60,26 +60,38 @@ as $function$
 declare
   r uuid[];
 begin
-  perform set_config('pg_trgm.word_similarity_threshold', '0.4', true);
+  -- Een woord telt als het aan het begin van een woord in de naam staat, als
+  -- het (5+ letters) ergens in de naam zit, of als het (5+ letters) één letter
+  -- afwijkt van een woord in de naam (twee bij 9+ letters). Korte woorden
+  -- tellen alleen exact: "bier" is geen "biet".
+  -- p_alle: alleen producten waar ALLE woorden in zitten; anders twee of meer.
+  perform set_config('pg_trgm.word_similarity_threshold', '0.3', true);
   select array_agg(t.id order by t.rn) into r from (
     select g.id, row_number() over (order by g.n desc, g.tot desc, g.basis desc, g.pop desc, g.len) as rn
     from (
-      select c.id, count(distinct w.s) as n, sum(c.m) as tot, bool_or(c.barcode is null) as basis,
+      select c.id, count(distinct w.o) as n, sum(c.m * (1 + 0.1 * w.o)) as tot, bool_or(c.barcode is null) as basis,
              max(coalesce(c.log_count, 0)) as pop, min(length(c.zoek_kern)) as len
-      from unnest(p_woorden) as w(s)
+      from (select u.x, public.zoek_stam(u.x) as s, u.o from unnest(p_woorden) with ordinality as u(x, o)) w
       cross join lateral (
         select i.id, i.barcode, i.log_count, i.zoek_kern,
-               greatest(case when i.zoek_naam ~ ('(^| )' || w.s) then 1.0
-                             when position(w.s in i.zoek_naam) > 0 then 0.85 else 0 end,
-                        word_similarity(w.s, i.zoek_naam)) as m
+               case when i.zoek_naam ~ ('(^| )' || w.s) then 1.0
+                    when length(w.s) >= 5 and position(w.s in i.zoek_naam) > 0 then 0.85
+                    -- "glutenvrije" vindt ook "gluten vrij": zonder spaties en zonder slot-e.
+                    when length(w.s) >= 6 and position(regexp_replace(w.s, 'e$', '') in replace(i.zoek_naam, ' ', '')) > 0 then 0.8
+                    when length(w.x) >= 5 and exists (
+                           select 1 from unnest(string_to_array(i.zoek_naam, ' ')) y
+                           where abs(length(y) - length(w.x)) <= 2
+                             and extensions.levenshtein(y, w.x) <= case when length(w.x) >= 9 then 2 else 1 end) then 0.7
+                    else 0 end as m
         from ai_ingredients i
-        where (i.zoek_naam like '%' || w.s || '%' or w.s <% i.zoek_naam)
+        where (i.zoek_naam like '%' || w.s || '%' or w.x <% i.zoek_naam)
           and not exists (select 1 from zoek_verborgen zv where zv.id = i.id)
           and coalesce(i.calories_per_100g, 0) <= 900
           and coalesce(i.protein_per_100g, 0) + coalesce(i.carbs_per_100g, 0) + coalesce(i.fat_per_100g, 0) <= 105
       ) c
+      where c.m > 0
       group by c.id
-      having count(distinct w.s) >= 2
+      having count(distinct w.o) >= case when p_alle then cardinality(p_woorden) else 2 end
     ) g
     order by rn
     limit p_limit
@@ -169,28 +181,37 @@ begin
        select 1 from ai_ingredients i
        where i.id = any (basis[1:8])
          and not exists (select 1 from unnest(stam) s where position(s in i.zoek_naam) = 0)) then
-    multi := public.zoek_ingredienten_woorden(stam, 15);
-    if cardinality(multi) = 0 then
+    -- Alle woorden erin (in elke volgorde, tikfout mag): bovenaan. Twee van de
+    -- drie of meer: net onder de eerste oude treffer, want die was vaak goed.
+    multi := public.zoek_ingredienten_woorden(heel, 10, true);
+    if cardinality(heel) >= 3 then
+      extra := public.zoek_ingredienten_woorden(heel, 8, false);
+      basis := multi || basis[1:1] || extra || basis[2:];
+    else
+      basis := multi || basis;
+    end if;
+    -- Weinig gevonden: het laatste woord dat zelf een basisproduct is erachter.
+    if cardinality(basis) < 5 then
       for idx in reverse cardinality(heel) .. 1 loop
         w := heel[idx];
         continue when position(w in hoofd) = 0;
         if exists (select 1 from ai_ingredients i where i.barcode is null
                    and i.zoek_kern in (w, stam[idx], stam[idx] || 'en', stam[idx] || 's', stam[idx] || 'n')) then
-          multi := array(select k.id from public.zoek_ingredienten_kern(w, p_client, p_limit) k);
+          basis := basis || array(select k.id from public.zoek_ingredienten_kern(w, p_client, p_limit) k);
           exit;
         end if;
       end loop;
     end if;
-    if cardinality(multi) > 0 then basis := multi || basis; anders := true; end if;
+    anders := true;
   end if;
 
-  -- Nog steeds niets: het langste woord alleen.
+  -- Nog steeds niets: woord voor woord, het langste eerst.
   if cardinality(basis) = 0 then
-    select x into w from unnest(heel) x order by length(x) desc limit 1;
-    if w is not null then
+    for w in select x from unnest(heel) x order by length(x) desc loop
       basis := array(select k.id from public.zoek_ingredienten_kern(w, p_client, p_limit) k);
       anders := true;
-    end if;
+      exit when cardinality(basis) > 0;
+    end loop;
   end if;
 
   if not anders then
