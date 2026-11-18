@@ -132,6 +132,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showDayPicker, setShowDayPicker] = useState(false)
   // Rustdag aangeklikt: de nieuwe dag komt op die plek in de cyclus (18 nov 2026).
   const [vulPlek, setVulPlek] = useState(null)
+  const [meldingOpen, setMeldingOpen] = useState(null) // dag-id waarvan de meldingen open staan
   const cycRef = useRef(null)
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
@@ -1492,11 +1493,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               // Spieren die de vorige cyclusdag ook al direct trainde: geen rustdag ertussen.
               const vorige = isLos ? null : weekSlots[(plek - 1 + weekSlots.length) % weekSlots.length]
               const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
+              const laat = zwaarTeLaat(dag.exercises || [])
+              const dagMeldingen = [
+                ...(ookGisteren.length ? [{ titel: `${ookGisteren.map(k => spierLabel(k)).join(', ')} ook de dag ervoor`, uitleg: 'Geen rustdag tussen twee trainingen van dezelfde spier.' }] : []),
+                ...(laat ? [{ titel: `${laat.naam} pas als ${laat.plek}e oefening`, uitleg: 'Zware compounds vooraan: daar is de output het hoogst.' }] : []),
+              ]
               return (
               <div key={dag.id} data-dag={dag.id} style={{ flex: '1 0 280px', minWidth: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: (klembord.length > 0 && plakDag === String(dag.id)) ? 'rgba(255,255,255,0.08)' : dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 {slotKop}
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
-                <div data-dagtitel style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div data-dagtitel style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
                   <button data-dagtitel onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Klik: deze dag openen. Sleep over titels: alle oefeningen van die dagen selecteren." style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 7px', minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                   {/* De naam zoals de klant hem op zijn weekrooster ziet staat voorop
@@ -1516,25 +1522,28 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                     })()}
                   </span>
                   </button>
+                  {dagMeldingen.length > 0 && (
+                    <button onClick={() => setMeldingOpen(v => v === dag.id ? null : dag.id)} title={`${dagMeldingen.length} ${dagMeldingen.length === 1 ? 'melding' : 'meldingen'}`} aria-label="Meldingen" style={{ width: 20, height: 20, flexShrink: 0, padding: 0, borderRadius: 999, border: 'none', background: '#f59e0b', color: '#fff', fontSize: '0.66rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {dagMeldingen.length}
+                    </button>
+                  )}
                   {(dag.exercises || []).length > 1 && (
                     <button onClick={() => sorteerOpSpier(dag.id)} title="Sorteer op spiergroep (zelfde spieren bij elkaar)" aria-label="Sorteer op spiergroep" style={{ ...iconKnop(), width: 24, height: 24, marginRight: -4 }}>
                       <ArrowDownWideNarrow size={14} />
                     </button>
                   )}
                   </div>
-                  {ookGisteren.length > 0 && (
-                    <span title="Geen rustdag tussen twee trainingen van dezelfde spier." style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>
-                      ! {ookGisteren.map(k => spierLabel(k)).join(', ')} ook de dag ervoor
-                    </span>
+                  {/* Meldingen: oranje bolletje in de titelregel, klik = uitleg (18 nov 2026). */}
+                  {meldingOpen === dag.id && dagMeldingen.length > 0 && (
+                    <div data-geen-sleep style={{ position: 'absolute', top: 34, left: 8, right: 8, zIndex: 5, background: '#111', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.7)', padding: '0.6rem 0.7rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {dagMeldingen.map((mel, mi) => (
+                        <div key={mi}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#fff' }}>{mel.titel}</div>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.35, marginTop: 2 }}>{mel.uitleg}</div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                  {(() => {
-                    const laat = zwaarTeLaat(dag.exercises || [])
-                    return laat ? (
-                      <span title="Zware compounds vooraan: daar is de output het hoogst (ACSM: de lift waarin je sterker wilt worden eerst)." style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>
-                        ! {laat.naam} pas als {laat.plek}e oefening
-                      </span>
-                    ) : null
-                  })()}
                   {/* Sets per spiergroep in de dagkop, niet in de lijst eronder. */}
                   {(dag.exercises || []).length > 0 && (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
