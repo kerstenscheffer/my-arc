@@ -7,7 +7,7 @@
 // Daaronder de signalen: wat valt op in deze week. Klik op een dag of een
 // signaal om die dag te openen.
 
-import { MACROS, pctVan, pctKleur, weekGemiddelde } from './weekCijfers'
+import { MACROS, pctVan, pctKleur, weekGemiddelde, dagDoel } from './weekCijfers'
 
 const LIJN = '1px solid rgba(255,255,255,0.12)'
 const DUN = '1px solid rgba(255,255,255,0.06)'
@@ -19,7 +19,13 @@ const DONKER = { '#ef4444': '#b91c1c', '#f59e0b': '#b45309', '#22c55e': '#047857
 
 export default function WeekStats({ dagen, targets = {}, open, onOpen, onKiesDag, isMobile }) {
   const gem = weekGemiddelde(dagen)
-  const doelVan = (mac) => Number(targets?.[mac.doel]) || 0
+  // Weekdoel = gemiddelde van de dagdoelen (trainingsdagen liggen hoger door de pre-workout).
+  const metEten = dagen.filter(d => d.maaltijden.length > 0)
+  const doelVan = (mac) => {
+    if (!(Number(targets?.[mac.doel]) > 0)) return 0
+    const lijst = metEten.length ? metEten : dagen
+    return lijst.length ? lijst.reduce((s, d) => s + (Number(dagDoel(d, targets)[mac.doel]) || 0), 0) / lijst.length : Number(targets[mac.doel])
+  }
   const m = isMobile
 
   return (
@@ -43,7 +49,7 @@ export default function WeekStats({ dagen, targets = {}, open, onOpen, onKiesDag
               {open && (
                 <div style={{ borderTop: LIJN }}>
                   {dagen.map((dag, j) => {
-                    const pd = pctVan(dag[mac.key], doel)
+                    const pd = pctVan(dag[mac.key], doel > 0 ? dagDoel(dag, targets)[mac.doel] : 0)
                     const leeg = dag.maaltijden.length === 0
                     return (
                       <button key={dag.index} onClick={() => onKiesDag?.(dag.index)} title={`${DAG[dag.index]} openen`} style={{

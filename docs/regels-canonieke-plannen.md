@@ -11,6 +11,7 @@ Volume- en tijdsregels: `docs/regels-volume.md` en `trainingsTijd.js`.
 
 ## Dag
 - Maximaal 60 minuten (9 min per oefening met 2 sets, +3 per extra set) en maximaal 16 sets.
+- Minimaal 45 minuten: een plan van 30 minuten maken we niet. Geeft de klant minder op, dan wordt het 45.
 - Zwaarste compound eerst, isolatie daarna, buik als laatste.
 - Past niet alles: kuiten vallen als eerste af. Elke andere oefening heeft voorrang op kuiten.
 

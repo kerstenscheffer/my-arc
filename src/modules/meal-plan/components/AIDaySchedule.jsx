@@ -47,7 +47,7 @@ export default function AIDaySchedule({
   workoutSchedule = null,
   db, dailyTotals,
   // ✅ FOOD LOG: New props from AIMealDashboard
-  client, onMealLogged, targets,
+  client, onMealLogged, targets, onDagPreWorkout = null,
   // ✅ OVERHAUL: View mode — 'plan' (default, show plan slots) | 'free' (logging only)
   mode = 'plan',
   // ✅ OVERHAUL: hide internal day picker + totals bar when dashboard renders
@@ -475,7 +475,7 @@ export default function AIDaySchedule({
 
   const loadDayMeals = async (dayIndex) => {
     const tijdelijk = overrides[datumVanDag(dayIndex)]?.dag || null
-    if (!tijdelijk && !activePlan?.week_structure) { setDisplayMeals([]); return }
+    if (!tijdelijk && !activePlan?.week_structure) { setDisplayMeals([]); onDagPreWorkout?.(null); return }
     setLoading(true)
     try {
       const dayKey = daysOfWeek[dayIndex]?.key
@@ -488,7 +488,9 @@ export default function AIDaySchedule({
         trainingStart: trainingStarts[dayKey],
       })
       setDisplayMeals(meals)
-    } catch (e) { setDisplayMeals([]) }
+      // Het dagdoel beweegt mee met de pre-workout van deze dag (zie preWorkoutMeal.js).
+      onDagPreWorkout?.(meals.find(x => x?.slot === 'pre_workout') || null)
+    } catch (e) { setDisplayMeals([]); onDagPreWorkout?.(null) }
     finally { setLoading(false) }
   }
   

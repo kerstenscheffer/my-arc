@@ -74,7 +74,7 @@ import WisselStappen from './components/WisselStappen'
 import { weekplanVoorWeek } from './DayTemplateService'
 import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen, zetMomentOpDagen } from './dagAanpassingen'
 import MomentVenster from './components/MomentVenster'
-import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
+import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT, doelenMetPreWorkout } from './utils/preWorkoutMeal'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
@@ -509,6 +509,9 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Wissel uit het alternatieven-venster: eerst kiezen op welke dagen het
   // geldt (DagenKiezer), dan pas opslaan via voerWisselUit.
   const [wisselKeuze, setWisselKeuze] = useState(null) // { meal, nieuw }
+  // Pre-workout van de gekozen dag: daarmee gaat het dagdoel omhoog (18 nov 2026).
+  const [dagPre, setDagPre] = useState(null)
+  const dagDoelen = doelenMetPreWorkout(dashboardData?.dailyTotals?.targets, dagPre)
   const [wisselBezig, setWisselBezig] = useState(false)
   const [wisselFout, setWisselFout] = useState(null)
 
@@ -817,7 +820,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         return (
           <MacroHero
             consumed={dashboardData?.dailyTotals?.consumed}
-            targets={dashboardData?.dailyTotals?.targets}
+            targets={dagDoelen}
             db={db}
             clientId={client?.id}
             selectedDate={selectedDate}
@@ -864,7 +867,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         if (plan.length === 0) return null
         const allDone = plan.every(m => m.isConsumed)
         if (!allDone) return null
-        const t = dashboardData?.dailyTotals?.targets || {}
+        const t = dagDoelen || {}
         const c = dashboardData?.dailyTotals?.consumed || {}
         const remaining = (t.calories || 0) - (c.calories || 0)
         return <DonePanel kcalRemaining={remaining} isMobile={isMobile} />
@@ -888,7 +891,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         onVerwijderMeal={(meal) => { setWisselFout(null); setVerwijderMeal(meal) }}
         onMomentWijzigen={(meal, pos) => setMomentKeuze({ meal, pos })}
         db={db}
-        dailyTotals={dashboardData.dailyTotals || {
+        onDagPreWorkout={setDagPre}
+        dailyTotals={dashboardData.dailyTotals ? { ...dashboardData.dailyTotals, targets: dagDoelen } : {
           targets: {
             calories: client.target_calories || 0,
             protein: client.target_protein || 0,
@@ -899,7 +903,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         }}
         client={client}
         onMealLogged={handleMealLogged}
-        targets={dashboardData.dailyTotals?.targets}
+        targets={dagDoelen}
         foodLogTrigger={foodLogTrigger}
         foodLogTab={foodLogTab}
         weekOffset={weekOffset}

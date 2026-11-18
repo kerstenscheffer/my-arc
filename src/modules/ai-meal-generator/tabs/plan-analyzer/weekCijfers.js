@@ -6,7 +6,7 @@
 // Grenzen gelijk aan de dag-ringen en de dagstrip: onder 85% van het doel is
 // te weinig (rood), boven 115% te veel (oranje).
 
-import { PRE_WORKOUT_SLOT } from '../../../meal-plan/utils/preWorkoutMeal'
+import { PRE_WORKOUT_SLOT, doelenMetPreWorkout } from '../../../meal-plan/utils/preWorkoutMeal'
 
 export const ONDER = 85
 export const BOVEN = 115
@@ -54,9 +54,15 @@ export function dagCijfers(weekData, { preWorkoutMeal = null, isTraining = () =>
       t.fat += getal(meal.fat)
       t.fiber += getal(meal.fiber)
     })
-    return { index: i, training, maaltijden, ...t }
+    // De pre-workout van deze dag (eigen slot of die van het plan): het
+    // dagdoel gaat daarmee omhoog, zie doelenMetPreWorkout.
+    const pre = maaltijden.find(x => x.slot === PRE_WORKOUT_SLOT)?.meal || null
+    return { index: i, training, maaltijden, pre, ...t }
   })
 }
+
+// Doelen van één dag: de basisdoelen plus de pre-workout van die dag.
+export const dagDoel = (dag, targets) => doelenMetPreWorkout(targets || {}, dag?.pre || null) || {}
 
 export const pctVan = (waarde, doel) => (getal(doel) > 0 ? (getal(waarde) / getal(doel)) * 100 : null)
 
@@ -81,11 +87,10 @@ export function weekSignalen(dagen, targets = {}) {
 
   // 1. Macro's per dag buiten de band.
   MACROS.forEach(({ key, doel, label }) => {
-    const d = getal(targets?.[doel])
-    if (!d) return
+    if (!getal(targets?.[doel])) return
     const onder = [], boven = []
     metEten.forEach(dag => {
-      const p = pctVan(dag[key], d)
+      const p = pctVan(dag[key], dagDoel(dag, targets)[doel])
       if (p < ONDER) onder.push(dag.index)
       else if (p > BOVEN) boven.push(dag.index)
     })

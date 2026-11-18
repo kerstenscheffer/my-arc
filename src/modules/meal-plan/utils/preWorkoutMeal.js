@@ -132,3 +132,28 @@ export const preWorkoutTijd = (trainingStartMin, eigenTijd = null) => {
   }
   return eigenTijd || null
 }
+
+// ── Dagdoel op een trainingsdag (18 nov 2026, Kersten) ────────────────────
+//
+// De macrodoelen van de klant (clients.target_*) zijn het doel van een
+// rustdag. Staat er die dag een pre-workout maaltijd, dan gaat het doel van
+// die dag omhoog met precies die maaltijd: trainingsdagen krijgen zo meer
+// koolhydraten, zonder dat er twee sets doelen bijgehouden hoeven te worden.
+// Eén functie, zodat klantpagina en Plan Analyzer hetzelfde rekenen.
+
+/** De pre-workout in een lijst maaltijden van één dag, of null. */
+export const preWorkoutUitMaaltijden = (maaltijden) =>
+  (maaltijden || []).find(x => x && x.slot === PRE_WORKOUT_SLOT) || null
+
+/** Doelen van de dag: de basisdoelen plus de pre-workout van die dag. */
+export const doelenMetPreWorkout = (doelen, maaltijd) => {
+  if (!doelen || !maaltijd) return doelen
+  const plus = (basis, extra) => (Number(basis) > 0 ? Math.round(Number(basis) + (Number(extra) || 0)) : basis)
+  return {
+    ...doelen,
+    calories: plus(doelen.calories, maaltijd.calories),
+    protein: plus(doelen.protein, maaltijd.protein),
+    carbs: plus(doelen.carbs, maaltijd.carbs),
+    fat: plus(doelen.fat, maaltijd.fat),
+  }
+}

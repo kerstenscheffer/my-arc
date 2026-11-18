@@ -40,7 +40,7 @@ import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import WeekKolommen, { BulkBalk } from './plan-analyzer/WeekKolommen'
 import ClientAgendaService from '../../client-agenda/ClientAgendaService'
 import { minutenVoorOefeningen } from '../../manual-workout-builder/trainingsTijd'
-import { minutenNaarTijd } from '../../meal-plan/utils/preWorkoutMeal'
+import { minutenNaarTijd, doelenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import WeekStats from './plan-analyzer/WeekStats'
 import { dagCijfers, weekSignalen } from './plan-analyzer/weekCijfers'
 import { laadIngredienten, schaalMaaltijd } from './plan-analyzer/schaalPortie'
@@ -2045,8 +2045,13 @@ export default function PlanAnalyzer({
     const training = trainingDays?.length > 0 ? trainingDays.includes(DAY_CODE_BY_INDEX[i]) : !!dag?.is_training_day
     const telt = preWorkoutMeal && training && !dag?.meals?.[PRE_WORKOUT_SLOT]
     const t = totalenMetPreWorkout(dag?.totals, telt ? preWorkoutMeal : null) || {}
-    return { label: d.label, kcal: Number(t.kcal ?? t.calories) || 0, eiwit: Number(t.protein) || 0, training }
+    // Dagdoel = basisdoel + de pre-workout van die dag (18 nov 2026).
+    const pre = dag?.meals?.[PRE_WORKOUT_SLOT] || (telt ? preWorkoutMeal : null)
+    const doel = doelenMetPreWorkout(targets, pre) || {}
+    return { label: d.label, kcal: Number(t.kcal ?? t.calories) || 0, eiwit: Number(t.protein) || 0, training, pre, doel, doelKcal: Number(doel.calories) || 0, doelEiwit: Number(doel.protein) || 0 }
   })
+  // Doelen van de open dag; in Gegeten ook (de klant at op die dag tegen dat doel).
+  const dagTargets = dagStripDagen[activeDay]?.doel || targets || {}
 
   // Wat er deze dag afwijkt van de doelen, in grammen (kcal in kcal).
   // Zelfde grenzen als de ringen: onder 85% en boven 115%.
@@ -2054,10 +2059,10 @@ export default function PlanAnalyzer({
   const gegetenDag = gegeten ? gegetenWeek.totalen[activeDay] : null
   const afwTot = gegetenDag ? { kcal: gegetenDag.calories, protein: gegetenDag.protein, carbs: gegetenDag.carbs, fat: gegetenDag.fat } : dagTotalen
   const afwijkingen = (gegetenDag && !gegetenDag.calories ? [] : [
-    { label: 'Kcal', w: afwTot.kcal, d: targets?.calories, e: ' kcal' },
-    { label: 'Eiwit', w: afwTot.protein, d: targets?.protein, e: ' g' },
-    { label: 'Koolh', w: afwTot.carbs, d: targets?.carbs, e: ' g' },
-    { label: 'Vet', w: afwTot.fat, d: targets?.fat, e: ' g' },
+    { label: 'Kcal', w: afwTot.kcal, d: dagTargets?.calories, e: ' kcal' },
+    { label: 'Eiwit', w: afwTot.protein, d: dagTargets?.protein, e: ' g' },
+    { label: 'Koolh', w: afwTot.carbs, d: dagTargets?.carbs, e: ' g' },
+    { label: 'Vet', w: afwTot.fat, d: dagTargets?.fat, e: ' g' },
   ]).filter(x => Number(x.d) > 0).map(x => {
     const pct = (Number(x.w) || 0) / Number(x.d) * 100
     const verschil = Math.round(Math.abs((Number(x.w) || 0) - Number(x.d)))
@@ -2533,7 +2538,7 @@ export default function PlanAnalyzer({
                 {m && (
                   <DagRingen
                     totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
-                    targets={targets || {}}
+                    targets={dagTargets}
                     isMobile={m}
                   />
                 )}
@@ -2586,7 +2591,7 @@ export default function PlanAnalyzer({
               {/* ── RECHTS: de maaltijden ── */}
               <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%' }}>
               {gegeten && resolvedClientId ? (
-                <GegetenDag week={gegetenWeek} dagIndex={activeDay} targets={targets || {}} isMobile={m} />
+                <GegetenDag week={gegetenWeek} dagIndex={activeDay} targets={dagTargets} isMobile={m} />
               ) : (<>
               {/* Ringen op één rij, even breed als de maaltijdkaarten eronder;
                   geen kader, weinig lucht erboven en eronder (Kersten, 24 okt 2026). */}
@@ -2594,7 +2599,7 @@ export default function PlanAnalyzer({
                 <div style={{ margin: '0 0.75rem 0.4rem' }}>
                   <DagRingen
                     totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
-                    targets={targets || {}}
+                    targets={dagTargets}
                     isMobile={m}
                     strak
                   />

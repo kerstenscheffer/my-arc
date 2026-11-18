@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { GripVertical, Plus, X, Trash2, Repeat, Minus, Clock, ArrowLeftRight, Pencil, Dumbbell } from 'lucide-react'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
-import { pctVan, pctKleur } from './weekCijfers'
+import { pctVan, pctKleur, dagDoel } from './weekCijfers'
 
 const LIJN = '1px solid rgba(255,255,255,0.12)'
 const DAG = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -115,8 +115,9 @@ export default function WeekKolommen({
       <div style={{ display: 'flex', border: LIJN, borderRadius: 12, overflow: 'hidden', minWidth: m ? 7 * 200 : 7 * 150 }}>
         {dagen.map((dag) => {
           const i = dag.index
-          const pK = pctVan(dag.kcal, targets?.calories)
-          const pE = pctVan(dag.protein, targets?.protein)
+          const doel = dagDoel(dag, targets)
+          const pK = pctVan(dag.kcal, doel.calories)
+          const pE = pctVan(dag.protein, doel.protein)
           const leeg = dag.maaltijden.length === 0
           const isDoel = doelDag === i && sleep && sleep.dag !== i
           return (
@@ -142,7 +143,7 @@ export default function WeekKolommen({
                 </span>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
                   <span style={{ ...getallen, fontSize: '0.98rem', fontWeight: 900, color: leeg ? 'rgba(255,255,255,0.3)' : pK == null ? '#fff' : pctKleur(pK) }}>{nl(dag.kcal)}</span>
-                  {targets?.calories > 0 && <span style={{ ...getallen, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>/ {nl(targets.calories)}</span>}
+                  {doel.calories > 0 && <span title={dag.pre ? 'Doel inclusief de pre-workout van deze dag' : undefined} style={{ ...getallen, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>/ {nl(doel.calories)}</span>}
                 </span>
                 <span style={{ display: 'flex', gap: 7, marginTop: 2, ...getallen, fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
                   <span style={{ color: pE != null && !leeg ? pctKleur(pE) : undefined }}>E {nl(dag.protein)}</span>

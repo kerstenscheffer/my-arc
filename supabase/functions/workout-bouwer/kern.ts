@@ -18,6 +18,7 @@
 
 const MIN_PER_OEFENING = 9, MIN_PER_EXTRA_SET = 3
 const MAX_SETS = 16, MAX_SETS_40PLUS = 14
+const MIN_TRAINING = 45
 const DAGEN = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 const DAG_VOL: Record<string, string> = { ma: 'maandag', di: 'dinsdag', wo: 'woensdag', do: 'donderdag', vr: 'vrijdag', za: 'zaterdag', zo: 'zondag' }
 
@@ -165,7 +166,10 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
   }
   let tijd = Number(wp?.default_time_per_session) || 0
   if (!tijd) { tijd = 60; nakijken.push('Tijd per training staat niet in de intake; gerekend met 60 minuten.') }
-  const budget = Math.max(30, Math.min(tijd, 90))
+  // Een training is minimaal 45 minuten (Kersten, 18 nov 2026): korter levert
+  // geen zinnig plan op. De intake-keuze "30 tot 45 min" telt dus als 45.
+  const budget = Math.max(MIN_TRAINING, Math.min(tijd, 90))
+  if (tijd < MIN_TRAINING) keuzes.push(`De klant gaf ${tijd} minuten per training op; het plan is op het minimum van ${MIN_TRAINING} minuten gezet.`)
   const jr = leeftijd(klant.date_of_birth)
   const maxSets = jr != null && jr >= 40 ? MAX_SETS_40PLUS : MAX_SETS
   if (maxSets === MAX_SETS_40PLUS) keuzes.push(`${jr} jaar: maximaal ${MAX_SETS_40PLUS} sets per training in plaats van ${MAX_SETS}.`)
@@ -348,7 +352,7 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
   }
 
   const langste = Math.max(...dagLijst().map(minuten))
-  const samenvatting = `${basisNaam} voor ${naam}: ${sleutels.length} keer per week, tot ${langste} minuten per training (klant heeft ${tijd} minuten). Focus op ${focusBron.map(k => FOCUS_NL[k]).join(', ')}.`
+  const samenvatting = `${basisNaam} voor ${naam}: ${sleutels.length} keer per week, tot ${langste} minuten per training (klant heeft ${Math.max(tijd, MIN_TRAINING)} minuten). Focus op ${focusBron.map(k => FOCUS_NL[k]).join(', ')}.`
 
   return {
     name: `Concept · ${basisNaam} · ${naam}`,

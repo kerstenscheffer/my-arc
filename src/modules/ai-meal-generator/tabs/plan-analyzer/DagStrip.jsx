@@ -73,10 +73,12 @@ export default function DagStrip({ dagen, actief, onKies, doelKcal, doelEiwit, i
       padding: m ? '0.5rem 0.5rem' : '0.6rem 0',
     }}>
       {dagen.map((d, i) => {
-        const pct = doelKcal > 0 ? (d.kcal / doelKcal) * 100 : null
+        // Eigen dagdoel als de dag er een heeft (trainingsdag met pre-workout).
+        const dKcal = d.doelKcal ?? doelKcal, dEiwit = d.doelEiwit ?? doelEiwit
+        const pct = dKcal > 0 ? (d.kcal / dKcal) * 100 : null
         // Eiwit telt mee in het oordeel: een dag die op kcal klopt maar
         // eiwit mist, is geen goede dag.
-        const eiwitPct = doelEiwit > 0 ? (d.eiwit / doelEiwit) * 100 : null
+        const eiwitPct = dEiwit > 0 ? (d.eiwit / dEiwit) * 100 : null
         const slecht = [pct, eiwitPct].filter(x => x != null)
         const kleur = d.kcal === 0 ? 'rgba(255,255,255,0.2)'
           : slecht.some(x => x < 85) ? '#ef4444'
