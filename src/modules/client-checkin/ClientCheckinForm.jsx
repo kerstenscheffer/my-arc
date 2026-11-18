@@ -12,7 +12,7 @@
 // 2 = dit). De coach-weergave leest dat om te weten welke velden gevuld zijn.
 
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown } from 'lucide-react'
+import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown, Info, Pencil, Trash2, Plus, Dumbbell, Scale, Utensils, Footprints, Moon, Target } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
 import { laadProgressie, haalFase } from './progressieWeek'
@@ -20,7 +20,7 @@ import ProgressieScherm from './ProgressieScherm'
 import { TEVREDEN_OPTIES, SECTIES, COACHING_SECTIE } from './checkinVragen'
 import {
   DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor, gemetenRegel, kleurVoorBehaald,
-  BEHAALD_OPTIES, leegDoel, voorstelBehaald,
+  BEHAALD_OPTIES, leegDoel, voorstelBehaald, MAX_DOELEN, VOORSTEL_VOLGORDE,
 } from './doelen'
 
 // Reviewvraag in de coachingronde (eens per 4 weken): geeft de klant een 8 of
@@ -29,6 +29,13 @@ import {
 const TRUSTPILOT_REVIEW_URL = 'https://nl.trustpilot.com/review/myarcfitness.com'
 const REVIEW_TEKST = (naam) => `Hey${naam ? ` ${naam}` : ''}, Het zou enorm veel voor mij betekenen als je een review zou willen achterlaten. Het kost 1 minuut. Gewoon over waar je tegen aanliep, en hoe dit traject je geholpen heeft. Misschien helpt het iemand anders ook.`
 const REVIEW_SCHERM = { id: '_review', type: 'review', optioneel: true }
+
+// Elk soort doel zijn eigen icoon, in de kleur van dat doel (doelen.js).
+const DOEL_ICOON = { trainen: Dumbbell, wegen: Scale, voeding: Utensils, stappen: Footprints, slaap: Moon, eigen: Target }
+function DoelIcoon({ type, size = 18 }) {
+  const Icoon = DOEL_ICOON[type] || Target
+  return <Icoon size={size} strokeWidth={2.6} color={typeVan(type)?.kleur || '#fff'} style={{ flexShrink: 0 }} />
+}
 
 const KAART = '#161616'
 const RAND = '#2a2a2a'
@@ -296,6 +303,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   // De terugblik van slide 2. Apart van `cijfers`: die telt wat er gebeurd is
   // (vier trainingen), dit laat zien waar het heen beweegt (sterker geworden).
   const [progressie, setProgressie] = useState(null)
+  // Welk doel heeft zijn uitleg open (de i achter het doel): index of null.
+  const [doelInfo, setDoelInfo] = useState(null)
   // De lopende fase, voor de aanloopzin op het eerste scherm. Apart opgehaald
   // omdat dat scherm meteen in beeld staat.
   const [fase, setFase] = useState(null)
@@ -398,10 +407,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
     lijst[i] = { ...lijst[i], ...patch }
     return { ...prev, doelen_komende_week: lijst }
   })
-  const voegDoelToe = () => setFormData(prev => {
+  // Zonder soort: de eerste die er nog niet staat (slaap voorop), zodat je niet
+  // twee keer 'Trainen' krijgt.
+  const voegDoelToe = (soort = null) => setFormData(prev => {
     const lijst = [...(prev.doelen_komende_week || [])]
-    if (lijst.length >= 3) return prev
-    return { ...prev, doelen_komende_week: [...lijst, leegDoel()] }
+    if (lijst.length >= MAX_DOELEN) return prev
+    const al = new Set(lijst.map(d => d.type))
+    const kies = (typeof soort === 'string' && soort) || VOORSTEL_VOLGORDE.find(k => !al.has(k)) || 'eigen'
+    return { ...prev, doelen_komende_week: [...lijst, leegDoel(kies)] }
   })
   const verwijderDoel = (i) => setFormData(prev => ({
     ...prev,
@@ -440,6 +453,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
     // heeft de volgende check-in niets om op terug te komen, en dan valt het
     // hele idee om.
     const doelen = (formData.doelen_komende_week || []).filter(d => geldigDoel(d))
+      // Oudere app-versies kennen het slaapdoel niet en tonen dan `tekst`. Die
+      // vullen we hier, zodat er daar geen lege regel staat.
+      .map(d => (d.type === 'slaap' ? { ...d, tekst: doelTekst(d) } : d))
     if (doelen.length === 0) {
       alert('Kies minstens één doel voor komende week.')
       return
@@ -577,15 +593,28 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                 return (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '13px 0', borderBottom: `1px solid ${RAND}`,
+                  padding: '7px 0', borderBottom: `1px solid ${RAND}`,
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
-                      {doelTekst(d)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                      <DoelIcoon type={d.type} size={17} />
+                      <span style={{ minWidth: 0, marginLeft: 6 }}>{doelTekst(d)}</span>
+                      {/* De i: hoe de app dit doel heeft gemeten. */}
+                      {typeVan(d.type)?.info && (
+                        <button type="button" onClick={() => setDoelInfo(doelInfo === i ? null : i)} aria-expanded={doelInfo === i} aria-label="Hoe is dit gemeten?"
+                          style={{ flexShrink: 0, width: 30, height: 26, padding: 0, background: 'transparent', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                          <Info size={15} strokeWidth={2.6} color={doelInfo === i ? '#fff' : 'rgba(255,255,255,0.45)'} />
+                        </button>
+                      )}
                     </div>
                     {gemetenRegel(d) && (
-                      <div style={{ marginTop: 3, fontSize: 13.5, fontWeight: 800, color: gemetenKleur, fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ marginTop: 1, fontSize: 13.5, fontWeight: 800, color: gemetenKleur, fontVariantNumeric: 'tabular-nums' }}>
                         {gemetenRegel(d)}
+                      </div>
+                    )}
+                    {doelInfo === i && (
+                      <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
+                        {typeVan(d.type).info}
                       </div>
                     )}
                   </div>
@@ -600,7 +629,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                       aria-label={`${doelTekst(d)}: gelukt?`}
                       style={{
                         appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
-                        height: 44, minWidth: 108, padding: '0 22px 0 30px', borderRadius: 0,
+                        height: 38, minWidth: 108, padding: '0 22px 0 30px', borderRadius: 0,
                         background: 'transparent', border: 'none', color: keuzeKleur,
                         fontSize: 15, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
                       }}
@@ -613,11 +642,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                 </div>
                 )
               })}
-              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 12, lineHeight: 1.5 }}>
-                Wat de app kon meten staat al ingevuld. Klopt het niet met hoe jouw week
-                ging, zet het gerust om.
-              </div>
-              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 24 }}>{v.uitlegLabel}{isVerplicht(v) ? ' *' : ''}</div>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 18 }}>{v.uitlegLabel}{isVerplicht(v) ? ' *' : ''}</div>
               <LijnTekst
                 placeholder={v.placeholder} value={formData[v.uitlegId]}
                 onChange={val => updateField(v.uitlegId, val)}
@@ -755,47 +780,49 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         {v.metDoelen && (() => {
           const lijst = formData.doelen_komende_week || []
           const rij = { ...invoerStijl(true), width: 'auto', minWidth: 0, fontSize: 15 }
-          const gekozen = lijst.filter(d => geldigDoel(d))
-          const open = () => { setDoelenOpen(true); if (lijst.length === 0) voegDoelToe() }
           return (
             <div style={{ marginTop: 20, textAlign: 'left' }}>
               <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>
                 Doelen stellen voor jezelf kan het makkelijker maken.
               </div>
 
-              {/* Op de pagina zelf alleen de gekozen doelen; het invullen
-                  gebeurt in de sheet onderaan, zodat de focus op één plek
-                  blijft. */}
-              {gekozen.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  {gekozen.map((d, i) => (
-                    <div key={i} style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.85)', padding: '4px 0' }}>
-                      {doelTekst(d)}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={open}
-                style={gekozen.length > 0
-                  ? {
-                      // Een echte knop met rand: als losse witte tekst las
-                      // het niet als iets om op te tikken (17 okt 2026).
-                      marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
-                      background: 'transparent', border: '1.5px solid rgba(255,255,255,0.85)',
-                      color: '#fff', fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }
-                  : {
-                      marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
-                      background: '#fff', border: 'none', color: '#0A0A0A',
-                      fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-              >
-                {gekozen.length > 0 ? 'Doelen aanpassen' : 'Stel doel'}
-              </button>
+              {/* Op de pagina zelf de gekozen doelen, elk met een potlood (aanpassen in
+                  de sheet onderaan) en een prullenbak; daaronder een plus voor een
+                  nieuw doel. De losse knop 'Doelen aanpassen' is daarmee vervallen. */}
+              {(() => {
+                const icoonKnop = { flexShrink: 0, width: 40, height: 40, padding: 0, background: 'transparent', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+                const zichtbaar = lijst.map((d, i) => ({ d, i })).filter(x => geldigDoel(x.d))
+                return (
+                  <div style={{ marginTop: 6 }}>
+                    {zichtbaar.map(({ d, i }) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2, borderBottom: `1px solid ${RAND}` }}>
+                        <DoelIcoon type={d.type} />
+                        <span style={{ flex: 1, minWidth: 0, marginLeft: 8, fontSize: 15, fontWeight: 800, color: '#fff', padding: '6px 0' }}>{doelTekst(d)}</span>
+                        <button type="button" onClick={() => setDoelenOpen(true)} aria-label={`${doelTekst(d)} aanpassen`} title="Aanpassen" style={icoonKnop}>
+                          <Pencil size={17} strokeWidth={2.6} color="#fff" />
+                        </button>
+                        <button type="button" onClick={() => verwijderDoel(i)} aria-label={`${doelTekst(d)} verwijderen`} title="Verwijderen" style={icoonKnop}>
+                          <Trash2 size={17} strokeWidth={2.6} color="rgba(255,255,255,0.55)" />
+                        </button>
+                      </div>
+                    ))}
+                    {/* Uitnodigend: een witte knop over de volle breedte, met eronder een
+                        zetje in de goede richting. */}
+                    {lijst.length < MAX_DOELEN && (
+                      <>
+                        <button type="button" onClick={() => setDoelenOpen(true)}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', minHeight: 46, padding: 0, marginTop: 12, borderRadius: 12, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: 15, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                          <Plus size={18} strokeWidth={3.2} />
+                          {zichtbaar.length > 0 ? 'Nog een doel toevoegen' : 'Stel je eerste doel'}
+                        </button>
+                        <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 700, color: GRIJS, lineHeight: 1.45, textAlign: 'center' }}>
+                          {zichtbaar.length > 0 ? 'Bijvoorbeeld een slaapdoel. Eén extra doel maakt je week concreter.' : 'Schrijf op wat je deze week wilt halen; volgende week kijken we samen terug.'}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Sheet van onderaf. */}
               {doelenOpen && (
@@ -828,6 +855,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                       const t = typeVan(d.type)
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <DoelIcoon type={d.type || 'trainen'} size={20} />
                           <LijnDropdown
                             value={d.type || 'trainen'}
                             opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
@@ -850,7 +878,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                             <>
                               <GetalRol
                                 value={d.doel_getal ?? null}
-                                min={t?.stap || 1}
+                                min={t?.min ?? (t?.stap || 1)}
                                 max={t?.max || 99}
                                 stap={t?.stap || 1}
                                 onChange={n => zetDoel(i, { doel_getal: n })}
@@ -872,18 +900,38 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                       )
                     })}
 
-                    {lijst.length < 3 && (
-                      <button type="button" onClick={voegDoelToe} style={{
-                        background: 'none', border: 'none', padding: 0,
-                        color: '#fff', fontSize: 14, fontWeight: 800,
-                        fontFamily: 'inherit', cursor: 'pointer',
-                      }}>
-                        + Doel erbij
-                      </button>
-                    )}
+                    {/* Suggesties: wat er nog niet staat, met één tik erbij. Slaap voorop. */}
+                    {lijst.length < MAX_DOELEN && (() => {
+                      const al = new Set(lijst.map(d => d.type))
+                      const nog = VOORSTEL_VOLGORDE.filter(k => !al.has(k))
+                      const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 38, padding: '0 12px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+                      return (
+                        <div style={{ marginTop: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+                            {nog.length ? 'Suggesties' : 'Nog een doel'}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {nog.map(k => {
+                              const dt = typeVan(k)
+                              return (
+                                <button key={k} type="button" onClick={() => voegDoelToe(k)} style={chip}>
+                                  <DoelIcoon type={k} size={16} />
+                                  {dt.zin(dt.standaard)}
+                                  <Plus size={14} strokeWidth={3} color="rgba(255,255,255,0.6)" />
+                                </button>
+                              )
+                            })}
+                            <button type="button" onClick={() => voegDoelToe('eigen')} style={chip}>
+                              <DoelIcoon type="eigen" size={16} />
+                              Eigen doel
+                              <Plus size={14} strokeWidth={3} color="rgba(255,255,255,0.6)" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
-                      Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
-                      op je startscherm.
+                      Deze doelen komen volgende week terug in je check-in.
                     </div>
                     <button
                       type="button"

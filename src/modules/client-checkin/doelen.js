@@ -15,7 +15,7 @@
 
 export const DOEL_TYPES = [
   {
-    key: 'trainen', label: 'Trainen', eenheid: 'keer',
+    key: 'trainen', label: 'Trainen', eenheid: 'keer', kleur: '#f97316',
     standaard: 3, max: 14,
     // Uit week_cijfers zoals weekCijfers.js die oplevert. Telt hoe vaak je
     // getraind hebt (`gestart`), net als het progressiescherm. Dit stond op
@@ -24,25 +24,28 @@ export const DOEL_TYPES = [
     // het 2 of 3 van de 5 bij iemand die vijf keer in de sportschool stond
     // (18 nov 2026).
     meet: (c) => c?.trainingen?.gestart ?? c?.trainingen?.gedaan ?? null,
+    info: 'Elke dag waarop je een training hebt gelogd telt als één keer, ook als je niet alles hebt ingevuld. Geteld van maandag t/m zondag.',
     zin: (n) => `${n}× trainen`,
     meetTekst: (m, doel) => `${m} van ${doel.doel_getal}× getraind`,
   },
   {
-    key: 'wegen', label: 'Wegen', eenheid: 'dagen',
+    key: 'wegen', label: 'Wegen', eenheid: 'dagen', kleur: '#38bdf8',
     standaard: 5, max: 7,
     meet: (c) => c?.wegingen?.gedaan ?? null,
+    info: 'Elke dag waarop je je gewicht hebt ingevuld. Geteld van maandag t/m zondag.',
     zin: (n) => `${n} dagen wegen`,
     meetTekst: (m, doel) => `${m} van ${doel.doel_getal} dagen gewogen`,
   },
   {
-    key: 'voeding', label: 'Voeding bijhouden', eenheid: 'dagen',
+    key: 'voeding', label: 'Voeding bijhouden', eenheid: 'dagen', kleur: '#ef4444',
     standaard: 5, max: 7,
     meet: (c) => c?.voeding?.dagen ?? null,
+    info: 'Een dag telt als je minstens 70% van de maaltijden uit je plan hebt afgevinkt. Geteld van maandag t/m zondag.',
     zin: (n) => `${n} dagen voeding bijhouden`,
     meetTekst: (m, doel) => `${m} van ${doel.doel_getal} dagen bijgehouden`,
   },
   {
-    key: 'stappen', label: 'Stappen', eenheid: 'per dag',
+    key: 'stappen', label: 'Stappen', eenheid: 'per dag', kleur: '#10b981',
     standaard: 8000, max: 30000, stap: 500,
     // Hoeveel dagen het stappendoel gehaald is, uit client_step_logs. Zonder
     // een enkele stappenrij in de week weten we het niet (null), en dat is
@@ -52,6 +55,7 @@ export const DOEL_TYPES = [
       if (!Array.isArray(dagen) || !dagen.some(d => d.steps > 0)) return null
       return dagen.filter(d => d.steps >= Number(doel?.doel_getal || 0)).length
     },
+    info: 'Het aantal dagen waarop je je stappendoel hebt gehaald, uit je gekoppelde stappen of wat je zelf hebt ingevuld. Geteld van maandag t/m zondag.',
     // Het voorstel gaat over dagen, niet over het stappengetal zelf.
     voorstelDoel: () => 7,
     meetTekst: (m, _doel, c) => {
@@ -61,12 +65,34 @@ export const DOEL_TYPES = [
     zin: (n) => `${Number(n).toLocaleString('nl-NL')} stappen per dag`,
   },
   {
-    key: 'eigen', label: 'Eigen doel', eenheid: null,
+    // Slaap (18 nov 2026): uren per nacht, uit sleep_logs. Net als bij stappen
+    // telt het aantal nachten waarop het doel gehaald is.
+    key: 'slaap', label: 'Slaap', eenheid: 'uur per nacht', kleur: '#a855f7',
+    standaard: 8, min: 5, max: 10, stap: 0.5,
+    meet: (c, doel) => {
+      const nachten = c?.slaap?.nachten
+      if (!Array.isArray(nachten) || nachten.length === 0) return null
+      return nachten.filter(n => n.uren >= Number(doel?.doel_getal || 0)).length
+    },
+    voorstelDoel: () => 7,
+    info: 'Het aantal nachten waarop je minstens zoveel uur hebt geslapen, uit wat je bij slaap hebt gelogd. Geteld van maandag t/m zondag.',
+    meetTekst: (m, _doel, c) => {
+      const gem = c?.slaap?.gemiddelde
+      return `${m} van 7 nachten gehaald${gem ? ` · gem. ${String(gem).replace('.', ',')} uur` : ''}`
+    },
+    zin: (n) => `${String(n).replace('.', ',')} uur slaap per nacht`,
+  },
+  {
+    key: 'eigen', label: 'Eigen doel', eenheid: null, kleur: '#ffffff',
     standaard: null, max: null,
     meet: () => null,
+    info: 'Dit doel kan de app niet meten. Jij geeft zelf aan of het gelukt is.',
     zin: (_n, tekst) => tekst || 'Eigen doel',
   },
 ]
+
+// Hoeveel doelen een klant per week mag zetten (was 3 tot 18 nov 2026).
+export const MAX_DOELEN = 5
 
 export const typeVan = (key) => DOEL_TYPES.find(t => t.key === key) || null
 
@@ -146,6 +172,9 @@ export function bereidTerugkoppelingVoor(vorigeDoelen, weekCijfers) {
 }
 
 // Een leeg doel van een bepaald type, met een zinnig startgetal.
+// In welke volgorde we een nieuw doel voorstellen: eerst wat er nog niet staat.
+export const VOORSTEL_VOLGORDE = ['slaap', 'voeding', 'stappen', 'wegen', 'trainen']
+
 export function leegDoel(typeKey = 'trainen') {
   const t = typeVan(typeKey)
   return { type: typeKey, doel_getal: t?.standaard ?? null, tekst: '' }

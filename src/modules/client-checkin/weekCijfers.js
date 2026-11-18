@@ -48,7 +48,7 @@ export async function laadWeekCijfers(db, client) {
   // Let op: een query-builder heeft geen .catch(). Het tweede argument van
   // .then() vangt de afwijzing; anders sloopt één mislukte query de Promise.all
   // en krijgt de klant een leeg formulier.
-  const [stand, wegingen, fases, stappen] = await Promise.all([
+  const [stand, wegingen, fases, stappen, slaap] = await Promise.all([
     db.supabase.rpc('get_challenge_stand', {
       p_client_id: client.id,
       p_start: isoDag(start),
@@ -74,6 +74,14 @@ export async function laadWeekCijfers(db, client) {
       .eq('client_id', client.id)
       .gte('date', isoDag(start))
       .lte('date', isoDag(eind))
+      .then(r => r, () => ({ data: [] })),
+
+    // Slaap, voor het slaapdoel. log_date is de ochtend waarop je wakker werd.
+    db.supabase.from('sleep_logs')
+      .select('log_date, hours_slept')
+      .eq('client_id', client.id)
+      .gte('log_date', isoDag(start))
+      .lte('log_date', isoDag(eind))
       .then(r => r, () => ({ data: [] })),
   ])
 
@@ -122,6 +130,21 @@ export async function laadWeekCijfers(db, client) {
       return {
         dagen,
         gemiddelde: met.length ? Math.round(met.reduce((t, d) => t + d.steps, 0) / met.length) : null,
+      }
+    })(),
+    slaap: (() => {
+      // Eén waarde per nacht: bij een dubbele log telt de langste.
+      const perDag = new Map()
+      for (const r of (slaap.data || [])) {
+        const u = Number(r.hours_slept)
+        if (!Number.isFinite(u) || u <= 0) continue
+        const d = String(r.log_date).slice(0, 10)
+        if (!perDag.has(d) || perDag.get(d) < u) perDag.set(d, u)
+      }
+      const nachten = [...perDag].map(([datum, uren]) => ({ datum, uren }))
+      return {
+        nachten,
+        gemiddelde: nachten.length ? Math.round((nachten.reduce((t, n) => t + n.uren, 0) / nachten.length) * 10) / 10 : null,
       }
     })(),
     gewicht: {
