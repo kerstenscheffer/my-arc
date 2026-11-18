@@ -196,7 +196,7 @@ export default function FasePaneel({
   const macrosVan = (n) => {
     if (!n) return null
     const kcal = Math.round(Number(n.tdee) + (Number(n.surplus) || 0))
-    const auto = computeMacros({ weight: Number(n.start_gewicht) || laatsteGewicht || 80, tdee: kcal, surplus: 0 })
+    const auto = computeMacros({ weight: Number(n.start_gewicht) || laatsteGewicht || 80, tdee: kcal, surplus: 0, goal: n.doel === 'build' ? 'bulk' : n.doel })
     const eiwit = n.eiwit ?? auto?.protein ?? 0
     const vet = n.vet ?? auto?.fat ?? 0
     const koolh = Math.max(0, Math.round((kcal - eiwit * 4 - vet * 9) / 4))

@@ -9,7 +9,7 @@
 //
 // De huidige regels (juni 2026):
 //   • Eiwit:        2,0 g per kg lichaamsgewicht
-//   • Vet:          1,0 g per kg lichaamsgewicht
+//   • Vet:          0,7 g per kg lichaamsgewicht, bij bulk 1,0 (Kersten, 18 nov 2026)
 //   • Koolhydraten: het rest-budget na eiwit en vet
 //   • Cut    → deficit 500–700 kcal (default 600)
 //   • Bulk   → surplus 300–500 kcal (default 400)
@@ -73,9 +73,11 @@ export const calcTDEE = ({ weight, height, age, gender, activity = DEFAULT_ACTIV
 // Eiwit en vet zijn per kg-lichaamsgewicht regels, koolhydraten is het rest.
 // Returnt null voor de hele set als bodyweight of tdee ontbreken.
 export const PROT_PER_KG = 2.0
-export const FAT_PER_KG  = 1.0
+export const FAT_PER_KG  = 0.7
+export const FAT_PER_KG_BULK = 1.0
+export const vetPerKg = (goal) => (normalizeGoal(goal) === 'bulk' ? FAT_PER_KG_BULK : FAT_PER_KG)
 
-export const computeMacros = ({ weight, tdee, surplus }) => {
+export const computeMacros = ({ weight, tdee, surplus, goal = null }) => {
   const w = parseFloat(weight)
   const t = parseFloat(tdee)
   const s = Number.isFinite(parseFloat(surplus)) ? parseFloat(surplus) : 0
@@ -83,7 +85,7 @@ export const computeMacros = ({ weight, tdee, surplus }) => {
 
   const targetCal = Math.round(t + s)
   const protein   = Math.round(w * PROT_PER_KG)
-  const fat       = Math.round(w * FAT_PER_KG)
+  const fat       = Math.round(w * vetPerKg(goal))
   const carbsKcal = targetCal - (protein * 4 + fat * 9)
   const carbs     = Math.max(0, Math.round(carbsKcal / 4))
 
@@ -119,7 +121,7 @@ export const applyMacroRules = (client, overrides = {}) => {
         ? parseFloat(client.surplus)
         : rule.default)
 
-  const macros = computeMacros({ weight, tdee, surplus })
+  const macros = computeMacros({ weight, tdee, surplus, goal: primaryGoal })
   if (!macros) return null
 
   return {

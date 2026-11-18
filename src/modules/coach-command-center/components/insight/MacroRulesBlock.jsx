@@ -325,7 +325,7 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
     const kcal = parseInt(raw)
     if (!Number.isFinite(kcal) || kcal <= 0) return
     if (kcal === targetCal) return // niks veranderd
-    const m = computeMacros({ weight: effectiveWeight, tdee: kcal, surplus: 0 })
+    const m = computeMacros({ weight: effectiveWeight, tdee: kcal, surplus: 0, goal: client?.primary_goal })
     if (!m) {
       alert('Kan macro\'s niet berekenen — geen gewicht bekend. Vul eerst het gewicht in bij Profiel.')
       return
