@@ -20,9 +20,15 @@ const binnen = (v, min, max) => Math.min(Math.max(v, min), Math.max(min, max))
 
 // Het zwevende venster zelf: sleepbaar aan de kop, blokkeert niets, onthoudt
 // zijn plek per `sleutel`. Ook gebruikt voor het wisselvenster.
-export function ZweefVenster({ titel, sleutel, breed = 430, maxHoog = 720, startLinks = false, onClose, children }) {
+// `startPlek` ({ x, y }): open op die plek (bv. onder de kaart die je bewerkt) en
+// onthoud de plek dan niet; zonder `startPlek` de laatst gebruikte plek.
+export function ZweefVenster({ titel, sleutel, breed = 430, maxHoog = 720, startLinks = false, startPlek = null, onClose, children }) {
   const hoog = Math.min(maxHoog, window.innerHeight - 40)
   const [plek, setPlek] = useState(() => {
+    if (startPlek) {
+      // Binnen het scherm houden: past het er niet onder, dan zo laag als kan.
+      return { x: binnen(startPlek.x, 8, window.innerWidth - breed - 8), y: binnen(startPlek.y, 8, window.innerHeight - hoog - 8) }
+    }
     let p = null
     try { p = JSON.parse(localStorage.getItem(sleutel) || 'null') } catch { /* geen opslag */ }
     const x = Number.isFinite(p?.x) ? p.x : (startLinks ? 24 : window.innerWidth - breed - 24)
@@ -32,8 +38,9 @@ export function ZweefVenster({ titel, sleutel, breed = 430, maxHoog = 720, start
   const sleep = useRef(null)
 
   useEffect(() => {
+    if (startPlek || !sleutel) return
     try { localStorage.setItem(sleutel, JSON.stringify(plek)) } catch { /* geen opslag */ }
-  }, [plek, sleutel])
+  }, [plek, sleutel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = (e) => {
     if (e.button !== 0 || e.target.closest('button')) return

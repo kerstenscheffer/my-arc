@@ -37,6 +37,8 @@ export const pctKleur = (pct) => {
 // dagTotalen in de Analyzer) en de maaltijden op tijd gesorteerd.
 // isTraining(i) zegt of dag i een trainingsdag is.
 export function dagCijfers(weekData, { preWorkoutMeal = null, isTraining = () => false, standaardTijden = {} } = {}) {
+  // De pre-workout van het plan: de plan-kolom, anders het eerste dag-slot.
+  const planPre = preWorkoutMeal || (weekData || []).map(d => d?.meals?.[PRE_WORKOUT_SLOT]).find(x => x && typeof x === 'object') || null
   return (weekData || []).map((dag, i) => {
     const training = !!isTraining(i)
     const maaltijden = Object.entries(dag?.meals || {})
@@ -54,15 +56,15 @@ export function dagCijfers(weekData, { preWorkoutMeal = null, isTraining = () =>
       t.fat += getal(meal.fat)
       t.fiber += getal(meal.fiber)
     })
-    // De pre-workout van deze dag (eigen slot of die van het plan): het
-    // dagdoel gaat daarmee omhoog, zie doelenMetPreWorkout.
+    // De pre-workout van deze dag (eigen slot of die van het plan). Zonder is
+    // het een rustdag en ligt het dagdoel lager, zie doelenMetPreWorkout.
     const pre = maaltijden.find(x => x.slot === PRE_WORKOUT_SLOT)?.meal || null
-    return { index: i, training, maaltijden, pre, ...t }
+    return { index: i, training, maaltijden, pre, planPre, ...t }
   })
 }
 
-// Doelen van één dag: de basisdoelen plus de pre-workout van die dag.
-export const dagDoel = (dag, targets) => doelenMetPreWorkout(targets || {}, dag?.pre || null) || {}
+// Doelen van één dag: op doel met pre-workout, anders het doel min de pre-workout van het plan.
+export const dagDoel = (dag, targets) => doelenMetPreWorkout(targets || {}, dag?.pre || null, dag?.planPre || null) || {}
 
 export const pctVan = (waarde, doel) => (getal(doel) > 0 ? (getal(waarde) / getal(doel)) * 100 : null)
 

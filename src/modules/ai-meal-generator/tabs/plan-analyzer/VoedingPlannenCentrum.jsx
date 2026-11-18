@@ -27,7 +27,7 @@ const GROEP = { man: { label: 'Man', kleur: BLAUW, Icoon: Mars }, vrouw: { label
 const VOLGENDE_GROEP = { '': 'man', man: 'vrouw', vrouw: null }
 const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
 // De foto op de kaart: het diner (anders de lunch) van maandag, rechtstreeks uit de jsonb.
-const TEMPLATE_KOLOMMEN = 'id, name, template_name, description, daily_calories, daily_protein, daily_carbs, daily_fat, meals_per_day, created_at, updated_at, is_canoniek, is_archived, doelgroep, foto:week_structure->monday->dinner->>image_url, foto2:week_structure->monday->lunch->>image_url, gerecht:week_structure->monday->dinner->>name'
+const TEMPLATE_KOLOMMEN = 'id, name, template_name, description, daily_calories, daily_protein, daily_carbs, daily_fat, meals_per_day, created_at, updated_at, is_canoniek, is_archived, doelgroep, foto:week_structure->monday->dinner->>image_url, foto2:week_structure->monday->lunch->>image_url, gerecht:week_structure->monday->dinner->>name, pre_kcal:pre_workout_meal->calories'
 const DAGEN = [['monday', 'Ma'], ['tuesday', 'Di'], ['wednesday', 'Wo'], ['thursday', 'Do'], ['friday', 'Vr'], ['saturday', 'Za'], ['sunday', 'Zo']]
 const SLOT_VOLGORDE = ['breakfast', 'snack1', 'lunch', 'snack2', 'pre_workout', 'dinner', 'snack3']
 const kaalNaam = (n) => String(n || '').trim().toLowerCase()
@@ -236,7 +236,8 @@ export default function VoedingPlannenCentrum({
   const pijl = (open) => <ChevronDown size={16} strokeWidth={2.6} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
   const verschil = (t) => {
     if (!(doelKcal > 0) || !t.daily_calories) return null
-    const d = Math.round(t.daily_calories - doelKcal)
+    // Het doel is de trainingsdag: de pre-workout telt mee.
+    const d = Math.round(t.daily_calories + (Number(t.pre_kcal) || 0) - doelKcal)
     return `${d > 0 ? '+' : d < 0 ? '−' : '±'}${Math.abs(d)} t.o.v. doel`
   }
   const tabs = [
@@ -343,7 +344,7 @@ export default function VoedingPlannenCentrum({
                           <div style={{ position: 'absolute', left: 12, right: 12, bottom: 8, textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}>
                             <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tNaam(t)}</div>
                             <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', marginTop: 3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {t.daily_calories || '?'} kcal · {t.daily_protein || '?'}E {t.daily_carbs || '?'}K {t.daily_fat || '?'}V{t.meals_per_day ? ` · ${t.meals_per_day} maaltijden` : ''}{gebruikt[t.id] ? ` · ${gebruikt[t.id]}× gebruikt` : ''}
+                              {Number(t.pre_kcal) > 0 && t.daily_calories ? `${Math.round(t.daily_calories + Number(t.pre_kcal))} kcal training · ${t.daily_calories} rust` : `${t.daily_calories || '?'} kcal`} · {t.daily_protein || '?'}E {t.daily_carbs || '?'}K {t.daily_fat || '?'}V{t.meals_per_day ? ` · ${t.meals_per_day} maaltijden` : ''}{gebruikt[t.id] ? ` · ${gebruikt[t.id]}× gebruikt` : ''}
                             </div>
                           </div>
                         </div>

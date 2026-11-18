@@ -5,9 +5,13 @@ Voeding rond de training: `docs/regels-voeding-rond-training.md`.
 
 ## Basis
 - Altijd rauw wegen: vlees, vis, rijst en pasta in rauwe grammen.
-- De doelen van de klant zijn het doel van een rustdag. De maaltijden zonder pre-workout komen samen op dat doel uit.
-- Trainingsdag = rustdag plus de pre-workout. Het dagdoel gaat die dag omhoog met precies die maaltijd
-  (`doelenMetPreWorkout` in `src/modules/meal-plan/utils/preWorkoutMeal.js`). Geen aparte set doelen.
+- De doelen van de klant zijn het doel van een trainingsdag, mét de pre-workout. Een canoniek plan komt dus
+  mét pre-workout op zijn trede uit (Man 2200 = 2200 op een trainingsdag).
+- Rustdag = trainingsdag zonder de pre-workout. Het dagdoel ligt die dag lager met precies die maaltijd
+  (`doelenMetPreWorkout` in `src/modules/meal-plan/utils/preWorkoutMeal.js`). Geen aparte set doelen, en de
+  klant komt nooit boven zijn doel uit.
+- Let op bij een grote pre-workout (ruim boven 150 kcal) of een bulk: het weekgemiddelde zakt dan merkbaar
+  onder het doel. Dan het doel ophogen of de pre-workout kleiner maken.
 - Pre-workout: 1 tot 2 uur voor de training, vooral koolhydraten, weinig vet. Standaard een banaan.
 - Na de training de grootste koolhydraatmaaltijd van de dag.
 - 4 tot 5 eiwitmaaltijden per dag, elke 3 tot 6 uur.

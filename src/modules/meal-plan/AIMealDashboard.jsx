@@ -74,7 +74,7 @@ import WisselStappen from './components/WisselStappen'
 import { weekplanVoorWeek } from './DayTemplateService'
 import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen, zetMomentOpDagen } from './dagAanpassingen'
 import MomentVenster from './components/MomentVenster'
-import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT, doelenMetPreWorkout } from './utils/preWorkoutMeal'
+import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT, doelenMetPreWorkout, preWorkoutVanPlan } from './utils/preWorkoutMeal'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
@@ -509,9 +509,10 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Wissel uit het alternatieven-venster: eerst kiezen op welke dagen het
   // geldt (DagenKiezer), dan pas opslaan via voerWisselUit.
   const [wisselKeuze, setWisselKeuze] = useState(null) // { meal, nieuw }
-  // Pre-workout van de gekozen dag: daarmee gaat het dagdoel omhoog (18 nov 2026).
-  const [dagPre, setDagPre] = useState(null)
-  const dagDoelen = doelenMetPreWorkout(dashboardData?.dailyTotals?.targets, dagPre)
+  // Pre-workout van de gekozen dag (undefined = nog niet geladen). Zonder
+  // pre-workout is het een rustdag: dan ligt het dagdoel lager (18 nov 2026).
+  const [dagPre, setDagPre] = useState(undefined)
+  const dagDoelen = doelenMetPreWorkout(dashboardData?.dailyTotals?.targets, dagPre, preWorkoutVanPlan(dashboardData?.activePlan))
   const [wisselBezig, setWisselBezig] = useState(false)
   const [wisselFout, setWisselFout] = useState(null)
 

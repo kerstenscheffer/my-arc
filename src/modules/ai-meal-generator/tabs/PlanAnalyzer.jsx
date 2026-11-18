@@ -2079,9 +2079,11 @@ export default function PlanAnalyzer({
     const training = trainingDays?.length > 0 ? trainingDays.includes(DAY_CODE_BY_INDEX[i]) : !!dag?.is_training_day
     const telt = preWorkoutMeal && training && !dag?.meals?.[PRE_WORKOUT_SLOT]
     const t = totalenMetPreWorkout(dag?.totals, telt ? preWorkoutMeal : null) || {}
-    // Dagdoel = basisdoel + de pre-workout van die dag (18 nov 2026).
+    // Dagdoel: op doel met pre-workout, anders (rustdag) het doel min de
+    // pre-workout van het plan (18 nov 2026).
     const pre = dag?.meals?.[PRE_WORKOUT_SLOT] || (telt ? preWorkoutMeal : null)
-    const doel = doelenMetPreWorkout(targets, pre) || {}
+    const planPre = preWorkoutMeal || (weekData || []).map(x => x?.meals?.[PRE_WORKOUT_SLOT]).find(x => x && typeof x === 'object') || null
+    const doel = doelenMetPreWorkout(targets, pre || null, planPre) || {}
     return { label: d.label, kcal: Number(t.kcal ?? t.calories) || 0, eiwit: Number(t.protein) || 0, training, pre, doel, doelKcal: Number(doel.calories) || 0, doelEiwit: Number(doel.protein) || 0 }
   })
   // Doelen van de open dag; in Gegeten ook (de klant at op die dag tegen dat doel).

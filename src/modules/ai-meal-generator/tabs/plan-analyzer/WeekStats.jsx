@@ -19,7 +19,7 @@ const DONKER = { '#ef4444': '#b91c1c', '#f59e0b': '#b45309', '#22c55e': '#047857
 
 export default function WeekStats({ dagen, targets = {}, open, onOpen, onKiesDag, isMobile }) {
   const gem = weekGemiddelde(dagen)
-  // Weekdoel = gemiddelde van de dagdoelen (trainingsdagen liggen hoger door de pre-workout).
+  // Weekdoel = gemiddelde van de dagdoelen (rustdagen liggen lager: geen pre-workout).
   const metEten = dagen.filter(d => d.maaltijden.length > 0)
   const doelVan = (mac) => {
     if (!(Number(targets?.[mac.doel]) > 0)) return 0

@@ -690,7 +690,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
           week staan compact linksboven in de zwarte balk (FocusDezeWeek
           compact), niet meer als losse kaarten ertussen. Geen FadeOnScroll:
           het eerste wat je ziet hoort er meteen te staan. */}
-      <div style={{ marginTop: isMobile ? '0.6rem' : '0.9rem' }}>
+      <div style={{ marginTop: isMobile ? '0.2rem' : '0.45rem' }}>
         <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
           <DagAgenda
             client={client}

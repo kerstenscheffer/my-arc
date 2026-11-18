@@ -133,27 +133,47 @@ export const preWorkoutTijd = (trainingStartMin, eigenTijd = null) => {
   return eigenTijd || null
 }
 
-// ── Dagdoel op een trainingsdag (18 nov 2026, Kersten) ────────────────────
+// ── Dagdoel: trainingsdag op doel, rustdag lager (18 nov 2026, Kersten) ───
 //
 // De macrodoelen van de klant (clients.target_*) zijn het doel van een
-// rustdag. Staat er die dag een pre-workout maaltijd, dan gaat het doel van
-// die dag omhoog met precies die maaltijd: trainingsdagen krijgen zo meer
-// koolhydraten, zonder dat er twee sets doelen bijgehouden hoeven te worden.
+// trainingsdag, mét de pre-workout. Op een dag zonder pre-workout (rustdag)
+// ligt het doel lager met precies die maaltijd. Zo komt een klant nooit boven
+// zijn doel uit en hoeven er geen twee sets doelen bijgehouden te worden.
+// Eerder die dag was het omgekeerd (rustdag op doel, trainingsdag hoger): dan
+// kwam het weekgemiddelde boven het doel uit.
 // Eén functie, zodat klantpagina en Plan Analyzer hetzelfde rekenen.
 
 /** De pre-workout in een lijst maaltijden van één dag, of null. */
 export const preWorkoutUitMaaltijden = (maaltijden) =>
   (maaltijden || []).find(x => x && x.slot === PRE_WORKOUT_SLOT) || null
 
-/** Doelen van de dag: de basisdoelen plus de pre-workout van die dag. */
-export const doelenMetPreWorkout = (doelen, maaltijd) => {
-  if (!doelen || !maaltijd) return doelen
-  const plus = (basis, extra) => (Number(basis) > 0 ? Math.round(Number(basis) + (Number(extra) || 0)) : basis)
+/** De pre-workout van het plan: de plan-kolom, anders het eerste dag-slot. */
+export const preWorkoutVanPlan = (plan) => {
+  if (plan?.pre_workout_meal && typeof plan.pre_workout_meal === 'object') return plan.pre_workout_meal
+  const ws = plan?.week_structure
+  if (!ws || typeof ws !== 'object') return null
+  for (const dag of Object.values(ws)) {
+    const pw = dag?.[PRE_WORKOUT_SLOT] || dag?.meals?.[PRE_WORKOUT_SLOT]
+    if (pw && typeof pw === 'object') return pw
+  }
+  return null
+}
+
+/**
+ * Doelen van één dag.
+ * @param {object} doelen   de doelen van de klant (= trainingsdag)
+ * @param {object|null|undefined} dagPre  de pre-workout van déze dag; null = geen,
+ *        undefined = nog niet bekend (dan de doelen ongewijzigd)
+ * @param {object|null} planPre  de pre-workout die het plan op trainingsdagen zet
+ */
+export const doelenMetPreWorkout = (doelen, dagPre, planPre = null) => {
+  if (!doelen || dagPre === undefined || dagPre || !planPre) return doelen
+  const min = (basis, eraf) => (Number(basis) > 0 ? Math.max(0, Math.round(Number(basis) - (Number(eraf) || 0))) : basis)
   return {
     ...doelen,
-    calories: plus(doelen.calories, maaltijd.calories),
-    protein: plus(doelen.protein, maaltijd.protein),
-    carbs: plus(doelen.carbs, maaltijd.carbs),
-    fat: plus(doelen.fat, maaltijd.fat),
+    calories: min(doelen.calories, planPre.calories),
+    protein: min(doelen.protein, planPre.protein),
+    carbs: min(doelen.carbs, planPre.carbs),
+    fat: min(doelen.fat, planPre.fat),
   }
 }

@@ -13,7 +13,7 @@
 // van DagAgenda, die de gegevens en de vensters al heeft.
 
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight, Info, Plus, Minus } from 'lucide-react'
+import { CircleCheck, Circle, HeartPulse, Footprints, Moon, Briefcase, Pill, Scale, ClipboardCheck, Calendar, Milk, Coffee, Utensils, ChevronRight, Info, Plus, Minus, Play } from 'lucide-react'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { getWorkoutImage } from '../../modules/workout/components/week-schedule/workoutImage'
 import { cardioFoto } from '../../modules/workout/utils/workoutFoto'
@@ -26,9 +26,9 @@ const PAARS = '#a855f7'
 const SLAAP_DOEL = 8
 // Ruimte boven de banden, zodat de gloed van de slaapring niet tegen de
 // bovenrand wordt afgesneden.
-const BAND_BOVEN = 10
-const BAND = 60 // ruimte erboven + slaapband + stappenband, elk hoog genoeg voor de ring
-const BAND_HOOG = 24
+const BAND_BOVEN = 5
+const BAND = 68 // ruimte erboven + slaapband + stappenband (elk 30 hoog, 18 nov 2026: was 24) + lijntje
+const BAND_HOOG = 30
 // De balken van voeding en water beginnen iets boven de onderrand, zodat een
 // lage stand met zijn ring niet onder in beeld wegvalt.
 const BALK_BODEM = 0
@@ -305,9 +305,9 @@ export default function DagTijdlijn({
               {/* De vulling loopt altijd minstens tot het midden van de ring, ook als er nog niets is. */}
               <div style={{ position: 'absolute', left: 0, top: 3, bottom: 3, width: `max(${Math.round(x.deel * 100)}%, ${U + R / 2 + 2}px)`, background: x.vulling, transition: 'width 0.4s ease' }} />
               <span style={{ position: 'absolute', top: 1, left: plek, width: R, height: R, marginLeft: -R / 2, boxSizing: 'border-box', borderRadius: '50%', border: `2px solid ${x.ring}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: x.gloed ? undefined : 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))', animation: x.gloed ? `${x.gloed} 1.8s ease-in-out infinite` : 'none', transition: 'left 0.4s ease' }}>
-                <x.Icoon size={11} strokeWidth={2.6} color={x.icoonKleur || '#fff'} />
+                <x.Icoon size={13} strokeWidth={2.6} color={x.icoonKleur || '#fff'} />
               </span>
-              <span style={{ position: 'absolute', top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontSize: '0.68rem', fontWeight: 900, color: x.kleur, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: '0 1px 4px rgba(0,0,0,0.9)',
+              <span style={{ position: 'absolute', top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontSize: '0.74rem', fontWeight: 900, color: x.kleur, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: '0 1px 4px rgba(0,0,0,0.9)',
                 ...(links ? { right: `calc(100% - ${plek} + ${R / 2 + 5}px)` } : { left: `calc(${plek} + ${R / 2 + 5}px)` }) }}>
                 {x.tekst}
               </span>
@@ -391,11 +391,17 @@ export default function DagTijdlijn({
                 const foto = cardio ? cardioFoto(naam) : getWorkoutImage({ name: naam })
                 const sub = cardio ? `${Math.max(0, b.end - b.start)} min` : (b.meta?.exercise_count > 0 ? `${b.meta.exercise_count} oefeningen` : null)
                 return (
-                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: aanRand ? '9px 0 0 9px' : 9, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1.5px rgba(255,255,255,0.85)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
+                  <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} onClick={alsGeenSleep(onOpen ? () => onOpen(b) : null)} style={{ ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: GROOT, borderRadius: aanRand ? '9px 0 0 9px' : 9, overflow: 'hidden', background: '#121212', boxShadow: gedaan ? `inset 0 -2px 0 ${GROEN}` : volgende?.id === b.id ? 'inset 0 0 0 1.5px rgba(255,255,255,0.85)' : 'none', cursor: onOpen ? 'pointer' : 'default', ...tik }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: gedaan ? 0.5 : 0.35 }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%)' }} />
                     {gedaan && <CircleCheck size={15} strokeWidth={2.6} color={GROEN} style={{ position: 'absolute', top: 4, right: 4 + randPad, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }} />}
-                    <div style={{ position: 'absolute', left: 6, right: 6 + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    {/* Start: wit en vet, rechts op de kaart. Tikken op de kaart zelf doet hetzelfde. */}
+                    {!gedaan && onOpen && (
+                      <span aria-hidden style={{ position: 'absolute', right: 8 + randPad, top: '50%', marginTop: -(GROOT >= 44 ? 16 : 13), width: GROOT >= 44 ? 32 : 26, height: GROOT >= 44 ? 32 : 26, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.6)', zIndex: 2 }}>
+                        <Play size={GROOT >= 44 ? 15 : 12} strokeWidth={3} color="#0a0a0a" fill="#0a0a0a" style={{ marginLeft: 2 }} />
+                      </span>
+                    )}
+                    <div style={{ position: 'absolute', left: 6, right: (!gedaan && onOpen ? 46 : 6) + randPad, bottom: 4, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: isMobile ? '0.82rem' : '0.76rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>
                         {cardio && <HeartPulse size={11} strokeWidth={2.8} style={{ flexShrink: 0 }} />}
                         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>

@@ -251,7 +251,7 @@ export default function MealCard({
   const photoSize = m ? 64 : 58
 
   return (
-    <div style={{
+    <div data-maaltijdkaart style={{
       // Floating card — exact dezelfde stijl als de client meal-card.
       margin: m ? '0 0.5rem 0.35rem' : '0 0.75rem 0.35rem',
       background: 'rgba(255,255,255,0.025)',
@@ -375,9 +375,14 @@ export default function MealCard({
         <ActionCell
           icon={<Pencil size={m ? 13 : 14} />}
           label="Edit"
-          onClick={(e) => { e.stopPropagation(); setShowEditModal(s => !s) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            // Het venster opent direct onder deze kaart (18 nov 2026).
+            const kaart = e.currentTarget.closest('[data-maaltijdkaart]')?.getBoundingClientRect() || e.currentTarget.getBoundingClientRect()
+            setShowEditModal(s => (s ? false : { x: kaart.left + 36, y: kaart.bottom + 4 }))
+          }}
           m={m}
-          active={showEditModal}
+          active={!!showEditModal}
         />
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
@@ -667,7 +672,7 @@ export default function MealCard({
         />
       ) : (
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'contents' }}>
-          <ZweefVenster sleutel="pa_bewerkvenster" breed={460} maxHoog={470} titel={`Bewerken · ${meal.name || meal.meal_name || 'maaltijd'}`} onClose={() => setShowEditModal(false)}>
+          <ZweefVenster sleutel="pa_bewerkvenster" startPlek={showEditModal} breed={460} maxHoog={470} titel={`Bewerken · ${meal.name || meal.meal_name || 'maaltijd'}`} onClose={() => setShowEditModal(false)}>
             <MealEditModal
               embedded inVenster
               db={db} meal={meal} slot={slot} dayIndex={dayIndex}
