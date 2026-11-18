@@ -139,7 +139,9 @@ export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {
     if (m.vet < doel.vet - 4) {
       const opBrood = rijen.some(r => /brood|boterham|wrap|tortilla|cracker|beschuit|bagel|pistolet/.test(String(r.ing.name || '').toLowerCase()))
       const bron = opBrood ? null : ['breakfast', 'snack', 'avondsnack', 'pre_workout', 'post_workout'].includes(moment) ? vetbron.noten : vetbron.olie
-      if (bron && !rijen.some(r => r.ing.id === bron.id)) {
+      // Staat er al olie of noten in het recept, dan komt er geen tweede bij.
+      const soort = bron === vetbron.olie ? /\bolie\b|olijfolie|boter/ : /noot|noten|walno|amandel|cashew|pinda/
+      if (bron && !rijen.some(r => r.ing.id === bron.id || soort.test(String(r.ing.name || '').toLowerCase()))) {
         const proef = rijen.map(r => ({ ...r }))
         proef.push({ ing: bron, regel: { stap: 5, min: 5, max: bron === vetbron.olie ? 15 : 20 }, gram: 5, erbij: true })
         const m2 = schaal(proef, doel)

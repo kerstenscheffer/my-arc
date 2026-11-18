@@ -464,9 +464,11 @@ export default function AIAlternativesModal({
       if (!embedded && kcal >= 80) {
         const mo = basisMoment(slotKey)
         const huidigId = currentMeal?.meal_id || currentMeal?.id
-        const huidigNaam = String(currentMeal?.name || '').trim().toLowerCase()
+        // Dezelfde maaltijd (ook als '(aangepast)'-versie) is geen wissel.
+        const kaal = (n) => String(n || '').replace(/\(aangepast\)/gi, '').trim().toLowerCase()
+        const huidigNaam = kaal(currentMeal?.name)
         const kand = meals.filter(m => {
-          if (m.partner || m.id === huidigId || String(m.name || '').trim().toLowerCase() === huidigNaam) return false
+          if (m.partner || m.id === huidigId || kaal(m.name) === huidigNaam) return false
           const t = (Array.isArray(m.timing) ? m.timing : []).map(x => String(x).toLowerCase())
           if (!t.includes(mo)) return false
           const l = Array.isArray(m.ingredients_list) ? m.ingredients_list : []
