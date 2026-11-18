@@ -130,6 +130,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [templates, setTemplates] = useState([])
   const [dayTemplates, setDayTemplates] = useState([])
   const [showDayPicker, setShowDayPicker] = useState(false)
+  // Rustdag aangeklikt: de nieuwe dag komt op die plek in de cyclus (18 nov 2026).
+  const [vulPlek, setVulPlek] = useState(null)
+  const cycRef = useRef(null)
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
   // Titel-venster voor "opslaan als template". null = dicht; anders de
@@ -438,11 +441,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     } catch (e) { alert('❌ Verwijderen mislukt: ' + (e.message || e)) }
   }
 
+  // Kwam de dag-kiezer van een rustdag, dan landt de nieuwe dag op die plek.
+  const opPlek = (id) => {
+    if (vulPlek == null || cycRef.current?.slots?.[vulPlek] != null) return {}
+    const slots = [...cycRef.current.slots]
+    slots[vulPlek] = id
+    return { cyclus: { lengte: cycRef.current.lengte, volgorde: slots } }
+  }
   const addEmptyDay = () => {
     const newDay = { id: Date.now(), name: '', focus: '', exercises: [], geschatteTijd: '60 minutes' }
-    setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
+    setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1, ...opPlek(newDay.id) }))
     setActiveDay(newDay.id)
     setShowDayPicker(false)
+    setVulPlek(null)
   }
 
   const addDayFromTemplate = (tpl) => {
@@ -454,9 +465,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       geschatteTijd: tpl.geschatte_tijd || '60 minutes',
       exercises: (tpl.exercises || []).map((ex, i) => ({ ...ex, id: base + i + 1 + Math.random() })),
     }
-    setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
+    setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1, ...opPlek(newDay.id) }))
     setActiveDay(newDay.id)
     setShowDayPicker(false)
+    setVulPlek(null)
   }
 
   // Oefeningen van een dag groeperen per spiergroep (10 nov 2026). Groepen in de
@@ -696,6 +708,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     const actiefId = effectiveClient?.assigned_schema_id || clientSchemas[0]?.id || null
     return cyclusVan(workoutPlan, { rooster: trainingInfo?.workout_schedule, actief: !!selectedSchemaId && actiefId === selectedSchemaId, schemaId: selectedSchemaId, keyNaarId })
   }, [workoutPlan, trainingInfo?.workout_schedule, effectiveClient?.assigned_schema_id, clientSchemas, selectedSchemaId])
+  cycRef.current = cyc
   const zetCyclus = (lengte, slots) => setWorkoutPlan(prev => ({ ...prev, cyclus: { lengte, volgorde: slots } }))
   const verschuif = (plek, richting) => {
     const naar = plek + richting
@@ -1398,7 +1411,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           return (
             <div style={{ flexShrink: 0, padding: '0.9rem 1rem 0' }}>
               <div style={{ maxWidth: 1460, margin: '0 auto', maxHeight: overzichtOpen ? '48vh' : 'none', overflowY: overzichtOpen ? 'auto' : 'visible' }}>
-                <SpierOverzicht blokken={gevuld} sets={sets} advies={advies} herstel={herstel}
+                <SpierOverzicht onderRecht={!dagenDicht} blokken={gevuld} sets={sets} advies={advies} herstel={herstel}
                   open={overzichtOpen} onOpen={setOverzichtOpen}
                   kader={volumeKader}
                   onSets={(dayId, exId, n) => updateExercise(dayId, exId, { sets: n })}
@@ -1409,30 +1422,40 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )
         })()}
         {!dagenDicht && <div ref={kolommenRef} onPointerDown={startLasso} onPointerMove={volgMuis} onPointerLeave={() => { plakDagRef.current = null; setPlakDag(null) }} style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', height: '100%', padding: '0.9rem 1rem 0', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', height: '100%', padding: '0 1rem', boxSizing: 'border-box', width: 'max-content', minWidth: '100%' }}>
             {/* Eén blok: kolommen tegen elkaar met lijnen ertussen, in de volgorde van de cyclus. */}
-            <div style={{ display: 'flex', height: 'calc(100% - 1rem)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flex: '1 1 auto', maxWidth: 1460, height: 'calc(100% - 1rem)', border: '1px solid rgba(255,255,255,0.12)', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
             {cyc.slots.map((slotId, plek) => {
               const isLos = !!cyc.ingepland && plek >= cyc.ingepland
               const label = isLos ? 'Niet ingepland' : cyc.weekdagen ? WEEKDAG_KORT[plek] : `Dag ${plek + 1}`
-              const verplaats = cyc.bron !== 'rooster' && (
-                <span style={{ display: 'inline-flex', gap: 0, marginLeft: 'auto' }}>
-                  <button onClick={() => verschuif(plek, -1)} disabled={plek === 0} title="Eerder in de cyclus" aria-label="Eerder" style={{ ...iconKnop(), width: 20, height: 18, opacity: plek === 0 ? 0.25 : 1 }}><ChevronLeft size={13} /></button>
-                  <button onClick={() => verschuif(plek, 1)} disabled={plek === cyc.slots.length - 1} title="Later in de cyclus" aria-label="Later" style={{ ...iconKnop(), width: 20, height: 18, opacity: plek === cyc.slots.length - 1 ? 0.25 : 1 }}><ChevronRight size={13} /></button>
-                </span>
-              )
+              // Kop: dag in het midden, pijlen links en rechts (18 nov 2026).
+              const kanSchuiven = cyc.bron !== 'rooster'
+              const pijl = (richting, uit) => kanSchuiven ? (
+                <button onClick={() => verschuif(plek, richting)} disabled={uit} title={richting < 0 ? 'Eerder in de cyclus' : 'Later in de cyclus'} aria-label={richting < 0 ? 'Eerder' : 'Later'} style={{ width: 24, height: 36, flexShrink: 0, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#fff', opacity: uit ? 0.2 : 1, cursor: uit ? 'default' : 'pointer' }}>
+                  {richting < 0 ? <ChevronLeft size={17} strokeWidth={3} /> : <ChevronRight size={17} strokeWidth={3} />}
+                </button>
+              ) : <span style={{ width: 24, flexShrink: 0 }} />
               const slotKop = (
-                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 0.55rem 0 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: isLos ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>{label}</span>
-                  {verplaats}
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: 36, padding: '0 2px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+                  {pijl(-1, plek === 0)}
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', color: isLos ? '#f59e0b' : '#fff' }}>{label}</span>
+                  {pijl(1, plek === cyc.slots.length - 1)}
                 </div>
               )
-              if (slotId == null) return (
+              if (slotId == null) {
+                // Een rustdag vullen kan alleen als de builder de volgorde bepaalt
+                // (niet als die uit het weekrooster van de klant komt).
+                const vulbaar = cyc.bron !== 'rooster' && bewerk?.soort !== 'dag'
+                return (
                 <div key={`rust-${plek}`} style={{ width: 84, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 6px, transparent 6px 12px)' }}>
                   {slotKop}
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '1rem', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Rust</div>
+                  <button disabled={!vulbaar} onClick={() => { setVulPlek(plek); setShowDayPicker(true) }} title={vulbaar ? 'Training op deze dag zetten' : undefined} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 10, paddingTop: '1rem', background: 'transparent', border: 'none', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', cursor: vulbaar ? 'pointer' : 'default' }}>
+                    Rust
+                    {vulbaar && <Plus size={16} strokeWidth={2.8} color="#fff" />}
+                  </button>
                 </div>
-              )
+                )
+              }
               const i = workoutPlan.days.findIndex(d => d.id === slotId)
               const dag = workoutPlan.days[i]
               if (!dag) return null
@@ -1454,7 +1477,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               const vorige = isLos ? null : weekSlots[(plek - 1 + weekSlots.length) % weekSlots.length]
               const ookGisteren = vorige != null ? spierenVanDag(slotId).filter(k => spierenVanDag(vorige).includes(k)) : []
               return (
-              <div key={dag.id} data-dag={dag.id} style={{ width: 280, flexShrink: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: (klembord.length > 0 && plakDag === String(dag.id)) ? 'rgba(255,255,255,0.08)' : dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
+              <div key={dag.id} data-dag={dag.id} style={{ flex: '1 0 280px', minWidth: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: (klembord.length > 0 && plakDag === String(dag.id)) ? 'rgba(255,255,255,0.08)' : dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 {slotKop}
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1861,7 +1884,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           onPickTemplate={addDayFromTemplate}
           onEditTemplate={(t) => startBewerk('dag', t)}
           onDeleteTemplate={deleteDayTemplate}
-          onClose={() => setShowDayPicker(false)}
+          onClose={() => { setShowDayPicker(false); setVulPlek(null) }}
           isMobile={isMobile}
         />
       )}

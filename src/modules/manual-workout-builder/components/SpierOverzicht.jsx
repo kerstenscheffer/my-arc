@@ -110,14 +110,14 @@ const ORANJE = '#f59e0b'
 // blokken: [[titel, [spier...]]], sets: { spier: { frac } }, advies/herstel per spier.
 // onSets(dayId, exId, sets): sets van één oefening in het plan aanpassen.
 // open/onOpen: lichaam uitgeklapt; klik op de titelregel klapt in en uit.
-export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {}, onSets, onActie, onWissel, open: lichaamOpen, onOpen, kader = null }) {
+export default function SpierOverzicht({ blokken, sets, advies = {}, herstel = {}, onSets, onActie, onWissel, open: lichaamOpen, onOpen, kader = null, onderRecht = false }) {
   const getallen = { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }
   // Spiergroepen die uitgeklapt zijn: daar staan de oefeningen met -/+ per set.
   const [open, setOpen] = useState(() => new Set())
   const wissel = (k) => setOpen(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
   const stap = { width: 22, height: 22, padding: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', border: LIJN, borderRadius: 10, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', border: LIJN, borderRadius: onderRecht ? '10px 10px 0 0' : 10, overflow: 'hidden' }}>
     <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${blokken.length}, minmax(0, 1fr))` }}>
       {blokken.map(([titel, spieren], i) => {
         // Kopregel per blok: totaal sets, doel (som van de spieren met een doel) en het zwaarste advies.
