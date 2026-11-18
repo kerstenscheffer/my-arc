@@ -354,6 +354,33 @@ export default function GewichtBandGrafiek({
       }
     })
 
+    // Het plan vooruit (18 nov 2026, Kersten): ook mét wegingen hoort het
+    // streeftempo en de band door te lopen naar waar het heen moet. Met twee
+    // wegingen in een nieuwe fase stond er anders alleen een kort streepje.
+    // Per week een punt, tot het einde van de fase; zonder einddatum tot
+    // twaalf weken na de start. Alleen streeftempo en band, geen trend.
+    if (uitFase && reeks.length) {
+      const start = new Date(`${String(startDatum).slice(0, 10)}T00:00:00`)
+      const eindIso = actief?.eindigt ? String(actief.eindigt).slice(0, 10) : null
+      const twaalf = new Date(start); twaalf.setDate(twaalf.getDate() + 12 * 7)
+      const plafond = new Date(start); plafond.setDate(plafond.getDate() + 26 * 7)
+      const eind = eindIso ? new Date(`${eindIso}T00:00:00`) : twaalf
+      const horizon = eind < plafond ? eind : plafond
+      const d = new Date(`${reeks[reeks.length - 1].datum}T00:00:00`)
+      for (;;) {
+        d.setDate(d.getDate() + 7)
+        if (d > horizon) break
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const l = lijnenOpDatum(iso, startGewicht, segmenten, config.venster_dagen)
+        if (!l) break
+        punten.push({
+          datum: iso, label: kort(iso), vooruit: true,
+          doel: Math.round(l.doel * 10) / 10,
+          band: [Math.round(Math.min(l.traag, l.snel) * 10) / 10, Math.round(Math.max(l.traag, l.snel) * 10) / 10],
+        })
+      }
+    }
+
     const weken = weekBeoordelingen(reeks, startGewicht, startDatum, config, segmenten)
     const laatste = weken[weken.length - 1] || null
     return { config, punten, weken, laatste, startGewicht, startDatum, herijkt, leeg: false }

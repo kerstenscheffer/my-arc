@@ -6,6 +6,7 @@ import { X, ArrowLeft, AlertCircle, Heart, Plus, CalendarCheck } from 'lucide-re
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
+import UitetenTab from './UitetenTab'
 import MyMealsTab from './MyMealsTab'
 import ScanTab from './ScanTab'
 import FotoTab from './FotoTab'
@@ -453,6 +454,8 @@ export default function FoodLogModal({
               <FotoTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} initialValues={quickAddInitialValues} />
+            ) : filter === 'uiteten' ? (
+              <UitetenTab db={db} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : coachModus && filter !== 'coach' && filter !== 'maaltijden' ? (
               <SearchTab
                 db={db} onSelect={handleSelectItem} isMobile={isMobile} client={null}
@@ -565,12 +568,15 @@ function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = nu
     { id: 'producten', label: 'Producten' },
     { id: 'maaltijden', label: 'Coach maaltijden' },
     { id: 'coach', label: 'Recepten' },
+    { id: 'uiteten', label: 'Uiteten' },
   ] : [
     { id: 'producten', label: 'Producten' },
     { id: 'maaltijden', label: 'Mijn maaltijden' },
     // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen. Heette
     // 'Coach'; 'Recepten' zegt wat je er vindt (kant-en-klare maaltijden).
     { id: 'coach', label: 'Recepten' },
+    // Een etentje loggen zonder zoeken of wegen (18 nov 2026).
+    { id: 'uiteten', label: 'Uiteten' },
   ]
   const favAan = filter === 'favorieten'
   return (
