@@ -181,7 +181,7 @@ export default function DayBuilder({ rirDoel = null,
           return (
           <div key={exercise.id} data-sleep-index={index} data-oef={`${day.id}|${exercise.id}`} style={sleep.kaartStijl(index)}>
             {kopje && (
-              <div style={{ display: 'flex', alignItems: 'center', margin: index === 0 ? '0 0.4rem 5px 0.7rem' : '7px 0.4rem 5px 0.7rem', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: groep(exercise) === 'onbekend' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', margin: index === 0 ? '0 0.4rem 2px 0.7rem' : '2px 0.4rem 2px 0.7rem', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.07em', textTransform: 'uppercase', color: groep(exercise) === 'onbekend' ? '#f59e0b' : '#fff' }}>
                 <span style={{ flex: 1, minWidth: 0 }}>{groep(exercise) === 'cardio' ? 'Cardio' : spierLabel(groep(exercise))}</span>
                 {blokken.length > 1 && (
                   <>

@@ -86,7 +86,7 @@ export default function BuilderExerciseCard({
   if (compact) {
     const DIV = 'rgba(255,255,255,0.06)'
     const actie = (kleur) => ({
-      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '0.3rem 0.3rem',
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '0.22rem 0.3rem',
       background: 'transparent', border: 'none', color: kleur || 'rgba(255,255,255,0.7)', fontSize: '0.66rem', fontWeight: 800,
       cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
     })
@@ -98,14 +98,17 @@ export default function BuilderExerciseCard({
         background: geselecteerd ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.025)',
         border: `1px solid ${geselecteerd ? '#fff' : 'rgba(255,255,255,0.05)'}`, borderRadius: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, padding: 5 }}>
+        {/* Foto over de volle hoogte links, naam en knoppen rechts ervan (18 nov 2026). */}
+        <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
           <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
-            width: 38, height: 38, flexShrink: 0, position: 'relative', overflow: 'hidden', borderRadius: 7, background: '#1a1a1a', cursor: 'pointer',
+            width: 52, flexShrink: 0, position: 'relative', overflow: 'hidden', background: '#1a1a1a', cursor: 'pointer',
           }}>
             <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%)' }} />
             <span style={{ position: 'absolute', left: 4, bottom: 2, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{index + 1}</span>
           </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, padding: '4px 0 4px 9px' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
               <span style={{ minWidth: 0, fontSize: '0.8rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -121,21 +124,23 @@ export default function BuilderExerciseCard({
           <div {...greep} data-greep title="Slepen om te verplaatsen" style={{ ...greep?.style, width: 20, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)' }}>
             <GripVertical size={14} strokeWidth={2.4} />
           </div>
-        </div>
+          </div>
         <div style={{ display: 'flex', borderTop: `1px solid ${DIV}` }}>
           {/* Video zit in Bewerken (13 nov 2026, Kersten): één knop minder.
               Ervoor in de plaats: de logs en krachtgrafiek van de klant. */}
-          <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken en video" style={actie()}><Pencil size={13} /></button>
+          <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken en video" style={actie()}><Pencil size={11} /></button>
           <div style={{ width: 1, background: DIV }} />
           {kanLogs && <>
-            <button onClick={(e) => { stop(e); setLogsOpen(true) }} title="Logs en krachtgrafiek van de klant" style={actie()}><TrendingUp size={14} /></button>
+            <button onClick={(e) => { stop(e); setLogsOpen(true) }} title="Logs en krachtgrafiek van de klant" style={actie()}><TrendingUp size={12} /></button>
             <div style={{ width: 1, background: DIV }} />
           </>}
           {onSwap && <>
-            <button onClick={(e) => { stop(e); onSwap() }} title="Wisselen" style={actie()}><ArrowLeftRight size={13} /></button>
+            <button onClick={(e) => { stop(e); onSwap() }} title="Wisselen" style={actie()}><ArrowLeftRight size={11} /></button>
             <div style={{ width: 1, background: DIV }} />
           </>}
-          <button onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={actie('#ef4444')}><Trash2 size={13} /></button>
+          <button onClick={(e) => { stop(e); onDelete() }} title="Verwijderen" style={actie('#ef4444')}><Trash2 size={11} /></button>
+        </div>
+          </div>
         </div>
         {logsModal}
         {editing && (

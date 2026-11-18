@@ -579,10 +579,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // een kaart = die aan/uit, op de lege ruimte = selectie weg.
   const startLasso = (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return
-    if (e.target.closest?.('button, input, textarea, select, a, [data-geen-sleep], [data-greep]')) return
+    // Slepen vanaf een dagtitel: elke titel die het kader raakt = die hele dag
+    // geselecteerd (18 nov 2026). Klikken op de titel opent de dag nog gewoon.
+    const opTitel = !!e.target.closest?.('[data-dagtitel]')
+    if (!opTitel && e.target.closest?.('button, input, textarea, select, a, [data-geen-sleep], [data-greep]')) return
     e.preventDefault()
     const erbij = e.shiftKey || e.metaKey
-    lassoRef.current = { x: e.clientX, y: e.clientY, basis: erbij ? new Set(selectie) : new Set(), bewogen: false, kaart: e.target.closest?.('[data-oef]')?.dataset.oef }
+    lassoRef.current = { x: e.clientX, y: e.clientY, basis: erbij ? new Set(selectie) : new Set(), bewogen: false, opTitel, kaart: e.target.closest?.('[data-oef]')?.dataset.oef }
     const beweeg = (ev) => {
       const st = lassoRef.current
       if (!st) return
@@ -595,6 +598,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         const b = el.getBoundingClientRect()
         if (b.right > r.l && b.left < r.r && b.bottom > r.t && b.top < r.b) nieuw.add(el.dataset.oef)
       })
+      if (st.opTitel) kolommenRef.current?.querySelectorAll('[data-dagtitel]').forEach(el => {
+        const b = el.getBoundingClientRect()
+        if (b.right > r.l && b.left < r.r && b.bottom > r.t && b.top < r.b) {
+          el.closest('[data-dag]')?.querySelectorAll('[data-oef]').forEach(k => nieuw.add(k.dataset.oef))
+        }
+      })
       setSelectie(nieuw)
     }
     const los = () => {
@@ -603,7 +612,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       const st = lassoRef.current
       lassoRef.current = null
       setLasso(null)
+      if (st?.bewogen && st.opTitel) {
+        // De klik die op het loslaten volgt mag de dag niet openen.
+        const slik = (ev) => { ev.stopPropagation(); ev.preventDefault() }
+        window.addEventListener('click', slik, { capture: true, once: true })
+        setTimeout(() => window.removeEventListener('click', slik, { capture: true }), 0)
+      }
       if (!st || st.bewogen) return
+      if (st.opTitel) return
       if (st.kaart) setSelectie(prev => { const n = new Set(prev); if (n.has(st.kaart)) n.delete(st.kaart); else n.add(st.kaart); return n })
       else if (!erbij) setSelectie(new Set())
     }
@@ -1436,7 +1452,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </button>
               ) : <span style={{ width: 24, flexShrink: 0 }} />
               const slotKop = (
-                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: 36, padding: '0 2px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+                <div data-dagtitel style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: 36, padding: '0 2px', borderBottom: '1px solid rgba(255,255,255,0.12)', cursor: 'default' }}>
                   {pijl(-1, plek === 0)}
                   <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', color: isLos ? '#f59e0b' : '#fff' }}>{label}</span>
                   {pijl(1, plek === cyc.slots.length - 1)}
@@ -1447,7 +1463,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 // (niet als die uit het weekrooster van de klant komt).
                 const vulbaar = cyc.bron !== 'rooster' && bewerk?.soort !== 'dag'
                 return (
-                <div key={`rust-${plek}`} style={{ width: 84, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 6px, transparent 6px 12px)' }}>
+                <div key={`rust-${plek}`} style={{ width: 124, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 6px, transparent 6px 12px)' }}>
                   {slotKop}
                   <button disabled={!vulbaar} onClick={() => { setVulPlek(plek); setShowDayPicker(true) }} title={vulbaar ? 'Training op deze dag zetten' : undefined} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 10, paddingTop: '1rem', background: 'transparent', border: 'none', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', cursor: vulbaar ? 'pointer' : 'default' }}>
                     Rust
@@ -1480,9 +1496,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <div key={dag.id} data-dag={dag.id} style={{ flex: '1 0 280px', minWidth: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderLeft: plek ? '1px solid rgba(255,255,255,0.12)' : 'none', background: (klembord.length > 0 && plakDag === String(dag.id)) ? 'rgba(255,255,255,0.08)' : dag.id === activeDay ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
                 {slotKop}
                 {/* Kop: titelregel = dag openen; spiergroepen eronder = herstel-menu (eigen knoppen). */}
-                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div data-dagtitel style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '0.6rem 0.7rem 0.55rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-                  <button onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Deze dag openen" style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 7px', minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+                  <button data-dagtitel onClick={() => { setActiveDay(dag.id); setAlleDagen(false) }} title="Klik: deze dag openen. Sleep over titels: alle oefeningen van die dagen selecteren." style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 7px', minWidth: 0, padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                   {/* De naam zoals de klant hem op zijn weekrooster ziet staat voorop
                       (12 nov 2026): hij werd door de cijfers ernaast weggedrukt, waardoor
                       alleen "Dag 2" overbleef. De cijfers staan nu op een eigen regel. */}
@@ -1556,7 +1572,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </div>
               )
             })}
-            {!effectiveClient && bewerk?.soort !== 'dag' && (
+            {/* Alleen als er geen rustdag meer vrij is; anders vul je een rustdag. */}
+            {!effectiveClient && bewerk?.soort !== 'dag' && !cyc.slots.includes(null) && (
               <button onClick={() => setShowDayPicker(true)} title="Nieuwe dag" aria-label="Nieuwe dag" style={{ width: 56, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '0.9rem', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>
                 <Plus size={18} strokeWidth={2.8} />
               </button>
