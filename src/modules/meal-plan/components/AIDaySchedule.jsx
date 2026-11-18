@@ -344,10 +344,12 @@ export default function AIDaySchedule({
   useEffect(() => {
     // OVERHAUL: free-mode skips plan loading entirely
     if (isFreeMode) {
+      setKlaarDag(`${weekOffset}|${currentDay}`)
       setDisplayMeals([])
     } else if (isVandaag() && todayMeals && !overrides[datumVanDag(currentDay)]) {
       ++dagVraag.current // een lopende laadbeurt mag dit niet meer overschrijven
       getoondeDag.current = `${weekOffset}|${currentDay}`
+      setKlaarDag(getoondeDag.current)
       setLoading(false)
       setDisplayMeals(todayMeals)
     } else {
@@ -367,6 +369,7 @@ export default function AIDaySchedule({
   // binnenkomen en zag je de logs van vorige week zondag op aankomende zondag.
   const consumedVraag = useRef(0)
   const laatsteDag = useRef(null)
+  const [logDag, setLogDag] = useState(null)
   const loadConsumedMeals = async (dayIndex) => {
     if (!db?.supabase || !client?.id) return
     const vraagNr = ++consumedVraag.current
@@ -386,7 +389,9 @@ export default function AIDaySchedule({
       setConsumedMeals(data || [])
     } catch (err) {
       console.error('Failed to load consumed meals:', err)
-      setConsumedMeals([])
+      if (vraagNr === consumedVraag.current) setConsumedMeals([])
+    } finally {
+      if (vraagNr === consumedVraag.current) setLogDag(`${weekOffset}|${dayIndex}`)
     }
   }
 
@@ -483,10 +488,17 @@ export default function AIDaySchedule({
   // Alleen het laatste antwoord telt, net als bij loadConsumedMeals.
   const getoondeDag = useRef(null)
   const dagVraag = useRef(0)
+  // Welke dag staat er echt klaar: plan (klaarDag) en logs (logDag). Pas als
+  // beide bij de getoonde dag horen, verschijnt de lijst. Eerst kwam het plan,
+  // dan een frame lege vakken en daarna schoven de logs ertussen en duwden
+  // alles 340 px omlaag (18 nov 2026, gemeten).
+  const [klaarDag, setKlaarDag] = useState(null)
+  const nuSleutel = `${weekOffset}|${currentDay}`
+  const lijstKlaar = !loading && klaarDag === nuSleutel && (!client?.id || logDag === nuSleutel)
   const loadDayMeals = async (dayIndex) => {
     const tijdelijk = overrides[datumVanDag(dayIndex)]?.dag || null
     const sleutel = `${weekOffset}|${dayIndex}`
-    if (!tijdelijk && !activePlan?.week_structure) { getoondeDag.current = sleutel; setDisplayMeals([]); onDagPreWorkout?.(null); return }
+    if (!tijdelijk && !activePlan?.week_structure) { getoondeDag.current = sleutel; setKlaarDag(sleutel); setDisplayMeals([]); onDagPreWorkout?.(null); return }
     const vraagNr = ++dagVraag.current
     if (getoondeDag.current !== sleutel) setLoading(true)
     try {
@@ -501,10 +513,11 @@ export default function AIDaySchedule({
       })
       if (vraagNr !== dagVraag.current) return
       getoondeDag.current = sleutel
+      setKlaarDag(sleutel)
       setDisplayMeals(meals)
       // Het dagdoel beweegt mee met de pre-workout van deze dag (zie preWorkoutMeal.js).
       onDagPreWorkout?.(meals.find(x => x?.slot === 'pre_workout') || null)
-    } catch (e) { if (vraagNr === dagVraag.current) { setDisplayMeals([]); onDagPreWorkout?.(null) } }
+    } catch { if (vraagNr === dagVraag.current) { setKlaarDag(sleutel); setDisplayMeals([]); onDagPreWorkout?.(null) } }
     finally { if (vraagNr === dagVraag.current) setLoading(false) }
   }
   
@@ -886,7 +899,7 @@ export default function AIDaySchedule({
           }} />
       )}
 
-      {loading ? (
+      {!lijstKlaar ? (
         <MaaltijdKaartenSkelet isMobile={isMobile} />
       ) : !hasContent && !client ? (
         <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>
@@ -1113,7 +1126,7 @@ export default function AIDaySchedule({
 
       {/* Empty state — knop weg, tekst blijft als hint. De FAB rechtsonder
           is het enige aanknopingspunt voor "loggen". */}
-      {!loading && displayMeals.length === 0 && consumedMeals.length === 0 && client && (
+      {lijstKlaar && displayMeals.length === 0 && consumedMeals.length === 0 && client && (
         <div style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>
             {activePlan ? 'Geen maaltijden gepland voor deze dag' : 'Nog niks gelogd vandaag'}

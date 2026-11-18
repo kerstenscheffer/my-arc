@@ -289,7 +289,7 @@ export default function TodaysWorkoutCard({
         <div style={{
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'center', position: 'relative',
         }}>
           {zonderFoto && (
             <div style={{
@@ -303,6 +303,9 @@ export default function TodaysWorkoutCard({
           )}
           {/* Label en naam staan in de kop boven de foto; hier alleen de
               voortgang als die er is, en de stats in dik wit. */}
+          {/* Op de pagina-kop (zonderFoto) zweeft dit regeltje boven de titel,
+              op de foto. Het komt pas binnen als de logs geladen zijn; in de
+              flow duwde het dan de hele pagina 13 px omlaag (18 nov 2026). */}
           {(isCompleted || inProgress) && <div style={{
             fontSize: isMobile ? '0.55rem' : '0.6rem',
             fontWeight: 800,
@@ -310,6 +313,7 @@ export default function TodaysWorkoutCard({
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             lineHeight: 1, marginBottom: 4, opacity: 0.85,
+            ...(zonderFoto ? { position: 'absolute', left: 0, bottom: '100%', textShadow: '0 1px 6px rgba(0,0,0,0.7)' } : null),
           }}>
             {isCompleted ? 'Voltooid' : `${pct}% voltooid`}
           </div>}

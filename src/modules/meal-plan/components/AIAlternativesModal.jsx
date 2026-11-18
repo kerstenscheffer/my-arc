@@ -8,7 +8,7 @@ import FoodLogModal from './food-log/FoodLogModal'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan } from './food-log/portionPresets'
-import { maakWisselOpties } from '../utils/portieSchaal'
+import { maakWisselOpties, kiesPerGroep } from '../utils/portieSchaal'
 import PartnerBestellen, { PartnerLabel } from './PartnerBestellen'
 import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
@@ -110,14 +110,27 @@ const groepVan = (m) => {
 // Icoon per groep, voor de grote kopjes in het blok "zelfde macro's".
 const GROEP_ICOON = { 'Op brood': Sandwich, Bowl: Soup, Wrap: Wheat, Warm: Flame, 'Licht en snel': Salad, Klassiek: Utensils, 'Pasta en wok': CookingPot, Mexicaans: Flame, Zoet: Cookie, Hartig: Drumstick }
 const GROEP_KLEUR = { 'Op brood': '#d97706', Bowl: '#60a5fa', Wrap: '#eab308', Warm: '#f97316', 'Licht en snel': '#10b981', Klassiek: '#a78bfa', 'Pasta en wok': '#fb7185', Mexicaans: '#ef4444', Zoet: '#ec4899', Hartig: '#fb923c' }
+// Wat Nederlanders op dat moment het vaakst eten staat bovenaan (18 nov 2026,
+// Kersten): lunch is brood en wraps, diner is warm, ontbijt is brood of een bak
+// kwark. Per groep drie echt verschillende gerechten.
+// eslint-disable-next-line react-refresh/only-export-components
+export const GROEP_PER_MOMENT = {
+  breakfast: ['Op brood', 'Bowl', 'Wrap', 'Zoet', 'Klassiek', 'Warm', 'Hartig'],
+  lunch: ['Op brood', 'Wrap', 'Bowl', 'Licht en snel', 'Warm', 'Pasta en wok', 'Klassiek', 'Mexicaans'],
+  dinner: ['Klassiek', 'Warm', 'Pasta en wok', 'Mexicaans', 'Wrap', 'Bowl', 'Licht en snel', 'Op brood'],
+  snack: ['Bowl', 'Zoet', 'Op brood', 'Hartig', 'Licht en snel', 'Wrap', 'Klassiek'],
+}
+const PER_GROEP = 3
 // Groep van een gerecht: het label als het er een heeft, anders afgeleid uit
 // de naam en de ingrediënten.
-const groepOfAfgeleid = (m) => {
+// eslint-disable-next-line react-refresh/only-export-components
+export const groepOfAfgeleid = (m) => {
   const g = groepVan(m)
   if (g) return g
   const t = `${m?.name || ''} ${(Array.isArray(m?.ingredients_list) ? m.ingredients_list : []).map(i => i?.name || '').join(' ')}`.toLowerCase()
   if (/wrap|tortilla/.test(t)) return 'Wrap'
-  if (/brood|boterham|tosti|cracker|beschuit|bagel/.test(t)) return 'Op brood'
+  if (/brood|boterham|tosti|cracker|beschuit|bagel|sandwich|pistolet|burger|toast/.test(t)) return 'Op brood'
+  if (/salade/.test(t)) return 'Licht en snel'
   if (/pasta|spaghetti|macaroni|noodles|\bmie\b|wok|bami|nasi/.test(t)) return 'Pasta en wok'
   if (/kwark|skyr|yoghurt|havermout|muesli|oats|smoothie|shake/.test(t)) return 'Bowl'
   if (/rijst|aardappel|kip|rund|gehakt|zalm|vis|couscous|quinoa/.test(t)) return 'Warm'
@@ -477,11 +490,18 @@ export default function AIAlternativesModal({
         const ids = [...new Set(kand.flatMap(m => m.ingredients_list.map(i => i.ingredient_id)))]
         const [ingredienten, vetbron] = await Promise.all([haalIngredienten(sb, ids), haalVetbronnen(sb).then(r => r, () => ({}))])
         const voorkeur = new Set([...curated, ...dagmenu, ...opties, ...meals.filter(m => String(m.internal_name || '').startsWith('wissel'))].map(m => m.id))
-        zelfde = maakWisselOpties({ huidig: currentMeal, kandidaten: kand, ingredienten, vetbron, voorkeur, moment: mo, aantal: 10 })
-          .map((m, i) => ({ ...m, _groep: groepOfAfgeleid(m), _rang: i }))
-        // Per groep bij elkaar (Op brood, Bowl, Wrap, Warm, …), binnen de groep de beste eerst.
-        const plek = (g) => { const n = GROEP_VOLGORDE.indexOf(g); return n === -1 ? 99 : n }
-        zelfde.sort((a, b) => plek(a._groep) - plek(b._groep) || a._rang - b._rang)
+        // Alles wat past, beste eerst; ruim genoeg om elke groep te kunnen vullen.
+        const alle = maakWisselOpties({ huidig: currentMeal, kandidaten: kand, ingredienten, vetbron, voorkeur, moment: mo, aantal: 200, ruim: true })
+          .map(m => ({ ...m, _groep: groepOfAfgeleid(m) }))
+        // De kern van de maaltijd die de klant wisselt: bijna hetzelfde gerecht is geen wissel.
+        const huidigKcal = (Array.isArray(currentMeal?.ingredients_list) ? currentMeal.ingredients_list : []).map(i => {
+          const ing = ingredienten.get(i?.ingredient_id)
+          return ing ? { id: ing.id, kcal: (Number(ing.calories_per_100g) || 0) * (Number(i.amount) || 0) / 100 } : null
+        }).filter(Boolean)
+        const huidigTotaal = huidigKcal.reduce((t, x) => t + x.kcal, 0)
+        const huidigAls = { name: currentMeal?.name, _kern: huidigKcal.filter(x => x.kcal >= huidigTotaal * 0.12).map(x => x.id) }
+        // Per groep drie echt verschillende gerechten: eerst wat strak past, dan aanvullen met wat iets ruimer past.
+        zelfde = kiesPerGroep(alle, huidigAls, GROEP_PER_MOMENT[mo] || GROEP_VOLGORDE, PER_GROEP)
       }
     } catch (e) { console.warn('Zelfde macro\'s:', e?.message) }
 

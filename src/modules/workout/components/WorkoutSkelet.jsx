@@ -10,19 +10,25 @@ const PULS = { animation: 'skeletPuls 1.4s ease-in-out infinite' }
 // De kop van de dag (foto 200/250 hoog) met de kaart eronder: titel, een
 // regel cijfers en de knop. Gebruikt door TodaysWorkoutMain bij de eerste keer laden.
 export function WorkoutKopSkelet({ isMobile }) {
-  const pad = isMobile ? '0 1rem' : '0 1.5rem'
   return (
     <div aria-hidden>
       <SkeletStijl />
       <div style={{ position: 'relative', height: isMobile ? 140 : 180, background: 'rgba(255,255,255,0.04)', ...PULS }}>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0) 40%, #0a0a0a 100%)' }} />
       </div>
-      <div style={{ padding: pad, marginTop: isMobile ? -46 : -56, position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <SkeletBlok breedte="58%" hoogte={isMobile ? 26 : 32} radius={8} />
+      {/* Precies de maat van de echte kaart onder de foto (TodaysWorkoutMain:
+          marginTop -64/-84, kaart 71 hoog op mobiel, gemeten 18 nov 2026).
+          Was 114 hoog met een knop die er niet is: het weekschema sprong dan
+          48 px omhoog zodra de training er was. */}
+      <div style={{
+        padding: isMobile ? '0.6rem 1rem 0.75rem' : '0.75rem 1.5rem 1rem', marginTop: isMobile ? -64 : -84,
+        height: isMobile ? 71 : 90, boxSizing: 'border-box', position: 'relative',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8,
+      }}>
+        <SkeletBlok breedte="58%" hoogte={isMobile ? 24 : 32} radius={8} />
         <div style={{ display: 'flex', gap: 14 }}>
-          {[0, 1, 2].map(i => <SkeletBlok key={i} breedte={64} hoogte={14} />)}
+          {[0, 1, 2].map(i => <SkeletBlok key={i} breedte={64} hoogte={12} />)}
         </div>
-        <SkeletBlok hoogte={48} radius={12} stijl={{ marginTop: 6 }} />
       </div>
     </div>
   )

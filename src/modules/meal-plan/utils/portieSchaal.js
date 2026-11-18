@@ -145,7 +145,7 @@ const r1 = (n) => Math.round(n * 10) / 10
 //   ingredienten: Map id -> ai_ingredients-rij (per 100 g, eenheid)
 //   vetbron: { noten, olie } ai_ingredients-rijen, of null
 //   voorkeur: Set met id's van gerechten die de coach of het systeem aanraadt
-export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {}, voorkeur = new Set(), moment = 'snack', aantal = 10 }) {
+export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {}, voorkeur = new Set(), moment = 'snack', aantal = 10, ruim = false }) {
   const doel = { kcal: Number(huidig?.calories) || 0, eiwit: Number(huidig?.protein) || 0, koolh: Number(huidig?.carbs) || 0, vet: Number(huidig?.fat) || 0 }
   if (doel.kcal < 80) return []
   const uit = []
@@ -186,12 +186,18 @@ export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {
     }
     const dk = Math.abs(m.kcal - doel.kcal), dp = Math.abs(m.eiwit - doel.eiwit), dv = Math.abs(m.vet - doel.vet)
     // Alleen wat echt dichtbij komt: kcal binnen 8% (of 30 kcal), eiwit binnen 6 g, vet binnen 7 g.
-    if (dk > Math.max(30, doel.kcal * 0.08) || dp > 6 || dv > 7) continue
+    // Met `ruim` mag het anderhalf keer zo ver, om een groep (Op brood, Wrap) aan te vullen.
+    const strak = !(dk > Math.max(30, doel.kcal * 0.08) || dp > 6 || dv > 7)
+    if (!strak && !(ruim && dk <= Math.max(45, doel.kcal * 0.12) && dp <= 9 && dv <= 10)) continue
     const score = afstand(m, doel) + (voorkeur.has(meal.id) ? 0 : 0.004)
+    // De kern van het gerecht: ingrediënten die minstens 12% van de kcal leveren.
+    // Twee gerechten met bijna dezelfde kern zijn voor de klant hetzelfde gerecht.
+    const kern = rijen.filter(r => (Number(r.ing.calories_per_100g) || 0) * r.gram / 100 >= m.kcal * 0.12).map(r => r.ing.id)
     uit.push({
       score,
       meal: {
         ...meal,
+        _strak: strak, _kern: kern,
         name: erbij ? `${meal.name} met ${String(erbij).toLowerCase()}` : meal.name,
         calories: Math.round(m.kcal), protein: r1(m.eiwit), carbs: r1(m.koolh), fat: r1(m.vet),
         ingredients_list: rijen.map(r => ({
@@ -213,4 +219,37 @@ export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {
     if (!perNaam.has(sleutel)) perNaam.set(sleutel, x.meal)
   }
   return [...perNaam.values()].slice(0, aantal)
+}
+
+// Lijken twee gerechten zo op elkaar dat het geen echte keuze is? Zelfde kern
+// (bijna dezelfde hoofdingrediënten) of dezelfde naam op een toevoeging na.
+const kaleNaam = (n) => String(n || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/ met (olijfolie|walnoten)$/, '').replace(/[^a-z0-9]+/g, ' ').trim()
+const STOP = new Set(['met', 'en', 'van', 'de', 'het', 'op', 'in', 'volkoren', 'mager', 'magere', 'meal', 'prep'])
+const woorden = (n) => new Set(kaleNaam(n).split(' ').filter(w => w.length > 1 && !STOP.has(w)).map(w => w.replace(/(jes|s)$/, '')))
+const overlap = (x, y) => { if (!x.size || !y.size) return 0; const samen = [...x].filter(w => y.has(w)).length; return samen / (x.size + y.size - samen) }
+export function lijktOp(a, b) {
+  if (kaleNaam(a?.name) === kaleNaam(b?.name)) return true
+  // Dezelfde woorden in een andere volgorde ("wrap met ei, kipfilet en kaas" en
+  // "wrap met kaas, ei en kipfilet") is hetzelfde gerecht.
+  if (overlap(woorden(a?.name), woorden(b?.name)) >= 0.6) return true
+  const x = new Set(a?._kern || []), y = new Set(b?._kern || [])
+  if (!x.size || !y.size) return false
+  const samen = [...x].filter(id => y.has(id)).length
+  return samen / (x.size + y.size - samen) >= 0.6
+}
+
+// Per groep (Op brood, Wrap, Warm, …) een paar echt verschillende gerechten, in
+// de volgorde van `volgorde`. Eerst wat strak past, dan aanvullen met wat iets
+// ruimer past. `alle` komt uit maakWisselOpties (beste eerst), elk met `_groep`.
+export function kiesPerGroep(alle, huidigAls, volgorde = [], perGroep = 3) {
+  const plek = (g) => { const n = volgorde.indexOf(g); return n === -1 ? 99 : n }
+  const groepen = new Map()
+  for (const strak of [true, false]) for (const m of alle) {
+    if (m._strak !== strak || lijktOp(m, huidigAls)) continue
+    const lijst = groepen.get(m._groep) || []
+    // Ook niet twee keer bijna hetzelfde in verschillende groepen ("Kip met rijst" bij Klassiek én bij Warm).
+    if (lijst.length >= perGroep || [...groepen.values()].some(l => l.some(x => lijktOp(x, m)))) continue
+    lijst.push(m); groepen.set(m._groep, lijst)
+  }
+  return [...groepen.entries()].sort((x, y) => plek(x[0]) - plek(y[0])).flatMap(([, lijst]) => lijst)
 }

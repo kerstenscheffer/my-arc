@@ -183,6 +183,11 @@ export default function DagAgenda({
     const meet = () => {
       const plek = plekRef.current, baken = bakenRef.current
       if (!plek || !baken) return
+      // Home verborgen (een andere pagina staat open, keep-alive): dan meet
+      // alles 0 en zette dit de agenda op top 0. Terug op Home stond hij dan
+      // een frame over de foto en sprong hij daarna omlaag (18 nov 2026,
+      // gemeten: 0→176 px). Verborgen = de laatste goede maat houden.
+      if (!plek.offsetParent && getComputedStyle(plek).position !== 'fixed') return
       const r = plek.getBoundingClientRect(), b = baken.getBoundingClientRect()
       // In een geschaald paneel (meekijken) zijn gemeten afstanden verkleind.
       const schaal = plek.offsetWidth > 0 && r.width > 0 ? r.width / plek.offsetWidth : 1

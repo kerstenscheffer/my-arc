@@ -218,6 +218,11 @@ export default function WeekSchedule({
   const [trainingBlokken, setTrainingBlokken] = useState([])
   const [vasteTrainingstijd, setVasteTrainingstijd] = useState(null)
   const [cardioVersie, setCardioVersie] = useState(0)
+  // Voor welke week de cardio en de gedane trainingen binnen zijn. De tegels
+  // komen pas in beeld (zachte fade) als allebei klaar zijn; eerst schoven
+  // ze bij het openen 2x om terwijl de stukken binnendruppelden (18 nov 2026).
+  const [cardioWeek, setCardioWeek] = useState(null)
+  const [gedaanWeek, setGedaanWeek] = useState(null)
   // Gedane trainingen van de getoonde week: een sessie in workout_sessions
   // met minstens één gelogde set. De oude bron (localStorage) werd nooit
   // gevuld, waardoor 'Gedaan' nooit verscheen.
@@ -347,6 +352,9 @@ export default function WeekSchedule({
       })
       setGedaneDagen(uit)
     })()
+      .catch(e => console.warn('gedane trainingen laden mislukt:', e?.message))
+      // Altijd vrijgeven, ook bij een fout: anders blijven de tegels onzichtbaar.
+      .finally(() => { if (!weg) setGedaanWeek(weekOffset) })
     return () => { weg = true }
   }, [clientId, db, weekOffset, sessieVersie])
   useEffect(() => {
@@ -378,7 +386,8 @@ export default function WeekSchedule({
       setVasteTrainingstijd(c?.data?.training_time ? String(c.data.training_time).slice(0, 5) : null)
       const eind = new Date(maandag); eind.setDate(eind.getDate() + 6)
       setCardioLogs((logs || []).filter(l => String(l.logged_date).slice(0, 10) <= iso(eind)))
-    })
+      setCardioWeek(weekOffset)
+    }, () => { if (!weg) setCardioWeek(weekOffset) })
     return () => { weg = true }
   }, [clientId, db, weekOffset, cardioVersie])
   const hasValidSchema = schema && schema.week_structure && typeof schema.week_structure === 'object'
@@ -934,7 +943,11 @@ export default function WeekSchedule({
             )}
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
             {/* Telefoon: de week van rand tot rand (13 nov 2026, Kersten). */}
-            <div style={{ padding: isMobile ? 0 : '0 1rem' }}>
+            <div style={{
+              padding: isMobile ? 0 : '0 1rem',
+              opacity: !clientId || (cardioWeek === weekOffset && gedaanWeek === weekOffset) ? 1 : 0,
+              transition: 'opacity 0.25s ease',
+            }}>
               <WeekGrid
                 stappenPerDag={stappenPerDag} stappenDoel={stappenDoel}
                 cardioPerDag={cardioPerDag}

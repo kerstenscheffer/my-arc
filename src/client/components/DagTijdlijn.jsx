@@ -100,7 +100,10 @@ export default function DagTijdlijn({
   useEffect(() => {
     const el = vak.current
     if (!el) return
-    const meet = () => setVakHoogte(el.clientHeight)
+    // Verborgen pagina (keep-alive) meet 0: dan de laatste maat houden. Anders
+    // bouwde de tijdlijn zich bij terugkomen op Home in twee stappen opnieuw
+    // op en sprongen de blokken (18 nov 2026).
+    const meet = () => { if (el.clientHeight > 0) setVakHoogte(el.clientHeight) }
     meet()
     if (typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(meet)
