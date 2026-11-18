@@ -8,12 +8,13 @@ import FoodLogModal from './food-log/FoodLogModal'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan } from './food-log/portionPresets'
+import { maakWisselOpties } from '../utils/portieSchaal'
 import PartnerBestellen, { PartnerLabel } from './PartnerBestellen'
 import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil, Sandwich, Soup, Salad, Flame, CookingPot, Cookie, Drumstick, Wheat } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 // Gedeelde cache voor wat voor iedereen gelijk is: alle maaltijden (~1,5 MB)
@@ -39,6 +40,28 @@ const haalOpNaam = (sb, patroon) => haalGedeeld(patroon, async () => {
   const { data, error } = await sb.from('ai_meals').select('*').like('internal_name', patroon)
   if (error) throw error
   return data || []
+})
+// Ingrediënten (per 100 g) voor het schalen van wisselopties; per id onthouden.
+const ingredientCache = new Map()
+async function haalIngredienten(sb, ids) {
+  const mist = ids.filter(id => !ingredientCache.has(id))
+  for (let i = 0; i < mist.length; i += 120) {
+    const { data } = await sb.from('ai_ingredients')
+      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, eenheid, gram_per_eenheid')
+      .in('id', mist.slice(i, i + 120)).then(r => r, () => ({ data: [] }))
+    ;(data || []).forEach(r => ingredientCache.set(r.id, r))
+  }
+  return ingredientCache
+}
+// Gewone vetbronnen om een te mager gerecht mee aan te vullen.
+const haalVetbronnen = (sb) => haalGedeeld('vetbronnen', async () => {
+  const zoek = async (q) => {
+    const { data } = await sb.rpc('zoek_ingredienten', { p_q: q, p_client: null, p_limit: 8 }).then(r => r, () => ({ data: [] }))
+    const kand = (data || []).filter(k => Number(k.fat_per_100g) >= 40)
+    return kand.find(k => k.source === 'coach' && !k.brand) || kand[0] || null
+  }
+  const [noten, olie] = await Promise.all([zoek('walnoten'), zoek('olijfolie')])
+  return { noten, olie }
 })
 // Laatste uitkomst per klant + slot: opnieuw openen toont direct de lijst.
 const klantCache = new Map()
@@ -83,6 +106,23 @@ const GROEP_VOLGORDE = ['Op brood', 'Bowl', 'Wrap', 'Warm', 'Licht en snel', 'Kl
 const groepVan = (m) => {
   const l = (Array.isArray(m?.labels) ? m.labels : []).map(String).find(x => x.startsWith('groep:'))
   return l ? l.slice(6) : null
+}
+// Icoon per groep, voor de grote kopjes in het blok "zelfde macro's".
+const GROEP_ICOON = { 'Op brood': Sandwich, Bowl: Soup, Wrap: Wheat, Warm: Flame, 'Licht en snel': Salad, Klassiek: Utensils, 'Pasta en wok': CookingPot, Mexicaans: Flame, Zoet: Cookie, Hartig: Drumstick }
+const GROEP_KLEUR = { 'Op brood': '#d97706', Bowl: '#60a5fa', Wrap: '#eab308', Warm: '#f97316', 'Licht en snel': '#10b981', Klassiek: '#a78bfa', 'Pasta en wok': '#fb7185', Mexicaans: '#ef4444', Zoet: '#ec4899', Hartig: '#fb923c' }
+// Groep van een gerecht: het label als het er een heeft, anders afgeleid uit
+// de naam en de ingrediënten.
+const groepOfAfgeleid = (m) => {
+  const g = groepVan(m)
+  if (g) return g
+  const t = `${m?.name || ''} ${(Array.isArray(m?.ingredients_list) ? m.ingredients_list : []).map(i => i?.name || '').join(' ')}`.toLowerCase()
+  if (/wrap|tortilla/.test(t)) return 'Wrap'
+  if (/brood|boterham|tosti|cracker|beschuit|bagel/.test(t)) return 'Op brood'
+  if (/pasta|spaghetti|macaroni|noodles|\bmie\b|wok|bami|nasi/.test(t)) return 'Pasta en wok'
+  if (/kwark|skyr|yoghurt|havermout|muesli|oats|smoothie|shake/.test(t)) return 'Bowl'
+  if (/rijst|aardappel|kip|rund|gehakt|zalm|vis|couscous|quinoa/.test(t)) return 'Warm'
+  if (/salade/.test(t)) return 'Licht en snel'
+  return 'Klassiek'
 }
 const wisselNiveauVan = (m) => {
   const l = (Array.isArray(m?.labels) ? m.labels : []).map(String).find(x => x.startsWith('wissel_'))
@@ -159,6 +199,8 @@ export default function AIAlternativesModal({
   const [coachPerMoment, setCoachPerMoment] = useState({})
   // Vaste wisselopties voor het kcal-niveau van de klant, per moment.
   const [wisselPerMoment, setWisselPerMoment] = useState({})
+  // Gerechten die naar de macro's van de huidige maaltijd zijn geschaald, in hele porties (18 nov 2026).
+  const [zelfdeMacros, setZelfdeMacros] = useState([])
   // Maaltijd die naar "Mijn maaltijden" gaat; het blad vraagt eerst bij welk
   // moment hij hoort.
   const [sterMeal, setSterMeal] = useState(null)
@@ -254,7 +296,7 @@ export default function AIAlternativesModal({
   const loadAlternatives = async () => {
     // Al eerder geladen (zelfde sessie)? Dan staat de lijst er direct en
     // verversen we op de achtergrond, zonder laadscherm.
-    const sleutel = `${client?.id || currentMeal?.client_id || ''}|${slotKey}`
+    const sleutel = `${client?.id || currentMeal?.client_id || ''}|${slotKey}|${currentMeal?.meal_id || currentMeal?.id || ''}|${Math.round(currentMeal?.calories || 0)}`
     const vorige = klantCache.get(sleutel)
     if (vorige) zetLijsten(vorige)
     setLoading(!vorige)
@@ -276,6 +318,7 @@ export default function AIAlternativesModal({
     setCoachOptions(u.curated)
     setCoachPerMoment(u.perMoment)
     setWisselPerMoment(u.wissel)
+    setZelfdeMacros(u.zelfde || [])
     if (u.doel) setDoelKcal(u.doel)
     // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
     setMoment(slotKey)
@@ -412,7 +455,36 @@ export default function AIAlternativesModal({
       }
     } catch {}
 
+    // Zelfde macro's: gerechten van dit moment, geschaald naar de maaltijd die
+    // de klant wisselt, in hele porties. Alleen bij wisselen (niet in het
+    // log-venster, daar is geen maaltijd om op te passen).
+    let zelfde = []
+    try {
+      const kcal = Number(currentMeal?.calories) || 0
+      if (!embedded && kcal >= 80) {
+        const mo = basisMoment(slotKey)
+        const huidigId = currentMeal?.meal_id || currentMeal?.id
+        const huidigNaam = String(currentMeal?.name || '').trim().toLowerCase()
+        const kand = meals.filter(m => {
+          if (m.partner || m.id === huidigId || String(m.name || '').trim().toLowerCase() === huidigNaam) return false
+          const t = (Array.isArray(m.timing) ? m.timing : []).map(x => String(x).toLowerCase())
+          if (!t.includes(mo)) return false
+          const l = Array.isArray(m.ingredients_list) ? m.ingredients_list : []
+          return l.length >= 2 && l.every(i => i?.ingredient_id) && m.calories >= kcal * 0.4 && m.calories <= kcal * 2.5
+        })
+        const ids = [...new Set(kand.flatMap(m => m.ingredients_list.map(i => i.ingredient_id)))]
+        const [ingredienten, vetbron] = await Promise.all([haalIngredienten(sb, ids), haalVetbronnen(sb).then(r => r, () => ({}))])
+        const voorkeur = new Set([...curated, ...dagmenu, ...opties, ...meals.filter(m => String(m.internal_name || '').startsWith('wissel'))].map(m => m.id))
+        zelfde = maakWisselOpties({ huidig: currentMeal, kandidaten: kand, ingredienten, vetbron, voorkeur, moment: mo, aantal: 10 })
+          .map((m, i) => ({ ...m, _groep: groepOfAfgeleid(m), _rang: i }))
+        // Per groep bij elkaar (Op brood, Bowl, Wrap, Warm, …), binnen de groep de beste eerst.
+        const plek = (g) => { const n = GROEP_VOLGORDE.indexOf(g); return n === -1 ? 99 : n }
+        zelfde.sort((a, b) => plek(a._groep) - plek(b._groep) || a._rang - b._rang)
+      }
+    } catch (e) { console.warn('Zelfde macro\'s:', e?.message) }
+
     return {
+      zelfde,
       smartAlts,
       // Partnergerechten die niet meer leverbaar zijn horen er niet tussen.
       meals: meals.filter(m => !m.partner || m.partner_actief !== false),
@@ -491,7 +563,11 @@ export default function AIAlternativesModal({
       return true
     })
     laagRef.current = laag
+    // Bovenaan: dezelfde macro's als de maaltijd die je wisselt. Alleen op het
+    // eigen moment; kies je een ander moment, dan past de vergelijking niet.
+    const metZelfde = moment === slotKey ? zelfdeMacros : []
     let pool = [
+      ...neem(metZelfde, -1),
       ...neem(customMeals.filter(pastMoment), 0),
       ...neem(aanraders, 1),
       ...neem(allMeals.filter(pastMoment), 2),
@@ -580,14 +656,14 @@ export default function AIAlternativesModal({
         // De maaltijd die je nu wisselt blijft altijd staan, ook als hij uit
         // een ander niveau komt: hem verstoppen zou raar zijn.
         if (m.id && currentMeal && (m.id === (currentMeal.meal_id || currentMeal.id))) return true
-        return !n || n === huidigNiveau
+        return m._zelfdeMacros || !n || n === huidigNiveau
       })
     }
     // Wisselopties van een ander niveau horen nooit in de lijst: die zijn
     // voor een ander caloriedoel gemaakt.
     meals = meals.filter(m => {
       const n = wisselNiveauVan(m)
-      return !n || !huidigWisselNiveau || n === huidigWisselNiveau
+      return m._zelfdeMacros || !n || !huidigWisselNiveau || n === huidigWisselNiveau
     })
 
     // 4. Grenzen op kcal en eiwit. Wie een maximum of minimum invult, wil die
@@ -630,7 +706,7 @@ export default function AIAlternativesModal({
         return [...meals].sort((a, b) => {
           const la = laag.get(a.id) ?? 2, lb = laag.get(b.id) ?? 2
           if (la !== lb) return la - lb
-          if (la === 1) return volg.get(a.id) - volg.get(b.id)
+          if (la === 1 || la === -1) return volg.get(a.id) - volg.get(b.id)
           const ra = rang.has(a.id) ? rang.get(a.id) : Infinity
           const rb = rang.has(b.id) ? rang.get(b.id) : Infinity
           if (ra !== rb) return ra - rb
@@ -917,6 +993,7 @@ export default function AIAlternativesModal({
   const kopVan = (m) => {
     if (!m) return null
     const l = laagRef.current.get(m.id)
+    if (l === -1) return `zm:${m._groep || 'Klassiek'}`
     if (l === 0) return 'Mijn maaltijden'
     if (l === 1) return groepVan(m) || 'Aanraders'
     return 'Meer maaltijden'
@@ -1360,6 +1437,25 @@ export default function AIAlternativesModal({
               <React.Fragment key={meal.id || idx}>
               {sortering === 'smart' && !searchTerm && kopVan(meal)
                 && kopVan(meal) !== kopVan(filteredMeals[idx - 1]) && (
+                String(kopVan(meal)).startsWith('zm:') ? (() => {
+                  // Blok "zelfde macro's": groot wit kopje met icoon per groep (18 nov 2026).
+                  const groep = String(kopVan(meal)).slice(3)
+                  const Icoon = GROEP_ICOON[groep] || Utensils
+                  const eerste = !String(kopVan(filteredMeals[idx - 1]) || '').startsWith('zm:')
+                  return (
+                    <div style={{ padding: `${eerste ? '0.3rem' : '1rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.4rem` }}>
+                      {eerste && (
+                        <div style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#10b981', marginBottom: '0.6rem' }}>
+                          Zelfde macro's als je maaltijd · hele porties
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: isMobile ? '1.15rem' : '1.25rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                        <Icoon size={isMobile ? 20 : 22} strokeWidth={2.6} color={GROEP_KLEUR[groep] || '#fff'} />
+                        {groep}
+                      </div>
+                    </div>
+                  )
+                })() : (
                 <div onClick={() => setDicht(prev => { const n = new Set(prev); const k = kopVan(meal); if (n.has(k)) n.delete(k); else n.add(k); return n })} style={{
                   display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent', userSelect: 'none',
@@ -1370,6 +1466,7 @@ export default function AIAlternativesModal({
                   {kopVan(meal)}
                   <ChevronDown size={14} strokeWidth={3} style={{ transition: 'transform 0.15s ease', transform: dicht.has(kopVan(meal)) ? 'rotate(-90deg)' : 'none' }} />
                 </div>
+                )
               )}
               {!(sortering === 'smart' && !searchTerm && dicht.has(kopVan(meal))) && <SuggestieKaart
                 meal={meal}

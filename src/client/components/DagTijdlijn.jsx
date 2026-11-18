@@ -497,18 +497,18 @@ export default function DagTijdlijn({
                   <div key={b.id} onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
-                    background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
-                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                    background: klaar ? '#070707' : mee ? '#1a1a1a' : '#121212',
+                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(info)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: info ? 'pointer' : 'default', ...tik }}>
-                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#fff', opacity: klaar ? 0.5 : 1 }}>
+                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#fff', opacity: klaar ? 0.28 : 1 }}>
                         {info && (
                           <span aria-hidden style={{ position: 'absolute', left: 3, bottom: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Info size={12} strokeWidth={2.6} color="#fff" />
                           </span>
                         )}
                       </span>
-                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: klaar ? 0.6 : 1 }}>
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: klaar ? 0.38 : 1 }}>
                         <span style={{ fontSize: isMobile ? '0.8rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: klaar ? 'line-through' : 'none' }}>{naam}</span>
                         <span style={{ fontSize: isMobile ? '0.62rem' : '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {tijdKnop(b, 'inherit')}{onder ? ` · ${onder}` : ''}{volgende?.id === b.id && <span style={{ color: '#fff', fontWeight: 900 }}> · {overTekst(b)}</span>}
@@ -517,7 +517,7 @@ export default function DagTijdlijn({
                     </div>
                     {vink && (
                       <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
-                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
+                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} style={{ opacity: 0.65 }} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
                       </button>
                     )}
                   </div>
@@ -541,11 +541,11 @@ export default function DagTijdlijn({
                   <div onPointerDown={(e) => beginSleep(e, b)} style={{
                     ...sleepStijl(b), position: 'absolute', left: 0, right: rechts, transition: 'right 0.18s ease', top, height: KAART, boxSizing: 'border-box',
                     display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: aanRand ? '10px 0 0 10px' : 10, paddingRight: randPad,
-                    background: klaar ? '#2e2e2e' : mee ? '#1a1a1a' : '#121212',
-                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                    background: klaar ? '#070707' : mee ? '#1a1a1a' : '#121212',
+                    border: `1px solid ${volgende?.id === b.id ? 'rgba(255,255,255,0.85)' : klaar ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`,
                   }}>
                     <div onClick={alsGeenSleep(openen)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', gap: 8, cursor: openen ? 'pointer' : 'default', ...tik }}>
-                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: doorgestreept ? 0.5 : 1 }}>
+                      <span style={{ position: 'relative', width: KAART + 4, flexShrink: 0, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.06)', opacity: klaar ? 0.28 : 1 }}>
                         {/* De i ligt over de foto: tik op de foto of de naam opent de maaltijd. */}
                         {openen && (
                           <span aria-hidden style={{ position: 'absolute', left: 3, bottom: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -553,7 +553,7 @@ export default function DagTijdlijn({
                           </span>
                         )}
                       </span>
-                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: doorgestreept ? 0.6 : 1 }}>
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.15, opacity: klaar ? 0.38 : 1 }}>
                         <span style={{ fontSize: isMobile ? '0.8rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: doorgestreept ? 'line-through' : 'none' }}>{naam}</span>
                         <span style={{ fontSize: isMobile ? '0.62rem' : '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {tijdKnop(b, 'inherit')}{delen.length ? ` · ${delen.join(' · ')}` : ''}{volgende?.id === b.id && <span style={{ color: '#fff', fontWeight: 900 }}> · {overTekst(b)}</span>}
@@ -567,10 +567,10 @@ export default function DagTijdlijn({
                         {stapel.open ? <ChevronUp size={15} strokeWidth={3} /> : `+${stapel.n - 1}`}
                       </button>
                     )}
-                    {b.meta?.los && <span style={{ ...knop, cursor: 'default' }}><CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /></span>}
+                    {b.meta?.los && <span style={{ ...knop, cursor: 'default' }}><CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} style={{ opacity: 0.65 }} /></span>}
                     {vink && (
                       <button onClick={vink} aria-label={klaar ? 'Afvinken ongedaan maken' : 'Afronden'} title={klaar ? 'Toch niet' : 'Afronden'} style={knop}>
-                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
+                        {klaar ? <CircleCheck size={isMobile ? 22 : 18} strokeWidth={2.6} color={GROEN} style={{ opacity: 0.65 }} /> : <Circle size={isMobile ? 22 : 18} strokeWidth={2.2} color="rgba(255,255,255,0.6)" />}
                       </button>
                     )}
                   </div>
