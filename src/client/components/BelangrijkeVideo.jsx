@@ -29,8 +29,22 @@ import { getThumbnailFromUrl } from '../../modules/videos/utils/youtubeHelpers'
 // Voor plekken waar de video tussen bestaande blokken in staat — op de
 // maaltijdpagina tussen de dag en de macro's — en waar 190 pixels kaart de
 // ringen van het scherm zou duwen.
+// Laatst bekende lijst per klant en pagina (18 nov 2026, Kersten: "pagina's
+// laden verspringt"). Kom je terug op een pagina, dan staat het blok er
+// meteen in plaats van na het ophalen ineens alles omlaag te duwen. Komt er
+// echt een nieuwe video bij, dan schuift hij rustig open (inschuif).
+const onthouden = new Map()
+
 export default function BelangrijkeVideo({ client, pagina, isMobile = false, compact = false }) {
-  const [items, setItems] = useState([])
+  const sleutel = `${client?.id}|${pagina}`
+  const [items, setItems] = useState(() => onthouden.get(sleutel) || [])
+  const [inschuif, setInschuif] = useState(false)
+  const vorigAantal = useRef(items.length)
+  useEffect(() => {
+    if (client?.id && pagina) onthouden.set(`${client.id}|${pagina}`, items)
+    if (!vorigAantal.current && items.length) setInschuif(true)
+    vorigAantal.current = items.length
+  }, [items, client?.id, pagina])
   const [speler, setSpeler] = useState(null)
   const [bezig, setBezig] = useState(null)   // video_id dat wordt afgevinkt
   const [idx, setIdx] = useState(0)          // welke video staat er voor
@@ -44,7 +58,9 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
   // laatste binnenkomt en de verkeerde pagina zou vullen.
   useEffect(() => {
     let weg = false
-    setItems([]); setIdx(0)
+    const bekend = onthouden.get(`${client?.id}|${pagina}`) || []
+    vorigAantal.current = bekend.length
+    setItems(bekend); setIdx(0)
     if (!client?.id || !pagina) return undefined
     videoService.getBelangrijkeVideosVoorPagina(client.id, pagina)
       .then(lijst => { if (!weg) setItems(lijst || []) })
@@ -190,9 +206,10 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
 
   if (compact) {
     return (
-      <div style={{
+      <div onAnimationEnd={e => { if (e.animationName === 'videoIn') setInschuif(false) }} style={{
         display: 'flex', flexDirection: 'column', gap: 6,
         padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0',
+        ...(inschuif ? { animation: 'videoIn 0.35s cubic-bezier(0.22, 1, 0.36, 1)', overflow: 'hidden' } : null),
       }}>
         {(() => {
           const item = huidig
@@ -291,16 +308,17 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
         })()}
         {speler_}
         {bevestiging}
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes videoIn { from { max-height: 0; opacity: 0; } to { max-height: 420px; opacity: 1; } }`}</style>
       </div>
     )
   }
 
   return (
-    <div style={{
+    <div onAnimationEnd={e => { if (e.animationName === 'videoIn') setInschuif(false) }} style={{
       display: 'flex', flexDirection: 'column', gap: isMobile ? '0.6rem' : '0.75rem',
       padding: isMobile ? '0 1rem' : '0 1.5rem',
       marginBottom: isMobile ? '1rem' : '1.25rem',
+      ...(inschuif ? { animation: 'videoIn 0.35s cubic-bezier(0.22, 1, 0.36, 1)', overflow: 'hidden' } : null),
     }}>
       {(() => {
         const item = huidig
@@ -460,7 +478,7 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
           gezien-zetten doen wij hier. */}
       {speler_}
       {bevestiging}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes videoIn { from { max-height: 0; opacity: 0; } to { max-height: 420px; opacity: 1; } }`}</style>
     </div>
   )
 }

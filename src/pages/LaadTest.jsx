@@ -117,7 +117,7 @@ function Stil() {
 
 // Het echte laadscherm, ingeklemd in het vak.
 function Gekozen() {
-  return <div style={{ height: 150, overflow: 'hidden', display: 'flex', alignItems: 'center' }}><LaadScherm /></div>
+  return <div style={{ height: 150, overflow: 'hidden', display: 'flex', alignItems: 'center' }}><LaadScherm inline /></div>
 }
 
 const VARIANTEN = [

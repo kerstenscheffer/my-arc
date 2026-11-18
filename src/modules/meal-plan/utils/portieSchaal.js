@@ -62,6 +62,8 @@ export function portieRegel(ing, orig) {
   const naam = String(ing?.name || '').toLowerCase()
   // Groente (onder 40 kcal per 100 g) doet niets voor de macro's: die blijft zoals in het recept.
   if (Number(ing?.calories_per_100g) > 0 && Number(ing.calories_per_100g) < 40) return null
+  // Sauzen, dressings en kruiden blijven zoals in het recept: geen 60 g knoflooksaus om aan het vet te komen.
+  if (/saus|dressing|mayo|ketchup|pesto|mosterd|sambal|sriracha|bouillon|kruiden|specerij|kaneel|knoflook|gember|peper|\bzout\b|salsa/.test(naam)) return null
   const stuk = Number(ing?.gram_per_eenheid) > 0 && PER_STUK.test(String(ing?.eenheid || '')) ? Number(ing.gram_per_eenheid) : 0
   let regel = null
   for (const [re, stap, min, max, stukStandaard] of PORTIE) {

@@ -8,7 +8,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const GAT = 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))'
 
-export default function LaadScherm() {
+// inline: alleen voor het voorbeeld op /test; anders vast over het hele scherm,
+// net als .loading-container in index.html, zodat het logo niet verspringt.
+export default function LaadScherm({ inline = false }) {
   const [lang, setLang] = useState(false)
   // Op de klok zetten via startTime: 4800 ms is een veelvoud van beide rondes
   // (1,6 s en 2,4 s). Een animation-delay werkt hier niet: die telt vanaf het
@@ -28,7 +30,7 @@ export default function LaadScherm() {
   }, [])
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 16px', textAlign: 'center' }}>
+    <div style={{ ...(inline ? { minHeight: '100%' } : { position: 'fixed', inset: 0, zIndex: 1 }), background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 16px', textAlign: 'center' }}>
       {/* Boog met staart + lichtstreep over het logo (Kersten, 18 nov 2026).
           Zelfde opbouw als het eerste scherm in index.html. Loopt op de klok:
           dit scherm wordt bij het opstarten een paar keer opnieuw neergezet en

@@ -160,9 +160,14 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
 
   // Laatste set van de laatste oefening gelogd → afrondvraag, één keer.
   const workoutKlaar = isWorkoutFullyLogged(todaysWorkout?.exercises, todaysLogs)
+  // Alleen nadat je in dit scherm zelf iets gelogd hebt (18 nov 2026). Zonder
+  // die voorwaarde opende de vraag bij elk bezoek aan de pagina: de logs van
+  // vandaag komen na het eerste tekenen binnen, en dat is ook een overgang van
+  // "niet klaar" naar "klaar".
   const vorigKlaar = useRef(null)
+  const zelfGelogd = useRef(false)
   useEffect(() => {
-    if (vorigKlaar.current === false && workoutKlaar && bouwfase.aan && !fbDag.workout) setWkOpen(true)
+    if (vorigKlaar.current === false && workoutKlaar && zelfGelogd.current && bouwfase.aan && !fbDag.workout) setWkOpen(true)
     vorigKlaar.current = workoutKlaar
   }, [workoutKlaar, bouwfase.aan, fbDag.workout])
 
@@ -344,6 +349,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   }, [])
 
   const handleLogsUpdate = async (options) => {
+    zelfGelogd.current = true
     if (options?.reloadSchema) {
       triggerReload()
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
@@ -477,7 +483,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const kaart = (
     <TodaysWorkoutCard
       workout={todaysWorkout}
-      onLogClick={() => { setExpanded(e => !e); loadTodaysLogs() }}
+      onLogClick={() => { zelfGelogd.current = true; setExpanded(e => !e); loadTodaysLogs() }}
       logsCount={todaysLogs.length}
       isCompleted={isWorkoutFullyLogged(todaysWorkout?.exercises, todaysLogs)}
       completionPct={workoutCompletionPct(todaysWorkout?.exercises, todaysLogs)}
@@ -516,7 +522,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
             <LogModal
               workout={todaysWorkout}
               todaysLogs={todaysLogs}
-              onClose={loadTodaysLogs}
+              onClose={() => { zelfGelogd.current = true; loadTodaysLogs() }}
               onLogsUpdate={handleLogsUpdate}
               client={client}
               schema={freshSchema}

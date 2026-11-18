@@ -346,6 +346,9 @@ export default function AIDaySchedule({
     if (isFreeMode) {
       setDisplayMeals([])
     } else if (isVandaag() && todayMeals && !overrides[datumVanDag(currentDay)]) {
+      ++dagVraag.current // een lopende laadbeurt mag dit niet meer overschrijven
+      getoondeDag.current = `${weekOffset}|${currentDay}`
+      setLoading(false)
       setDisplayMeals(todayMeals)
     } else {
       loadDayMeals(currentDay)
@@ -473,10 +476,19 @@ export default function AIDaySchedule({
     return () => { leeft = false }
   }, [db, client?.id, schemaSleutel])
 
+  // Laadkaarten alleen bij een andere dag (18 nov 2026, Kersten: "een swap
+  // maken in meals verspringt"). Herlaadt dezelfde dag, na een wissel of log,
+  // dan blijven de maaltijden staan tot de nieuwe er zijn. Eerst klapte de
+  // hele lijst in tot 4 grijze kaarten en sprong hij daarna weer open.
+  // Alleen het laatste antwoord telt, net als bij loadConsumedMeals.
+  const getoondeDag = useRef(null)
+  const dagVraag = useRef(0)
   const loadDayMeals = async (dayIndex) => {
     const tijdelijk = overrides[datumVanDag(dayIndex)]?.dag || null
-    if (!tijdelijk && !activePlan?.week_structure) { setDisplayMeals([]); onDagPreWorkout?.(null); return }
-    setLoading(true)
+    const sleutel = `${weekOffset}|${dayIndex}`
+    if (!tijdelijk && !activePlan?.week_structure) { getoondeDag.current = sleutel; setDisplayMeals([]); onDagPreWorkout?.(null); return }
+    const vraagNr = ++dagVraag.current
+    if (getoondeDag.current !== sleutel) setLoading(true)
     try {
       const dayKey = daysOfWeek[dayIndex]?.key
       if (!dayKey) { setDisplayMeals([]); setLoading(false); return }
@@ -487,11 +499,13 @@ export default function AIDaySchedule({
         workoutSchedule: workoutSchedule ?? client?.workout_schedule,
         trainingStart: trainingStarts[dayKey],
       })
+      if (vraagNr !== dagVraag.current) return
+      getoondeDag.current = sleutel
       setDisplayMeals(meals)
       // Het dagdoel beweegt mee met de pre-workout van deze dag (zie preWorkoutMeal.js).
       onDagPreWorkout?.(meals.find(x => x?.slot === 'pre_workout') || null)
-    } catch (e) { setDisplayMeals([]); onDagPreWorkout?.(null) }
-    finally { setLoading(false) }
+    } catch (e) { if (vraagNr === dagVraag.current) { setDisplayMeals([]); onDagPreWorkout?.(null) } }
+    finally { if (vraagNr === dagVraag.current) setLoading(false) }
   }
   
   // Vaste momenten (27 okt 2026): ontbreekt er een (permanent weggehaald),

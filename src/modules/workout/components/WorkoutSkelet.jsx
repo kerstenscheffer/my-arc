@@ -35,7 +35,8 @@ export function WorkoutPaginaSkelet({ isMobile }) {
   return (
     <div aria-hidden style={{ minHeight: '100vh', background: '#0a0a0a' }}>
       <SkeletStijl />
-      <div style={{ height: isMobile ? 40 : 48, paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0, boxSizing: 'content-box', borderBottom: '1px solid rgba(255,255,255,0.12)' }} />
+      {/* Zelfde maat als de echte balk in WorkoutPlan (34/40, geen rand); stond op 40/48 met rand, dan schoof alles 7 px omhoog zodra de pagina er was. */}
+      <div style={{ height: isMobile ? 34 : 40, paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0, boxSizing: 'content-box' }} />
       <WorkoutKopSkelet isMobile={isMobile} />
       <div style={{ padding: pad, marginTop: isMobile ? '3.5rem' : '4.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <SkeletBlok breedte="42%" hoogte={18} />
