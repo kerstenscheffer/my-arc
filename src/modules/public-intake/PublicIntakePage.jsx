@@ -623,6 +623,8 @@ export default function PublicIntakePage() {
           .then(() => supabase.rpc('maak_intake_voedingsconcept', { p_client: res.clientId }))
           .then(r => { if (r?.error || r?.data?.fout) console.warn('voedingsconcept niet gemaakt:', r?.error?.message || r?.data?.fout) },
                 e => console.warn('voedingsconcept niet gestart:', e?.message || e))
+          // Eigen maaltijden uit de intake in het concept (edge function intake-maaltijden), daarna pas nakijken.
+          .then(() => supabase.functions.invoke('intake-maaltijden', { body: { client_id: res.clientId } }).then(r => r, () => null))
           .then(() => supabase.functions.invoke('concept-nakijker', { body: { client_id: res.clientId, soort: 'voeding' } }).then(r => r, () => null))
       }
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }

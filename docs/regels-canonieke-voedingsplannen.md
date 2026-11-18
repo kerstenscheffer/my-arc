@@ -52,3 +52,13 @@ Naam `Man | 2200 | Vast`. Opnieuw bouwen: `scripts/canonieke-voeding/plannen.py`
 - Vet per trede: man cut 62 / 64 / 68, man bulk 78 / 84 / 90, vrouw 50 / 54 / 60 / 66.
 - Vet komt eerst uit olijfolie (maximaal 15 g per maaltijd), daarna uit een extra ei.
 - Bulk (man vanaf 2600): avocado bij het avondeten en cottage cheese met cracker als tweede tussendoortje.
+
+## Eigen maaltijden uit de intake (18 nov 2026)
+Code: `supabase/functions/intake-maaltijden/index.ts`. Draait in de intake-keten na `maak_intake_voedingsconcept` en vóór de nakijker.
+- Doel: zoveel mogelijk van wat de klant al eet in het plan. Persoonlijker, makkelijker op te pakken.
+- Overnemen als de klant een concrete maaltijd beschrijft die goed is (eiwitbron erin of logisch erbij, schaalbaar met normale porties), of als hij iets uitdrukkelijk wil houden (ook een cappuccino; die komt er als extra bij).
+- Niet overnemen: vaag of wisselend, en matige keuzes zonder uitdrukkelijke wens (brood met pindakaas, koek, afhaal).
+- Schalen doet de code, in hele porties: eieren per stuk (max 4), brood per snee (max 4), whey per halve schep, kwark per 50 g (max 500), havermout en muesli per 10 g, rijst en pasta per 10 g rauw, vlees en vis per 25 g (max 250), honing en pindakaas per 5 g. Smaakmakers blijven vast.
+- Doel van het schalen: de kcal en het eiwit van het gerecht dat hij vervangt. Geaccepteerd bij kcal binnen 10% en eiwit hooguit 5 g lager, of als de dag het eiwitdoel van de klant nog voor 95% haalt.
+- De maaltijd wordt een eigen maaltijd van de klant (`ai_custom_meals`, `personal_notes = 'uit_intake'`) en komt op de dagen waar het vervangen gerecht stond.
+- De brief zegt per moment wat is overgenomen (met porties en macro's) en wat niet, met de reden.

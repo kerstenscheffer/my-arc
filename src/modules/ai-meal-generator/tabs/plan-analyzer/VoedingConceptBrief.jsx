@@ -57,7 +57,8 @@ export default function VoedingConceptBrief({ db, planMeta, client, onActiveer, 
     try {
       const { data, error } = await db.supabase.rpc('maak_intake_voedingsconcept', { p_client: client.id, p_opnieuw: true })
       if (error || data?.fout) throw new Error(data?.fout || error?.message || 'mislukt')
-      // Het nieuwe concept weer langs de feedback van de coach.
+      // Eigen maaltijden uit de intake er weer in, daarna langs de feedback van de coach.
+      await db.supabase.functions.invoke('intake-maaltijden', { body: { client_id: client.id, opnieuw: true } }).then(r => r, () => null)
       await db.supabase.functions.invoke('concept-nakijker', { body: { client_id: client.id, soort: 'voeding' } }).then(r => r, () => null)
       await onHerlaad?.(data?.plan_id || planMeta.id)
     } catch (e) { alert('Opnieuw maken mislukt: ' + (e?.message || e)) }
