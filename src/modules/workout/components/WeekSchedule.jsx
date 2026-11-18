@@ -717,8 +717,8 @@ export default function WeekSchedule({
   // Cardio: blokken in de agenda op de gekozen dagen. Standaard = vast blok
   // (elke week) én een regel in het cardioplan; eenmalig = blok met
   // week_start, alleen zichtbaar in deze week.
-  const bewaarCardio = async ({ soort, duur, tijd, dagen, bereik }) => {
-    await CardioService.planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel }, db)
+  const bewaarCardio = async ({ soort, duur, tijd, dagen, bereik, afstandKm = null }) => {
+    await CardioService.planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel, afstandKm }, db)
     setCardioVersie(v => v + 1)
   }
 

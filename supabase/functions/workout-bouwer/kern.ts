@@ -19,6 +19,14 @@
 const MIN_PER_OEFENING = 9, MIN_PER_EXTRA_SET = 3
 const MAX_SETS = 16, MAX_SETS_40PLUS = 14
 const MIN_TRAINING = 45
+// De intake vraagt een bereik ("45 tot 60 min") en bewaart de ondergrens. Het
+// plan mag de bovengrens gebruiken (Kersten, 18 nov 2026).
+const TIJD_BEREIK = 15
+// Zes oefeningen passen altijd in een training: wie krap in de tijd zit doet
+// oefeningen om en om. Voor tijd wordt er dus nooit onder de zes ingekort
+// (feedback Kersten, 18 nov 2026: "6 oefeningen moet in 45 ook lukken").
+const MIN_OEFENINGEN = 6
+const BEEN = ['quads', 'hamstrings', 'glutes', 'calves']
 const DAGEN = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 const DAG_VOL: Record<string, string> = { ma: 'maandag', di: 'dinsdag', wo: 'woensdag', do: 'donderdag', vr: 'vrijdag', za: 'zaterdag', zo: 'zondag' }
 
@@ -165,11 +173,14 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
     keuzes.push('Dagen per week: de klant liet dit aan jou. Gekozen voor 3 keer.')
   }
   let tijd = Number(wp?.default_time_per_session) || 0
+  const tijdBekend = tijd > 0
   if (!tijd) { tijd = 60; nakijken.push('Tijd per training staat niet in de intake; gerekend met 60 minuten.') }
-  // Een training is minimaal 45 minuten (Kersten, 18 nov 2026): korter levert
-  // geen zinnig plan op. De intake-keuze "30 tot 45 min" telt dus als 45.
-  const budget = Math.max(MIN_TRAINING, Math.min(tijd, 90))
-  if (tijd < MIN_TRAINING) keuzes.push(`De klant gaf ${tijd} minuten per training op; het plan is op het minimum van ${MIN_TRAINING} minuten gezet.`)
+  // De klant kiest een bereik en de intake bewaart de ondergrens: "45 tot 60
+  // min" staat als 45 in de database. Het plan mag tot de bovengrens duren.
+  // Een training is minimaal 45 minuten: korter levert geen zinnig plan op.
+  const bovengrens = tijdBekend ? tijd + TIJD_BEREIK : tijd
+  const budget = Math.max(MIN_TRAINING, Math.min(bovengrens, 90))
+  if (tijdBekend) keuzes.push(`Tijd: de klant koos ${tijd} tot ${tijd + TIJD_BEREIK} minuten per training; het plan mag tot ${budget} minuten duren.`)
   const jr = leeftijd(klant.date_of_birth)
   const maxSets = jr != null && jr >= 40 ? MAX_SETS_40PLUS : MAX_SETS
   if (maxSets === MAX_SETS_40PLUS) keuzes.push(`${jr} jaar: maximaal ${MAX_SETS_40PLUS} sets per training in plaats van ${MAX_SETS}.`)
@@ -260,12 +271,17 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
   for (const d of dagLijst()) {
     const weg: string[] = [], minder: string[] = []
     let rem = 40
-    while ((minuten(d) > budget || setsVan(d) > maxSets) && d.exercises.length > 3 && rem-- > 0) {
+    // Beendag: de helft of meer van de oefeningen is voor de benen. Daar gaat
+    // geen beenoefening weg om plaats te maken voor het bovenlichaam, ook niet
+    // als dat een focusspier is (feedback Kersten, 18 nov 2026).
+    const beenDag = d.exercises.filter(e => BEEN.includes(spierVan(e))).length >= d.exercises.length / 2
+    while (((minuten(d) > budget && d.exercises.length > MIN_OEFENINGEN) || setsVan(d) > maxSets) && d.exercises.length > 3 && rem-- > 0) {
       const totaal = weekSets()
       const kandidaat = d.exercises.map((e, i) => {
         const s = spierVan(e)
         const dubbel = d.exercises.filter(x => spierVan(x) === s).length > 1
         const rang = s === 'calves' && !focus.has(s) ? 0
+          : beenDag && !BEEN.includes(s) && s !== 'abs' ? 0.5
           : niet.has(s) && (!isCompound(e) || dubbel) ? 1
           : beschermd.has(s) ? (isCompound(e) ? 9 : dubbel ? 6 : 7)
           : !isCompound(e) && dubbel ? 2
@@ -283,7 +299,8 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
     if (weg.length || minder.length) {
       keuzes.push(`${d.name.trim()}: ingekort om binnen ${budget} minuten te blijven. ${weg.length ? `Eruit: ${weg.join(', ')}. ` : ''}${minder.length ? `Naar 2 sets: ${minder.join(', ')}.` : ''}`.trim())
     }
-    if (minuten(d) > budget) nakijken.push(`${d.name.trim()} is ${minuten(d)} minuten en past niet in de ${budget} minuten van de klant.`)
+    if (minuten(d) > budget && d.exercises.length <= MIN_OEFENINGEN) keuzes.push(`${d.name.trim()}: ${d.exercises.length} oefeningen blijven staan, ook al is dat op papier ${minuten(d)} minuten bij ${budget} beschikbaar. Zes oefeningen passen als de klant oefeningen om en om doet.`)
+    else if (minuten(d) > budget) nakijken.push(`${d.name.trim()} is ${minuten(d)} minuten en past niet in de ${budget} minuten van de klant.`)
   }
 
   // ── 5. Focusspieren extra werk waar tijd over is ─────────────────────────
@@ -352,7 +369,7 @@ export function bouwConcept({ klant, wp, templates }: Invoer) {
   }
 
   const langste = Math.max(...dagLijst().map(minuten))
-  const samenvatting = `${basisNaam} voor ${naam}: ${sleutels.length} keer per week, tot ${langste} minuten per training (klant heeft ${Math.max(tijd, MIN_TRAINING)} minuten). Focus op ${focusBron.map(k => FOCUS_NL[k]).join(', ')}.`
+  const samenvatting = `${basisNaam} voor ${naam}: ${sleutels.length} keer per week, tot ${langste} minuten per training (klant heeft ${tijdBekend ? `${tijd} tot ${tijd + TIJD_BEREIK}` : budget} minuten). Focus op ${focusBron.map(k => FOCUS_NL[k]).join(', ')}.`
 
   return {
     name: `Concept · ${basisNaam} · ${naam}`,

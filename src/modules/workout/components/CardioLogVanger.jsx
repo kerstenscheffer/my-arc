@@ -14,7 +14,7 @@ export default function CardioLogVanger({ client, db, isMobile }) {
   const [blad, setBlad] = useState(null) // { soort, minuten }
   const [gewicht, setGewicht] = useState(null)
   useEffect(() => {
-    const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null, datum: e.detail?.datum || null })
+    const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null, datum: e.detail?.datum || null, afstandKm: e.detail?.afstandKm || null })
     window.addEventListener('myarc:cardio-log', open)
     return () => window.removeEventListener('myarc:cardio-log', open)
   }, [])
@@ -47,7 +47,7 @@ export default function CardioLogVanger({ client, db, isMobile }) {
   }
 
   return (
-    <CardioLogBlad open={!!blad} soort={blad?.soort} minutenGepland={blad?.minuten}
+    <CardioLogBlad open={!!blad} soort={blad?.soort} minutenGepland={blad?.minuten} afstandGepland={blad?.afstandKm}
       gewicht={gewicht || Number(client?.current_weight) || 80}
       onLog={log} onClose={() => setBlad(null)} isMobile={isMobile} />
   )

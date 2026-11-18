@@ -72,7 +72,7 @@ export default function CardioLogBlad(props) {
   )
 }
 
-function CardioLogBladInhoud({ open, soort, minutenGepland, gewicht = 80, onLog, onClose, isMobile, naarStap }) {
+function CardioLogBladInhoud({ open, soort, minutenGepland, afstandGepland = null, gewicht = 80, onLog, onClose, isMobile, naarStap }) {
   const [stap, setStapRuw] = useState(1)
   // Elke stapwissel eerst het toetsenbord dicht, anders verdwijnt het
   // horloge-veld met open toetsenbord en blijft de pagina verschoven.
@@ -84,8 +84,8 @@ function CardioLogBladInhoud({ open, soort, minutenGepland, gewicht = 80, onLog,
   const [bezig, setBezig] = useState(false)
   useEffect(() => {
     if (!open) return
-    setStapRuw(1); setMinuten(Number(minutenGepland) || 30); setIntensiteit('gemiddeld'); setAfstand(''); setHorloge(''); setBezig(false)
-  }, [open, minutenGepland, soort])
+    setStapRuw(1); setMinuten(Number(minutenGepland) || 30); setIntensiteit('gemiddeld'); setAfstand(Number(afstandGepland) > 0 ? String(afstandGepland).replace('.', ',') : ''); setHorloge(''); setBezig(false)
+  }, [open, minutenGepland, afstandGepland, soort])
   if (!open) return null
 
   const f = INTENSITEIT.find(i => i.id === intensiteit) || INTENSITEIT[1]

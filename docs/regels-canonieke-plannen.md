@@ -37,3 +37,10 @@ Volume- en tijdsregels: `docs/regels-volume.md` en `trainingsTijd.js`.
 ## Vorm
 - Naam `5X | PPL-UL`. Cyclus 7 dagen met vaste rustdagen, niveau intermediair, 60 minuten.
 - Eerst gym, daarna thuis. Beginnersversie: nog niet besloten.
+
+## Concept na de intake (workout-bouwer, 18 nov 2026)
+Code: `supabase/functions/workout-bouwer/kern.ts`. Uit feedback van Kersten op de brief:
+- Tijd: de intake vraagt een bereik en bewaart de ondergrens ("45 tot 60 min" staat als 45). Het plan mag tot de bovengrens duren (60).
+- Zes oefeningen passen altijd: voor tijd wordt een dag nooit onder de zes oefeningen ingekort. Wie krap zit doet oefeningen om en om.
+- Beendag: een beenoefening gaat niet weg om plaats te maken voor het bovenlichaam, ook niet als dat een focusspier is.
+  Kuiten blijven wel als eerste afvallen.
