@@ -42,8 +42,10 @@ export function checkinWeek(nu = new Date()) {
   }
 }
 
-// "wk 47 · 16 t/m 22 nov"
+// "wk 47 · Ma 16 t/m Zo 22 nov"; over een maandgrens "Ma 30 nov t/m Zo 6 dec".
 export function checkinWeekLabel(week = checkinWeek()) {
-  const kort = (x) => new Date(`${x}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '')
-  return `wk ${week.weeknummer} · ${kort(week.start)} t/m ${kort(week.eind)}`
+  const van = new Date(`${week.start}T12:00:00`), tot = new Date(`${week.eind}T12:00:00`)
+  const maand = (d) => d.toLocaleDateString('nl-NL', { month: 'short' }).replace('.', '')
+  const zelfdeMaand = van.getMonth() === tot.getMonth()
+  return `wk ${week.weeknummer} · Ma ${van.getDate()}${zelfdeMaand ? '' : ` ${maand(van)}`} t/m Zo ${tot.getDate()} ${maand(tot)}`
 }

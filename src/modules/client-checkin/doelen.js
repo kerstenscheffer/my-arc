@@ -83,16 +83,27 @@ export const DOEL_TYPES = [
     zin: (n) => `${String(n).replace('.', ',')} uur slaap per nacht`,
   },
   {
+    // Meal preppen (18 nov 2026): hoe vaak je vooruit kookt. Dat ziet de app
+    // niet, dus de klant zegt zelf of het gelukt is.
+    key: 'mealprep', label: 'Meal preppen', eenheid: 'keer', kleur: '#f59e0b',
+    standaard: 1, max: 7,
+    meet: () => null,
+    info: 'Dit doel kan de app niet meten. Jij geeft zelf aan of het gelukt is.',
+    zin: (n) => `${n}× meal preppen`,
+  },
+  {
     key: 'eigen', label: 'Eigen doel', eenheid: null, kleur: '#ffffff',
     standaard: null, max: null,
     meet: () => null,
     info: 'Dit doel kan de app niet meten. Jij geeft zelf aan of het gelukt is.',
-    zin: (_n, tekst) => tekst || 'Eigen doel',
+    // Met een aantal erbij: "3× om 22:00 naar bed".
+    zin: (n, tekst) => (Number(n) > 0 ? `${n}× ${tekst || 'eigen doel'}` : (tekst || 'Eigen doel')),
   },
 ]
 
-// Hoeveel doelen een klant per week mag zetten (was 3 tot 18 nov 2026).
-export const MAX_DOELEN = 5
+// Hoeveel doelen een klant per week mag zetten (was 3 tot 18 nov 2026; 5 bleek
+// ook te krap: na een eigen doel kon je er geen meer bij zetten).
+export const MAX_DOELEN = 8
 
 export const typeVan = (key) => DOEL_TYPES.find(t => t.key === key) || null
 
@@ -173,7 +184,7 @@ export function bereidTerugkoppelingVoor(vorigeDoelen, weekCijfers) {
 
 // Een leeg doel van een bepaald type, met een zinnig startgetal.
 // In welke volgorde we een nieuw doel voorstellen: eerst wat er nog niet staat.
-export const VOORSTEL_VOLGORDE = ['slaap', 'voeding', 'stappen', 'wegen', 'trainen']
+export const VOORSTEL_VOLGORDE = ['slaap', 'mealprep', 'voeding', 'stappen', 'wegen', 'trainen']
 
 export function leegDoel(typeKey = 'trainen') {
   const t = typeVan(typeKey)

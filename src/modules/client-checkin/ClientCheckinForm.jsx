@@ -12,7 +12,7 @@
 // 2 = dit). De coach-weergave leest dat om te weten welke velden gevuld zijn.
 
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown, Info, Pencil, Trash2, Plus, Dumbbell, Scale, Utensils, Footprints, Moon, Target } from 'lucide-react'
+import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown, Info, Pencil, Trash2, Plus, Dumbbell, Scale, Utensils, Footprints, Moon, Target, ChefHat, X } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
 import { laadProgressie, haalFase } from './progressieWeek'
@@ -23,15 +23,19 @@ import {
   BEHAALD_OPTIES, leegDoel, voorstelBehaald, MAX_DOELEN, VOORSTEL_VOLGORDE,
 } from './doelen'
 
-// Reviewvraag in de coachingronde (eens per 4 weken): geeft de klant een 8 of
+// Reviewvraag in de coachingronde (eens per 4 weken): geeft de klant een 7 of
 // hoger voor het traject, dan komt direct na de toelichting een eigen scherm
 // met deze tekst en de Trustpilot-knop. Daarna gaat het formulier gewoon verder.
 const TRUSTPILOT_REVIEW_URL = 'https://nl.trustpilot.com/review/myarcfitness.com'
 const REVIEW_TEKST = (naam) => `Hey${naam ? ` ${naam}` : ''}, Het zou enorm veel voor mij betekenen als je een review zou willen achterlaten. Het kost 1 minuut. Gewoon over waar je tegen aanliep, en hoe dit traject je geholpen heeft. Misschien helpt het iemand anders ook.`
 const REVIEW_SCHERM = { id: '_review', type: 'review', optioneel: true }
+// Vanaf welk cijfer voor het traject de reviewvraag komt (was 8 tot 18 nov 2026).
+const REVIEW_VANAF = 7
 
 // Elk soort doel zijn eigen icoon, in de kleur van dat doel (doelen.js).
-const DOEL_ICOON = { trainen: Dumbbell, wegen: Scale, voeding: Utensils, stappen: Footprints, slaap: Moon, eigen: Target }
+// Eén woord per suggestie; het aantal stel je in zodra hij in de lijst staat.
+const KORT = { trainen: 'Trainen', wegen: 'Wegen', voeding: 'Voeding', stappen: 'Stappen', slaap: 'Slaap', mealprep: 'Meal prep' }
+const DOEL_ICOON = { trainen: Dumbbell, wegen: Scale, voeding: Utensils, stappen: Footprints, slaap: Moon, mealprep: ChefHat, eigen: Target }
 function DoelIcoon({ type, size = 18 }) {
   const Icoon = DOEL_ICOON[type] || Target
   return <Icoon size={size} strokeWidth={2.6} color={typeVan(type)?.kleur || '#fff'} style={{ flexShrink: 0 }} />
@@ -305,6 +309,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   const [progressie, setProgressie] = useState(null)
   // Welk doel heeft zijn uitleg open (de i achter het doel): index of null.
   const [doelInfo, setDoelInfo] = useState(null)
+  // Eigen doelen die met het vinkje zijn vastgezet (index in de lijst).
+  const [eigenKlaar, setEigenKlaar] = useState(() => new Set())
   // De lopende fase, voor de aanloopzin op het eerste scherm. Apart opgehaald
   // omdat dat scherm meteen in beeld staat.
   const [fase, setFase] = useState(null)
@@ -453,9 +459,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
     // heeft de volgende check-in niets om op terug te komen, en dan valt het
     // hele idee om.
     const doelen = (formData.doelen_komende_week || []).filter(d => geldigDoel(d))
-      // Oudere app-versies kennen het slaapdoel niet en tonen dan `tekst`. Die
+      // Oudere app-versies kennen het slaap- en mealprepdoel niet en tonen dan `tekst`. Die
       // vullen we hier, zodat er daar geen lege regel staat.
-      .map(d => (d.type === 'slaap' ? { ...d, tekst: doelTekst(d) } : d))
+      .map(d => (d.type === 'slaap' || d.type === 'mealprep' ? { ...d, tekst: doelTekst(d) } : d))
     if (doelen.length === 0) {
       alert('Kies minstens één doel voor komende week.')
       return
@@ -842,6 +848,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                     style={{
                       width: '100%', maxWidth: 560, boxSizing: 'border-box',
                       background: '#141414', borderRadius: '16px 16px 0 0',
+                      // Met meer doelen moet het venster kunnen scrollen.
+                      maxHeight: '88vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
                       padding: '16px 16px max(16px, env(safe-area-inset-bottom))',
                       animation: 'checkinSheetUp 0.2s ease',
                       textAlign: 'left',
@@ -850,51 +858,83 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                     <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 12 }}>
                       Doelen voor komende week
                     </div>
-                    {/* Eén regel per doel: soort (dropdown), dan het aantal. */}
+                    {/* Eén regel per doel: soort (dropdown), dan het aantal. Een eigen doel
+                        heeft een tweede regel: je tekst, eventueel hoe vaak, en een vinkje
+                        om hem vast te zetten. Daarna staat hij als één regel in de lijst. */}
                     {lijst.map((d, i) => {
                       const t = typeVan(d.type)
+                      const weg = lijst.length > 1 && (
+                        <button type="button" onClick={() => { verwijderDoel(i); setEigenKlaar(new Set()) }} aria-label="Doel verwijderen" style={{
+                          flexShrink: 0, width: 32, height: 36, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                        }}><X size={17} strokeWidth={2.8} /></button>
+                      )
+                      if (d.type === 'eigen' && eigenKlaar.has(i) && String(d.tekst || '').trim()) {
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, minHeight: 40 }}>
+                            <DoelIcoon type="eigen" size={20} />
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{doelTekst(d)}</span>
+                            <button type="button" onClick={() => setEigenKlaar(prev => { const n = new Set(prev); n.delete(i); return n })} aria-label="Aanpassen" style={{ flexShrink: 0, width: 32, height: 36, padding: 0, background: 'none', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                              <Pencil size={16} strokeWidth={2.6} color="#fff" />
+                            </button>
+                            {weg}
+                          </div>
+                        )
+                      }
                       return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <DoelIcoon type={d.type || 'trainen'} size={20} />
-                          <LijnDropdown
-                            value={d.type || 'trainen'}
-                            opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
-                            placeholder="Soort doel"
-                            onChange={key => {
-                              const dt = typeVan(key)
-                              zetDoel(i, { type: key, doel_getal: dt?.standaard ?? null, tekst: '' })
-                            }}
-                            style={{ flex: 1, minWidth: 0 }}
-                          />
-                          {d.type === 'eigen' ? (
-                            <input
-                              className="ci-lijn"
-                              value={d.tekst || ''}
-                              onChange={e => zetDoel(i, { tekst: e.target.value })}
-                              placeholder="Bijvoorbeeld: om 23:00 in bed"
-                              style={{ ...rij, flex: 2 }}
+                        <div key={i} style={{ marginBottom: d.type === 'eigen' ? 12 : 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <DoelIcoon type={d.type || 'trainen'} size={20} />
+                            <LijnDropdown
+                              value={d.type || 'trainen'}
+                              opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
+                              placeholder="Soort doel"
+                              onChange={key => {
+                                const dt = typeVan(key)
+                                zetDoel(i, { type: key, doel_getal: dt?.standaard ?? null, tekst: '' })
+                              }}
+                              style={{ flex: 1, minWidth: 0 }}
                             />
-                          ) : (
-                            <>
+                            {d.type !== 'eigen' && (
+                              <>
+                                <GetalRol
+                                  value={d.doel_getal ?? null}
+                                  min={t?.min ?? (t?.stap || 1)}
+                                  max={t?.max || 99}
+                                  stap={t?.stap || 1}
+                                  onChange={n => zetDoel(i, { doel_getal: n })}
+                                  style={{ width: 72, flex: 'none' }}
+                                />
+                                <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
+                                  {t?.eenheid}
+                                </span>
+                              </>
+                            )}
+                            {weg}
+                          </div>
+                          {d.type === 'eigen' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, paddingLeft: 28 }}>
+                              <input
+                                className="ci-lijn"
+                                value={d.tekst || ''}
+                                onChange={e => zetDoel(i, { tekst: e.target.value })}
+                                onKeyDown={e => { if (e.key === 'Enter' && String(d.tekst || '').trim()) { e.currentTarget.blur(); setEigenKlaar(prev => new Set(prev).add(i)) } }}
+                                placeholder="Bijvoorbeeld: om 23:00 in bed"
+                                style={{ ...rij, flex: 1, minWidth: 0 }}
+                              />
+                              {/* Hoe vaak: mag leeg blijven. */}
                               <GetalRol
                                 value={d.doel_getal ?? null}
-                                min={t?.min ?? (t?.stap || 1)}
-                                max={t?.max || 99}
-                                stap={t?.stap || 1}
+                                min={1} max={7} stap={1}
                                 onChange={n => zetDoel(i, { doel_getal: n })}
-                                style={{ width: 72, flex: 'none' }}
+                                style={{ width: 56, flex: 'none' }}
                               />
-                              <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
-                                {t?.eenheid}
-                              </span>
-                            </>
-                          )}
-                          {lijst.length > 1 && (
-                            <button type="button" onClick={() => verwijderDoel(i)} aria-label="Doel verwijderen" style={{
-                              background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)',
-                              fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-                              padding: '0 4px', lineHeight: 1,
-                            }}>×</button>
+                              <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>keer</span>
+                              <button type="button" disabled={!String(d.tekst || '').trim()} onClick={() => setEigenKlaar(prev => new Set(prev).add(i))} aria-label="Doel opslaan" title="Opslaan"
+                                style={{ flexShrink: 0, width: 38, height: 38, padding: 0, borderRadius: '50%', border: 'none', background: String(d.tekst || '').trim() ? '#10b981' : 'rgba(255,255,255,0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                <Check size={18} strokeWidth={3.2} color={String(d.tekst || '').trim() ? '#0a0a0a' : 'rgba(255,255,255,0.4)'} />
+                              </button>
+                            </div>
                           )}
                         </div>
                       )
@@ -904,7 +944,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                     {lijst.length < MAX_DOELEN && (() => {
                       const al = new Set(lijst.map(d => d.type))
                       const nog = VOORSTEL_VOLGORDE.filter(k => !al.has(k))
-                      const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 38, padding: '0 12px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+                      const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36, padding: '0 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
                       return (
                         <div style={{ marginTop: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
@@ -916,14 +956,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                               return (
                                 <button key={k} type="button" onClick={() => voegDoelToe(k)} style={chip}>
                                   <DoelIcoon type={k} size={16} />
-                                  {dt.zin(dt.standaard)}
+                                  {KORT[k] || dt.label}
                                   <Plus size={14} strokeWidth={3} color="rgba(255,255,255,0.6)" />
                                 </button>
                               )
                             })}
                             <button type="button" onClick={() => voegDoelToe('eigen')} style={chip}>
                               <DoelIcoon type="eigen" size={16} />
-                              Eigen doel
+                              Eigen
                               <Plus size={14} strokeWidth={3} color="rgba(255,255,255,0.6)" />
                             </button>
                           </div>
@@ -995,7 +1035,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   const geenDoelen = Array.isArray(vorigeDoelen) && vorigeDoelen.length === 0
   const vragen = (coachingRonde ? VRAGEN_MET_COACHING : VRAGEN_BASIS)
     .filter(v => !(v.alleenMetDoelen && geenDoelen))
-    .flatMap(v => v.id === 'traject_toelichting' && Number(formData.traject_score) >= 8 ? [v, REVIEW_SCHERM] : [v])
+    .flatMap(v => v.id === 'traject_toelichting' && Number(formData.traject_score) >= REVIEW_VANAF ? [v, REVIEW_SCHERM] : [v])
   const vraag = vragen[stap]
   const laatste = stap === vragen.length - 1
   // Een verplichte slide is pas klaar als alles erop is ingevuld. Tekstvelden
