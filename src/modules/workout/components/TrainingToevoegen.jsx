@@ -13,6 +13,8 @@ import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilt
 import Keuze from '../../meal-plan/components/Keuze'
 import { maakPlanKey } from '../utils/planKey'
 import { CARDIO_SOORTEN } from '../cardioSoorten'
+import CardioService from '../services/CardioService'
+import { INTENSITEIT, schatKcal } from '../cardioKcal'
 import { getWorkoutImage } from './week-schedule/workoutImage'
 
 const SPORTEN = CARDIO_SOORTEN
@@ -22,10 +24,35 @@ const DAGEN = [
 ]
 const TITELS = {
   soort: 'Wat voor training?', 'gym-welke': 'Welke training?', 'gym-dag': 'Op welke dag?',
-  'cardio-sport': 'Welke sport?', 'cardio-duur': 'Hoe lang, hoe ver en wanneer?', 'cardio-log': 'Wanneer heb je getraind?', 'cardio-dagen': 'Op welke dagen?', bereik: 'Waar geldt dit?',
+  'cardio-sport': 'Welke sport?', 'cardio-duur': 'Hoe lang, hoe ver en wanneer?', 'cardio-log': 'Hoe lang, hoe ver en welke dag?', 'cardio-dagen': 'Op welke dagen?', bereik: 'Waar geldt dit?',
 }
 const VORIGE = { 'gym-welke': 'soort', 'gym-dag': 'gym-welke', 'cardio-sport': 'soort', 'cardio-duur': 'cardio-sport', 'cardio-dagen': 'cardio-duur', 'cardio-log': 'cardio-duur' }
 const fmt = (d) => d ? d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : ''
+
+// Een getal dat je kunt aantikken en typen (18 nov 2026); de plus en min ernaast
+// blijven werken. Tijdens het typen houdt het veld zijn eigen tekst vast, zodat
+// je een komma of een leeg veld kunt hebben; bij verlaten wordt het een getal.
+function TypGetal({ waarde, onZet, decimaal = false, leeg = '', stijl, label }) {
+  const [tekst, setTekst] = useState(null) // null = niet aan het typen
+  const toon = tekst !== null ? tekst : (Number(waarde) > 0 ? String(waarde).replace('.', ',') : leeg)
+  const klaar = () => {
+    if (tekst === null) return
+    const n = parseFloat(String(tekst).replace(',', '.'))
+    if (Number.isFinite(n)) onZet(n); else if (decimaal) onZet(0)
+    setTekst(null)
+  }
+  return (
+    <input
+      value={toon} aria-label={label}
+      inputMode={decimaal ? 'decimal' : 'numeric'}
+      onFocus={e => { setTekst(Number(waarde) > 0 ? String(waarde).replace('.', ',') : ''); const el = e.currentTarget; setTimeout(() => { try { el.select() } catch { /* niet erg */ } }, 0) }}
+      onChange={e => setTekst(e.target.value.replace(decimaal ? /[^0-9.,]/g : /[^0-9]/g, '').slice(0, 5))}
+      onBlur={klaar}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      style={{ ...stijl, width: 64, minWidth: 0, padding: 0, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', borderBottom: tekst !== null ? '2px solid #fff' : '2px solid transparent' }}
+    />
+  )
+}
 
 export default function TrainingToevoegen({
   open, onClose, isMobile, schema, workoutService, clientId, db,
@@ -70,6 +97,7 @@ export default function TrainingToevoegen({
   const [km, setKm] = useState(0) // afstand in km; 0 = niet opgegeven
   const vandaagIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
   const [logDatum, setLogDatum] = useState(vandaagIso) // dag van een al gedane training
+  const [zwaarte, setZwaarte] = useState('gemiddeld')  // hoe zwaar die training was
   const [tijd, setTijd] = useState('18:00')
   const [dagen, setDagen] = useState([])
   const [eigen, setEigen] = useState([])
@@ -159,6 +187,29 @@ export default function TrainingToevoegen({
     if (w?.name || w?.focus) return w.name || w.focus
     const ander = andereDagen.find(d => d.key === key) || standaardDagen.find(d => d.key === key)
     return ander?.naam || key
+  }
+
+  // Een training die al gedaan is: direct loggen, zonder tweede venster. De
+  // kcal is dezelfde schatting als in het logblad (cardioKcal.js), op het
+  // laatst gewogen gewicht.
+  const logGedaan = async () => {
+    if (bezig || !clientId || !sport) return
+    setBezig(true)
+    try {
+      const { data: w } = await db.supabase.from('weight_challenge_logs').select('weight').eq('client_id', clientId)
+        .order('date', { ascending: false }).limit(1).then(r => r, () => ({ data: null }))
+      const gewicht = Number(w?.[0]?.weight) || 80
+      await CardioService.addLog({
+        client_id: clientId, cardio_type: sport, duration_minutes: duur,
+        distance_km: km > 0 ? km : null, intensity: zwaarte,
+        calories: schatKcal(sport, zwaarte, gewicht, duur), calories_source: 'schatting',
+        logged_date: logDatum,
+      }, db)
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+      window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
+      onClose()
+    } catch (e) { alert('Loggen mislukt: ' + (e?.message || 'onbekende fout')) }
+    finally { setBezig(false) }
   }
 
   const bewaar = async (bereik) => {
@@ -480,20 +531,27 @@ export default function TrainingToevoegen({
             </>
           )}
 
-          {stap === 'cardio-duur' && (() => {
-            // Alles op één scherm (18 nov 2026): duur, afstand en tijd naast elkaar,
-            // zonder kaders, met de dagen er direct onder. De aparte dagenstap is weg.
+          {(stap === 'cardio-duur' || stap === 'cardio-log') && (() => {
+            // Eén scherm voor inplannen én voor loggen (18 nov 2026): duur en afstand
+            // naast elkaar zonder kaders, het tempo dat daaruit volgt, en de dagen
+            // er direct onder. Bij loggen kies je één dag die al geweest is en hoe
+            // zwaar het was; bij inplannen één of meer dagen en een tijd.
+            const loggen = stap === 'cardio-log'
             const kaal = { width: 34, height: 44, padding: 0, background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
             const getal = { fontSize: '1.9rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'center' }
             const onder = { fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center', marginTop: 2 }
             const kol = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }
+            // Tempo per km uit duur en afstand: "6:00".
+            const tempo = km > 0 ? (() => { const sec = Math.round((duur * 60) / km); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` })() : null
+            const vandaag = vandaagIso()
+            const isoVan = (d) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null)
             return (
             <>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, marginBottom: 16 }}>
                 <div style={kol}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <button onClick={() => setDuur(d => Math.max(5, d - 5))} aria-label="5 minuten minder" style={kaal}>−</button>
-                    <span style={getal}>{duur}</span>
+                    <TypGetal waarde={duur} onZet={n => setDuur(Math.max(1, Math.min(600, Math.round(n))))} stijl={getal} label="Minuten" />
                     <button onClick={() => setDuur(d => d + 5)} aria-label="5 minuten meer" style={kaal}>+</button>
                   </div>
                   <div style={onder}>minuten</div>
@@ -501,27 +559,45 @@ export default function TrainingToevoegen({
                 <div style={kol}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <button onClick={() => setKm(k => Math.max(0, Math.round((k - 0.5) * 2) / 2))} aria-label="Halve kilometer minder" style={kaal}>−</button>
-                    <span style={{ ...getal, color: km > 0 ? '#fff' : 'rgba(255,255,255,0.35)' }}>{km > 0 ? String(km).replace('.', ',') : '–'}</span>
+                    <TypGetal waarde={km} onZet={n => setKm(Math.max(0, Math.min(300, Math.round(n * 100) / 100)))} decimaal leeg="–" stijl={{ ...getal, color: km > 0 ? '#fff' : 'rgba(255,255,255,0.35)' }} label="Kilometers" />
                     <button onClick={() => setKm(k => Math.round((k + 0.5) * 2) / 2)} aria-label="Halve kilometer meer" style={kaal}>+</button>
                   </div>
                   <div style={onder}>km</div>
                 </div>
-                <div style={kol}>
-                  <input type="time" value={tijd} onChange={e => setTijd(e.target.value || '18:00')} aria-label="Hoe laat"
-                    style={{ height: 44, width: '100%', maxWidth: 110, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', textAlign: 'center', colorScheme: 'dark', fontVariantNumeric: 'tabular-nums' }} />
-                  <div style={onder}>hoe laat</div>
-                </div>
+                {/* Derde kolom: bij inplannen de tijd, bij loggen het tempo dat je liep. */}
+                {loggen ? (
+                  <div style={kol}>
+                    <span style={{ ...getal, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: tempo ? '#fff' : 'rgba(255,255,255,0.35)' }}>{tempo || '–'}</span>
+                    <div style={onder}>tempo /km</div>
+                  </div>
+                ) : (
+                  <div style={kol}>
+                    <input type="time" value={tijd} onChange={e => setTijd(e.target.value || '18:00')} aria-label="Hoe laat"
+                      style={{ height: 44, width: '100%', maxWidth: 110, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', textAlign: 'center', colorScheme: 'dark', fontVariantNumeric: 'tabular-nums' }} />
+                    <div style={onder}>hoe laat</div>
+                  </div>
+                )}
               </div>
 
-              {/* Op welke dag(en): direct hier, in één kader met een lijn tussen de
-                  dagen. Gekozen = wit rondje. */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 14, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, overflow: 'hidden' }}>
+              {/* Bij inplannen: het tempo waar dit op uitkomt, als doel. */}
+              {!loggen && tempo && (
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: -6, marginBottom: 14 }}>
+                  Doeltempo <span style={{ color: '#fff', fontWeight: 900 }}>{tempo} /km</span>
+                </div>
+              )}
+
+              {/* De dagen in één kader met een lijn ertussen. Gekozen = wit rondje.
+                  Bij loggen één dag, en alleen dagen die al geweest zijn. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: loggen ? 8 : 14, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, overflow: 'hidden' }}>
                 {DAGEN.map((d, i) => {
-                  const aan = dagen.includes(d.id)
+                  const datum = isoVan(dayDates?.[i])
+                  const kanNiet = loggen && (!datum || datum > vandaag)
+                  const aan = loggen ? (!!datum && logDatum === datum) : dagen.includes(d.id)
                   const cardioHier = (cardioPerDag[i] || []).length > 0
                   return (
-                    <button key={d.id} onClick={() => { tik(); setDagen(l => l.includes(d.id) ? l.filter(x => x !== d.id) : [...l, d.id]) }} aria-pressed={aan}
-                      style={{ padding: '8px 0 6px', background: aan ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.14)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <button key={d.id} disabled={kanNiet} aria-pressed={aan}
+                      onClick={() => { tik(); if (loggen) setLogDatum(datum); else setDagen(l => l.includes(d.id) ? l.filter(x => x !== d.id) : [...l, d.id]) }}
+                      style={{ padding: '8px 0 6px', background: aan ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.14)', color: '#fff', fontFamily: 'inherit', cursor: kanNiet ? 'default' : 'pointer', opacity: kanNiet ? 0.3 : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                       <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: aan ? '#fff' : 'rgba(255,255,255,0.5)' }}>{d.kort}</span>
                       <span style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : '#fff', fontSize: '0.86rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
                         {dayDates?.[i]?.getDate() || ''}
@@ -532,144 +608,50 @@ export default function TrainingToevoegen({
                   )
                 })}
               </div>
-              <button onClick={() => dagen.length && setStap('bereik')} disabled={!dagen.length} style={primair(!dagen.length)}>{dagen.length ? `Volgende · ${dagen.length}×` : 'Kies één of meer dagen'}</button>
-              )}
-            </>
-          )}
 
-          {stap === 'cardio-sport' && (
-            <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {SPORTEN.map(s => {
-                const Icoon = s.icoon
-                return (
-                  <button key={s.id} onClick={() => { tik(); setSport(s.id); setStap('cardio-duur') }} style={tegel(sport === s.id)}>
-                    <Icoon size={18} strokeWidth={2.4} /><span style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em' }}>{s.id}</span>
-                  </button>
-                )
-              })}
-              {/* Eigen sporten: na de vaste, met een kruisje om weg te halen. */}
-              {eigenCardio.map(s => (
-                <div key={s.id} style={{ position: 'relative' }}>
-                  <button onClick={() => { tik(); setSport(s.naam); setStap('cardio-duur') }} style={tegel(sport === s.naam, { paddingRight: '2rem' })}>
-                    <Activity size={18} strokeWidth={2.4} /><span style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.naam}</span>
-                  </button>
-                  <button onClick={() => verwijderEigenSport(s)} aria-label={`${s.naam} weghalen`} style={{
-                    position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, padding: 0,
-                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}><X size={14} strokeWidth={2.6} /></button>
-                </div>
-              ))}
-              {nieuweSport === null && (
-                <button onClick={() => setNieuweSport('')} style={tegel(false, { borderStyle: 'dashed', color: 'rgba(255,255,255,0.75)' })}>
-                  <Plus size={18} strokeWidth={2.6} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen sport</span>
-                </button>
-              )}
-            </div>
-            {nieuweSport !== null && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <input autoFocus value={nieuweSport} maxLength={40} placeholder="Bv. Boksen, Voetbal, Spinning"
-                  onChange={e => setNieuweSport(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') bewaarNieuweSport() }}
-                  style={{
-                    flex: 1, minWidth: 0, height: 48, padding: '0 0.9rem', borderRadius: 12, border: 'none',
-                    background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.92rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
-                  }} />
-                <button onClick={bewaarNieuweSport} disabled={!nieuweSport.trim()} style={{ ...primair(!nieuweSport.trim()), width: 'auto', minHeight: 48, padding: '0 1.1rem' }}>Opslaan</button>
-              </div>
-            )}
-            </>
-          )}
-
-          {stap === 'cardio-duur' && (() => {
-            // Alles op één scherm (18 nov 2026): duur, afstand en tijd naast elkaar,
-            // zonder kaders, met de dagen er direct onder. De aparte dagenstap is weg.
-            const kaal = { width: 34, height: 44, padding: 0, background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
-            const getal = { fontSize: '1.9rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'center' }
-            const onder = { fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center', marginTop: 2 }
-            const kol = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }
-            return (
-            <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, marginBottom: 16 }}>
-                <div style={kol}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <button onClick={() => setDuur(d => Math.max(5, d - 5))} aria-label="5 minuten minder" style={kaal}>−</button>
-                    <span style={getal}>{duur}</span>
-                    <button onClick={() => setDuur(d => d + 5)} aria-label="5 minuten meer" style={kaal}>+</button>
+              {loggen ? (
+                <>
+                  {/* Langer geleden dan deze week: een losse datum. */}
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+                    Andere datum
+                    <input type="date" value={logDatum} max={vandaag} onChange={e => setLogDatum(e.target.value || vandaag)} aria-label="Datum van de training"
+                      style={{ height: 30, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.86rem', fontWeight: 900, colorScheme: 'dark' }} />
+                  </label>
+                  {/* Hoe zwaar het was: bepaalt mee hoeveel kcal het telt. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 14, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, overflow: 'hidden' }}>
+                    {INTENSITEIT.map((o, n) => {
+                      const aan = zwaarte === o.id
+                      return (
+                        <button key={o.id} onClick={() => { tik(); setZwaarte(o.id) }} aria-pressed={aan} title={o.uitleg}
+                          style={{ minHeight: 40, padding: '0 2px', background: aan ? '#fff' : 'transparent', border: 'none', borderLeft: n === 0 ? 'none' : '1px solid rgba(255,255,255,0.14)', color: aan ? '#0a0a0a' : '#fff', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                          {o.label}
+                        </button>
+                      )
+                    })}
                   </div>
-                  <div style={onder}>minuten</div>
-                </div>
-                <div style={kol}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <button onClick={() => setKm(k => Math.max(0, Math.round((k - 0.5) * 2) / 2))} aria-label="Halve kilometer minder" style={kaal}>−</button>
-                    <span style={{ ...getal, color: km > 0 ? '#fff' : 'rgba(255,255,255,0.35)' }}>{km > 0 ? String(km).replace('.', ',') : '–'}</span>
-                    <button onClick={() => setKm(k => Math.round((k + 0.5) * 2) / 2)} aria-label="Halve kilometer meer" style={kaal}>+</button>
-                  </div>
-                  <div style={onder}>km</div>
-                </div>
-                <div style={kol}>
-                  <input type="time" value={tijd} onChange={e => setTijd(e.target.value || '18:00')} aria-label="Hoe laat"
-                    style={{ height: 44, width: '100%', maxWidth: 110, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', textAlign: 'center', colorScheme: 'dark', fontVariantNumeric: 'tabular-nums' }} />
-                  <div style={onder}>hoe laat</div>
-                </div>
-              </div>
-
-              {/* Op welke dag(en): direct hier. Gekozen = wit rondje. */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 14 }}>
-                {DAGEN.map((d, i) => {
-                  const aan = dagen.includes(d.id)
-                  const cardioHier = (cardioPerDag[i] || []).length > 0
-                  return (
-                    <button key={d.id} onClick={() => { tik(); setDagen(l => l.includes(d.id) ? l.filter(x => x !== d.id) : [...l, d.id]) }} aria-pressed={aan}
-                      style={{ padding: '4px 0', background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: aan ? '#fff' : 'rgba(255,255,255,0.5)' }}>{d.kort}</span>
-                      <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : '#fff', fontSize: '0.86rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-                        {dayDates?.[i]?.getDate() || ''}
-                      </span>
-                      {/* Stip: er staat op die dag al cardio. */}
-                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: cardioHier ? '#06b6d4' : 'transparent' }} />
+                  <button onClick={logGedaan} disabled={bezig} style={primair(bezig)}>
+                    {bezig ? 'Bezig…' : `Log ${String(sport || 'training').toLowerCase()}`}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => dagen.length && setStap('bereik')} disabled={!dagen.length} style={primair(!dagen.length)}>
+                    {dagen.length ? `Inplannen · ${dagen.length}×` : 'Kies een dag om in te plannen'}
+                  </button>
+                  {/* Al gedaan? Dan niet inplannen maar loggen (Roshan, 18 nov 2026):
+                      hetzelfde scherm, maar dan voor een dag die al geweest is. */}
+                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>Al gedaan?</span>
+                    <button onClick={() => { tik(); setLogDatum(vandaagIso()); setStap('cardio-log') }}
+                      style={{ flexShrink: 0, minHeight: 40, padding: '0 20px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(255,255,255,0.85)', color: '#fff', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                      Log
                     </button>
-                  )
-                })}
-              </div>
-              <button onClick={() => dagen.length && setStap('bereik')} disabled={!dagen.length} style={primair(!dagen.length)}>
-                {dagen.length ? `Inplannen · ${dagen.length}×` : 'Kies een dag om in te plannen'}
-              </button>
-              {/* Al gedaan? Dan niet inplannen maar loggen: het logblad vraagt ook
-                  de afstand in km (Roshan, 18 nov 2026). Dat blad hangt aan de
-                  workoutpagina (CardioLogVanger) en luistert naar dit seintje. */}
-              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>Al gedaan?</span>
-                <button onClick={() => { tik(); setLogDatum(vandaagIso()); setStap('cardio-log') }}
-                  style={{ flexShrink: 0, minHeight: 40, padding: '0 20px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(255,255,255,0.85)', color: '#fff', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  Log
-                </button>
-              </div>
+                  </div>
+                </>
+              )}
             </>
             )
           })()}
-
-          {stap === 'cardio-log' && (
-            <>
-              {/* Eerst de dag waarop je het deed; daarna opent het logblad met de
-                  duur en afstand van hiervoor al ingevuld. */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
-                <input type="date" value={logDatum} max={vandaagIso()} onChange={e => setLogDatum(e.target.value || vandaagIso())} aria-label="Datum van de training"
-                  style={{ height: 52, padding: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', textAlign: 'center', colorScheme: 'dark' }} />
-                <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>
-                  {logDatum === vandaagIso() ? 'vandaag' : new Date(`${logDatum}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'long' })}
-                </div>
-              </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 14 }}>
-                {sport} · {duur} min{km > 0 ? ` · ${String(km).replace('.', ',')} km` : ''}
-              </div>
-              <button onClick={() => {
-                const detail = { soort: sport, minuten: duur, datum: logDatum, afstandKm: km > 0 ? km : null }
-                tik(); onClose()
-                setTimeout(() => window.dispatchEvent(new CustomEvent('myarc:cardio-log', { detail })), 60)
-              }} style={primair()}>Verder</button>
-            </>
-          )}
 
           {stap === 'bereik' && (
             <>

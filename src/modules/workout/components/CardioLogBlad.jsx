@@ -6,6 +6,7 @@
 // dan wint het horloge en bewaren we dat als bron.
 
 import { Component, useEffect, useRef, useState } from 'react'
+import { metVan, INTENSITEIT } from '../cardioKcal'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, ChevronLeft, Watch } from 'lucide-react'
 import { meldFout, foutContext } from '../../../ui/PaginaVangnet'
@@ -36,20 +37,6 @@ class BladVangnet extends Component {
   render() { return this.state.fout ? null : this.props.children }
 }
 
-// Zelfde MET-tabel als het weekbudget van de coach (Compendium 2011).
-const MET = { wandelen: 4.3, fietsen: 6.8, zwemmen: 6.0, hardlopen: 8.3, roeien: 7.0, crosstrainer: 5.0, stairmaster: 9.0, hiit: 8.0, padel: 6.0, hyrox: 9.0, crossfit: 8.0 }
-const metVan = (soort) => {
-  const n = String(soort || '').toLowerCase()
-  const k = Object.keys(MET).find(k => n.includes(k)) || (n.includes('run') ? 'hardlopen' : n.includes('cycl') || n.includes('bike') ? 'fietsen' : null)
-  return k ? MET[k] : 6.0
-}
-// Hoe zwaar: factor op de MET. Rustig praten = rustig; hijgen = pittig.
-const INTENSITEIT = [
-  { id: 'rustig',    label: 'Rustig',    uitleg: 'je kunt praten',          factor: 0.85 },
-  { id: 'gemiddeld', label: 'Gemiddeld', uitleg: 'korte zinnen',            factor: 1.0 },
-  { id: 'pittig',    label: 'Pittig',    uitleg: 'hijgen, paar woorden',    factor: 1.2 },
-  { id: 'vol_gas',   label: 'Vol gas',   uitleg: 'niet praten, alles geven', factor: 1.4 },
-]
 const METAFSTAND = /wandel|hardl|fiets|roei|zwem|run|cycl|walk/i
 // 'Hoe lang heb je …?' — per sport de juiste vorm, anders neutraal.
 const VERVOEGING = [['wandel','gewandeld'],['hardl','hardgelopen'],['run','hardgelopen'],['fiets','gefietst'],['cycl','gefietst'],['zwem','gezwommen'],['roei','geroeid'],['padel','gepadeld'],['stap','gelopen']]
