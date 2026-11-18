@@ -78,15 +78,14 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <AdjustBtn label={`-${step * 5}`} onClick={() => handleSelect(localValue - step * 5)} isMobile={isMobile} />
+      {/* Eén regel, zonder kaders: alleen de getallen (18 nov 2026). De stap van 5 is weg; daarvoor is de lijst erboven. */}
+      <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
         <AdjustBtn label={`-${step}`} onClick={() => handleSelect(localValue - step)} isMobile={isMobile} />
         {halfStep && <AdjustBtn label={`-${halfStep}`} onClick={() => handleSelect(localValue - halfStep)} isMobile={isMobile} />}
         {smallStep && <AdjustBtn label={`-${smallStep}`} onClick={() => handleSelect(Math.round((localValue - smallStep) * 10) / 10)} isMobile={isMobile} />}
         {smallStep && <AdjustBtn label={`+${smallStep}`} onClick={() => handleSelect(Math.round((localValue + smallStep) * 10) / 10)} isMobile={isMobile} />}
         {halfStep && <AdjustBtn label={`+${halfStep}`} onClick={() => handleSelect(localValue + halfStep)} isMobile={isMobile} />}
         <AdjustBtn label={`+${step}`} onClick={() => handleSelect(localValue + step)} isMobile={isMobile} />
-        <AdjustBtn label={`+${step * 5}`} onClick={() => handleSelect(localValue + step * 5)} isMobile={isMobile} />
       </div>
 
       <button onClick={onConfirm} style={{ width: '100%', padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -101,7 +100,7 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
 // voor zes knoppen die alle zes hetzelfde doen.
 function AdjustBtn({ label, onClick, isMobile }) {
   return (
-    <button onClick={onClick} style={{ padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.8rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 10, color: '#fff', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900, cursor: 'pointer', minHeight: 38, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+    <button onClick={onClick} style={{ flex: 1, minWidth: 0, padding: '0.5rem 0', background: 'transparent', border: 'none', color: '#fff', fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', whiteSpace: 'nowrap', cursor: 'pointer', minHeight: 44, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
       {label}
     </button>
   )

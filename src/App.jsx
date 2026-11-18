@@ -16,6 +16,7 @@ import pushNotificationService from './services/PushNotificationService'
 
 // Pagina's als losse stukken (zie main.jsx voor het laadscherm).
 const UiDemo = lazy(() => import('./ui/UiDemo'))
+const LaadTest = lazy(() => import('./pages/LaadTest'))
 const InfoPage = lazy(() => import('./pages/InfoPage'))
 const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
 const SalesSlider = lazy(() => import('./pages/SalesSlider'))
@@ -201,6 +202,11 @@ function App() {
   // Interne UI-controle-pagina (Fase 1 fundament) — niet gelinkt in menu's.
   if (currentPath === '/ui-demo') {
     return <UiDemo />
+  }
+
+  // Keuzepagina voor het laadscherm (18 nov 2026) — niet gelinkt in menu's.
+  if (currentPath === '/test') {
+    return <LaadTest />
   }
 
   // InfoPage moved to /info and /home only (link-in-bio page)
