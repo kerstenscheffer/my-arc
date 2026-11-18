@@ -95,7 +95,7 @@ export default function BriefZweef({ brief, isConcept, bezig = null, onGoedkeure
                 {brief.keuzes.map((t, i) => <li key={i} style={{ ...regel, color: 'rgba(255,255,255,0.8)' }}>{t}</li>)}
               </ul>
             </>)}
-            {kanFeedback && (<>
+            {kanFeedback && feedback.length > 0 && (<>
               <div style={kopje('rgba(255,255,255,0.55)')}>Feedback voor volgende keer</div>
               {feedback.length > 0 && (
                 <ul style={{ margin: '0 0 8px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -107,13 +107,19 @@ export default function BriefZweef({ brief, isConcept, bezig = null, onGoedkeure
                   ))}
                 </ul>
               )}
-              <textarea value={tekst} onChange={e => setTekst(e.target.value)} rows={2} placeholder="Wat moet de volgende keer anders? Bijv: nooit 4 eieren in een cut."
-                style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '0.5rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none' }} />
-              <button onClick={bewaarFeedback} disabled={!tekst.trim() || fbBezig} style={{ ...knop(false), marginTop: 6, marginBottom: 8, opacity: !tekst.trim() || fbBezig ? 0.4 : 1 }}>
-                {fbBezig ? 'Opslaan…' : 'Bewaar voor volgende keer'}
-              </button>
             </>)}
           </div>
+          {/* Feedback staat vast onderaan het venster, zodat je kunt typen terwijl je de brief leest. */}
+          {kanFeedback && (
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: 6, padding: '0.55rem 0.95rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <textarea value={tekst} onChange={e => setTekst(e.target.value)} rows={1} placeholder="Feedback voor volgende keer…"
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); bewaarFeedback() } }}
+                style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', resize: 'none', minHeight: 34, maxHeight: 96, padding: '0.45rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none', fieldSizing: 'content' }} />
+              <button onClick={bewaarFeedback} disabled={!tekst.trim() || fbBezig} title="Bewaar voor volgende keer (Cmd+Enter)" style={{ ...knop(false), height: 34, opacity: !tekst.trim() || fbBezig ? 0.4 : 1 }}>
+                {fbBezig ? 'Opslaan…' : 'Bewaar'}
+              </button>
+            </div>
+          )}
           {isConcept && (
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '0.6rem 0.95rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               {onGoedkeuren && (

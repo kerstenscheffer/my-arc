@@ -497,7 +497,26 @@ export default function TrainingToevoegen({
                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hoe laat</span>
                 <input type="time" value={tijd} onChange={e => setTijd(e.target.value || '18:00')} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: '1.1rem', fontWeight: 900, fontFamily: 'inherit', padding: '0.45rem 0.7rem', outline: 'none', colorScheme: 'dark' }} />
               </div>
-              <button onClick={() => setStap('cardio-dagen')} style={primair()}>Volgende</button>
+              <button onClick={() => setStap('cardio-dagen')} style={primair()}>Inplannen</button>
+              {/* Al gedaan? Dan niet inplannen maar loggen: het logblad vraagt ook
+                  de afstand in km (Roshan, 18 nov 2026). Dat blad hangt aan de
+                  workoutpagina (CardioLogVanger) en luistert naar dit seintje. */}
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#fff', textAlign: 'center' }}>Al gedaan? Log hem</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 2, marginBottom: 10 }}>Met tijd, afstand in km en hoe zwaar het was.</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[{ label: 'Vandaag', terug: 0 }, { label: 'Gisteren', terug: 1 }].map(o => (
+                    <button key={o.label} onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() - o.terug)
+                      const datum = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                      tik(); onClose()
+                      setTimeout(() => window.dispatchEvent(new CustomEvent('myarc:cardio-log', { detail: { soort: sport, minuten: duur, datum } })), 60)
+                    }} style={{ flex: 1, minHeight: 46, borderRadius: 14, background: 'transparent', border: '1.5px solid rgba(255,255,255,0.85)', color: '#fff', fontFamily: 'inherit', fontSize: '0.86rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </>
           )}
 
