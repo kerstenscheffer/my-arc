@@ -66,3 +66,11 @@ Code: `supabase/functions/intake-maaltijden/index.ts`. Draait in de intake-keten
 - Afwisselend plan: de variatiekeuze van de klant is leidend, ook als hij schrijft dat hij iets elke dag eet. Zijn maaltijd wisselt dan af met een gerecht van ons.
 - Proefstand: body `{ client_id, proef: { ontbijt, lunch, diner, snack } }` rekent een tekst door zonder iets weg te schrijven.
 - Vetminimum (0,7 g per kg, bulk 1,0) is een ondergrens per dag. Eigen maaltijden schalen ook op het vet van het gerecht dat ze vervangen; komt dat ruim tekort, dan komt er olijfolie (lunch, diner) of walnoten (ontbijt, snack) bij. De nakijker moet een weggehaalde vetbron compenseren. Zakt een dag toch onder 95% van het minimum, dan staat dat onder "Zelf nakijken".
+
+## Hele porties en plafonds (18 nov 2026)
+Geldt voor eigen maaltijden uit de intake (`intake-maaltijden`) en voor de wisselopties met dezelfde macro's (`src/modules/meal-plan/utils/portieSchaal.js`). De twee lijsten moeten gelijk blijven.
+- Plafond per soort over de hele maaltijd, ook als er twee van in het recept zitten: olie en boter 15 g, noten en zaden 30 g, eieren 5, brood 4 sneetjes, whey 1,5 schep, kaas 60 g, zoet beleg 30 g, pindakaas en hummus 30 g.
+- Staat er al olie of noten in een gerecht, dan komt er geen tweede vetbron bij. Nooit olie of noten op brood of een wrap.
+- Kent de database een plak, snee of stuk voor een product, dan is dat de stap (kaas per plak van 13 g, niet per 10 g).
+- Groente (onder 40 kcal per 100 g) schaalt niet mee in de wissel.
+- Een portie in de wissel blijft tussen 40% en 250% van het recept.

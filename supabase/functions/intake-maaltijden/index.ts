@@ -72,12 +72,29 @@ function portieRegel(ing: any): Regel {
   for (const [re, stap, min, max, stukStandaard] of PORTIE) {
     if (!re.test(naam)) continue
     if (stap === 0) { const g = stuk || stukStandaard || 50; return { stap: g, min: min * g, max: max * g } }
+    // Kent de database een plak, snee of stuk (kaas: 1 plak = 13 g), dan is dat de stap.
+    if (stuk && /stuk|snee|plak/.test(String(ing.eenheid || '')) && stuk <= max) return { stap: stuk, min: stuk, max: Math.max(1, Math.floor(max / stuk)) * stuk }
     return { stap, min, max }
   }
   if (ing.rol === 'groente') return { stap: 50, min: 50, max: 300 }
   if (stuk) return { stap: stuk, min: stuk, max: stuk * 4 }
   return { stap: 10, min: 10, max: 300 }
 }
+
+// Plafond per soort over de HELE maaltijd, ook als er twee van in zitten
+// (twee soorten olie) of er een vetbron bij komt. Zelfde lijst als in
+// src/modules/meal-plan/utils/portieSchaal.js.
+const SOORT: [string, RegExp, number][] = [
+  ['olie', /\bolie\b|olijfolie|boter|margarine|halvarine/, 15],
+  ['noten', /noot|noten|walno|amandel|cashew|pinda(?!kaas)|pitten|zaden|chia|lijnzaad/, 30],
+  ['ei', /\b(ei|eieren)\b|gekookt ei|gebakken ei|ei \(heel\)/, 300],
+  ['brood', /brood|boterham/, 140],
+  ['poeder', /whey|eiwitpoeder|proteinepoeder|proteïnepoeder|protein isolate|caseine|caseïne/, 45],
+  ['zoet', /honing|jam|siroop|chocopasta|hagelslag|suiker/, 30],
+  ['smeer', /pindakaas|notenpasta|hummus/, 30],
+  ['kaas', /kaas|mozzarella|feta/, 60],
+]
+const soortVan = (naam: unknown) => SOORT.find(([, re]) => re.test(String(naam || '').toLowerCase())) || null
 
 const macrosVan = (rijen: any[]) => {
   const som = (veld: string) => rijen.reduce((s, r) => s + (Number(r.ing[veld]) || 0) * r.gram / 100, 0)
@@ -100,9 +117,15 @@ function schaal(rijen: any[], doelKcal: number, doelEiwit: number, doelVet = 0) 
     return dk * dk + (dp < 0 ? dp * dp * 1.5 : dp * dp * 0.4) + dv * dv * 0.6 + afstand * 0.002
   }
   const vrij = rijen.map((r, i) => (r.vast ? -1 : i)).filter(i => i >= 0)
+  const soorten = rijen.map(r => soortVan(r.ing?.name))
   const zet = (i: number, d: number) => {
     const r = rijen[i], g = r.gram + d * r.regel.stap
     if (g < r.regel.min - 0.01 || g > r.regel.max + 0.01) return false
+    const so = soorten[i]
+    if (d > 0 && so) {
+      const totaal = rijen.reduce((s, x, k) => s + (soorten[k]?.[0] === so[0] ? (k === i ? g : x.gram) : 0), 0)
+      if (totaal > so[2] + 0.01) return false
+    }
     r.gram = g; return true
   }
   let beste = fout()
@@ -379,7 +402,8 @@ Deno.serve(async (req) => {
         const zoek = ['ontbijt', 'snack'].includes(m.moment) ? 'walnoten' : opBrood ? '' : 'olijfolie'
         const kand = !zoek ? [] : (await kandidaten(sb, zoek)).filter((k: any) => Number(k.fat_per_100g) >= 40)
         const vetbron = kand.find((k: any) => k.source === 'coach' && !k.brand) || kand[0]
-        if (vetbron && !rijen.some(r => r.ing.id === vetbron.id)) {
+        const zelfde = zoek === 'olijfolie' ? 'olie' : 'noten'
+        if (vetbron && !rijen.some(r => r.ing.id === vetbron.id || soortVan(r.ing.name)?.[0] === zelfde)) {
           // Een toegevoegde vetbron blijft een scheutje of een handje: hooguit 15 g olie of 20 g noten.
           const ing = { ...vetbron, rol: 'vet' }, regel = { stap: 5, min: 5, max: zoek === 'olijfolie' ? 15 : 20 }
           rijen.push({ ing, regel, vast: false, start: regel.min, gram: regel.min, toegevoegd: false, vetErbij: true, was: null, naam: vetbron.name })

@@ -36,6 +36,25 @@ const PORTIE = [
 ]
 const PER_STUK = /stuk|snee|plak|schep|wrap/
 
+// Plafond per soort over de HELE maaltijd, ook als het recept er twee van
+// heeft (olijfolie én zonnebloemolie) of er een vetbron bij komt. Zonder dit
+// kon een gerecht op 25 g olie uitkomen (18 nov 2026).
+const SOORT = [
+  ['olie', /\bolie\b|olijfolie|boter|margarine|halvarine/, 15],
+  ['noten', /noot|noten|walno|amandel|cashew|pinda(?!kaas)|pitten|zaden|chia|lijnzaad/, 30],
+  ['ei', /\b(ei|eieren)\b|gekookt ei|gebakken ei|ei \(heel\)/, 300],
+  ['brood', /brood|boterham/, 140],
+  ['poeder', /whey|eiwitpoeder|proteinepoeder|proteïnepoeder|protein isolate|caseine|caseïne/, 45],
+  ['zoet', /honing|jam|siroop|chocopasta|hagelslag|suiker/, 30],
+  ['smeer', /pindakaas|notenpasta|hummus/, 30],
+  ['kaas', /kaas|mozzarella|feta/, 60],
+]
+export const soortVan = (naam) => {
+  const n = String(naam || '').toLowerCase()
+  const s = SOORT.find(([, re]) => re.test(n))
+  return s ? { naam: s[0], max: s[2] } : null
+}
+
 // Regel voor één ingrediënt. `orig` = de hoeveelheid in het recept: de portie
 // blijft tussen 40% en 250% daarvan, zodat het gerecht herkenbaar blijft.
 // Kleine smaakmakers zonder eigen regel staan vast (null).
@@ -47,7 +66,11 @@ export function portieRegel(ing, orig) {
   let regel = null
   for (const [re, stap, min, max, stukStandaard] of PORTIE) {
     if (!re.test(naam)) continue
-    if (stap === 0) { const g = stuk || stukStandaard || 50; regel = { stap: g, min: min * g, max: max * g } } else regel = { stap, min, max }
+    if (stap === 0) { const g = stuk || stukStandaard || 50; regel = { stap: g, min: min * g, max: max * g } }
+    // Kent de database een plak, snee of stuk voor dit product (kaas: 1 plak = 13 g),
+    // dan is dát de stap. Anders krijg je 10 g kaas, en dat is geen hele plak.
+    else if (stuk && /stuk|snee|plak/.test(String(ing?.eenheid || '')) && stuk <= max) regel = { stap: stuk, min: stuk, max: Math.max(1, Math.floor(max / stuk)) * stuk }
+    else regel = { stap, min, max }
     break
   }
   if (!regel) {
@@ -81,9 +104,15 @@ const afstand = (m, doel) => {
 // tegen elkaar in, zolang het dichter bij het doel komt.
 function schaal(rijen, doel) {
   const vrij = rijen.map((r, i) => (r.regel ? i : -1)).filter(i => i >= 0)
+  const soorten = rijen.map(r => soortVan(r.ing?.name))
   const zet = (i, d) => {
     const r = rijen[i], g = r.gram + d * r.regel.stap
     if (g < r.regel.min - 0.01 || g > r.regel.max + 0.01) return false
+    // Plafond per soort over de hele maaltijd (alleen bij omhoog).
+    if (d > 0 && soorten[i]) {
+      const totaal = rijen.reduce((s, x, k) => s + (soorten[k]?.naam === soorten[i].naam ? (k === i ? g : x.gram) : 0), 0)
+      if (totaal > soorten[i].max + 0.01) return false
+    }
     r.gram = g; return true
   }
   let beste = afstand(macros(rijen), doel)
@@ -133,6 +162,11 @@ export function maakWisselOpties({ huidig, kandidaten, ingredienten, vetbron = {
     }
     if (!rijen.length) continue
     let m = schaal(rijen, doel)
+    // Zit het recept na schalen nog boven een plafond (het begon er al boven en
+    // kon niet genoeg omlaag), dan is het geen nette wisseloptie.
+    const perSoort = {}
+    for (const r of rijen) { const so = soortVan(r.ing.name); if (so) perSoort[so.naam] = { som: (perSoort[so.naam]?.som || 0) + r.gram, max: so.max } }
+    if (Object.values(perSoort).some(x => x.som > x.max + 0.01)) continue
     let erbij = null
     // Te mager voor deze maaltijd? Dan een gewone vetbron erbij: noten bij
     // ontbijt en snack, een scheutje olie bij een warme maaltijd. Niet op brood.
