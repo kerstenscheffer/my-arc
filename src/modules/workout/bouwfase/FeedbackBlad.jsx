@@ -16,6 +16,10 @@ import { RIR_KEUZES, rirLabel, rirTekst, SPIERPIJN, POMP, WERKDRUK } from './rir
 
 const kleurScore = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
 const scoreWoord = (n) => (n <= 3 ? 'slecht' : n <= 5 ? 'matig' : n <= 7 ? 'goed' : n <= 9 ? 'heel goed' : 'top')
+// Het cijfer start leeg, rechts van de 10 (18 nov 2026, Kersten): stond het op 7, dan
+// tikte je zo door. Nu moet je eerst naar je cijfer schuiven of erop tikken.
+const LEEG = 11
+const CIJFERS = [...Array.from({ length: 10 }, (_, k) => k + 1), LEEG]
 const SMILEY = { nee: Smile, beetje: Meh, ja: Frown }
 
 const veld = {
@@ -37,7 +41,7 @@ const chip = (aan) => ({
 
 // rirDoel: het weekdoel "herhalingen over" (rir.js). Gevuld = eerst de vraag hoeveel je over had.
 export default function FeedbackBlad({ open, soort, onClose, client, db, fase, oefening, spiergroep, oefeningen = [], bestaand = null, onOpgeslagen, rirDoel = null, rirGelogd = null, datum = null, dagTekst = null }) {
-  const [score, setScore] = useState(7)
+  const [score, setScore] = useState(LEEG)
   const [gevoel, setGevoel] = useState('goed')
   const [opmerking, setOpmerking] = useState('')
   const [bezig, setBezig] = useState(false)
@@ -52,7 +56,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
 
   useEffect(() => {
     if (!open) return
-    setScore(bestaand?.score ?? 7)
+    setScore(bestaand?.score ?? LEEG)
     setGevoel(bestaand?.gevoel ?? 'goed')
     setOpmerking(bestaand?.opmerking ?? '')
     setFout(null)
@@ -65,6 +69,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   }, [open, bestaand, soort, rirDoel, rirGelogd])
 
   if (!open || !client?.id) return null
+  const leeg = score === LEEG
 
   const bewaar = async (extra = {}) => {
     if (bezig) return
@@ -76,7 +81,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         // Oefening-rijen krijgen hun spiergroep mee: dan ziet de coach herstel en gevoel per spiergroep.
         spiergroep: soort === 'workout' ? null : (spiergroep || null),
         // Met RIR-progressie vervalt het cijfer per oefening: hoeveel je over had zegt meer.
-        score: soort === 'herstel' || soort === 'spier' || metRir ? null : score,
+        score: soort === 'herstel' || soort === 'spier' || metRir || leeg ? null : score,
         gevoel: soort === 'workout' || soort === 'spier' ? null : gevoel,
         opmerking: opmerking.trim() || null,
         ...(metRir ? { rir } : {}),
@@ -94,7 +99,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
   }
 
   const titel = soort === 'oefening' ? oefening : soort === 'herstel' ? 'Herstel' : soort === 'spier' ? `${spierWoord(spiergroep).charAt(0).toUpperCase()}${spierWoord(spiergroep).slice(1)} klaar` : 'Je training'
-  const sub = soort === 'oefening' ? (metRir && rirGelogd != null ? 'Oefening klaar' : `Oefening klaar · stap ${metRir ? (stap === 0 ? 1 : 2) : stap} van 2`) : soort === 'herstel' ? 'Voor je begint' : soort === 'spier' ? 'Twee korte vragen' : 'Training afronden'
+  const sub = soort === 'oefening' ? '' : soort === 'herstel' ? 'Voor je begint' : soort === 'spier' ? 'Twee korte vragen' : 'Training afronden'
 
   return createPortal(
     <div onClick={onClose} style={{
@@ -110,7 +115,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
           <div style={{ width: 40 }} />
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{sub}</div>
+            {!!sub && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{sub}</div>}
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titel}</div>
           </div>
           <button onClick={onClose} aria-label="Sluiten" style={{
@@ -189,18 +194,15 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
             )}
             {(soort === 'workout' || stap === 1) && (
               <>
-                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 2 }}>
                   {soort === 'oefening' ? 'Hoe goed voelde deze oefening?' : `Hoe goed voelde de training ${dagTekst ? `van ${dagTekst}` : 'vandaag'}?`}
                 </div>
-                <HorizontaleSlider waarden={Array.from({ length: 10 }, (_, k) => k + 1)} waarde={score} onChange={setScore} itemBreedte={64} />
-                <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kleurScore(score), marginTop: 2 }}>{scoreWoord(score)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 14px' }}>
-                  <span>1 = slecht</span><span>10 = top</span>
-                </div>
+                <HorizontaleSlider waarden={CIJFERS} waarde={score} onChange={setScore} toon={(v) => (v === LEEG ? '–' : String(v))} itemBreedte={64} hoogte={58} />
+                <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: leeg ? 'rgba(255,255,255,0.5)' : kleurScore(score), margin: '0 0 12px' }}>{leeg ? 'Schuif naar je cijfer' : scoreWoord(score)}</div>
               </>
             )}
             {soort === 'oefening' && stap === 1 && (
-              <button onClick={() => setStap(2)} style={primair(false)}>Volgende</button>
+              <button onClick={() => setStap(2)} disabled={leeg} style={{ ...primair(false), ...(leeg ? { opacity: 0.35, cursor: 'default' } : {}) }}>Volgende</button>
             )}
             {soort === 'oefening' && stap === 2 && (
               <>
@@ -227,7 +229,7 @@ export default function FeedbackBlad({ open, soort, onClose, client, db, fase, o
                   placeholder={soort === 'oefening' ? 'Toelichting (mag leeg)' : 'Wil je dat cijfer toelichten? (mag leeg)'}
                   style={{ ...veld, marginBottom: 14 }} />
                 {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
-                <button onClick={() => bewaar()} disabled={bezig} style={primair(bezig)}>
+                <button onClick={() => bewaar()} disabled={bezig || (soort === 'workout' && leeg)} style={{ ...primair(bezig), ...(soort === 'workout' && leeg ? { opacity: 0.35, cursor: 'default' } : {}) }}>
                   <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : bestaand ? 'Bijwerken' : 'Opslaan'}
                 </button>
               </>

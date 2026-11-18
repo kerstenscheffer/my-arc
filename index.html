@@ -136,30 +136,54 @@
         background: #0a0a0a;
       }
       
-      /* Zelfde als LaadScherm.jsx: wit rondje met het logo in het midden. */
+      /* Zelfde als LaadScherm.jsx: dunne boog met staart om het logo, en een
+         lichtstreep over het logo. Beide lopen op de klok (script onder #root), zodat
+         opnieuw neerzetten verdergaat waar het was. Alleen transform beweegt:
+         dat loopt door terwijl de app-code nog wordt ingelezen. */
       .loading-logo {
         position: relative;
-        width: 96px;
-        height: 96px;
+        width: 150px;
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .loading-spinner {
         position: absolute;
         inset: 0;
-        border: 3px solid rgba(255, 255, 255, 0.12);
-        border-top-color: #fff;
         border-radius: 50%;
-        animation: spin 0.9s linear infinite;
+        background: conic-gradient(from 0deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,0) 150deg, #fff 360deg);
+        -webkit-mask-image: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+        mask-image: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+        animation: spin 1.6s linear infinite;
+        will-change: transform;
       }
-      .loading-logo img {
+      .loading-glans {
+        position: relative;
+        width: 104px;
+        height: 52px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.5);
+        -webkit-mask: url(/ma-logo-header.png) center / contain no-repeat;
+        mask: url(/ma-logo-header.png) center / contain no-repeat;
+      }
+      .loading-glans i {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 84px;
-        transform: translate(-50%, -50%);
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 45%;
+        background: linear-gradient(105deg, rgba(255,255,255,0), #fff, rgba(255,255,255,0));
+        animation: glans 2.4s linear infinite;
+        will-change: transform;
       }
-      
+
       @keyframes spin {
         to { transform: rotate(360deg); }
+      }
+      @keyframes glans {
+        from { transform: translateX(-120%); }
+        to { transform: translateX(340%); }
       }
     </style>
   </head>
@@ -172,10 +196,23 @@
       <div class="loading-container">
         <div class="loading-logo">
           <div class="loading-spinner"></div>
-          <img src="/ma-logo-header.png" alt="MY ARC" />
+          <div class="loading-glans"><i></i></div>
         </div>
       </div>
     </div>
+    <!-- Laadanimatie vastzetten op de klok, zelfde som als LaadScherm.jsx. Via
+         startTime en niet via een vertraging: een vertraging telt vanaf het
+         eerste tekenen, en dat schuift op als de app-code de pagina bezet houdt. -->
+    <script>
+      (function () {
+        try {
+          var start = -(performance.timeOrigin % 4800)
+          document.querySelectorAll('.loading-spinner, .loading-glans i').forEach(function (el) {
+            el.getAnimations().forEach(function (a) { a.startTime = start })
+          })
+        } catch (e) {}
+      })()
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

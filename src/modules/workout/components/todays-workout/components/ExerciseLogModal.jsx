@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, Gauge, Zap } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, Gauge, Zap, ArrowDown, Pencil, Trash2 } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 // Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
 // met de hele workoutpagina mee.
@@ -33,7 +33,7 @@ import OefeningThumb from '../../OefeningThumb'
 import { fotoKandidaten, bruikbareFotos } from '../../../utils/oefeningFoto'
 
 // ========== SCROLL NUMBER PICKER ==========
-function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null, smallStep = null }) {
+function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null, smallStep = null, uitloop = 0 }) {
   const isMobile = window.innerWidth <= 768
   const scrollRef = useRef(null)
   const [localValue, setLocalValue] = useState(value)
@@ -70,7 +70,7 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
         {displayValue}<span style={{ fontSize: '0.35em', color: 'rgba(255,255,255,0.4)', marginLeft: '0.25rem', fontWeight: 800 }}>{unit}</span>
       </div>
 
-      <div ref={scrollRef} style={{ width: '100%', height: isMobile ? '200px' : '240px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div ref={scrollRef} style={{ width: uitloop ? `calc(100% + 2 * ${uitloop})` : '100%', flexShrink: 0, height: isMobile ? '200px' : '240px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {options.map((opt) => (
           <div key={opt} onClick={() => handleSelect(opt)} style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: opt === localValue ? (isMobile ? '1.3rem' : '1.5rem') : (isMobile ? '0.9rem' : '1rem'), fontWeight: opt === localValue ? 900 : 700, color: opt === localValue ? '#fff' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.15s ease', background: opt === localValue ? 'rgba(255,255,255,0.07)' : 'transparent', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             {opt} {unit}
@@ -202,8 +202,8 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
           {stepTitles[step]}
         </h3>
 
-        {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />}
-        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : power ? setStep(3) : metRir ? setStep('rir') : snel ? handleFinishWithoutDrop() : setStep(3)} />}
+        {step === 1 && <NumberPicker uitloop={isMobile ? '1rem' : '1.5rem'} value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />}
+        {step === 2 && <NumberPicker uitloop={isMobile ? '1rem' : '1.5rem'} value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : power ? setStep(3) : metRir ? setStep('rir') : snel ? handleFinishWithoutDrop() : setStep(3)} />}
 
         {step === 'rir' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
@@ -430,10 +430,10 @@ function LoggedSetRow({ set, index, eerder = [], actief = 0, onAddDropset, onEdi
       {showMenu && (
         // Plakt links en is zo breed als het scherm: de tabel eromheen
         // scrolt zijwaarts, het menu hoort stil te staan.
-        <div style={{ position: 'sticky', left: 0, width: breedte || '100%', boxSizing: 'border-box', display: 'flex', gap: '0.35rem', padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
-          <MenuBtn label="↓ Dropset" onClick={() => { onAddDropset(index); setShowMenu(false) }} isMobile={isMobile} gold />
-          <MenuBtn label="✎ Aanpassen" onClick={() => { onEdit(index); setShowMenu(false) }} isMobile={isMobile} />
-          <MenuBtn label="✕ Verwijder" onClick={() => { onDelete(index); setShowMenu(false) }} isMobile={isMobile} danger />
+        <div style={{ position: 'sticky', left: 0, width: breedte || '100%', boxSizing: 'border-box', display: 'flex', gap: isMobile ? '1.4rem' : '1.8rem', padding: isMobile ? '0.15rem 1rem' : '0.2rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <MenuBtn label="Dropset" Icoon={ArrowDown} onClick={() => { onAddDropset(index); setShowMenu(false) }} isMobile={isMobile} />
+          <MenuBtn label="Aanpassen" Icoon={Pencil} onClick={() => { onEdit(index); setShowMenu(false) }} isMobile={isMobile} />
+          <MenuBtn label="Verwijder" Icoon={Trash2} onClick={() => { onDelete(index); setShowMenu(false) }} isMobile={isMobile} />
         </div>
       )}
     </div>
@@ -460,9 +460,11 @@ function LegeSetRow({ index, eerder = [], actief = 0, onClick, isMobile, eenheid
   )
 }
 
-function MenuBtn({ label, onClick, isMobile, danger, gold }) {
+// Alleen dik witte tekst, geen kaders of kleuren (18 nov 2026).
+function MenuBtn({ label, Icoon, onClick, isMobile }) {
   return (
-    <button onClick={onClick} style={{ padding: isMobile ? '0.5rem 0.7rem' : '0.55rem 0.85rem', background: gold ? 'rgba(255,215,0,0.1)' : danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${danger ? 'rgba(239,68,68,0.3)' : gold ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.7)', fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: isMobile ? '0.86rem' : '0.9rem', fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit', cursor: 'pointer', minHeight: 40, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+      {Icoon && <Icoon size={15} strokeWidth={2.8} />}
       {label}
     </button>
   )

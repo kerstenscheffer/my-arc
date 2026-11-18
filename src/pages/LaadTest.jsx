@@ -8,6 +8,7 @@
 // hangt af van de tijd, niet van het moment van neerzetten. Opnieuw neerzetten
 // gaat dus verder waar hij was.
 import { useEffect, useRef, useState } from 'react'
+import LaadScherm from '../components/LaadScherm'
 
 const LOGO = '/ma-logo-header.png'
 const B = 132 // logobreedte; het bestand is 2:1
@@ -114,7 +115,13 @@ function Stil() {
   return <Logo style={{ animation: 'lt-in 0.5s ease-out both' }} />
 }
 
+// Het echte laadscherm, ingeklemd in het vak.
+function Gekozen() {
+  return <div style={{ height: 150, overflow: 'hidden', display: 'flex', alignItems: 'center' }}><LaadScherm /></div>
+}
+
 const VARIANTEN = [
+  { id: 'gekozen', naam: 'Gekozen · Glans + boog', uitleg: 'Zo staat hij nu in het echte laadscherm.', C: Gekozen },
   { id: 'nu', naam: 'Nu', uitleg: 'Het huidige rondje. Begint bij elke herlaad opnieuw.', C: Nu },
   { id: 'ademen', naam: '1 · Ademen', uitleg: 'Logo wordt rustig iets lichter en donkerder.', C: Ademen },
   { id: 'glans', naam: '2 · Glans', uitleg: 'Een lichtstreep schuift over het logo.', C: Glans },
