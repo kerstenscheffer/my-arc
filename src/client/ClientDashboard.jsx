@@ -829,6 +829,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           {
             id: 'notifications', label: 'Meldingen', Icon: Bell, color: '#FFD700',
             active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
+            glow: widgetCounts.notifications > 0,
             onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
           },
           // Vragen zit in het Meer-menu op de onderbalk en de bibliotheek in

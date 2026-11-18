@@ -6,7 +6,7 @@ import { zoekNavraag, navraagWeg } from '../workout/bouwfase/trainingNavraag'
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
 const autoGeopend = new Set();
-import { Bell, X, TrendingUp, Award, Utensils, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
+import { Bell, X, CheckCircle } from 'lucide-react';
 
 export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange }) {
   const isMobile = window.innerWidth <= 768;
@@ -133,16 +133,6 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     loadNotifications();
   };
 
-  const getIcon = (type) => {
-    const iconProps = { size: 18, strokeWidth: 2 };
-    switch(type) {
-      case 'workout': return <TrendingUp {...iconProps} />;
-      case 'meal': return <Utensils {...iconProps} />;
-      case 'streak': return <Award {...iconProps} />;
-      default: return <Sparkles {...iconProps} />;
-    }
-  };
-
   const getPriorityColor = (priority) => {
     switch(priority) {
       case 'urgent': return '#ef4444';
@@ -266,25 +256,32 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       {/* Notification Panel — zelfde taal als de check-in-melding: foto,
           zwarte fade, bold witte tekst. Was een gouden kader met gouden
           strepen en gekleurde kaarten. */}
+      {/* De rest van de pagina dimt zolang het paneel open is; tik ernaast = dicht. */}
+      {isExpanded && (
+        <div onClick={() => setIsExpanded(false)} aria-hidden style={{
+          position: 'fixed', inset: 0, zIndex: 998, background: 'rgba(0,0,0,0.6)',
+          animation: 'meldingDim 0.25s ease both',
+        }} />
+      )}
       {isExpanded && (
         <div style={{
           position: 'fixed',
-          bottom: '160px',
-          right: '20px',
-          width: '90%',
+          // Op de hoogte van de bel (WidgetSidebar, plek 'rechtsboven') en tegen
+          // de rechterrand: het paneel schuift uit de bel naar links open.
+          ...(controlled
+            ? { top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 64 : 76}px)`, right: 0, borderRadius: '18px 0 0 18px', borderRight: 'none' }
+            : { bottom: '160px', right: 0, borderRadius: '18px 0 0 18px', borderRight: 'none' }),
+          width: '92%',
           maxWidth: '400px',
-          maxHeight: '60vh',
+          maxHeight: '70vh',
           background: '#0a0a0a',
-          borderRadius: 18,
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75)',
+          boxShadow: '-18px 18px 50px rgba(0, 0, 0, 0.75)',
           zIndex: 999,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255,255,255,0.12)',
-          animation: 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          animation: 'meldingSchuif 0.32s cubic-bezier(0.22, 1, 0.36, 1) both'
         }}>
           {/* Kop: coachfoto rechts, fade naar links, tekst eroverheen. */}
           <div style={{
@@ -362,206 +359,100 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
             }} />
           </div>
 
-          {/* Notifications List - Cleaner */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
+          {/* Meldingen: geen kaart in een kaart. Elke melding begint met een dunne
+              lijn; het label 'Belangrijk' zit rechtsboven half over die lijn. */}
+          <div style={{ flex: 1, overflowY: 'auto', paddingTop: 12 }}>
             {isLoading ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '2rem',
-                color: 'rgba(255, 255, 255, 0.4)'
-              }}>
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255, 255, 255, 0.4)' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  border: '2px solid rgba(255, 255, 255, 0.1)',
-                  borderTopColor: 'rgba(139, 92, 246, 0.5)',
-                  borderRadius: '50%',
-                  margin: '0 auto',
+                  width: '32px', height: '32px', border: '2px solid rgba(255, 255, 255, 0.1)',
+                  borderTopColor: 'rgba(255,255,255,0.6)', borderRadius: '50%', margin: '0 auto',
                   animation: 'spin 1s linear infinite'
                 }} />
               </div>
             ) : notifications.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '2rem'
-              }}>
-                <Bell size={32} style={{ color: 'rgba(255, 255, 255, 0.15)', margin: '0 auto 0.75rem' }} />
-                <p style={{ color: 'rgba(255, 255, 255, 0.4)', margin: 0, fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
-                  Geen nieuwe berichten
-                </p>
-              </div>
+              <p style={{ textAlign: 'center', padding: '1.75rem 1rem 2rem', color: 'rgba(255, 255, 255, 0.45)', margin: 0, fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700 }}>
+                Geen nieuwe berichten
+              </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.65rem' : '0.85rem' }}>
+              <div>
                 {notifications.map((notification, index) => {
                   const pc = getPriorityColor(notification.priority);
                   const isActive = notification.status === 'active';
+                  const belangrijk = notification.priority === 'urgent' || notification.priority === 'high';
+                  const open = () => {
+                    if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
+                    // Feedback op een techniekvideo: meteen de modal open.
+                    if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
+                    if (isActive) handleMarkAsRead(notification.id)
+                  };
                   return (
                   <div
                     key={notification.id}
                     id={`notification-${notification.id}`}
-                    onClick={() => {
-                      if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
-                      // Feedback op een techniekvideo: meteen de modal open.
-                      if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
-                      if (isActive) handleMarkAsRead(notification.id)
-                    }}
+                    onClick={open}
                     style={{
-                      padding: isMobile ? '0.9rem 0.95rem' : '1rem 1.1rem',
-                      paddingLeft: isMobile ? '1.05rem' : '1.2rem',
-                      borderRadius: 12,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderLeft: `3px solid ${isActive ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)'}`,
-                      cursor: isActive ? 'pointer' : 'default',
-                      transition: 'all 0.2s ease',
-                      opacity: notification.status === 'read' ? 0.55 : 1,
-                      animation: `slideInRight 0.3s ease ${index * 0.05}s both`,
                       position: 'relative',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (isActive && !isMobile) {
-                        e.currentTarget.style.transform = 'translateX(-2px)';
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isMobile) {
-                        e.currentTarget.style.transform = 'translateX(0)';
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                      }
+                      padding: isMobile ? '1rem 0.95rem 0.95rem' : '1.05rem 1.1rem 1rem',
+                      borderTop: '1px solid rgba(255,255,255,0.12)',
+                      cursor: isActive ? 'pointer' : 'default',
+                      opacity: notification.status === 'read' ? 0.55 : 1,
+                      animation: `slideInRight 0.3s ease ${0.12 + index * 0.05}s both`,
                     }}
                   >
-                    <div style={{
-                      display: 'flex',
-                      gap: isMobile ? '0.7rem' : '0.85rem',
-                      alignItems: 'flex-start',
-                    }}>
-                      <div style={{
-                        width: isMobile ? 36 : 40,
-                        height: isMobile ? 36 : 40,
-                        borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.14)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        color: '#fff',
+                    {belangrijk && (
+                      <span style={{
+                        position: 'absolute', top: -9, right: isMobile ? 12 : 14,
+                        height: 17, padding: '0 0.5rem', display: 'inline-flex', alignItems: 'center',
+                        borderRadius: 6, background: '#0a0a0a', border: `1px solid ${pc}`, color: pc,
+                        fontSize: '0.56rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em',
                       }}>
-                        {getIcon(notification.type)}
-                      </div>
-
+                        {notification.priority === 'urgent' ? 'Urgent' : 'Belangrijk'}
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{
-                          margin: '0 0 0.3rem 0',
-                          fontSize: isMobile ? '0.95rem' : '1rem',
-                          fontWeight: 900,
-                          color: '#fff',
-                          letterSpacing: '-0.015em',
-                          lineHeight: 1.25,
-                        }}>
+                        <h4 style={{ margin: '0 0 0.3rem 0', fontSize: isMobile ? '0.98rem' : '1.02rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
                           {notification.title}
                         </h4>
-                        <p style={{
-                          margin: '0 0 0.5rem 0',
-                          fontSize: isMobile ? '0.82rem' : '0.88rem',
-                          color: 'rgba(255, 255, 255, 0.75)',
-                          fontWeight: 500,
-                          lineHeight: 1.5,
-                          whiteSpace: 'pre-wrap',
-                        }}>
+                        <p style={{ margin: 0, fontSize: isMobile ? '0.82rem' : '0.88rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: 500, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                           {notification.message}
                         </p>
-
-                        <div style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          alignItems: 'center',
-                          flexWrap: 'wrap'
-                        }}>
-                          {(notification.priority === 'urgent' || notification.priority === 'high') && (
-                            <span style={{
-                              padding: '0.15rem 0.55rem',
-                              borderRadius: 6,
-                              background: `${pc}1a`,
-                              border: `1px solid ${pc}55`,
-                              color: pc,
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                            }}>
-                              {notification.priority === 'urgent' ? 'Urgent' : 'Belangrijk'}
-                            </span>
-                          )}
-                          {notification.source === 'smart' && (
-                            <span style={{
-                              padding: '0.15rem 0.55rem',
-                              borderRadius: 6,
-                              background: 'rgba(255,255,255,0.07)',
-                              color: 'rgba(255,255,255,0.8)',
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              border: '1px solid rgba(255,255,255,0.16)',
-                              textTransform: 'uppercase', letterSpacing: '0.06em',
-                            }}>
-                              AI Insight
-                            </span>
-                          )}
-                          {notification.status === 'read' && (
-                            <span style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              fontSize: '0.65rem',
-                              color: 'rgba(255, 255, 255, 0.4)',
-                              fontWeight: 700,
-                            }}>
-                              <CheckCircle size={11} strokeWidth={2.4} />
-                              Gelezen
-                            </span>
-                          )}
-                        </div>
+                        {(notification._navraag || notification.source === 'smart' || notification.status === 'read') && (
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.7rem' }}>
+                            {notification._navraag && (
+                              <button onClick={(e) => { e.stopPropagation(); open() }} style={{
+                                height: 38, padding: '0 1.1rem', borderRadius: 10, background: '#fff', color: '#0a0a0a', border: 'none',
+                                fontFamily: 'inherit', fontSize: '0.84rem', fontWeight: 900, letterSpacing: '-0.01em', cursor: 'pointer',
+                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              }}>
+                                Vul in
+                              </button>
+                            )}
+                            {notification.source === 'smart' && (
+                              <span style={{ padding: '0.15rem 0.55rem', borderRadius: 6, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)', fontSize: '0.62rem', fontWeight: 800, border: '1px solid rgba(255,255,255,0.16)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                AI Insight
+                              </span>
+                            )}
+                            {notification.status === 'read' && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', fontWeight: 700 }}>
+                                <CheckCircle size={11} strokeWidth={2.4} />
+                                Gelezen
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-
                       <button
                         onClick={(e) => handleDismiss(e, notification.id)}
                         aria-label="Wegklikken"
                         style={{
-                          width: 28, height: 28,
-                          borderRadius: 7,
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          background: 'rgba(255,255,255,0.02)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          transition: 'all 0.2s ease',
-                          color: 'rgba(255, 255, 255, 0.5)',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isMobile) {
-                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
-                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)';
-                            e.currentTarget.style.color = '#fff';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isMobile) {
-                            e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
-                          }
+                          width: 30, height: 30, marginTop: -2, marginRight: -6, padding: 0, border: 'none', background: 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+                          color: 'rgba(255, 255, 255, 0.45)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                         }}
                       >
-                        <X size={13} strokeWidth={2.4} />
+                        <X size={15} strokeWidth={2.4} />
                       </button>
                     </div>
                   </div>
@@ -584,6 +475,16 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
             transform: translateY(0);
             opacity: 1;
           }
+        }
+
+        @keyframes meldingSchuif {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+
+        @keyframes meldingDim {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         @keyframes slideInRight {

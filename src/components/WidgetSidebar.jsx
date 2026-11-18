@@ -4,7 +4,8 @@
 // floating widgets (notificaties, issues, content ideeën, etc.).
 //
 // Props:
-//   buttons: [{ id, label, Icon, onClick, active?, badge?, color? }]
+//   buttons: [{ id, label, Icon, onClick, active?, badge?, color?, glow? }]
+//            glow: zachte pulserende gloed zolang de knop niet open staat (ongelezen melding)
 //   isMobile: bool
 //
 // Stond rechtsonder, boven de bottom-nav. Met nog maar één knop erin (de
@@ -63,6 +64,15 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         gap: 2,
       }}
     >
+      {buttons.some(b => b.glow) && (
+        <style>{`
+          @keyframes widgetGloed {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0), 0 0 0 rgba(255,255,255,0); background: transparent; }
+            50% { box-shadow: 0 0 0 2px rgba(255,255,255,0.35), 0 0 18px 4px rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); }
+          }
+          @media (prefers-reduced-motion: reduce) { nav[aria-label="Widgets"] button { animation: none !important; } }
+        `}</style>
+      )}
       {buttons.map((btn, i) => {
         const Icon = btn.Icon
         const isActive = !!btn.active
@@ -87,6 +97,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
                 padding: 0,
                 background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
                 border: 'none', borderRadius: 11,
+                animation: btn.glow && !isActive ? 'widgetGloed 2.2s ease-in-out infinite' : 'none',
                 cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 transition: 'background 0.15s ease',
@@ -95,7 +106,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
               {Icon && (
                 <Icon
                   size={isMobile ? 18 : 19}
-                  color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'}
+                  color={isActive || btn.glow ? '#fff' : 'rgba(255,255,255,0.5)'}
                   strokeWidth={isActive ? 2.6 : 2}
                 />
               )}

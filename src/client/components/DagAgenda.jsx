@@ -14,7 +14,8 @@
 //   - de lopende tijd staat als lijn in het rooster
 //   - blokken lezen als kaarten: bold wit, tijd rechts, kleur alleen als streep
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import lazy from '../../lazyMetHerlaad'
 import { createPortal } from '../paginaPortal'
 import { createPortal as domPortal } from 'react-dom'
 import {
@@ -108,6 +109,9 @@ function verdeelInKolommen(blokken) {
   sluit()
   return [...achter, ...uit]
 }
+
+// Het logvenster van de maaltijdpagina, hier pas geladen als je op het plusje tikt.
+const FoodLogModal = lazy(() => import('../../modules/meal-plan/components/food-log/FoodLogModal'))
 
 export default function DagAgenda({
   client, db, isMobile = false, onOpen,
@@ -482,6 +486,8 @@ export default function DagAgenda({
     onOpen?.(b)
   }
   const [logVersie, setLogVersie] = useState(0)
+  // Plusje bij de voedingsbalk: het logvenster opent hier, je blijft op deze pagina (18 nov 2026).
+  const [voedingLogOpen, setVoedingLogOpen] = useState(false)
   useEffect(() => {
     const sb = db?.supabase || db
     if (weergave !== 'rooster' || !sb?.from || !client?.id || !dagIso) return
@@ -1117,7 +1123,7 @@ export default function DagAgenda({
               onWater={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(100) : null}
               onWaterMin={dagIso && dagIso <= toIsoDate(nu) ? () => waterErbij(-100) : null}
               onStappen={() => window.dispatchEvent(new CustomEvent('myarc:stappen-open'))}
-              onVoeding={onOpen ? () => onOpen({ type: 'log', day: dag }) : null}
+              onVoeding={() => setVoedingLogOpen(true)}
               onVerzet={(b, start) => setVerzetVraag({ blok: b, start })}
               onSlaap={!(slaapDagIso && slaapDagIso <= toIsoDate(nu)) ? null : () => {
                 // De slaapband opent het slaapblad voor de nacht die op deze dag eindigt.
@@ -1181,6 +1187,20 @@ export default function DagAgenda({
           datum={datum}
           onSaved={() => { setVersie(v => v + 1); setLogVersie(v => v + 1) }}
         />
+      )}
+      {voedingLogOpen && (
+        <Suspense fallback={null}>
+          <FoodLogModal
+            isOpen
+            onClose={() => setVoedingLogOpen(false)}
+            client={client} db={db}
+            targets={doelen} consumedToday={verbruikt}
+            // Een andere dag dan vandaag in beeld: op die dag loggen, niet op nu.
+            consumedAt={dagIso && dagIso !== toIsoDate(new Date()) ? new Date(`${dagIso}T12:00:00`).toISOString() : null}
+            // De maaltijdpagina ververst zelf zodra je er terugkomt (usePaginaTerug).
+            onMealLogged={() => { setVersie(v => v + 1); setLogVersie(v => v + 1) }}
+          />
+        </Suspense>
       )}
 
       {/* Uitleg bij een supplement (de i op de kaart), zelfde venster als op de maaltijdpagina. */}

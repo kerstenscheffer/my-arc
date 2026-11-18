@@ -35,6 +35,13 @@ export default function FoodLogModal({
   // Op welk tabblad het venster opent. 'meals' = Mijn maaltijden, gebruikt
   // door de knop "Maaltijd aanmaken" in het wisselvenster.
   startTab = 'search',
+  // In een eigen venster (Plan Analyzer → ToevoegVenster): geen portal, het
+  // scherm vult dan het venster in plaats van de hele pagina.
+  inVenster = false,
+  // Coach-stand (Plan Analyzer, 18 nov 2026): geen klantgegevens. Alleen
+  // producten en de gerechten uit de database; `onNieuweMaaltijd` opent de
+  // maaltijdmaker van de coach.
+  coachModus = false, onNieuweMaaltijd = null,
 }) {
   const isMobile = window.innerWidth <= 768
   // Twee dingen sturen het scherm: de schuifknop (zoeken of scannen) en de
@@ -294,8 +301,8 @@ export default function FoodLogModal({
 
   const modal = (
     <div style={{
-      position: 'fixed', inset: 0, background: '#0a0a0a',
-      zIndex: 10000, display: 'flex', flexDirection: 'column',
+      position: inVenster ? 'absolute' : 'fixed', inset: 0, background: '#0a0a0a',
+      zIndex: inVenster ? 1 : 10000, display: 'flex', flexDirection: 'column',
       animation: 'flmFadeIn 0.2s ease'
     }}>
 
@@ -404,6 +411,7 @@ export default function FoodLogModal({
             weergave={weergave}
             onWeergave={setWeergave}
             isMobile={isMobile}
+            titel={coachModus ? 'Coach snel toevoegen' : undefined}
           />
 
           {/* Ingrediënt zoeken voor een eigen maaltijd: vaste balk met de
@@ -417,7 +425,7 @@ export default function FoodLogModal({
               onTerug={() => { setAddIngredientCallback(null); setFilter('maaltijden') }}
             />
           ) : weergave === 'zoeken' && (
-            <FilterKnoppen filter={filter} zet={setFilter} isMobile={isMobile} />
+            <FilterKnoppen filter={filter} zet={setFilter} isMobile={isMobile} coachModus={coachModus} onNieuw={onNieuweMaaltijd} />
           )}
 
           {/* Coach maaltijden heeft een eigen vaste kop (zoeken + keuzes) en
@@ -442,10 +450,18 @@ export default function FoodLogModal({
               <FotoTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} initialValues={quickAddInitialValues} />
+            ) : coachModus && filter !== 'coach' ? (
+              <SearchTab
+                key={filter === 'gerechten' ? 'gerechten' : 'producten'}
+                db={db} onSelect={handleSelectItem} isMobile={isMobile} client={null}
+                onQuickLog={handleLog} defaultMealMoment={defaultMealMoment}
+                modus={filter === 'gerechten' ? 'meals' : 'products'} zonderLog
+              />
             ) : filter === 'coach' ? (
               <AIAlternativesModal
                 embedded
                 isOpen
+                zonderLog={coachModus}
                 currentMeal={coachStartMaaltijd}
                 db={db}
                 service={mealService}
@@ -504,6 +520,7 @@ export default function FoodLogModal({
     </div>
   )
 
+  if (inVenster) return modal
   return createPortal(modal, document.body)
 }
 
@@ -541,8 +558,12 @@ function BouwBalk({ maaltijd, isMobile, onTerug }) {
 // Waar je zoekt: favorieten (hartje), producten, je eigen maaltijden of de
 // maaltijden van je coach. Geen vakken meer: alleen tekst, de gekozen keuze
 // een wit pilletje (27 okt 2026, naar voorbeeld van een andere log-app).
-function FilterKnoppen({ filter, zet, isMobile }) {
-  const knoppen = [
+function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = null }) {
+  const knoppen = coachModus ? [
+    { id: 'producten', label: 'Producten' },
+    { id: 'gerechten', label: 'Coach maaltijden' },
+    { id: 'coach', label: 'Recepten' },
+  ] : [
     { id: 'producten', label: 'Producten' },
     { id: 'maaltijden', label: 'Mijn maaltijden' },
     // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen. Heette
@@ -556,7 +577,7 @@ function FilterKnoppen({ filter, zet, isMobile }) {
       padding: isMobile ? '0 0.75rem 0.55rem' : '0 1rem 0.65rem',
       overflowX: 'auto', scrollbarWidth: 'none',
     }}>
-      <button onClick={() => zet('favorieten')} title="Favorieten" aria-label="Favorieten" style={{
+      {!coachModus && <button onClick={() => zet('favorieten')} title="Favorieten" aria-label="Favorieten" style={{
         flexShrink: 0, width: 38, height: 34, padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
@@ -564,7 +585,7 @@ function FilterKnoppen({ filter, zet, isMobile }) {
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
         <Heart size={20} strokeWidth={2.4} fill={favAan ? '#fff' : 'none'} />
-      </button>
+      </button>}
       {knoppen.map(k => {
         const aan = filter === k.id
         return (
@@ -585,6 +606,13 @@ function FilterKnoppen({ filter, zet, isMobile }) {
           </button>
         )
       })}
+      {coachModus && onNieuw && (
+        <button onClick={onNieuw} title="Nieuwe coach-maaltijd maken" style={{
+          flexShrink: 0, marginLeft: 'auto', height: 34, padding: '0 0.8rem', borderRadius: 999,
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#fff',
+          fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+        }}>+ Nieuw</button>
+      )}
     </div>
   )
 }

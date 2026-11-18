@@ -47,11 +47,13 @@ const snelTekst = ({ aantal, eenheid }) => {
 // `bron` komt van de knoppenrij in het log-venster: 'alles' of 'favorieten'.
 // `planModus`: het venster plant in voor een dag in plaats van te loggen; de
 // snelknop bij recente logs krijgt dan een agenda-icoon.
-export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles', planModus = false }) {
+// `modus`: 'products' (standaard) of 'meals' (gerechten uit de database, coach-venster).
+// `zonderLog`: zoekpogingen niet in zoek_log zetten (de coach is geen klant).
+export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles', planModus = false, modus = 'products', zonderLog = false }) {
   // Zoeken doet altijd producten; maaltijden en snel zitten in eigen knoppen.
-  const mode = 'products'
+  const mode = modus === 'meals' ? 'meals' : 'products'
   // Elke zoekpoging naar zoek_log: wat zocht de klant, en klikte hij iets aan?
-  const zoekLog = useZoekLog({ db, client, modus: mode, context: bron })
+  const zoekLog = useZoekLog({ db: zonderLog ? null : db, client, modus: mode, context: bron })
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)

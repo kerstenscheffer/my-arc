@@ -27,7 +27,7 @@ const STANDEN = [
 const TOTAAL = STANDEN.reduce((t, s) => t + s.breedte, 0)
 const LINKS = STANDEN.map((_, i) => STANDEN.slice(0, i).reduce((t, s) => t + s.breedte, 0) / TOTAAL * 100)
 
-export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
+export default function FoodLogHeader({ weergave, onWeergave, isMobile, titel = 'Voeding loggen' }) {
   const actief = Math.max(0, STANDEN.findIndex(st => st.id === weergave))
   return (
     <div style={{ flexShrink: 0 }}>
@@ -39,7 +39,7 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
           fontSize: isMobile ? '1.15rem' : '1.3rem',
           fontWeight: 900, color: '#fff', letterSpacing: '-0.025em'
         }}>
-          Voeding loggen
+          {titel}
         </div>
       </div>
 

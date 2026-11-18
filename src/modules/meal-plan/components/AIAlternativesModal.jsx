@@ -104,12 +104,14 @@ export default function AIAlternativesModal({
   // onKiesMaaltijd (de portie kies je daarna in het log-venster).
   embedded = false,
   onKiesMaaltijd,
+  // Coach-venster: zoekpogingen niet in zoek_log (de coach is geen klant).
+  zonderLog = false,
   // Na 'Wissel': de keuze waar het geldt (dagkiezer), in dit venster in
   // plaats van de lijst. Komt van de ouder, die ook het opslaan doet.
   waarInhoud = null,
 }) {
   const isMobile = window.innerWidth <= 768
-  const zoekLog = useZoekLog({ db, client, modus: 'products', context: 'wissel' })
+  const zoekLog = useZoekLog({ db: zonderLog ? null : db, client, modus: 'products', context: 'wissel' })
   const filteredMealsRef = useRef([])
   const [searchTerm, setSearchTerm] = useState('')
   // Drie keuzes in plaats van één rij chips: welk moment, waar zoeken, en de

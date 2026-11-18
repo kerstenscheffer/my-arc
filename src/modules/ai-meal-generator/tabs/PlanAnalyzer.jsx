@@ -29,6 +29,7 @@ import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import VoedingPlannenCentrum from './plan-analyzer/VoedingPlannenCentrum'
+import ToevoegVenster from './plan-analyzer/ToevoegVenster'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 // Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
 import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
@@ -359,8 +360,8 @@ export default function PlanAnalyzer({
   const [selectie, setSelectie] = useState(() => new Set())
   const [bulkBezig, setBulkBezig] = useState(null)
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
-  // Keuzemenuutje van de zwevende 'maaltijd toevoegen'-knop.
-  const [toevoegKeuze, setToevoegKeuze] = useState(false)
+  // Zwevend toevoegvenster (snel-logscherm van de klant in kiesstand).
+  const [toevoegVenster, setToevoegVenster] = useState(false)
   const [intakeOpen, setIntakeOpen] = useState(false)
   // Targets-knop: de macro-editor uit het coach-inzicht, met de lopende fase.
   const [targetsOpen, setTargetsOpen] = useState(false)
@@ -1375,6 +1376,38 @@ export default function PlanAnalyzer({
     }
   }
   const handleAdd = (dayIndex, slot) => setSwapState({ dayIndex, slot, meal: null })
+
+  // Keuze uit het toevoegvenster → maaltijd op de open dag, eerste vrije plek.
+  // Een los product (150 g kwark) wordt een maaltijd met dat product als enige
+  // regel, net als bij loggen aan klantkant.
+  const voegUitLogToe = async (d) => {
+    if (!d?.name || !weekData) return
+    const dag = weekData[activeDay]
+    const slot = SLOTS.find(sl => sl !== PRE_WORKOUT_SLOT && !dag?.meals?.[sl])
+    if (!slot) { alert('Alle maaltijd-slots van deze dag zijn gevuld.'); return }
+    const isGram = d.per_unit === 'gram' || d.per100g === true
+    const r1 = (x) => Math.round((Number(x) || 0) * 10) / 10
+    const uitLog = Array.isArray(d.ingredients) ? d.ingredients.filter(i => i && (i.calories || i.protein || i.amount)) : []
+    const isGerecht = d.type === 'meal' || d.type === 'custom_meal'
+    const maaltijd = {
+      ...(isGerecht && d.sourceId ? { id: d.sourceId, meal_id: d.sourceId } : {}),
+      name: String(d.name).trim(), meal_name: String(d.name).trim(),
+      calories: Math.round(Number(d.calories) || 0), protein: r1(d.protein), carbs: r1(d.carbs), fat: r1(d.fat), fiber: r1(d.fiber),
+      image_url: d.image_url || null,
+      ingredients_list: uitLog.length ? uitLog : [{
+        ...(d.sourceId && !isGerecht ? { ingredient_id: d.sourceId } : {}),
+        name: String(d.name).trim(), amount: Number(d.amount) || (isGram ? 100 : 1), unit: isGram ? 'gram' : 'portie',
+        calories: Math.round(Number(d.calories) || 0), protein: r1(d.protein), carbs: r1(d.carbs), fat: r1(d.fat),
+      }],
+      slot,
+    }
+    const updated = weekData.map((dg, di) => {
+      if (di !== activeDay) return dg
+      const meals = { ...(dg.meals || {}), [slot]: maaltijd }
+      return { ...dg, meals, totals: calculateTotals(meals) }
+    })
+    await applyWeekUpdate(updated, `Toegevoegd: ${maaltijd.name}`)
+  }
 
   // Maaltijd verwijderen vanuit de agenda. Staat hier als losse functie omdat
   // de agenda op twee plekken gemonteerd wordt — als zijpaneel én als
@@ -2695,29 +2728,24 @@ export default function PlanAnalyzer({
             </div>
 
             {/* Maaltijd toevoegen: witte ronde knop linksonder in de
-                maaltijdkolom, zoals de LOG-knop op de voedingspagina. Tik =
-                kiezen tussen zoeken en zelf maken; pakt de eerste vrije slot. */}
+                maaltijdkolom. Tik = het zwevende toevoegvenster (met een klant) of
+                het zoekpaneel (template); pakt de eerste vrije slot. */}
             {currentDay && (() => {
               const freeSlot = SLOTS.find(sl => !currentDay.meals?.[sl])
               return (
                 <>
-                  {toevoegKeuze && freeSlot && (
-                    <>
-                      <div onClick={() => setToevoegKeuze(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
-                      <div style={{ position: 'fixed', right: m ? 16 : 28, bottom: m ? 182 : 196, zIndex: 91, background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, boxShadow: '0 18px 44px rgba(0,0,0,0.7)', padding: 4, minWidth: 180 }}>
-                        {[{ t: 'Maaltijd zoeken', f: () => handleAdd(activeDay, freeSlot) }, { t: 'Zelf maken', f: () => setMakerState({ dayIndex: activeDay, slot: freeSlot }) }].map(o => (
-                          <button key={o.t} onClick={() => { setToevoegKeuze(false); o.f() }} style={{ width: '100%', display: 'block', padding: '0.6rem 0.75rem', background: 'transparent', border: 'none', borderRadius: 8, color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{o.t}</button>
-                        ))}
-                      </div>
-                    </>
-                  )}
                   <button
-                    onClick={() => freeSlot ? setToevoegKeuze(v => !v) : alert('Alle maaltijd-slots van deze dag zijn gevuld.')}
+                    onClick={() => {
+                      if (!freeSlot) { alert('Alle maaltijd-slots van deze dag zijn gevuld.'); return }
+                      // Het zwevende coach-venster; werkt ook bij een template (geen klant nodig).
+                      setToevoegVenster(v => !v)
+                    }}
                     aria-label="Maaltijd toevoegen" title="Maaltijd toevoegen"
                     style={{
                       // Vast in beeld rechtsonder, boven de navigatiebalk (de
                       // linkerkant is hier de zijbalk).
-                      position: 'fixed', right: m ? 16 : 28, bottom: m ? 96 : 102, zIndex: 92,
+                      // Desktop: tegen de rand van de maaltijdkolom (max 1200 breed), niet in de schermhoek.
+                      position: 'fixed', right: m ? 16 : 'max(28px, calc((100vw - 1200px) / 2 + 20px))', bottom: m ? 96 : 102, zIndex: 92,
                       width: m ? 66 : 72, height: m ? 66 : 72, borderRadius: '50%',
                       background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer',
                       boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
@@ -2806,6 +2834,17 @@ export default function PlanAnalyzer({
           />
         )}
       </BladModal>
+
+      {toevoegVenster && viewMode === 'day' && weekData && (
+        <ToevoegVenster db={db} dagNaam={DAYS[activeDay]?.full || ''}
+          onKies={voegUitLogToe}
+          onNieuweMaaltijd={() => {
+            const vrij = SLOTS.find(sl => sl !== PRE_WORKOUT_SLOT && !weekData[activeDay]?.meals?.[sl])
+            if (!vrij) { alert('Alle maaltijd-slots van deze dag zijn gevuld.'); return }
+            setMakerState({ dayIndex: activeDay, slot: vrij })
+          }}
+          onClose={() => setToevoegVenster(false)} />
+      )}
 
       <BladModal
         open={!!verwijderBereik}

@@ -708,13 +708,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
             toonKop={false}
             toonMacros={false}
             onOpen={(blok) => {
-              // Het plusje bij voeding: naar de maaltijdpagina met snel loggen meteen open.
-              if (blok.type === 'log') {
-                try { sessionStorage.setItem('myarc_open_voedingslog', '1') } catch { /* geen opslag */ }
-                setCurrentView && setCurrentView('meal')
-                setTimeout(() => window.dispatchEvent(new CustomEvent('myarc:open-voedingslog')), 80)
-                return
-              }
+              // (Het plusje bij voeding opent het logvenster in de agenda zelf; je blijft op Home.)
               // Training: meteen het logscherm van die dag op de workoutpagina.
               // De dag gaat mee, anders opent morgen 'Pull' de 'Push' van vandaag.
               if (blok.type === 'training') { try { sessionStorage.setItem('myarc_open_workout', blok.day || '1') } catch { /* geen opslag */ } }
