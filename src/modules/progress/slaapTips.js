@@ -172,7 +172,7 @@ export function persoonlijkeTips(nachten) {
   // Teksten uit de keuzelijst (NachtOpmerking.jsx) en eigen tekst.
   const opmerkingen = [
     [/moeilijk in slaap|inslapen|niet in slaap/g, 'Moeilijk in slaap', 'Kom je moeilijk in slaap? Een vast avondritueel helpt: zelfde tijd, licht dimmen, scherm weg, warme douche. Lig je na 20 minuten nog wakker, sta dan even op.'],
-    [/(vaak|veel) wakk|wakker gelegen|lag wakker/g, 'Vaak wakker', 'Word je vaak wakker? Check je slaapkamer (koel, donker, stil) en drink geen alcohol of cafeïne in de avond. Kijk niet op je telefoon als je wakker wordt.'],
+    [/(vaak|veel) wakk|wakker gelegen|lag wakker/g, 'Vaak wakker', 'Word je vaak wakker? Check je slaapkamer (koel, donker, stil) en drink geen alcohol of cafeïne in de avond. Kijk niet op je telefoon of wekker als je wakker wordt.'],
     [/te vroeg wakker/g, 'Te vroeg wakker', 'Te vroeg wakker? Houd je kamer donker tot je wekker gaat en sta wel op je vaste tijd op, ook als de nacht kort was.'],
     [/pieker|stress|hoofd|onrust|gedacht/g, 'Hoofd vol', 'Je schreef over piekeren. Schrijf voor het slapen op wat er morgen moet gebeuren. Dan hoeft je hoofd het niet vast te houden.'],
     [/koffie|cafe|cola|energy|pre.?workout/g, 'Cafeïne', 'Cafeïne werkt 6 tot 8 uur door. Je laatste koffie of pre-workout uiterlijk om 14:00.'],

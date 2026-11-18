@@ -55,10 +55,11 @@ const PORTIE: [RegExp, number, number, number, number?][] = [
   [/havermout|muesli|cruesli|granola|cornflakes|brinta|gepofte/, 10, 20, 100],
   [/rijst|pasta|spaghetti|macaroni|penne|couscous|quinoa|noodles|\bmie\b|bulgur/, 10, 40, 125],
   [/aardappel|krieltjes|zoete aardappel/, 50, 100, 400],
-  [/kipfilet \(beleg|vleeswaren|achterham|\bham\b|rookvlees|rosbief|filet americain|kalkoenfilet \(beleg/, 15, 15, 90],
+  [/beleg|vleeswaren|achterham|\bham\b|rookvlees|rosbief|filet americain|plakken|plakjes/, 15, 15, 90],
   [/kip|kalkoen|rund|gehakt|biefstuk|zalm|tonijn|kabeljauw|\bvis\b|garnalen|tofu|tempeh|varkens/, 25, 75, 250],
   [/kaas|mozzarella|feta/, 10, 10, 60],
-  [/honing|jam|siroop|pindakaas|notenpasta|hummus|\bolie\b|olijfolie|boter|margarine|chocopasta|hagelslag|suiker/, 5, 5, 30],
+  [/\bolie\b|olijfolie|boter|margarine|halvarine/, 5, 5, 15],
+  [/honing|jam|siroop|pindakaas|notenpasta|hummus|chocopasta|hagelslag|suiker/, 5, 5, 30],
   [/noten|amandel|walnoot|walnoten|pinda|cashew|chia|lijnzaad|zaden|pitten|kokos/, 5, 5, 30],
   [/banaan|appel|peer|sinaasappel|kiwi|mandarijn|perzik/, 0, 1, 2, 120],
   [/bosvruchten|bessen|aardbei|frambo|druiven|mango|ananas|fruit/, 25, 50, 200],
@@ -207,6 +208,7 @@ Ook een algemeen genoemde maaltijd met een duidelijke vorm neem je over, en je v
 Ingrediënten:
 - Neem wat de klant noemt, in de betere variant waar die bestaat: wit brood wordt volkoren, volvette kaas wordt 30+, volle zuivel wordt mager of halfvol, vet vlees wordt mager, frisdrank en sauzen laat je weg. Zet dan in "was" wat de klant schreef. Vul je iets algemeens in ("vlees" wordt kipfilet), zet dan ook in "was" wat hij schreef.
 - Voeg hooguit één eiwitbron toe (toegevoegd: true) als de maaltijd anders duidelijk te weinig eiwit heeft voor zijn moment: whey of magere kwark bij zuivel en havermout, kipfilet of ei bij brood, wrap en salade. Bij een uitdrukkelijke wens verander je niets en voeg je niets toe.
+- Vet: de klant heeft een vetminimum. Is de maaltijd erg mager en het gerecht dat hij vervangt niet, dan mag er één vetbron bij die bij de maaltijd past en die de klant zou herkennen: een ei of 30+ kaas of avocado bij brood en wraps, een scheutje olijfolie bij een warme maaltijd, noten bij zuivel en havermout. Nooit olie op brood.
 - Hooguit zes ingrediënten. Smaakmakers in een vaste kleine hoeveelheid krijgen rol "smaak" (honing, kaneel, saus); die worden niet geschaald.
 - Hoeveelheden rauw gewogen, als normale portie. Het exacte schalen doet het systeem daarna.
 - Gebruik gewone productnamen zonder merk.
@@ -372,11 +374,14 @@ Deno.serve(async (req) => {
       // komt er een gewone vetbron bij: olijfolie bij warm en hartig, walnoten
       // bij ontbijt en snack. Niet bij een uitdrukkelijke wens.
       if (doel && !wens && doelVet >= 8 && mac.vet < doelVet - 5) {
-        const zoek = ['ontbijt', 'snack'].includes(m.moment) ? 'walnoten' : 'olijfolie'
-        const kand = (await kandidaten(sb, zoek)).filter((k: any) => Number(k.fat_per_100g) >= 40)
+        // Olie hoort bij een warme maaltijd, niet op brood, een wrap of crackers: daar komt er door de code niets bij.
+        const opBrood = rijen.some(r => /brood|boterham|wrap|tortilla|cracker|beschuit|bagel|pistolet/.test(String(r.ing.name || '').toLowerCase()))
+        const zoek = ['ontbijt', 'snack'].includes(m.moment) ? 'walnoten' : opBrood ? '' : 'olijfolie'
+        const kand = !zoek ? [] : (await kandidaten(sb, zoek)).filter((k: any) => Number(k.fat_per_100g) >= 40)
         const vetbron = kand.find((k: any) => k.source === 'coach' && !k.brand) || kand[0]
         if (vetbron && !rijen.some(r => r.ing.id === vetbron.id)) {
-          const ing = { ...vetbron, rol: 'vet' }, regel = portieRegel(ing)
+          // Een toegevoegde vetbron blijft een scheutje of een handje: hooguit 15 g olie of 20 g noten.
+          const ing = { ...vetbron, rol: 'vet' }, regel = { stap: 5, min: 5, max: zoek === 'olijfolie' ? 15 : 20 }
           rijen.push({ ing, regel, vast: false, start: regel.min, gram: regel.min, toegevoegd: false, vetErbij: true, was: null, naam: vetbron.name })
           for (const r of rijen) if (!r.vast) r.gram = r.start
           mac = schaal(rijen, Number(doel.m.calories), Number(doel.m.protein), doelVet)

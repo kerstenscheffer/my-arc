@@ -14,7 +14,7 @@
 // gewoon): de keuzes plus de notitie, met ' · ' ertussen.
 
 import { useMemo, useRef, useState } from 'react'
-import { Search, X, Check } from 'lucide-react'
+import { X, Check, Plus, ChevronDown } from 'lucide-react'
 
 // [label, zoekwoorden]
 const OPTIES = [
@@ -49,17 +49,22 @@ const score = (zoekWoorden, i) => zoekWoorden.reduce((n, w) => {
   return n + (DOEL[i].some(d => d.startsWith(kop)) ? 1 : 0)
 }, 0)
 
+// Tekst → keuzes (vaste opties) en notities (eigen tekst), beide als chip.
 const lees = (tekst) => {
   const delen = String(tekst || '').split(SCHEIDING).map(x => x.trim()).filter(Boolean)
-  return { keuzes: delen.filter(d => LABELS.includes(d)), notitie: delen.filter(d => !LABELS.includes(d)).join(', ') }
+  return { keuzes: delen.filter(d => LABELS.includes(d)), notities: delen.filter(d => !LABELS.includes(d)) }
 }
-const schrijf = (keuzes, notitie) =>
-  [...LABELS.filter(o => keuzes.includes(o)), String(notitie || '').replace(/ · /g, ', ').trim()].filter(Boolean).join(SCHEIDING)
+const schoon = (t) => String(t || '').replace(/ · /g, ', ').trim()
+const schrijf = (keuzes, notities, lopend = '') =>
+  [...LABELS.filter(o => keuzes.includes(o)), ...notities.map(schoon), schoon(lopend)].filter(Boolean).join(SCHEIDING)
 
 export default function NachtOpmerking({ waarde, onChange }) {
-  const { keuzes } = lees(waarde)
-  // De notitie is ook de zoektekst; lokaal, anders verdwijnt een spatie tijdens het typen.
-  const [tekst, setTekst] = useState(() => lees(waarde).notitie)
+  // Wat nog in de balk staat (niet afgevinkt) telt ook mee bij opslaan; daarom
+  // staat de bovenliggende waarde altijd op keuzes + notities + lopende tekst.
+  const [tekst, setTekst] = useState('')
+  const basis = lees(waarde)
+  const keuzes = basis.keuzes
+  const notities = tekst.trim() ? basis.notities.filter((n, i, l) => !(i === l.length - 1 && n === schoon(tekst))) : basis.notities
   const [open, setOpen] = useState(false)
   const invoer = useRef(null)
 
@@ -70,7 +75,14 @@ export default function NachtOpmerking({ waarde, onChange }) {
     return rijen.filter(r => r.s > 0).sort((a, b) => b.s - a.s || a.i - b.i)
   }, [tekst])
 
-  const zetTekst = (v) => { setTekst(v); onChange(schrijf(keuzes, v)) }
+  const zetTekst = (v) => { setTekst(v); onChange(schrijf(keuzes, notities, v)) }
+  // Check in de balk (of Enter): de getypte tekst wordt een notitie-chip.
+  const bewaarNotitie = () => {
+    const t = schoon(tekst)
+    if (!t) return
+    setTekst('')
+    onChange(schrijf(keuzes, notities.includes(t) ? notities : [...notities, t]))
+  }
   const kies = (label) => {
     let nieuw
     if (keuzes.includes(label)) nieuw = keuzes.filter(k => k !== label)
@@ -78,82 +90,97 @@ export default function NachtOpmerking({ waarde, onChange }) {
     else nieuw = [...keuzes.filter(k => k !== GOED), label]
     // De getypte tekst was een zoekopdracht: die is nu een keuze geworden.
     setTekst('')
-    onChange(schrijf(nieuw, ''))
+    onChange(schrijf(nieuw, notities))
   }
-  const haalWeg = (label) => onChange(schrijf(keuzes.filter(k => k !== label), tekst))
+  const haalWeg = (label) => onChange(schrijf(keuzes.filter(k => k !== label), notities.filter(n => n !== label), tekst))
+
+  const chip = (k, notitie) => (
+    <button key={k} type="button" onClick={() => haalWeg(k)} aria-label={`${k} weghalen`} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 28, padding: 0,
+      background: 'none', border: 'none', color: notitie ? 'rgba(255,255,255,0.85)' : '#fff', textAlign: 'left',
+      fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation',
+    }}>
+      {notitie ? `“${k}”` : k} <X size={13} strokeWidth={3} color={notitie ? 'rgba(255,255,255,0.6)' : PAARS} style={{ flexShrink: 0 }} />
+    </button>
+  )
+
+  const randKleur = open ? 'rgba(192,132,252,0.55)' : 'rgba(255,255,255,0.12)'
 
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', marginBottom: 8 }}>Wat speelde er vannacht?</div>
 
-      {keuzes.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-          {keuzes.map(k => (
-            <button key={k} type="button" onClick={() => haalWeg(k)} aria-label={`${k} weghalen`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5, height: 30, padding: '0 0.55rem 0 0.7rem', borderRadius: 999,
-              background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(192,132,252,0.45)', color: '#fff',
-              fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation',
-            }}>
-              {k} <X size={13} strokeWidth={3} color={PAARS} />
-            </button>
-          ))}
+      {(keuzes.length > 0 || notities.length > 0) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 14, rowGap: 2, marginBottom: 6 }}>
+          {keuzes.map(k => chip(k, false))}
+          {notities.map(n => chip(n, true))}
         </div>
       )}
 
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, minHeight: 48, padding: '0 0.8rem',
-        background: 'rgba(255,255,255,0.05)', border: `1px solid ${open ? 'rgba(192,132,252,0.55)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 12,
-      }}>
-        <Search size={16} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
-        <input
-          ref={invoer}
-          value={tekst}
-          onChange={e => { zetTekst(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 120)}
-          placeholder={keuzes.length ? 'Nog iets? Zoek of typ een notitie' : 'Zoek of typ, bv. wakker, stress, koffie'}
-          enterKeyHint="done"
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); invoer.current?.blur() } }}
-          style={{
-            flex: 1, minWidth: 0, height: 46, background: 'none', border: 'none', outline: 'none', padding: 0,
-            color: '#fff', fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 700,
-          }}
-        />
-        {tekst && (
-          <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => zetTekst('')} aria-label="Tekst wissen" style={{
-            width: 28, height: 28, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}><X size={15} strokeWidth={2.8} /></button>
-        )}
-      </div>
-
-      {open && (
-        <div style={{ marginTop: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden' }}>
-          {lijst.map((r, n) => {
-            const aan = keuzes.includes(r.label)
-            return (
-              <button key={r.label} type="button" onMouseDown={e => e.preventDefault()} onClick={() => kies(r.label)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '0.65rem 0.8rem', background: aan ? 'rgba(168,85,247,0.14)' : 'transparent', border: 'none',
-                borderTop: n ? '1px solid rgba(255,255,255,0.06)' : 'none', color: aan ? '#fff' : 'rgba(255,255,255,0.82)',
-                fontFamily: 'inherit', fontSize: '0.86rem', fontWeight: aan ? 900 : 700, textAlign: 'left', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                {r.label}
-                {aan && <Check size={16} strokeWidth={3} color={PAARS} />}
-              </button>
-            )
-          })}
-          {tekst.trim() && (
-            <div style={{
-              padding: '0.6rem 0.8rem', borderTop: lijst.length ? '1px solid rgba(255,255,255,0.06)' : 'none',
-              fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
-            }}>
-              Niets passends? <span style={{ color: PAARS, fontWeight: 900 }}>“{tekst.trim()}”</span> wordt bewaard als notitie.
-            </div>
+      {/* Balk en lijst als één geheel: open = de lijst hangt direct onder de balk. */}
+      <div style={{ border: `1px solid ${randKleur}`, borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 48, padding: '0 0.4rem 0 0.85rem' }}>
+          <input
+            ref={invoer}
+            value={tekst}
+            onChange={e => { zetTekst(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 120)}
+            placeholder={keuzes.length || notities.length ? 'Nog iets? Kies of typ' : 'Kies of typ, bv. wakker, stress, koffie'}
+            enterKeyHint="done"
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); bewaarNotitie() } }}
+            style={{
+              flex: 1, minWidth: 0, height: 46, background: 'none', border: 'none', outline: 'none', padding: 0,
+              color: '#fff', fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 700,
+            }}
+          />
+          {tekst.trim() ? (
+            <button type="button" onMouseDown={e => e.preventDefault()} onClick={bewaarNotitie} aria-label="Notitie bewaren" style={{
+              width: 34, height: 34, flexShrink: 0, padding: 0, borderRadius: '50%', background: PAARS, border: 'none', color: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation',
+            }}><Check size={18} strokeWidth={3.2} /></button>
+          ) : (
+            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { if (open) { setOpen(false); invoer.current?.blur() } else invoer.current?.focus() }}
+              aria-label={open ? 'Lijst sluiten' : 'Lijst openen'} style={{
+                width: 34, height: 34, flexShrink: 0, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              }}><ChevronDown size={19} strokeWidth={2.8} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} /></button>
           )}
         </div>
-      )}
+
+        {open && (
+          <div style={{ borderTop: `1px solid ${randKleur}`, maxHeight: 300, overflowY: 'auto', background: '#121212' }}>
+            {lijst.map((r, n) => {
+              const aan = keuzes.includes(r.label)
+              return (
+                <button key={r.label} type="button" onMouseDown={e => e.preventDefault()} onClick={() => kies(r.label)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                  padding: '0.7rem 0.85rem', background: aan ? 'rgba(168,85,247,0.14)' : 'transparent', border: 'none',
+                  borderTop: n ? '1px solid rgba(255,255,255,0.06)' : 'none', color: aan ? '#fff' : 'rgba(255,255,255,0.85)',
+                  fontFamily: 'inherit', fontSize: '0.86rem', fontWeight: aan ? 900 : 700, textAlign: 'left', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {r.label}
+                  {aan
+                    ? <Check size={16} strokeWidth={3} color={PAARS} />
+                    : <Plus size={16} strokeWidth={2.8} color="rgba(255,255,255,0.4)" />}
+                </button>
+              )
+            })}
+            {tekst.trim() && (
+              <button type="button" onMouseDown={e => e.preventDefault()} onClick={bewaarNotitie} style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                padding: '0.7rem 0.85rem', background: 'transparent', border: 'none',
+                borderTop: lijst.length ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                fontFamily: 'inherit', fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textAlign: 'left', cursor: 'pointer',
+              }}>
+                <span>Als notitie: <span style={{ color: PAARS, fontWeight: 900 }}>“{tekst.trim()}”</span></span>
+                <Check size={16} strokeWidth={3} color={PAARS} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

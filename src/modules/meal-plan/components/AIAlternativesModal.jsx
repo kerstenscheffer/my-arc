@@ -515,15 +515,54 @@ export default function AIAlternativesModal({
       })()
       const hooi = (m) => {
         const t = `${plat(m.name)} ${plat(m.name_en)} ${m.partner ? `${plat(m.partner)} prep my meal kant en klaar` : ''}`
-        return { t, compact: t.replace(/ /g, '') }
+        return { t, compact: t.replace(/ /g, ''), losse: t.split(' ').filter(Boolean) }
       }
-      const treffers = alles.filter(m => {
-        const h = hooi(m)
-        return woorden.every(w => h.t.includes(w) || h.compact.includes(w))
-      })
-      // Naam die met de zoekterm begint eerst.
+      // Hoe goed past een zoekwoord? (18 nov 2026, uit het zoek_log: 62% van
+      // de zoekopdrachten hier eindigde zonder keuze.)
+      //   3 = een woord in de naam begint ermee
+      //   2 = het staat ergens in de naam (vanaf 3 letters; "ik" en "ll" gaven
+      //       eerst tientallen toevalstreffers midden in een woord)
+      //   1 = tikfout: één letter ernaast, twee bij 8+ letters ("stampo",
+      //       "biterhammen", "carpacio")
+      const afstand = (x, y, max) => {
+        if (Math.abs(x.length - y.length) > max) return max + 1
+        let vorig = Array.from({ length: y.length + 1 }, (_, i) => i)
+        for (let i = 1; i <= x.length; i++) {
+          const nu = [i]
+          let min = i
+          for (let j = 1; j <= y.length; j++) {
+            nu[j] = Math.min(vorig[j] + 1, nu[j - 1] + 1, vorig[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
+            if (nu[j] < min) min = nu[j]
+          }
+          if (min > max) return max + 1
+          vorig = nu
+        }
+        return vorig[y.length]
+      }
+      const raak = (w, h) => {
+        if (h.losse.some(x => x.startsWith(w))) return 3
+        if (w.length >= 3 && (h.t.includes(w) || h.compact.includes(w))) return 2
+        if (w.length >= 5) {
+          const max = w.length >= 8 ? 2 : 1
+          // Ook tegen het begin van een langer woord: je bent nog aan het typen.
+          if (h.losse.some(x => x.length >= 4 && (afstand(w, x, max) <= max || (x.length > w.length && afstand(w, x.slice(0, w.length), max) <= max)))) return 1
+        }
+        return 0
+      }
       const begin = plat(searchTerm).trim()
-      return treffers.sort((a, b) => (plat(b.name).startsWith(begin) ? 1 : 0) - (plat(a.name).startsWith(begin) ? 1 : 0))
+      const treffers = []
+      alles.forEach((m, i) => {
+        const h = hooi(m)
+        let som = 0
+        for (const w of woorden) {
+          const r = raak(w, h)
+          if (!r) return
+          som += r
+        }
+        treffers.push({ m, i, som: som / woorden.length, begin: plat(m.name).startsWith(begin) ? 1 : 0 })
+      })
+      // Naam die met de zoekterm begint eerst, dan de beste woordtreffers.
+      return treffers.sort((x, y) => y.begin - x.begin || y.som - x.som || x.i - y.i).map(x => x.m)
     }
 
     // 3. Welk moment? Maaltijden zonder moment blijven staan — 19 van de 482
@@ -883,10 +922,81 @@ export default function AIAlternativesModal({
     return 'Meer maaltijden'
   }
   filteredMealsRef.current = filteredMeals
+  const toonProducten = !embedded && searchTerm.trim().length >= 3 && producten.q === searchTerm.trim()
+    && producten.rijen.length > 0 && filteredMeals.length < 5
+  const productBlok = !toonProducten ? null : (
+    <div style={{ padding: filteredMeals.length ? '1rem 0 0.5rem' : '0.25rem 0 0.5rem' }}>
+      <div style={{ padding: '0 0.25rem 0.5rem' }}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Losse producten</div>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+          {Number(currentMeal?.calories) > 0 ? 'Portie afgestemd op de maaltijd die je wisselt. Daarna kun je de grammen aanpassen.' : 'Daarna kun je de grammen aanpassen.'}
+        </div>
+      </div>
+      {producten.rijen.map((pr, i) => {
+        const po = productPortie(pr)
+        return (
+          <button key={pr.id} onClick={() => kiesProduct(pr)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.25rem', background: 'transparent',
+            border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <img src={resolveFoodImage(pr, { size: 200 })} alt="" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</span>
+              <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
+                {po.gram} g · {po.calories} kcal · {Math.round(po.protein)} g eiwit
+              </span>
+            </span>
+            <Plus size={20} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
+          </button>
+        )
+      })}
+    </div>
+  )
 
   // Zoekterm loggen zodra de gebruiker typt (wissel-context).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (searchTerm.trim().length >= 2) zoekLog.noteer(searchTerm, filteredMealsRef.current) }, [searchTerm])
+
+  // Losse producten erbij als er (bijna) geen gerecht gevonden is (18 nov 2026,
+  // Kersten: "als mensen daar zoeken moeten wij leveren"). Uit het zoek_log:
+  // hier werd gezocht naar friet, kroket, zuurkool en cappuccino, en dat gaf
+  // altijd niets omdat dit venster alleen gerechten kende. Zelfde zoeker als
+  // bij het loggen (zoek_ingredienten). De uitkomst hangt aan zijn zoekterm,
+  // zodat een trage oude zoekopdracht nooit onder een nieuwe terechtkomt.
+  const [producten, setProducten] = useState({ q: '', rijen: [] })
+  useEffect(() => {
+    const q = searchTerm.trim()
+    if (embedded || q.length < 3 || !db?.supabase) return
+    let weg = false
+    const t = setTimeout(() => {
+      db.supabase.rpc('zoek_ingredienten', { p_q: q, p_client: client?.id || null, p_limit: 8 })
+        .then(r => { if (!weg) setProducten({ q, rijen: r.error ? [] : (r.data || []) }) }, () => { if (!weg) setProducten({ q, rijen: [] }) })
+    }, 350)
+    return () => { weg = true; clearTimeout(t) }
+  }, [searchTerm, embedded, db, client?.id])
+  // Portie zo dat de calorieën ongeveer gelijk zijn aan de maaltijd die je
+  // wisselt, binnen een half tot tweeënhalf keer de gewone portie (anders
+  // krijg je 1,7 liter cappuccino tegenover een warme maaltijd).
+  const productPortie = (pr) => {
+    const per100 = Number(pr.calories_per_100g) || 0
+    const gewoon = Number(pr.default_portion_gram) || 100
+    const doel = Number(currentMeal?.calories) || 0
+    let gram = per100 > 0 && doel > 0 ? (doel / per100) * 100 : gewoon
+    gram = Math.max(gewoon * 0.5, Math.min(gewoon * 2.5, gram))
+    gram = Math.max(5, Math.round(gram / 5) * 5)
+    const f = gram / 100
+    const r1 = (x) => Math.round((Number(x) || 0) * f * 10) / 10
+    return { gram, calories: Math.round(per100 * f), protein: r1(pr.protein_per_100g), carbs: r1(pr.carbs_per_100g), fat: r1(pr.fat_per_100g) }
+  }
+  const kiesProduct = (pr) => {
+    const po = productPortie(pr)
+    kiesUitLog({
+      name: pr.name, calories: po.calories, protein: po.protein, carbs: po.carbs, fat: po.fat,
+      amount: po.gram, per_unit: 'gram', image_url: pr.image_url || null,
+      ingredients: [{ ingredient_id: pr.id, name: pr.name, amount: po.gram, unit: 'gram', calories: po.calories, protein: po.protein, carbs: po.carbs, fat: po.fat }],
+    })
+  }
 
   if (!isOpen && !embedded) return null
 
@@ -1274,6 +1384,7 @@ export default function AIAlternativesModal({
               />}
               </React.Fragment>
             ))}
+            {productBlok}
             {/* Vangnet: weinig uitkomst door filters? Eén tik en alles staat er. */}
             {!searchTerm.trim() && filteredMeals.length < 6 && (moment !== 'alles' || afwijkingen.length > 0 || bron !== 'alles') && (
               <div style={{ textAlign: 'center', padding: '1rem 1rem 1.25rem' }}>
@@ -1283,7 +1394,7 @@ export default function AIAlternativesModal({
                 }}>Niet gevonden wat je zoekt? Toon alles</button>
               </div>
             )}
-          </>) : (
+          </>) : toonProducten ? productBlok : (
             <div style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
                 Geen resultaten
