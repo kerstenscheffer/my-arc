@@ -247,6 +247,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     try {
       const { data, error } = await db.supabase.functions.invoke('workout-bouwer', { body: { client_id: client.id } })
       if (error || data?.error || !data?.schema_id) throw new Error(data?.error || data?.overgeslagen || error?.message || 'mislukt')
+      await db.supabase.functions.invoke('concept-nakijker', { body: { client_id: client.id, soort: 'workout' } }).then(r => r, () => null)
       openConcept(data.schema_id)
     } catch (e) { alert('Concept maken mislukt: ' + (e?.message || e)) }
     finally { setConceptBezig(false) }

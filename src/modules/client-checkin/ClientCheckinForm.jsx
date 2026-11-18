@@ -12,11 +12,12 @@
 // 2 = dit). De coach-weergave leest dat om te weten welke velden gevuld zijn.
 
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown, Info, Pencil, Trash2, Plus, Dumbbell, Scale, Utensils, Footprints, Moon, Target, ChefHat, X } from 'lucide-react'
+import { CheckCircle, ChevronDown, Check, Smile, Meh, Frown, Info, Pencil, Trash2, Plus, X } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
 import { laadProgressie, haalFase } from './progressieWeek'
 import ProgressieScherm from './ProgressieScherm'
+import DoelIcoon from './DoelIcoon'
 import { TEVREDEN_OPTIES, SECTIES, COACHING_SECTIE } from './checkinVragen'
 import {
   DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor, gemetenRegel, kleurVoorBehaald,
@@ -32,14 +33,8 @@ const REVIEW_SCHERM = { id: '_review', type: 'review', optioneel: true }
 // Vanaf welk cijfer voor het traject de reviewvraag komt (was 8 tot 18 nov 2026).
 const REVIEW_VANAF = 7
 
-// Elk soort doel zijn eigen icoon, in de kleur van dat doel (doelen.js).
 // Eén woord per suggestie; het aantal stel je in zodra hij in de lijst staat.
 const KORT = { trainen: 'Trainen', wegen: 'Wegen', voeding: 'Voeding', stappen: 'Stappen', slaap: 'Slaap', mealprep: 'Meal prep' }
-const DOEL_ICOON = { trainen: Dumbbell, wegen: Scale, voeding: Utensils, stappen: Footprints, slaap: Moon, mealprep: ChefHat, eigen: Target }
-function DoelIcoon({ type, size = 18 }) {
-  const Icoon = DOEL_ICOON[type] || Target
-  return <Icoon size={size} strokeWidth={2.6} color={typeVan(type)?.kleur || '#fff'} style={{ flexShrink: 0 }} />
-}
 
 const KAART = '#161616'
 const RAND = '#2a2a2a'

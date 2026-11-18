@@ -160,9 +160,10 @@ export default function DagAgenda({
   // beantwoordt "wat moet ik vandaag" zonder scrollen. Het rooster laat zien
   // hoe de dag verdeeld is, en dat is pas nuttig op een heel scherm.
   // De agenda (op tijd) is de standaard; de keuze van de klant blijft bewaard op het toestel.
-  const [weergave, setWeergaveRuw] = useState(() => {
-    try { return localStorage.getItem('myarc_home_weergave') === 'lijst' ? 'lijst' : 'rooster' } catch { return 'rooster' }
-  })
+  // Sinds 18 nov 2026 is er op Home alleen nog de agenda: de wisselknop naar de
+  // lijst is weg. Wie eerder 'lijst' had gekozen (bewaard op het toestel) komt
+  // dus ook gewoon in de agenda, anders zat hij vast in een weergave zonder knop.
+  const [weergave, setWeergaveRuw] = useState('rooster')
   const setWeergave = (w) => {
     setWeergaveRuw(w)
     try { localStorage.setItem('myarc_home_weergave', w) } catch { /* privévenster */ }
@@ -876,16 +877,6 @@ export default function DagAgenda({
         </button>, gewichtSlot)}
       {(() => {
         const knoppen = (<>
-        {!weergaveSlot && (
-        <button
-          onClick={() => setWeergave(weergave === 'lijst' ? 'rooster' : 'lijst')}
-          title={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
-          aria-label={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
-          style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
-        >
-          {weergave === 'lijst' ? <CalendarClock size={16} strokeWidth={2.6} /> : <List size={16} strokeWidth={2.6} />}
-        </button>
-        )}
         <button
           onClick={() => setDagindeling(true)}
           title="Mijn dagindeling"

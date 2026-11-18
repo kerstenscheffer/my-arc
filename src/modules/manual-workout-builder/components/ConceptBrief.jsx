@@ -43,6 +43,8 @@ export default function ConceptBrief({ db, plan, client, nietOpgeslagen, onKlaar
     try {
       const { data, error } = await db.supabase.functions.invoke('workout-bouwer', { body: { client_id: client.id } })
       if (error || data?.error) throw new Error(data?.error || error?.message || 'mislukt')
+      // Het nieuwe concept weer langs de feedback van de coach.
+      await db.supabase.functions.invoke('concept-nakijker', { body: { client_id: client.id, soort: 'workout' } }).then(r => r, () => null)
       await onKlaar?.(data?.schema_id || plan.id)
     } catch (e) { alert('Opnieuw maken mislukt: ' + (e?.message || e)) }
     finally { setBezig(null) }
@@ -50,7 +52,7 @@ export default function ConceptBrief({ db, plan, client, nietOpgeslagen, onKlaar
 
   // Zelfde zwevende vorm als de brief bij het voedingsconcept (18 nov 2026).
   return (
-    <BriefZweef brief={brief} isConcept={isConcept} bezig={bezig} isMobile={isMobile} sleutel="mwb_briefvenster"
+    <BriefZweef brief={brief} isConcept={isConcept} bezig={bezig} isMobile={isMobile} db={db} soort="workout" clientId={client?.id} planId={plan?.id} sleutel="mwb_briefvenster"
       onGoedkeuren={keurGoed} onOpnieuw={opnieuw} />
   )
 }

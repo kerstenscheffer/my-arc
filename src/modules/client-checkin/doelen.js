@@ -157,6 +157,15 @@ export const BEHAALD_OPTIES = [
 export const kleurVoorBehaald = (b) =>
   BEHAALD_OPTIES.find(o => o.key === b)?.kleur || 'rgba(255,255,255,0.3)'
 
+// "Heel erg tevreden" / "Een beetje tevreden" / "Niet tevreden" → dezelfde drie.
+export const behaaldVanTevreden = (antwoord) => {
+  const a = String(antwoord || '').toLowerCase()
+  if (a.startsWith('heel erg')) return 'ja'
+  if (a.startsWith('een beetje')) return 'deels'
+  if (a.startsWith('niet')) return 'nee'
+  return null
+}
+
 // Hoeveel doelen staan er groen? Voor het regeltje "2/3" in het coachoverzicht.
 // 'deels' telt als half, naar beneden afgerond in de teller maar wel zichtbaar
 // in de opsomming — een halve training bestaat niet.

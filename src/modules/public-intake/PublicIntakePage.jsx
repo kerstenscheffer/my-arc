@@ -618,9 +618,12 @@ export default function PublicIntakePage() {
       if (res.clientId) {
         supabase.functions.invoke('workout-bouwer', { body: { client_id: res.clientId } })
           .then(r => r, e => console.warn('workout-bouwer niet gestart:', e?.message || e))
+          // Elk vers concept langs de feedback van de coach (edge function concept-nakijker).
+          .then(() => supabase.functions.invoke('concept-nakijker', { body: { client_id: res.clientId, soort: 'workout' } }).then(r => r, () => null))
           .then(() => supabase.rpc('maak_intake_voedingsconcept', { p_client: res.clientId }))
           .then(r => { if (r?.error || r?.data?.fout) console.warn('voedingsconcept niet gemaakt:', r?.error?.message || r?.data?.fout) },
                 e => console.warn('voedingsconcept niet gestart:', e?.message || e))
+          .then(() => supabase.functions.invoke('concept-nakijker', { body: { client_id: res.clientId, soort: 'voeding' } }).then(r => r, () => null))
       }
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }
     setSaving(false)

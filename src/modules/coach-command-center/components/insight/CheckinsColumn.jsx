@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import CheckinService from '../../../client-checkin/CheckinService'
 import { antwoordenVan } from '../../../client-checkin/checkinVragen'
-import { doelTekst, kleurVoorBehaald, gemetenRegel } from '../../../client-checkin/doelen'
+import { doelTekst, kleurVoorBehaald, gemetenRegel, voorstelBehaald, behaaldVanTevreden } from '../../../client-checkin/doelen'
+import DoelIcoon, { BehaaldSmiley } from '../../../client-checkin/DoelIcoon'
 import ProgressieScherm from '../../../client-checkin/ProgressieScherm'
 import { laadProgressie } from '../../../client-checkin/progressieWeek'
 
@@ -191,7 +192,7 @@ function CheckinCard({ checkin, isMobile, voornaam, client, db }) {
               er op hun plek tussen. */}
           {isV4 && antwoorden.map(a => (
             a.soort === 'tekst' ? (
-              <VraagAntwoord key={a.id} vraag={a.vraag} antwoord={a.antwoord} feedback={a.feedback} />
+              <VraagAntwoord key={a.id} id={a.id} vraag={a.vraag} antwoord={a.antwoord} feedback={a.feedback} />
             ) : a.soort === 'progressie' ? (
               <ProgressieKnop key={a.id} vraag={a.vraag} progressie={a.progressie} checkin={checkin} client={client} db={db} isMobile={isMobile} />
             ) : (
@@ -375,7 +376,13 @@ function ProgressieKnop({ vraag, progressie, checkin, client, db, isMobile }) {
 
 // Vraag in het wit, antwoord eronder. Coachingfeedback (eens per vier weken)
 // in goud, anders scrol je eroverheen.
-const VraagAntwoord = ({ vraag, antwoord, feedback }) => (
+const VraagAntwoord = ({ vraag, antwoord, feedback, id }) => {
+  // "Ben je tevreden?" krijgt dezelfde smiley en kleur als bij de klant; het
+  // cijfer voor het traject staat groot, in de kleur van het cijfer.
+  const tevreden = id === 'progressie_tevreden' ? behaaldVanTevreden(antwoord) : null
+  const cijfer = id === 'traject_score' && Number.isFinite(Number(antwoord)) ? Number(antwoord) : null
+  const cijferKleur = cijfer == null ? null : kleurVoorBehaald(cijfer >= 7 ? 'ja' : cijfer >= 5 ? 'deels' : 'nee')
+  return (
   <div style={{ padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
     <div style={{
       fontSize: '0.74rem', fontWeight: 800, lineHeight: 1.35,
@@ -383,29 +390,44 @@ const VraagAntwoord = ({ vraag, antwoord, feedback }) => (
     }}>
       {vraag}
     </div>
+    {tevreden ? (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 900, color: kleurVoorBehaald(tevreden) }}>
+        <BehaaldSmiley behaald={tevreden} size={17} /> {antwoord}
+      </div>
+    ) : cijfer != null ? (
+      <div style={{ fontSize: '1rem', fontWeight: 900, color: cijferKleur, fontVariantNumeric: 'tabular-nums' }}>
+        {cijfer}<span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}> / 10</span>
+      </div>
+    ) : (
     <div style={{
       fontSize: '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)',
       lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
       {antwoord}
     </div>
+    )}
   </div>
-)
+  )
+}
 
+// Zelfde beeld als de klant in de check-in: het icoon van het doel in zijn
+// kleur, eronder wat de app mat (groen, oranje of rood op het getal zelf) en
+// rechts de smiley met Ja, Deels of Nee.
 const DoelenBlok = ({ vraag, doelen, terug }) => (
   <div style={{ padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
     <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', marginBottom: '0.3rem' }}>{vraag}</div>
     {doelen.map((d, i) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.2rem 0' }}>
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.28rem 0' }}>
+        <DoelIcoon type={d.type} size={16} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>{doelTekst(d)}</div>
+          {terug && gemetenRegel(d) && (
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: d.gemeten != null ? kleurVoorBehaald(voorstelBehaald(d, d.gemeten)) : G.textDim }}>{gemetenRegel(d)}</div>
+          )}
+        </div>
         {terug && (
-          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kleurVoorBehaald(d.behaald) }} />
-        )}
-        <span style={{ flex: 1, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{doelTekst(d)}</span>
-        {terug && gemetenRegel(d) && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: G.textDim, fontVariantNumeric: 'tabular-nums' }}>{gemetenRegel(d)}</span>
-        )}
-        {terug && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), minWidth: 36, textAlign: 'right' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), flexShrink: 0 }}>
+            <BehaaldSmiley behaald={d.behaald} size={16} />
             {d.behaald === 'ja' ? 'Ja' : d.behaald === 'deels' ? 'Deels' : d.behaald === 'nee' ? 'Nee' : '—'}
           </span>
         )}

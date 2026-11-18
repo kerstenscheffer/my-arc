@@ -5,16 +5,44 @@
 // de brief zelf in een sleepbaar venster. Gebruikt door de Plan Analyzer
 // (VoedingConceptBrief) en de Workout Builder (ConceptBrief).
 
-import { useState } from 'react'
-import { Check, RefreshCw, AlertTriangle, FileText } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, RefreshCw, AlertTriangle, FileText, X } from 'lucide-react'
 import { ZweefVenster } from './ToevoegVenster'
 
 const GROEN = '#10b981'
 const ORANJE = '#f59e0b'
 
-export default function BriefZweef({ brief, isConcept, bezig = null, onGoedkeuren, onOpnieuw, waarschuwing = null, sleutel = 'brief_venster', isMobile }) {
+// Feedback (tabel concept_feedback): wat de coach hier opschrijft komt in elke
+// volgende brief van dezelfde soort terug onder "Eerdere feedback", tot het in
+// de regels van de bouwer is verwerkt. De bouwers werken met vaste regels en
+// lezen geen vrije tekst; verwerken = de regels aanpassen en het punt afvinken.
+export default function BriefZweef({ brief, isConcept, bezig = null, onGoedkeuren, onOpnieuw, waarschuwing = null, sleutel = 'brief_venster', isMobile, db = null, soort = null, clientId = null, planId = null }) {
   // Bij een concept staat de brief meteen open: dat is het eerste wat je moet lezen.
   const [open, setOpen] = useState(!!isConcept)
+  const [feedback, setFeedback] = useState([])
+  const [tekst, setTekst] = useState('')
+  const [fbBezig, setFbBezig] = useState(false)
+  const kanFeedback = !!db?.supabase && !!soort
+  const laadFeedback = () => {
+    if (!kanFeedback) return
+    db.supabase.from('concept_feedback').select('id, tekst, created_at').eq('soort', soort).is('verwerkt_at', null)
+      .order('created_at', { ascending: false }).limit(30)
+      .then(r => setFeedback(r?.data || []), () => null)
+  }
+  useEffect(() => { laadFeedback() }, [soort]) // eslint-disable-line react-hooks/exhaustive-deps
+  const bewaarFeedback = async () => {
+    const t = tekst.trim()
+    if (!t || fbBezig || !kanFeedback) return
+    setFbBezig(true)
+    const { error } = await db.supabase.from('concept_feedback').insert({ soort, tekst: t, client_id: clientId, plan_id: planId }).then(r => r, e => ({ error: e }))
+    setFbBezig(false)
+    if (error) { alert('Feedback opslaan mislukt: ' + (error.message || error)); return }
+    setTekst(''); laadFeedback()
+  }
+  const haalWeg = async (id) => {
+    setFeedback(prev => prev.filter(f => f.id !== id))
+    await db.supabase.from('concept_feedback').update({ verwerkt_at: new Date().toISOString(), verwerkt_notitie: 'weggehaald door de coach' }).eq('id', id).then(r => r, () => null)
+  }
   if (!brief) return null
   const k = brief.nakijken?.length || 0
   const datum = brief.gemaakt ? new Date(brief.gemaakt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : ''
@@ -66,6 +94,24 @@ export default function BriefZweef({ brief, isConcept, bezig = null, onGoedkeure
               <ul style={{ margin: 0, paddingLeft: '1.05rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {brief.keuzes.map((t, i) => <li key={i} style={{ ...regel, color: 'rgba(255,255,255,0.8)' }}>{t}</li>)}
               </ul>
+            </>)}
+            {kanFeedback && (<>
+              <div style={kopje('rgba(255,255,255,0.55)')}>Feedback voor volgende keer</div>
+              {feedback.length > 0 && (
+                <ul style={{ margin: '0 0 8px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {feedback.map(f => (
+                    <li key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ ...regel, flex: 1, color: 'rgba(255,255,255,0.8)' }}>{f.tekst}</span>
+                      <button onClick={() => haalWeg(f.id)} title="Weghalen: geldt niet meer" aria-label="Weghalen" style={{ flexShrink: 0, width: 22, height: 22, padding: 0, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} strokeWidth={2.8} /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <textarea value={tekst} onChange={e => setTekst(e.target.value)} rows={2} placeholder="Wat moet de volgende keer anders? Bijv: nooit 4 eieren in een cut."
+                style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '0.5rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none' }} />
+              <button onClick={bewaarFeedback} disabled={!tekst.trim() || fbBezig} style={{ ...knop(false), marginTop: 6, marginBottom: 8, opacity: !tekst.trim() || fbBezig ? 0.4 : 1 }}>
+                {fbBezig ? 'Opslaan…' : 'Bewaar voor volgende keer'}
+              </button>
             </>)}
           </div>
           {isConcept && (

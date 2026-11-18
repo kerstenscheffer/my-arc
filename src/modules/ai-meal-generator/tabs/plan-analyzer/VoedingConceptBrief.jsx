@@ -57,6 +57,8 @@ export default function VoedingConceptBrief({ db, planMeta, client, onActiveer, 
     try {
       const { data, error } = await db.supabase.rpc('maak_intake_voedingsconcept', { p_client: client.id, p_opnieuw: true })
       if (error || data?.fout) throw new Error(data?.fout || error?.message || 'mislukt')
+      // Het nieuwe concept weer langs de feedback van de coach.
+      await db.supabase.functions.invoke('concept-nakijker', { body: { client_id: client.id, soort: 'voeding' } }).then(r => r, () => null)
       await onHerlaad?.(data?.plan_id || planMeta.id)
     } catch (e) { alert('Opnieuw maken mislukt: ' + (e?.message || e)) }
     finally { setBezig(null) }
@@ -64,7 +66,7 @@ export default function VoedingConceptBrief({ db, planMeta, client, onActiveer, 
 
   const afwijkend = voorstel && isConcept && Number(client?.target_calories) > 0 && Number(client.target_calories) !== Number(voorstel.target_calories)
   return (
-    <BriefZweef brief={brief} isConcept={isConcept} bezig={bezig} isMobile={isMobile} sleutel="pa_briefvenster"
+    <BriefZweef brief={brief} isConcept={isConcept} bezig={bezig} isMobile={isMobile} db={db} soort="voeding" clientId={client?.id} planId={planMeta?.id} sleutel="pa_briefvenster"
       onGoedkeuren={keurGoed} onOpnieuw={opnieuw}
       waarschuwing={afwijkend ? `De klant heeft nu ${client.target_calories} kcal als doel. Goedkeuren vervangt dat door ${voorstel.target_calories}.` : null} />
   )

@@ -155,10 +155,43 @@ export default function DagTijdlijn({
     const vinger = e.pointerType !== 'mouse'
     let delta = 0
     let wacht = null
-    const activeer = () => { sleepActief.current = true; setSleep({ id: b.id, delta: 0 }); if (vinger && navigator.vibrate) navigator.vibrate(12) }
+    // Slepen tot buiten beeld: kom je bij de onder- of bovenkant, dan schuift de
+    // dag vanzelf mee (18 nov 2026). `laatsteY` is waar de vinger nu is; wat de
+    // dag intussen is opgeschoven telt bij de verplaatsing op.
+    const startScrol = baan.current ? baan.current.scrollTop : 0
+    let laatsteY = startY
+    let lus = null
+    const werkBij = () => {
+      const geschoven = (baan.current ? baan.current.scrollTop : startScrol) - startScrol
+      const d = Math.round((laatsteY - startY + geschoven) / pxRef.current / 5) * 5
+      if (d !== delta) { delta = d; setSleep({ id: b.id, delta }) }
+    }
+    const schuifMee = () => {
+      lus = null
+      const el = baan.current
+      if (!sleepActief.current || !el) return
+      const r = el.getBoundingClientRect()
+      // Onderaan ligt de zwevende menubalk over de dag: de rand zit daarboven.
+      const onder = Math.min(r.bottom, window.innerHeight) - 130
+      const boven = r.top + 40
+      let stap = 0
+      if (laatsteY > onder) stap = Math.min(14, 2 + (laatsteY - onder) / 6)
+      else if (laatsteY < boven) stap = -Math.min(14, 2 + (boven - laatsteY) / 6)
+      if (stap !== 0) {
+        const voor = el.scrollTop
+        el.scrollTop = voor + stap
+        if (el.scrollTop !== voor) werkBij()
+      }
+      lus = requestAnimationFrame(schuifMee)
+    }
+    const activeer = () => {
+      sleepActief.current = true; setSleep({ id: b.id, delta: 0 }); if (vinger && navigator.vibrate) navigator.vibrate(12)
+      if (!lus) lus = requestAnimationFrame(schuifMee)
+    }
     if (vinger) wacht = setTimeout(activeer, 350)
     const klaar = () => {
       if (wacht) clearTimeout(wacht)
+      if (lus) { cancelAnimationFrame(lus); lus = null }
       window.removeEventListener('pointermove', beweeg); window.removeEventListener('pointerup', los); window.removeEventListener('pointercancel', stop)
     }
     const beweeg = (ev) => {
@@ -168,8 +201,8 @@ export default function DagTijdlijn({
         if (Math.abs(dy) < 4) return
         activeer()
       }
-      const d = Math.round(dy / pxRef.current / 5) * 5
-      if (d !== delta) { delta = d; setSleep({ id: b.id, delta }) }
+      laatsteY = ev.clientY
+      werkBij()
     }
     const stop = () => { klaar(); sleepActief.current = false; setSleep(null) }
     const los = () => {
