@@ -4,6 +4,9 @@
 --   callsVoorgesteld  leads die in de periode naar 'Call voorgesteld' zijn gezet
 --   callsGevoerd      leads met een Sales Call-rij waarvan call_date in de periode valt en call_happened waar is
 --                     (zelfde som als 'gehouden' in business-os-agent.sql)
+--   binnen            binnengekomen van p_van t/m vandaag volgens get_payment_schedule per teamlid,
+--                     zonder 'te_laat' en zonder 'komt_nog'. Later toegevoegd met dezelfde werkwijze
+--                     (replace op de live functie); het blok hieronder zet alleen de eerste drie.
 -- Alleen velden erbij; bestaande velden en oudere app-versies blijven ongemoeid.
 --
 -- De patch is op de live functie gezet (pg_get_functiondef + replace), niet via

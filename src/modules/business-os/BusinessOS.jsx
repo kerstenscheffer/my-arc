@@ -1446,7 +1446,9 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1, opacity: 0.2,
               fontSize: isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
             }}>
-              {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(a.omzet)}
+              {/* Rechts: binnengekomen van de 1e t/m vandaag (get_business_os.nu.binnen, 19 nov 2026);
+                  een oudere RPC zonder dat veld valt terug op de nieuwe sales. */}
+              {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(data?.nu?.binnen ?? a.omzet)}
             </div>
             {/* Leus met de stand van deze maand eronder, even breed en even vaag (19 nov 2026).
                 Stand komt uit get_business_os.nu; een oudere RPC zonder deze velden toont een streepje. */}
