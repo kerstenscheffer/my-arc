@@ -195,11 +195,16 @@ const getTabLabel = (id) => {
 // bladwijzers komen daar uit. #ads opent Leads, en die toont dan Ads.
 const OUDE_TABS = { ads: 'leads' }
 
+const START_TAB = 'business-os'
+
 const getHashTab = () => {
   const hash = window.location.hash.replace('#', '')
   // Tab + extra na ':' of '?' (#ai-meals:<id>, #business-os:content=<id>).
   const kop = hash.split(/[:?]/)[0]
   const base = OUDE_TABS[kop] || kop
+  // Zonder hash (de hub net geopend) start je op Business OS (Kersten, 19 nov
+  // 2026). Wie geen eigenaar of teamlid is, gaat hieronder vanzelf naar Command.
+  if (!hash) return START_TAB
   return ALL_TAB_IDS.includes(base) ? base : 'command'
 }
 
@@ -432,7 +437,7 @@ export default function CoachHub() {
     }
     
     if (!window.location.hash) {
-      setHashTab('command')
+      setHashTab(START_TAB)
     }
     
     return () => window.removeEventListener('hashchange', parseHash)
