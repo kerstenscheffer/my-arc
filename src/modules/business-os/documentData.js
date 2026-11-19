@@ -71,8 +71,9 @@ export function documentVoorGino(d, max = 1500) {
 
 // Dicht/open per apparaat; BusinessOS gebruikt hem ook voor de maat van de kop erboven.
 export function useDocumentDicht() {
-  const [dicht, setDichtState] = useState(() => { try { return localStorage.getItem('bos_doc_dicht') === '1' } catch { return false } })
-  const setDicht = useCallback((v) => { setDichtState(v); try { localStorage.setItem('bos_doc_dicht', v ? '1' : '0') } catch { /* leeg */ } }, [])
+  // Standaard weg: alleen zichtbaar als je hem opent (knop rechtsboven), 19 nov 2026.
+  const [dicht, setDichtState] = useState(() => { try { return localStorage.getItem('bos_doc_open') !== '1' } catch { return true } })
+  const setDicht = useCallback((v) => { setDichtState(v); try { localStorage.setItem('bos_doc_open', v ? '0' : '1') } catch { /* leeg */ } }, [])
   return [dicht, setDicht]
 }
 

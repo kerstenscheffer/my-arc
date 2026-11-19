@@ -10,7 +10,7 @@
 // '+ Onderdeel' zet onderaan een nieuw kopje klaar.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { Pencil, Plus, Check, X } from 'lucide-react'
 
 const KOP = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#fff' }
 
@@ -79,18 +79,19 @@ export default function GinoDocument({ document: d, titel, isMobile, dicht, setD
 
   return (
     <div style={{
-      width: '100%', maxWidth: 680, minHeight: 0, display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column',
       background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, boxSizing: 'border-box', textAlign: 'left',
-      ...(dicht ? null : { flex: 1 }),
+      // Nooit platgedrukt: dicht = alleen de kop, open = minstens een leesbaar vak.
+      // Bij weinig ruimte wijkt de 10K-kop erboven (19 nov 2026: open zag je niets).
+      flexShrink: 0, ...(dicht ? null : { flexGrow: 1, flexBasis: 0, minHeight: 'min(300px, calc(100% - 16px))' }),
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '10px 12px' : '12px 16px', borderBottom: dicht ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
-        <button type="button" onClick={() => setDicht(!dicht)} aria-expanded={!dicht} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#fff', fontFamily: 'inherit', textAlign: 'left' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#fff' }}>
           <span style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.025em' }}>{titel}</span>
           {stand === 'bezig' && <span style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Opslaan…</span>}
           {stand === 'ok' && <span style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Opgeslagen</span>}
           {stand === 'fout' && <span style={{ fontSize: '0.66rem', color: '#ef4444', fontWeight: 700 }}>Niet opgeslagen</span>}
-          {dicht ? <ChevronDown size={15} strokeWidth={2.6} style={{ marginLeft: 'auto' }} /> : <ChevronUp size={15} strokeWidth={2.6} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
-        </button>
+        </div>
         {!dicht && (
           <>
             <button type="button" onClick={() => (bewerk ? setConcept(c => `${c.replace(/\s*$/, '')}\n\n## Nieuw onderdeel\n`) : start(`${d.tekst.endsWith('\n') ? '' : '\n'}\n## Nieuw onderdeel\n`))} title="Onderdeel toevoegen" aria-label="Onderdeel toevoegen" style={knop}>
@@ -101,6 +102,7 @@ export default function GinoDocument({ document: d, titel, isMobile, dicht, setD
               : <button type="button" onClick={() => start()} title="Bewerken" aria-label="Bewerken" style={knop}><Pencil size={14} strokeWidth={2.6} /></button>}
           </>
         )}
+        <button type="button" onClick={() => { if (bewerk) klaar(); setDicht(true) }} title="Sluiten" aria-label="Sluiten" style={knop}><X size={15} strokeWidth={2.6} /></button>
       </div>
       {!dicht && (
         bewerk ? (

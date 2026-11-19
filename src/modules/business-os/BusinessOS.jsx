@@ -21,7 +21,7 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, CalendarDays, ChevronLeft, User, PhoneForwarded, PhoneCall, Trophy } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays, ChevronLeft, User, PhoneForwarded, PhoneCall, Trophy, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -1403,6 +1403,16 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         <CalendarDays size={16} strokeWidth={2.6} />
       </button>}
 
+      {/* ── Avatar-knop links van de agenda: document boven de bol open/dicht (19 nov 2026) ── */}
+      {!zwevend && !beperkt && !kalender && !podiumOpen && <button type="button" onClick={() => setDocDicht(!docDicht)} title={docDicht ? 'Avatar openen' : 'Avatar sluiten'} aria-label="Avatar" aria-pressed={!docDicht} style={{
+        position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 92, zIndex: 20,
+        width: 36, height: 36, borderRadius: '50%', border: 'none',
+        background: 'transparent', color: docDicht ? C.wit : colors.success, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <FileText size={16} strokeWidth={2.6} />
+      </button>}
+
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
       {!zwevend && <div style={{ position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
@@ -1448,7 +1458,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             alignItems: 'center', justifyContent: docDicht ? 'center' : 'flex-start', textAlign: 'center', gap: isMobile ? 8 : 14,
             paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : docDicht ? 0 : 8, boxSizing: 'border-box',
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: docDicht ? (isMobile ? 8 : 14) : 6, pointerEvents: 'none', userSelect: 'none', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: docDicht ? (isMobile ? 8 : 14) : 6, pointerEvents: 'none', userSelect: 'none', flexShrink: 1, minHeight: 0, overflow: 'hidden' }}>
             {/* Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026).
                 Met het document open kleiner, zodat het document het midden is. */}
             <div style={{
@@ -1468,7 +1478,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               }}>
                 Kill the bitch inside
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: docDicht ? 'flex' : 'none', justifyContent: 'space-between', alignItems: 'center' }}>
                 {[
                   ['mannen', User, 'Nieuwe mannelijke leads deze maand'],
                   ['callsVoorgesteld', PhoneForwarded, 'Calls voorgesteld'],
@@ -1485,7 +1495,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               </div>
             </div>
             </div>
-            <GinoDocument document={avatar} titel={AVATAR.titel} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
+            {!docDicht && <GinoDocument document={avatar} titel={AVATAR.titel} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />}
           </div>
         )}
         {kalender && !zwevend && (
