@@ -1,3 +1,6 @@
+-- GEDRAAID op 19 nov 2026 via de Supabase-koppeling (execute_sql): het plan
+-- staat op 3150 / 170 / 430 / 85. Niet opnieuw nodig.
+--
 -- Eenmalig, 19 nov 2026. Alleen het testaccount ks10k (Kersten Scheffer,
 -- clients.id 7e176d2d-a85b-4132-a1e3-59b1ddd9816d).
 --
