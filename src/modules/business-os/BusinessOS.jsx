@@ -21,7 +21,7 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, CalendarDays, ChevronLeft, User } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays, ChevronLeft, User, PhoneForwarded, PhoneCall, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -1448,32 +1448,30 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             }}>
               {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(a.omzet)}
             </div>
-            <div style={{
-              color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase',
-              fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)', opacity: 0.2,
-            }}>
-              Kill the bitch inside
-            </div>
-            {/* Stand van deze maand, klein en dik wit (19 nov 2026). Komt uit get_business_os.nu;
-                een oudere RPC zonder deze velden toont een streepje. */}
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center',
-              gap: isMobile ? '6px 16px' : '8px 28px', marginTop: isMobile ? 6 : 10, padding: '0 16px',
-            }}>
-              {[
-                ['mannen', 'nieuwe mannen'],
-                ['callsVoorgesteld', 'calls voorgesteld'],
-                ['callsGevoerd', 'calls gevoerd'],
-                ['sales', 'sales'],
-              ].map(([k, label]) => (
-                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                  {k === 'mannen' && <User size={isMobile ? 15 : 17} strokeWidth={3} color={C.wit} />}
-                  <span style={{ ...NUM, color: C.wit, fontWeight: 900, fontSize: isMobile ? '0.95rem' : '1.1rem' }}>
-                    {data?.nu?.[k] == null ? '–' : getal(data.nu[k])}
-                  </span>
-                  <span style={{ color: C.wit, fontWeight: 800, fontSize: isMobile ? '0.72rem' : '0.8rem' }}>{label}</span>
-                </div>
-              ))}
+            {/* Leus met de stand van deze maand eronder, even breed en even vaag (19 nov 2026).
+                Stand komt uit get_business_os.nu; een oudere RPC zonder deze velden toont een streepje. */}
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'stretch', gap: isMobile ? 4 : 6, opacity: 0.2 }}>
+              <div style={{
+                color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
+              }}>
+                Kill the bitch inside
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {[
+                  ['mannen', User, 'Nieuwe mannelijke leads deze maand'],
+                  ['callsVoorgesteld', PhoneForwarded, 'Calls voorgesteld'],
+                  ['callsGevoerd', PhoneCall, 'Calls gevoerd'],
+                  ['sales', Trophy, 'Sales'],
+                ].map(([k, icoon, titel]) => ({ k, icoon, titel })).map((st) => { const k = st.k; return (
+                  <div key={k} title={st.titel} style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 5 : 8, whiteSpace: 'nowrap' }}>
+                    <st.icoon size={isMobile ? 15 : 22} strokeWidth={3} color={C.wit} />
+                    <span style={{ ...NUM, color: C.wit, fontWeight: 900, fontSize: isMobile ? '1rem' : '1.5rem', lineHeight: 1 }}>
+                      {data?.nu?.[k] == null ? '–' : getal(data.nu[k])}
+                    </span>
+                  </div>
+                ) })}
+              </div>
             </div>
           </div>
         )}
