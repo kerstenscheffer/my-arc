@@ -53,6 +53,10 @@ Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als
    - Alleen Kerstens eigen beelden. Geen stock, geen beelden van anderen. Past er niets, maak de reel dan niet en meld het.
    - Nieuwe B-roll: kopieer uit Kerstens mappen naar `~/Gino/reel-assets/broll/<map>/` (`cp -c`, het origineel blijft staan). Bronnen tot nu toe: `~/Downloads/iCloud‑foto’s` (meal prep, 30 okt 2026) en in Drive `B-ROLL  MAP` (alleen te lezen na downloaden; rclone `reels:` ziet alleen de testmap).
    - Niet gebruiken: `meal-prep/Meal pep video` (tekst in beeld) en `meal-prep/rauwe kip eten`.
+   - Gym-B-roll (20 nov 2026) staat in `~/Gino/reel-assets/broll-gym` (`gym/` en `fysiek/`); in de config als `"broll-gym/gym/BR 140 SQUAD.mp4"`. Sinds die dag staan in `broll/` ook `voeding`, `slaap`, `hardloop`, `winkel`, `overig`, `jong` en `app` (alles uit Drive `B-ROLL  MAP` > `BROLL CLEAN`). Nooit de map `B-ROLL STOCK VID` gebruiken.
+   - Meer uit Drive halen: `rclone copy "reels:<mapnaam>" <doel> --drive-root-folder-id 1lmjYr9OqCJU4mKGtkrEnUmbeRn7kugkb` (dat is `BROLL CLEAN`; sommige mapnamen beginnen met een spatie).
+   - Niet gebruiken: `gym/BR 100 KG BENCH`, `fysiek/BR SIDE CHEST 2` en `jong/BR JONGE K DEADLIFT` (andere sporters herkenbaar in beeld), `jong/73683358…` (tekst in beeld) en de schermopname in `app/` (e-mailadres in beeld). De `app/`-clips tonen de coaching-app, niet de gratis tool: niet bij de tool-slides zetten.
+   - Mascotte en gezicht: de mascotte staat midden boven de tekst (ongeveer een kwart tot 40% van de hoogte). Staat Kersten daar met zijn gezicht, zet dan `mascotte_plek` of kies een clip van achteren of zonder gezicht.
 2. Schrijf `~/Gino/reels/<naam>/config.json` (naam: kleine letters en streepjes, bv. `menu-rekensom`):
 
 ```json
@@ -96,6 +100,13 @@ Vast in het script: 1080×1920, de stijl hierboven (Poppins Bold wit met rand, k
 - "de koppeling is niet bereikt, er is niets aangemaakt": één keer opnieuw proberen. Lukt het weer niet, stop dan en meld het pad van de mp4, zodat Kersten hem zelf in Metricool kan zetten. Blijf niet wachten.
 - "aanroep verstuurd maar geen antwoord": niet opnieuw proberen voor je met de Metricool-leestool hebt gekeken of het concept er al staat. Anders staat hij dubbel.
 - Een video die al in de opslag staat wordt niet opnieuw geüpload, dus een tweede poging is snel.
+- De login van een opdracht (PA_ACCESS_TOKEN) verloopt na ongeveer een uur. Daarna geeft de upload `"exp" claim timestamp check failed` en `pa-db` `JWT expired`; dat is in dezelfde run niet te herstellen. Zet bij een lange run dus elk concept direct na de montage, en plan niet meer dan een uur werk per opdracht. Verlopen? Noteer de mp4's en laat de opdracht opnieuw starten (20 nov 2026: 7 van 15 reels bleven zo liggen).
+
+## Veel reels achter elkaar (nachtrun)
+
+Hulpjes in `~/Gino/carrousel-reels/tools` (20 nov 2026): `voorbereid.sh <shortcode>` leest de slide-tekst uit (`ocr`) en maakt `raster.jpg` om hem na te kijken, `zet.py <naam> <shortcode> <muziek> <shots.json>` schrijft de config met de caption woordelijk uit de Metricool-export, `wachtrij.sh <naam>…` rendert na elkaar (ongeveer een minuut per reel) en `zetconcept.sh <naam> <dag>` zet het concept om 20:00, of 12:00 als er die dag al een reel om 20:00 staat. Slides van geplaatste carrousels staan als `media` in het antwoord van de Metricool-leestool (smal tijdvenster rond het plaatsingsmoment).
+
+Een reel langer dan ongeveer 46 s krijgt vanzelf minder bitrate, zodat hij onder de 24 MB blijft.
 
 ## Dag voor dag inplannen
 
