@@ -1433,6 +1433,29 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'flex-end',
       }}>
+        {/* Standaard beeld: doel / omzet van deze maand, met de leus eronder (19 nov 2026). */}
+        {!zwevend && !beperkt && !kalender && !podiumOpen && (
+          <div style={{
+            flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: isMobile ? 8 : 14,
+            paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0, boxSizing: 'border-box',
+            // Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026).
+            opacity: 0.2, pointerEvents: 'none', userSelect: 'none',
+          }}>
+            <div style={{
+              ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1,
+              fontSize: isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
+            }}>
+              {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(a.omzet)}
+            </div>
+            <div style={{
+              color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase',
+              fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
+            }}>
+              Kill the bitch inside
+            </div>
+          </div>
+        )}
         {kalender && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
