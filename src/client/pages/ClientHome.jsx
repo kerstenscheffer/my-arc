@@ -25,6 +25,7 @@ import DagAgenda from '../components/DagAgenda'
 import StappenPil from '../components/StappenPil'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import BelangrijkeVideo from '../components/BelangrijkeVideo'
+import CardioLogVanger from '../../modules/workout/components/CardioLogVanger'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
 
@@ -692,10 +693,22 @@ export default function ClientHome({ client, db, setCurrentView }) {
               // (Het plusje bij voeding opent het logvenster in de agenda zelf; je blijft op Home.)
               // Training: meteen het logscherm van die dag op de workoutpagina.
               // De dag gaat mee, anders opent morgen 'Pull' de 'Push' van vandaag.
+              // Cardio (Hardlopen e.d.): het logblad hier op Home openen. Ging eerst
+              // naar de maaltijdpagina, want alles behalve training viel op 'meal' (19 nov 2026).
+              const cardioNaam = blok.type === 'cardio' ? String(blok.label || '').replace(/^Cardio\s*·\s*/, '') || 'Cardio'
+                : blok.type === 'custom' && /^Cardio\s*·\s*/.test(String(blok.label || '')) ? String(blok.label).replace(/^Cardio\s*·\s*/, '') || 'Cardio' : null
+              if (cardioNaam) {
+                const d = agendaDatum || new Date()
+                const datum = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                const minuten = Number(blok.end) > Number(blok.start) ? Number(blok.end) - Number(blok.start) : null
+                window.dispatchEvent(new CustomEvent('myarc:cardio-log-home', { detail: { soort: cardioNaam, minuten, datum } }))
+                return
+              }
               if (blok.type === 'training') { try { sessionStorage.setItem('myarc_open_workout', blok.day || '1') } catch { /* geen opslag */ } }
               setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')
             }}
           />
+          <CardioLogVanger client={client} db={db} isMobile={isMobile} naam="myarc:cardio-log-home" />
         </div>
       </div>
 

@@ -10,14 +10,16 @@ import CardioLogBlad from './CardioLogBlad'
 import CardioService from '../services/CardioService'
 import { meldFout } from '../../../ui/PaginaVangnet'
 
-export default function CardioLogVanger({ client, db, isMobile }) {
+// `naam`: Home luistert naar een eigen event, zodat een open (verborgen)
+// workoutpagina niet tegelijk een tweede blad opent (19 nov 2026).
+export default function CardioLogVanger({ client, db, isMobile, naam = 'myarc:cardio-log' }) {
   const [blad, setBlad] = useState(null) // { soort, minuten }
   const [gewicht, setGewicht] = useState(null)
   useEffect(() => {
     const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null, datum: e.detail?.datum || null, afstandKm: e.detail?.afstandKm || null })
-    window.addEventListener('myarc:cardio-log', open)
-    return () => window.removeEventListener('myarc:cardio-log', open)
-  }, [])
+    window.addEventListener(naam, open)
+    return () => window.removeEventListener(naam, open)
+  }, [naam])
   useEffect(() => {
     if (!blad || gewicht || !client?.id || !db?.supabase) return
     let leeft = true
