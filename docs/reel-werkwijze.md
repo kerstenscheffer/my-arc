@@ -87,6 +87,16 @@ Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als
 
 Vast in het script: 1080×1920, de stijl hierboven (Poppins Bold wit met rand, kernwoord geel, mascotte boven de tekst), de eerste regel in elk shot op dezelfde hoogte, B-roll een fractie donkerder, zachte overgang van 0,15 s en een rustige zoom per clip (briefing punt 6), muziek op vaste luidheid.
 
+## Concept zetten: grens van 2 minuten
+
+`concept` stopt zichzelf na 120 s (upload en Metricool samen) en zegt waar het misging. Het verloop van elke poging staat in `~/Gino/reels/<naam>/<versie>/concept-log.json`.
+
+- Zet reels één voor één, elk als eigen commando. Nooit twee in één commando.
+- Twijfel je of de koppeling werkt: eerst `concept <naam> --datum … --droog`. Dat maakt geen concept en duurt ongeveer 20 s.
+- "de koppeling is niet bereikt, er is niets aangemaakt": één keer opnieuw proberen. Lukt het weer niet, stop dan en meld het pad van de mp4, zodat Kersten hem zelf in Metricool kan zetten. Blijf niet wachten.
+- "aanroep verstuurd maar geen antwoord": niet opnieuw proberen voor je met de Metricool-leestool hebt gekeken of het concept er al staat. Anders staat hij dubbel.
+- Een video die al in de opslag staat wordt niet opnieuw geüpload, dus een tweede poging is snel.
+
 ## Dag voor dag inplannen
 
 Eén reel per dag, opeenvolgend, vanaf de dag die Kersten noemt. Noemt hij niets, dan vanaf morgen. Standaardtijd 20:00, of de tijd die hij noemt. Dat andere posts die dag al gepland staan is geen reden om te waarschuwen of te verschuiven.
