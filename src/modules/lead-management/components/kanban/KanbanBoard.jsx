@@ -738,7 +738,11 @@ export default function KanbanBoard({
         const ig = (lead.instagram_handle || '').toLowerCase()
         const em = (lead.email || '').toLowerCase()
         const notes = (lead.notes || '').toLowerCase()
-        if (fn.includes(q) || ln.includes(q) || full.includes(q) || ig.includes(q) || em.includes(q) || notes.includes(q)) {
+        // Ook zonder spaties vergelijken: "irene muller" hoort irenemuller11 te vinden.
+        const qKaal = q.replace(/[\s._-]+/g, '')
+        const kaal = (t) => t.replace(/[\s._-]+/g, '')
+        if (fn.includes(q) || ln.includes(q) || full.includes(q) || ig.includes(q) || em.includes(q) || notes.includes(q)
+          || (qKaal.length >= 3 && (kaal(ig).includes(qKaal) || kaal(full).includes(qKaal)))) {
           results.push({ ...lead, sectionId: section.id, sectionTitle: section.title, sectionColor: section.color })
         }
       })
@@ -769,7 +773,14 @@ export default function KanbanBoard({
     setDbCheckLoading(true)
     const timer = setTimeout(async () => {
       try {
-        const found = await leadService.searchLeads(q, 10)
+        let found = await leadService.searchLeads(q, 10)
+        // Met een spatie getypt terwijl de Instagram-naam aan elkaar staat
+        // ("irene muller" → irenemuller11): ook zonder spaties zoeken (19 nov 2026).
+        const kaal = q.replace(/\s+/g, '')
+        if (kaal !== q && kaal.length >= 3 && (found || []).length < 10) {
+          const extra = await leadService.searchLeads(kaal, 10).then(r => r, () => [])
+          found = [...(found || []), ...(extra || []).filter(e => !(found || []).some(f => f.id === e.id))]
+        }
         if (!cancelled) setDbCheckResults(found)
       } catch (err) {
         console.error('Lead search failed:', err)
@@ -905,7 +916,9 @@ export default function KanbanBoard({
     const naarMidden = () => {
       const el = leadRefs.current[leadId]
       if (!el || !el.isConnected) return false
-      el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' })
+      // 'instant' en niet 'auto': het bord heeft zacht scrollen aan staan in de
+      // stijl, en 'auto' volgt dat. Over zes schermbreedtes duurde dat seconden.
+      el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' })
       return true
     }
     let pogingen = 0
