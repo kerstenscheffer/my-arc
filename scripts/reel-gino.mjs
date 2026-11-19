@@ -5,8 +5,9 @@
 //   node scripts/reel-gino.mjs ophalen <bestand>         download + transcript met tijden
 //   node scripts/reel-gino.mjs monteer <bestand>         render uit ~/Gino/reels/<naam>/config.json, maakt vN
 //   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog]
-//   node scripts/reel-gino.mjs broll-clips               eigen B-roll in ~/Gino/reel-assets/broll, met overzichtsbladen
+//   node scripts/reel-gino.mjs broll-clips               eigen B-roll in ~/Gino/reel-assets/broll en de mascottes, met overzichtsbladen
 //   node scripts/reel-gino.mjs broll <naam>              B-roll met tekst (geen stem): render uit ~/Gino/reels/<naam>/config.json, maakt vN
+//                                                        stijl: groot wit, één kernwoord geel, mascotte boven de tekst (docs/reel-werkwijze.md)
 //                                                        daarna: concept <naam> --datum … (zelfde commando als bij een praatreel)
 //   node scripts/reel-gino.mjs shorts                    kant-en-klare YouTube-shorts die nog geen concept hebben
 //   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
@@ -155,7 +156,12 @@ async function broll(naam) {
   const mb = fs.statSync(mp4).size / 1e6
   uit({
     versie: v, video: mp4, omslag: path.join(m, v, 'omslag.jpg'), controle_frames: path.join(m, v, 'controle.jpg'), omslag_uitsneden: path.join(m, v, 'omslag_check.jpg'),
-    uit_s: lang.uit_duur, shots: lang.shots.map(s => ({ van: s.van, tot: s.tot, lettergrootte: s.lettergrootte, clips: s.clips, tekst: s.tekst })),
+    uit_s: lang.uit_duur,
+    shots: lang.shots.map(s => ({
+      van: s.van, tot: s.tot, lettergrootte: s.lettergrootte, mascotte: s.mascotte, clips: s.clips,
+      blokken: s.blokken.map(b => ({ regels: b.regels, geel: b.geel, s: Math.round((b.tot - b.van) * 10) / 10 })),
+    })),
+    shots_zonder_mascotte: lang.shots.map((s, i) => (s.mascotte ? null : i + 1)).filter(Boolean),
     dubbele_clips: lang.dubbele_clips, streams: JSON.parse(info).streams, decodeert_zonder_fouten: !dec.trim(),
     mb: Math.round(mb * 10) / 10, te_groot_voor_upload: mb > 24,
   })
