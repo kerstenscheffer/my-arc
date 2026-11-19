@@ -17,6 +17,8 @@ FPS = 30
 W, H = 1080, 1920
 FONT = os.path.expanduser('~/Gino/reel-assets/fonts/Poppins-Bold.ttf')
 BROLL = os.path.expanduser('~/Gino/reel-assets/broll')
+# Gym-B-roll uit Drive 'B-ROLL  MAP' (20 nov 2026) staat in een eigen map; in de config als "broll-gym/<map>/<clip>".
+BROLL_GYM, GYM_VOOR = os.path.expanduser('~/Gino/reel-assets/broll-gym'), 'broll-gym/'
 MASCOTTES = os.path.expanduser('~/Gino/reel-assets/mascottes')
 TEKST_MAX, TEKST_MIN = 96, 80            # lettergrootte: groot zoals Kerstens voorbeeld, krimpt per shot tot elk blok in 3 regels past
 MAX_B, MAX_REGELS, REGEL = 950, 3, 1.16  # breedte van een regel, regels per blok, regelafstand
@@ -45,12 +47,20 @@ def duur_van(p):
     return float(r.stdout.strip())
 
 
+def clip_pad(rel):
+    """Pad van een clip uit de config: 'broll-gym/…' komt uit de gym-map, de rest uit de gewone B-roll-map. None als hij daar niet staat."""
+    wortel, r = (BROLL_GYM, rel[len(GYM_VOOR):]) if rel.startswith(GYM_VOOR) else (BROLL, rel)
+    pad = os.path.realpath(os.path.join(wortel, r))
+    return pad if pad.startswith(os.path.realpath(wortel) + os.sep) and os.path.isfile(pad) else None
+
+
 def clips():
     uit = []
-    for basis, _, namen in os.walk(BROLL):
-        for n in namen:
-            if n.lower().endswith(('.mp4', '.mov', '.m4v')) and not n.startswith('.'):
-                uit.append(os.path.relpath(os.path.join(basis, n), BROLL))
+    for wortel, voor in ((BROLL, ''), (BROLL_GYM, GYM_VOOR)):
+        for basis, _, namen in os.walk(wortel):
+            for n in namen:
+                if n.lower().endswith(('.mp4', '.mov', '.m4v')) and not n.startswith('.'):
+                    uit.append(voor + os.path.relpath(os.path.join(basis, n), wortel))
     return sorted(uit)
 
 
@@ -71,7 +81,7 @@ def blad(uit):
         im = Image.new('RGB', (kol * tw, math.ceil(len(deel) / kol) * (th + lh)), 'black')
         d = ImageDraw.Draw(im)
         for i, rel in enumerate(deel):
-            p = os.path.join(BROLL, rel)
+            p = clip_pad(rel)
             run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', f'{duur_van(p) / 2:.2f}', '-i', p, '-frames:v', '1',
                  '-vf', f'scale={tw}:{th}:force_original_aspect_ratio=increase,crop={tw}:{th}', tmp])
             x, y = (i % kol) * tw, (i // kol) * (th + lh)
@@ -102,7 +112,7 @@ def blad(uit):
             d.text(((i % mk) * 200 + 8, (i // mk) * 230 + 202), n, font=ft, fill='white')
         mblad = os.path.join(uit, 'mascottes.jpg')
         im.save(mblad, quality=88)
-    print(json.dumps({'map': BROLL, 'clips': [{'clip': c, 's': round(duur_van(os.path.join(BROLL, c)), 1)} for c in lijst],
+    print(json.dumps({'map': BROLL, 'gym_map': BROLL_GYM, 'clips': [{'clip': c, 's': round(duur_van(clip_pad(c)), 1)} for c in lijst],
                       'bladen': bladen, 'mascottes': namen, 'mascotte_blad': mblad}, ensure_ascii=False))
 
 
@@ -255,9 +265,9 @@ def monteer(map_, cfg_pad):
         bron = s['broll'] if isinstance(s['broll'], list) else [s['broll']]
         per = snap(d / len(bron))
         for i, rel in enumerate(bron):
-            pad = os.path.realpath(os.path.join(BROLL, rel))
-            if not pad.startswith(os.path.realpath(BROLL) + os.sep) or not os.path.isfile(pad):
-                sys.exit(f'B-roll niet gevonden in {BROLL}: {rel}. Alleen Kerstens eigen beelden uit die map, geen stock.')
+            pad = clip_pad(rel)
+            if not pad:
+                sys.exit(f'B-roll niet gevonden in {BROLL} of {BROLL_GYM}: {rel}. Alleen Kerstens eigen beelden uit die mappen, geen stock.')
             delen.append({'shot': n, 'clip': rel, 'pad': pad, 'duur': per if i < len(bron) - 1 else snap(d - per * (len(bron) - 1))})
         shots.append({'tekst': [b.replace('*', '') for b in ruw], 'duur': d, 'clips': bron, 'mascotte': s.get('mascotte') or None,
                       'mascotte_plek': s.get('mascotte_plek') or 'midden', '_blokken': blokken, '_duren': duren})
