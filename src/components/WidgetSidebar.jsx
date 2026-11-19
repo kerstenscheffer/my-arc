@@ -17,16 +17,25 @@
 // van 60px breed dat over de pagina viel. Het label blijft als title en
 // aria-label voor wie erop blijft staan of een schermlezer gebruikt.
 
-import React from 'react'
+import React, { useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
 // `achtergrond`: vaste tint i.p.v. het doorschijnende zwart, zodat de balk
 // exact de paginakleur heeft (CoachHub). Dan valt ook de zware schaduw weg.
 export default function WidgetSidebar({ buttons = [], isMobile = false, plek = 'rechtsonder', achtergrond }) {
+  // Telefoon met drie of meer knoppen (CoachHub): ingeklapt achter één knop,
+  // anders staat er een kolom van zes iconen over het bord (19 nov 2026,
+  // Kersten). Eén tik klapt uit; een knop kiezen of het pijltje klapt weer in.
+  const [uit, setUit] = useState(false)
   if (!buttons.length) return null
   // 'rij': horizontaal naast het oog (links), vlak boven de onderbalk.
   const rij = plek === 'rij'
+  const inklapbaar = isMobile && !rij && buttons.length >= 3
+  const dicht = inklapbaar && !uit
+  const ietsNieuws = buttons.some(b => (b.badge != null && b.badge > 0) || b.glow)
+  const actief = buttons.some(b => b.active)
 
   return (
     <nav
@@ -73,7 +82,25 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
           @media (prefers-reduced-motion: reduce) { nav[aria-label="Widgets"] button { animation: none !important; } }
         `}</style>
       )}
-      {buttons.map((btn, i) => {
+      {inklapbaar && (
+        <button
+          onClick={() => setUit(v => !v)}
+          title={dicht ? 'Knoppen tonen' : 'Knoppen inklappen'} aria-label={dicht ? 'Knoppen tonen' : 'Knoppen inklappen'} aria-expanded={!dicht}
+          style={{
+            position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 40, height: 40, padding: 0, background: dicht && actief ? 'rgba(255,255,255,0.12)' : 'transparent',
+            border: 'none', borderRadius: 11, cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {dicht ? <ChevronLeft size={20} color="#fff" strokeWidth={2.8} /> : <ChevronRight size={20} color="#fff" strokeWidth={2.8} />}
+          {/* Ingeklapt: een stip als er achter een van de knoppen iets nieuws staat. */}
+          {dicht && ietsNieuws && (
+            <span style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
+          )}
+        </button>
+      )}
+      {!dicht && buttons.map((btn, i) => {
         const Icon = btn.Icon
         const isActive = !!btn.active
         const accent = btn.color || GOLD
@@ -83,11 +110,11 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         const badgeKleur = accent === GOLD ? '#fff' : accent
         return (
           <React.Fragment key={btn.id}>
-            {i > 0 && !rij && (
+            {(i > 0 || inklapbaar) && !rij && (
               <div style={{ height: 1, margin: '0 6px', background: 'rgba(255,255,255,0.08)' }} />
             )}
             <button
-              onClick={btn.onClick}
+              onClick={(e) => { if (inklapbaar) setUit(false); btn.onClick?.(e) }}
               title={btn.label}
               aria-label={btn.label}
               style={{
