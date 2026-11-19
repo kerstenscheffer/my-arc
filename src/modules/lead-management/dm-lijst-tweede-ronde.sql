@@ -13,6 +13,12 @@
 --   select * from dm_list_fill_v2('<coach>', '<campagne van deze ronde>', 100, 50);
 -- De campagne staat in de opdracht van die routine. Nieuwe ronde = nieuwe rij in
 -- outreach_campaigns + het id in de routine vervangen.
+-- Let op bij het aanpassen van die routine via de API: job_config gaat er in
+-- zijn geheel in (losse velden worden geweigerd), en een aanroep van ~75 kB
+-- komt niet door de toestemmingskaart. Sinds 19 nov 2026 draait hij daarom
+-- zonder de lange standaard-systeemtekst van Cowork.
+-- Draai dm_list_fill_v2 nooit twee keer op een ochtend: bij een kleine lijst
+-- (<50) zet de tweede run de net geplaatste leads terug als 'niet gestuurd'.
 --
 -- "Gestuurd" = de lead heeft een tag van de campagne van deze ronde. Die tag
 -- zet het bord zelf: megafoon → campagne kiezen → paarse DM-knop op de kaart
@@ -21,8 +27,9 @@
 -- ---------------------------------------------------------------------------
 -- 1. Leads die tijdelijk niet op de DM-lijst mogen (bv. net een call-voorstel).
 -- ---------------------------------------------------------------------------
+-- Bewust zonder foreign key: een rij van een lead die niet meer bestaat doet niets.
 create table if not exists public.dm_lijst_overslaan (
-  lead_id    uuid primary key references public.call_leads(id) on delete cascade,
+  lead_id    uuid primary key,              -- call_leads.id
   tot        date not null,                 -- t/m deze dag overslaan
   reden      text,
   created_at timestamptz not null default now()
@@ -30,11 +37,16 @@ create table if not exists public.dm_lijst_overslaan (
 
 alter table public.dm_lijst_overslaan enable row level security;
 
-drop policy if exists rls_coach on public.dm_lijst_overslaan;
-create policy rls_coach on public.dm_lijst_overslaan
-  for all to authenticated
-  using ((select rls_is_coach()))
-  with check ((select rls_is_coach()));
+do $$
+begin
+  if not exists (select 1 from pg_policies
+                 where schemaname = 'public' and tablename = 'dm_lijst_overslaan' and policyname = 'rls_coach') then
+    create policy rls_coach on public.dm_lijst_overslaan
+      for all to authenticated
+      using ((select rls_is_coach()))
+      with check ((select rls_is_coach()));
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. De selectie: mannen die reageerden, meest recente eerste reactie eerst.
