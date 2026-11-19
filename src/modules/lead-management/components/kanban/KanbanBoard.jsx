@@ -728,6 +728,7 @@ export default function KanbanBoard({
       setDbCheckResults([]); setDbCheckLoading(false)
       return
     }
+    setGezochtLeadId(null) // nieuwe zoekopdracht: de vorige kaart niet meer volgen
     const q = query.toLowerCase().trim()
     const results = []
     sections.forEach(section => {
@@ -773,14 +774,8 @@ export default function KanbanBoard({
     setDbCheckLoading(true)
     const timer = setTimeout(async () => {
       try {
-        let found = await leadService.searchLeads(q, 10)
-        // Met een spatie getypt terwijl de Instagram-naam aan elkaar staat
-        // ("irene muller" → irenemuller11): ook zonder spaties zoeken (19 nov 2026).
-        const kaal = q.replace(/\s+/g, '')
-        if (kaal !== q && kaal.length >= 3 && (found || []).length < 10) {
-          const extra = await leadService.searchLeads(kaal, 10).then(r => r, () => [])
-          found = [...(found || []), ...(extra || []).filter(e => !(found || []).some(f => f.id === e.id))]
-        }
+        // search_leads negeert zelf punten, streepjes en spaties (supabase/zoek-leads.sql).
+        const found = await leadService.searchLeads(q, 10)
         if (!cancelled) setDbCheckResults(found)
       } catch (err) {
         console.error('Lead search failed:', err)
@@ -883,6 +878,52 @@ export default function KanbanBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
+  // Wachten tot de kaart er echt staat, dan meteen naar het midden (19 nov
+  // 2026). Eerst was dit één poging na 0,2 s met een zachte scroll: in een
+  // grote sectie die net uitklapt was de kaart dan nog niet getekend en
+  // gebeurde er niets. Nu: elke 80 ms kijken (tot 5 s), direct springen, en
+  // daarna twee keer bijsturen voor als de pagina nog verschoof.
+  const springNaarKaart = (leadId) => {
+    const naarMidden = () => {
+      const el = leadRefs.current[leadId]
+      if (!el || !el.isConnected) return false
+      // 'instant' en niet 'auto': 'auto' volgt zacht scrollen uit de stijl.
+      el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' })
+      return true
+    }
+    let pogingen = 0
+    const zoek = setInterval(() => {
+      pogingen += 1
+      if (naarMidden()) {
+        clearInterval(zoek)
+        setTimeout(naarMidden, 250)
+        setTimeout(naarMidden, 700)
+      } else if (pogingen > 60) clearInterval(zoek)
+    }, 80)
+  }
+
+  // De lead die je via zoeken opende blijft in beeld als hij van sectie wisselt
+  // (19 nov 2026, Kersten). Tik je "+ reactie", dan schuift de kaart vanzelf
+  // naar een andere sectie; op de telefoon staat alleen de actieve sectie in
+  // beeld, dus de kaart was dan weg terwijl je er nog mee bezig was. Nu gaat
+  // het scherm mee. Dat stopt zodra je iets nieuws zoekt.
+  const gezochtSectieId = gezochtLeadId
+    ? (sections.find(s => (s.leads || []).some(l => l.id === gezochtLeadId))?.id || null)
+    : null
+  const vorigGezochtSectie = useRef(null)
+  useEffect(() => {
+    const vorige = vorigGezochtSectie.current
+    vorigGezochtSectie.current = gezochtSectieId
+    if (!gezochtLeadId || !gezochtSectieId || !vorige || vorige === gezochtSectieId) return
+    if (isMobile) setActiveMobileSectionId(gezochtSectieId)
+    setExpandedSections(prev => ({ ...prev, [gezochtSectieId]: true }))
+    setHighlightedLeadId(gezochtLeadId)
+    springNaarKaart(gezochtLeadId)
+    const t = setTimeout(() => setHighlightedLeadId(null), 4000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gezochtSectieId, gezochtLeadId])
+
   const scrollToLead = async (leadId, sectionId) => {
     // Bord nog niet binnen? Bewaar de sprong voor straks.
     if (loading) { pendingScrollRef.current = { leadId, sectionId }; return }
@@ -907,29 +948,7 @@ export default function KanbanBoard({
     setGezochtLeadId(leadId)
     setShowSearchResults(false)
     setSearchQuery('')
-    // Wachten tot de kaart er echt staat, dan meteen naar het midden (19 nov
-    // 2026). Eerst was dit één poging na 0,2 s met een zachte scroll: in een
-    // grote sectie die net uitklapt was de kaart dan nog niet getekend en
-    // gebeurde er niets, of de scroll strandde halverwege omdat de kolom nog
-    // groeide. Nu: elke 80 ms kijken (tot 5 s), direct springen, en daarna
-    // twee keer bijsturen voor als de pagina nog verschoof.
-    const naarMidden = () => {
-      const el = leadRefs.current[leadId]
-      if (!el || !el.isConnected) return false
-      // 'instant' en niet 'auto': het bord heeft zacht scrollen aan staan in de
-      // stijl, en 'auto' volgt dat. Over zes schermbreedtes duurde dat seconden.
-      el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' })
-      return true
-    }
-    let pogingen = 0
-    const zoek = setInterval(() => {
-      pogingen += 1
-      if (naarMidden()) {
-        clearInterval(zoek)
-        setTimeout(naarMidden, 250)
-        setTimeout(naarMidden, 700)
-      } else if (pogingen > 60) clearInterval(zoek)
-    }, 80)
+    springNaarKaart(leadId)
     setTimeout(() => setHighlightedLeadId(null), 4000)
   }
 

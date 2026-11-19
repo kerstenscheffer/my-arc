@@ -1,0 +1,5 @@
+-- search_leads breder (19 nov 2026, Kersten: op de telefoon de naam typen zonder
+-- punten en streepjes). Zelfde naam, argumenten en velden; staat live.
+-- Vindt nu ook: zonder leestekens/spaties ("lars dunnik" → lars_dunnik),
+-- woorden in elke volgorde ("dunnik lars"), en een tikfout ("larsdunik").
+-- De volledige definitie staat in de database (pg_get_functiondef('search_leads'::regproc)).

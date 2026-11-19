@@ -95,6 +95,15 @@ const TEMP_CONFIG = {
   hot:  { label: 'HOT',  color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.25)' }
 }
 
+// De secties waar een lead het vaakst heen gaat staan bovenaan in de Move-lijst
+// (19 nov 2026, Kersten): call voorgesteld, sales call, sale. De rest volgt in
+// de volgorde van het bord.
+const MOVE_EERST = [/call\s*voorgesteld/i, /sales\s*call/i, /^sale(?!\s*verloren)/i, /gesprek/i, /call\s*afgewezen/i, /no\s*show/i, /sale\s*verloren/i]
+function moveVolgorde(lijst) {
+  const rang = (s) => { const i = MOVE_EERST.findIndex(re => re.test(String(s.title || '').trim())); return i === -1 ? MOVE_EERST.length : i }
+  return lijst.map((s, i) => ({ s, i, r: rang(s) })).sort((a, b) => a.r - b.r || a.i - b.i).map(x => x.s)
+}
+
 export default function KanbanCard({
   lead,
   sectionColor,
@@ -875,20 +884,22 @@ export default function KanbanCard({
                 onClick={openMoveDropdown}
                 style={{
                   flexShrink: 0,
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '2px 0',
+                  display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 4,
+                  // Op de telefoon de belangrijkste knop van de kaart: groter en
+                  // hoger, zodat je hem met je duim raakt (19 nov 2026, Kersten).
+                  padding: isMobile ? '0 2px' : '2px 0', minHeight: isMobile ? 40 : undefined,
                   background: 'transparent', border: 'none',
-                  cursor: 'pointer',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <FolderInput size={12} color="#fff" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <FolderInput size={isMobile ? 17 : 12} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
                 <span style={{
-                  fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120,
+                  fontSize: isMobile ? '0.95rem' : '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? 150 : 120,
                 }}>
                   {previousSectionTitle || 'Move'}
                 </span>
-                <ChevronDown size={10} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
+                <ChevronDown size={isMobile ? 15 : 10} color={isMobile ? '#fff' : 'rgba(255,255,255,0.35)'} strokeWidth={isMobile ? 2.8 : 2} style={{ flexShrink: 0 }} />
               </div>
 
               {/* Portal + fixed positie zodat de dropdown niet wordt geclipt
@@ -897,16 +908,16 @@ export default function KanbanCard({
                 <div
                   ref={moveMenuRef}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '170px', maxHeight: '260px', overflowY: 'auto' }}
+                  style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: isMobile ? '240px' : '170px', maxHeight: isMobile ? 'min(70vh, 460px)' : '260px', overflowY: 'auto' }}
                 >
                   <div style={{ padding: '6px 10px', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     {previousSectionTitle ? `Verplaats naar · nu uit ${previousSectionTitle}` : 'Verplaats naar'}
                   </div>
-                  {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
+                  {moveVolgorde(sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId)).map(section => (
                     <div
                       key={section.id}
                       onClick={(e) => { e.stopPropagation(); setShowMoveDropdown(false); onMoveToSection(section.id) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 11px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '7px', padding: isMobile ? '0 14px' : '8px 11px', minHeight: isMobile ? 46 : undefined, cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: isMobile ? '0.95rem' : '0.74rem', fontWeight: isMobile ? 800 : undefined, color: isMobile ? '#fff' : 'rgba(255,255,255,0.85)' }}
                       onMouseEnter={(e) => e.currentTarget.style.background = `${section.color}18`}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
