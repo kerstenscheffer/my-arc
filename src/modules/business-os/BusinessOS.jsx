@@ -21,7 +21,7 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, CalendarDays, ChevronLeft } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays, ChevronLeft, User } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -1439,20 +1439,41 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: isMobile ? 8 : 14,
             paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0, boxSizing: 'border-box',
-            // Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026).
-            opacity: 0.2, pointerEvents: 'none', userSelect: 'none',
+            pointerEvents: 'none', userSelect: 'none',
           }}>
+            {/* Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026). */}
             <div style={{
-              ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1,
+              ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1, opacity: 0.2,
               fontSize: isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
             }}>
               {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(a.omzet)}
             </div>
             <div style={{
               color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase',
-              fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
+              fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)', opacity: 0.2,
             }}>
               Kill the bitch inside
+            </div>
+            {/* Stand van deze maand, klein en dik wit (19 nov 2026). Komt uit get_business_os.nu;
+                een oudere RPC zonder deze velden toont een streepje. */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center',
+              gap: isMobile ? '6px 16px' : '8px 28px', marginTop: isMobile ? 6 : 10, padding: '0 16px',
+            }}>
+              {[
+                ['mannen', 'nieuwe mannen'],
+                ['callsVoorgesteld', 'calls voorgesteld'],
+                ['callsGevoerd', 'calls gevoerd'],
+                ['sales', 'sales'],
+              ].map(([k, label]) => (
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                  {k === 'mannen' && <User size={isMobile ? 15 : 17} strokeWidth={3} color={C.wit} />}
+                  <span style={{ ...NUM, color: C.wit, fontWeight: 900, fontSize: isMobile ? '0.95rem' : '1.1rem' }}>
+                    {data?.nu?.[k] == null ? '–' : getal(data.nu[k])}
+                  </span>
+                  <span style={{ color: C.wit, fontWeight: 800, fontSize: isMobile ? '0.72rem' : '0.8rem' }}>{label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
