@@ -335,9 +335,11 @@ def monteer(map_, cfg_pad):
         fc += f'[{n_geluid}:a]atrim=0:{totaal:.3f}[a]'
     open(f'{uit}/filter.txt', 'w').write(fc)
     mp4 = f"{uit}/{cfg['naam']}.mp4"
-    # Bitrate begrensd: boven ~30 MB breekt de upload naar de bucket af (zie reel-gino.mjs).
+    # Bitrate begrensd: boven ~30 MB breekt de upload naar de bucket af (zie reel-gino.mjs). Een lange reel (vanaf ~46 s)
+    # krijgt minder bitrate, zodat het bestand onder de 24 MB blijft.
+    kbps = min(3800, int(23e6 * 8 / totaal / 1000) - 200)
     run(['ffmpeg', '-y', '-loglevel', 'error', *invoer, '-filter_complex_script', f'{uit}/filter.txt', '-map', '[v]', '-map', '[a]',
-         '-t', f'{totaal:.3f}', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-maxrate', '3800k', '-bufsize', '7600k',
+         '-t', f'{totaal:.3f}', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-maxrate', f'{kbps}k', '-bufsize', f'{2 * kbps}k',
          '-pix_fmt', 'yuv420p', '-r', str(FPS), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-threads', '4', mp4])
 
     # 5. Omslag = het eerste tekstblok van de hook met de mascotte erbij, plus de uitsneden zoals Instagram ze toont (feed 4:5, grid 1:1).
