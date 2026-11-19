@@ -4,7 +4,8 @@
 //   node scripts/reel-gino.mjs lijst                     reels in de Drive-map "Reels agents test"
 //   node scripts/reel-gino.mjs ophalen <bestand>         download + transcript met tijden
 //   node scripts/reel-gino.mjs monteer <bestand>         render uit ~/Gino/reels/<naam>/config.json, maakt vN
-//   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog]
+//   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog] [--grens 120]
+//                                                        upload + Metricool samen hoogstens 120 s; verloop per poging in <versie>/concept-log.json
 //   node scripts/reel-gino.mjs broll-clips               eigen B-roll in ~/Gino/reel-assets/broll en de mascottes, met overzichtsbladen
 //   node scripts/reel-gino.mjs broll <naam>              B-roll met tekst (geen stem): render uit ~/Gino/reels/<naam>/config.json, maakt vN
 //                                                        stijl: groot wit, één kernwoord geel, mascotte boven de tekst (docs/reel-werkwijze.md)
@@ -60,6 +61,15 @@ const brollNaam = (n) => {
   return n
 }
 const reelNaam = (a) => (/\.(mov|mp4|m4v)$/i.test(a || '') ? bestandNaam(a) : brollNaam(a))
+
+// Harde grens (19 nov 2026): upload en Metricool samen hoogstens --grens seconden (standaard 120). Zonder grens
+// wachtte de Metricool-stap tot 24 minuten in stilte en stopte de waakhond de hele opdracht. De klok start bij de upload.
+const GRENS_S = Math.min(Math.max(Number(optie('--grens')) || 120, 30), 170)
+let eindtijd = null
+const startGrens = () => { eindtijd = Date.now() + GRENS_S * 1000 }
+const restMs = () => (eindtijd ? eindtijd - Date.now() : GRENS_S * 1000)
+// Voortgang op stderr: de uitvoer op stdout blijft één JSON-object.
+const stap = (t) => console.error(`[${new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' })}] ${t}`)
 const mapVan = (b) => path.join(REELS, stam(b))
 const versies = (m) => fs.existsSync(m)
   ? fs.readdirSync(m).filter(x => /^v\d+$/.test(x)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : []
@@ -174,7 +184,11 @@ function supabase() {
     .map(r => r.match(/^\s*(VITE_SUPABASE_[A-Z_]+)\s*=\s*(.*)\s*$/)).filter(Boolean).map(([, k, w]) => [k, w.replace(/^['"]|['"]$/g, '')]))
   return createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: {
+      headers: { Authorization: `Bearer ${token}` },
+      // Geen verzoek zonder einde: hoogstens 90 s, en nooit voorbij de grens van de upload.
+      fetch: (url, o = {}) => fetch(url, { ...o, signal: o.signal || AbortSignal.timeout(Math.max(5000, Math.min(90000, restMs()))) }),
+    },
   })
 }
 
@@ -191,17 +205,26 @@ function metVerschuiving(lokaal) {
 
 // De connector laadt soms te laat: dan vindt ToolSearch de tool niet en wordt er niets aangeroepen (19 nov 2026).
 // Alleen in dat geval opnieuw proberen. Is de tool wel aangeroepen, dan nooit: anders kan er een dubbel concept komen.
-async function maakConcept(...invoer) {
-  let r
-  for (let poging = 1; poging <= 3; poging++) {
-    r = await maakConceptEenKeer(...invoer)
+// Binnen de grens (startGrens): hoogstens twee pogingen, en een poging krijgt nooit meer tijd dan er nog over is.
+// Het verloop van elke poging komt in logPad (concept-log.json naast de video): daar staat waar hij bleef hangen.
+async function maakConcept(logPad, ...invoer) {
+  let r = { post: null, fout: null, aanroepen: 0, detail: { einde: 'grens bereikt voor Metricool is aangeroepen' } }
+  for (let poging = 1; poging <= 2; poging++) {
+    const rest = restMs() - 4000
+    if (rest < 20000) break
+    stap(`Metricool poging ${poging}, hoogstens ${Math.round(rest / 1000)} s`)
+    r = await maakConceptEenKeer(rest, ...invoer)
+    if (logPad) {
+      const eerder = fs.existsSync(logPad) ? JSON.parse(fs.readFileSync(logPad, 'utf8')) : []
+      fs.writeFileSync(logPad, JSON.stringify([...eerder, { tijd: new Date().toISOString(), poging, droog: !!invoer[5], gelukt: !!r.post && !r.fout, aanroepen: r.aanroepen, fout: r.fout, ...r.detail }], null, 1))
+    }
     if (r.aanroepen > 0 || r.post) break
-    if (poging < 3) await new Promise(k => setTimeout(k, 15000))
+    if (poging < 2 && restMs() > 30000) await new Promise(k => setTimeout(k, 5000))
   }
   return r
 }
 
-function maakConceptEenKeer(datum, lokaal, caption, video, cover, droog) {
+function maakConceptEenKeer(maxMs, datum, lokaal, caption, video, cover, droog) {
   const info = {
     autoPublish: false, draft: true, saveExternalMediaFiles: true, descendants: [], firstCommentText: '', hasNotReadNotes: false,
     media: [video], videoThumbnailUrl: cover, mediaAltText: [], providers: [{ network: 'instagram' }],
@@ -220,17 +243,33 @@ function maakConceptEenKeer(datum, lokaal, caption, video, cover, droog) {
     const p = spawn('claude', ['-p', prompt, '--model', 'sonnet', '--no-session-persistence', '--setting-sources', 'project',
       '--permission-mode', 'dontAsk', '--allowedTools', `${gebruik},ToolSearch`, '--output-format', 'stream-json', '--verbose', '--max-budget-usd', '1'],
     { cwd: os.tmpdir(), env: omgeving, stdio: ['ignore', 'pipe', 'pipe'] })
-    const delen = [], mis2 = []
-    p.stdout.on('data', d => delen.push(d))
+    const delen = [], mis2 = [], verloop = []
+    const begin = Date.now()
+    let over = false, staart = ''
+    // Elke stap met de seconde erbij: zo is achteraf te zien waar hij wachtte (koppeling, zoeken of de aanroep zelf).
+    const noteer = (wat) => { verloop.push(`${Math.round((Date.now() - begin) / 1000)}s ${wat}`); stap(wat) }
+    p.stdout.on('data', (d) => {
+      delen.push(d)
+      const regels = (staart + d.toString('utf8')).split('\n')
+      staart = regels.pop()
+      for (const regel of regels) {
+        let r
+        try { r = JSON.parse(regel) } catch { continue }
+        if (r.type === 'system' && r.subtype === 'init') noteer(`gestart, koppeling: ${(r.mcp_servers || []).filter(m => /metricool/i.test(m.name)).map(m => m.status).join(', ') || 'nog niet geladen'}`)
+        if (r.type === 'assistant') for (const c of r.message?.content || []) if (c.type === 'tool_use') noteer(c.name === 'ToolSearch' ? 'zoekt de Metricool-tool' : c.name === gebruik ? 'roept Metricool aan' : `roept ${c.name} aan`)
+        if (r.type === 'user') for (const c of Array.isArray(r.message?.content) ? r.message.content : []) if (c.type === 'tool_result') noteer(`antwoord${c.is_error ? ' (fout)' : ''}`)
+        if (r.type === 'result') noteer(`klaar: ${r.subtype}`)
+      }
+    })
     p.stderr.on('data', d => mis2.push(d))
-    const tik = setTimeout(() => p.kill('SIGTERM'), 8 * 60 * 1000)
+    const tik = setTimeout(() => { over = true; noteer(`grens van ${Math.round(maxMs / 1000)} s bereikt, gestopt`); p.kill('SIGTERM'); setTimeout(() => p.kill('SIGKILL'), 2000).unref() }, maxMs)
     p.on('error', e => { clearTimeout(tik); mis(e) })
     p.on('close', (code) => {
       clearTimeout(tik)
       let data = null, fout = null
       const ids = new Set()
       // Waarom het misging als de tool nooit is aangeroepen: zonder dit zie je alleen "connector niet bereikt".
-      const detail = { exit: code, connector: null, einde: null, laatste: null, stderr: Buffer.concat(mis2).toString('utf8').trim().slice(-300) || null }
+      const detail = { exit: code, grens_bereikt: over, seconden: Math.round((Date.now() - begin) / 1000), connector: null, einde: null, laatste: null, verloop, stderr: Buffer.concat(mis2).toString('utf8').trim().slice(-300) || null }
       for (const regel of Buffer.concat(delen).toString('utf8').split('\n')) {
         let r
         try { r = JSON.parse(regel) } catch { continue }
@@ -251,17 +290,35 @@ function maakConceptEenKeer(datum, lokaal, caption, video, cover, droog) {
   })
 }
 
+// Geen concept terug. Is de aanroep wel verstuurd, dan kan het concept er toch staan: eerst kijken, niet blind opnieuw.
+function geenConcept(r) {
+  if (r.fout) return `Metricool: ${r.fout}`
+  if (r.aanroepen > 0) return `Metricool: aanroep verstuurd maar geen antwoord binnen ${GRENS_S} s. Kijk eerst in Metricool of het concept er staat; pas daarna opnieuw, anders staat hij dubbel. (${JSON.stringify(r.detail)})`
+  return `Metricool: geen concept; de koppeling is niet bereikt binnen ${GRENS_S} s, er is niets aangemaakt. Eén keer opnieuw proberen mag, daarna stoppen en het bestand melden. (${JSON.stringify(r.detail)})`
+}
+
 async function uploadVoorMetricool(pad, mp4, omslag) {
+  startGrens()
   const sb = supabase()
   const links = {}
+  // Staat het bestand er al (zelfde grootte), dan niet opnieuw uploaden: een tweede poging na een hangende
+  // Metricool-stap hoeft de 20 MB niet nog eens te versturen.
+  const { data: staat } = await sb.storage.from(BUCKET).list(pad).then(r => r, () => ({ data: null }))
   for (const [naam, f, type] of [['video', mp4, 'video/mp4'], ['cover', omslag, 'image/jpeg']]) {
-    const p = `${pad}/${naam === 'video' ? 'variant.mp4' : 'cover.jpg'}`
-    // Een haperende verbinding mag een short niet kosten: drie keer proberen, alleen bij netwerkfouten.
-    let error
-    for (let poging = 1; poging <= 3; poging++) {
-      ({ error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true }))
-      if (!error || !/fetch failed|network|timeout|socket/i.test(error.message)) break
-      if (poging < 3) await new Promise(r => setTimeout(r, poging * 5000))
+    const bestand = naam === 'video' ? 'variant.mp4' : 'cover.jpg'
+    const p = `${pad}/${bestand}`
+    const erAl = (staat || []).find(x => x.name === bestand)?.metadata?.size === fs.statSync(f).size
+    // Een haperende verbinding mag een short niet kosten: drie keer proberen, alleen bij netwerkfouten en binnen de grens.
+    let error = null
+    if (erAl) stap(`${naam} staat al in de opslag`)
+    else {
+      stap(`upload ${naam} (${Math.round(fs.statSync(f).size / 1e5) / 10} MB)`)
+      for (let poging = 1; poging <= 3; poging++) {
+        ({ error } = await sb.storage.from(BUCKET).upload(p, fs.readFileSync(f), { contentType: type, upsert: true }))
+        if (!error || !/fetch failed|network|timeout|socket|aborted/i.test(error.message)) break
+        if (restMs() < 30000) break
+        if (poging < 3) await new Promise(r => setTimeout(r, poging * 5000))
+      }
     }
     if (error) stop(`upload ${naam}: ${error.message}${error.originalError?.cause ? ` (${error.originalError.cause.code || error.originalError.cause.message})` : ''}`)
     const { data, error: e2 } = await sb.storage.from(BUCKET).createSignedUrl(p, 7200)
@@ -389,13 +446,13 @@ async function short(id) {
   await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', mp4, '-frames:v', '1', '-q:v', '3', omslag])
   const pad = `short-${id.replace(/[^\w-]/g, '_')}`
   const links = await uploadVoorMetricool(pad, mp4, omslag)
-  const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
+  const r = await maakConcept(path.join(m, 'concept-log.json'), datum, lokaal, caption, links.video, links.cover, droog)
   if (droog) { uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, fout: r.fout }); return }
-  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || `geen concept terug; connector niet bereikt (${JSON.stringify(r.detail)})`}`)
+  if (r.fout || !r.post?.id) stop(geenConcept(r))
   if (r.post.draft !== true || r.post.autoPublish !== false) stop(`LET OP: post ${r.post.id} staat niet als concept in Metricool. Controleer hem meteen.`)
   const link = r.post.plannerUrl || `https://app.metricool.com/planner/calendar?blogId=${METRICOOL_MERK}&openWithPostUuid=${r.post.uuid}`
   const media = r.post.media?.[0]
-  const kop = media ? await fetch(media, { method: 'HEAD' }).then(x => Number(x.headers.get('content-length')), () => 0) : 0
+  const kop = media ? await fetch(media, { method: 'HEAD', signal: AbortSignal.timeout(15000) }).then(x => Number(x.headers.get('content-length')), () => 0) : 0
   const volledig = kop === fs.statSync(mp4).size
   fs.writeFileSync(klaarPad, JSON.stringify({ id: r.post.id, link, datum, titel: item.titel }, null, 1))
   if (volledig) fs.unlinkSync(mp4) // de Mac heeft weinig ruimte; opnieuw downloaden kan altijd
@@ -421,17 +478,17 @@ async function concept(b) {
   const caption = fs.readFileSync(path.join(vm, 'caption.txt'), 'utf8').trim()
   const pad = `reel-${stam(b).replace(/[^\w-]/g, '_')}-${v}`
   const links = await uploadVoorMetricool(pad, mp4, omslag)
-  const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
+  const r = await maakConcept(path.join(vm, 'concept-log.json'), datum, lokaal, caption, links.video, links.cover, droog)
   if (droog) {
     // Droog: uploadt wel (test van de token), leest Metricool en maakt geen concept.
     uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, aanroepen: r.aanroepen, fout: r.fout, detail: r.post ? undefined : r.detail })
     return
   }
-  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || `geen concept terug; connector niet bereikt (${JSON.stringify(r.detail)})`}`)
+  if (r.fout || !r.post?.id) stop(geenConcept(r))
   if (r.post.draft !== true || r.post.autoPublish !== false) stop(`LET OP: post ${r.post.id} staat niet als concept in Metricool. Controleer hem meteen.`)
   const link = r.post.plannerUrl || `https://app.metricool.com/planner/calendar?blogId=${METRICOOL_MERK}&openWithPostUuid=${r.post.uuid}`
   const media = r.post.media?.[0]
-  const kop = media ? await fetch(media, { method: 'HEAD' }).then(x => Number(x.headers.get('content-length')), () => 0) : 0
+  const kop = media ? await fetch(media, { method: 'HEAD', signal: AbortSignal.timeout(15000) }).then(x => Number(x.headers.get('content-length')), () => 0) : 0
   const volledig = kop === fs.statSync(mp4).size
   fs.writeFileSync(klaarPad, JSON.stringify({ id: r.post.id, link, datum, versie: v }, null, 1))
   uit({ concept: r.post.id, link, datum, versie: v, video_compleet_in_metricool: volledig })

@@ -421,7 +421,19 @@ const CODE_KAART_BASH = new RegExp([
   '\\bsupabase\\s+(db\\s+(reset|push)|functions\\s+delete|projects|branches)\\b',
 ].join('|'), 'i')
 const SUPABASE_VRIJ = /^mcp__claude_ai_Supabase__(execute_sql|apply_migration|deploy_edge_function|get_\w+|list_\w+|query_logs|search_docs|generate_typescript_types)$/
-const INGEBOUWD_KAART = /^(RemoteTrigger|Cron\w+|PushNotification|SendToProject\w*|EnterWorktree|ExitWorktree)$/
+// 19 nov 2026 (Kersten: "geef zoveel mogelijk recht"): ook vrij, want niemand anders ziet het
+// of het blijft een concept: Gmail-concepten en labels, eigen agenda-items (met gasten is
+// een harde blokkade), Drive-bestanden maken/aanpassen (delen blijft dicht), Metricool
+// ter review, Claude Docs, Unsplash, en alle lees-acties (get/list/search/read/query…).
+const MCP_VRIJ = new RegExp([
+  '^mcp__claude_ai_Gmail__(create_draft|update_draft|get_\\w+|list_\\w+|search_\\w+|label_\\w+|unlabel_\\w+|create_label|update_label|download_gmail_attachment|apply_sensitive_\\w+)$',
+  '^mcp__claude_ai_Google_Calendar__(create_event|list_\\w+|get_event|search_events|suggest_time)$',
+  '^mcp__claude_ai_Google_Drive__(create_file|copy_file|update_file|get_\\w+|list_\\w+|search_files|read_file_content|download_file_content)$',
+  '^mcp__claude_ai_Metricool_Social_Media_Management__(get\\w+|createScheduledPostForReview)$',
+  '^mcp__claude_ai_Claude_Docs__\\w+$', '^mcp__claude_ai_Unsplash__(search_\\w+|get_\\w+|download_asset|add_asset_to_\\w+|create_collection\\w*|upload_image_for_search)$',
+  '^mcp__[\\w-]+__(get|list|search|read|query|fetch|describe|find)[\\w-]*$',
+].join('|'))
+const INGEBOUWD_KAART = /^(RemoteTrigger|Cron\w+|SendToProject\w*|EnterWorktree|ExitWorktree)$/
 export function vrijInCode(tool, invoer = {}) {
   const naam = String(tool || '')
   const shell = naam === 'Bash' || naam === 'Monitor'
@@ -429,7 +441,7 @@ export function vrijInCode(tool, invoer = {}) {
   try { tekst = shell ? String(invoer?.command || '') : JSON.stringify(invoer || {}).replace(/\\n/g, '\n').replace(/\\"/g, '"') } catch { return false }
   if (PLAN_SCHRIJVEN.some(re => re.test(tekst)) || /\bdelete\s+from\b/i.test(tekst)) return false
   if (shell) return !!tekst.trim() && !CODE_KAART_BASH.test(tekst)
-  if (naam.startsWith('mcp__')) return SUPABASE_VRIJ.test(naam)
+  if (naam.startsWith('mcp__')) return SUPABASE_VRIJ.test(naam) || MCP_VRIJ.test(naam)
   return !!naam && !INGEBOUWD_KAART.test(naam)
 }
 const CODE_VRIJ = [
@@ -445,6 +457,11 @@ const CODE_VRIJ = [
   ['mcp__claude_ai_Supabase__deploy_edge_function', { name: 'feedback-regel', files: [] }],
   ['WebSearch', { query: 'supabase edge function deno npm import' }],
   ['Agent', { description: 'zoek', prompt: 'Zoek waar MealCard gebruikt wordt' }],
+  ['mcp__claude_ai_Gmail__create_draft', { to: 'x', body: 'concept' }],
+  ['mcp__claude_ai_Google_Calendar__create_event', { summary: 'Deep work' }],
+  ['mcp__claude_ai_Metricool_Social_Media_Management__createScheduledPostForReview', {}],
+  ['mcp__claude_ai_Zoom_for_Claude__search_meetings', { q: 'x' }],
+  ['PushNotification', { message: 'klaar' }],
 ]
 const CODE_KAART = [
   ['Bash', { command: 'npm run release' }],
@@ -457,7 +474,9 @@ const CODE_KAART = [
   ['mcp__claude_ai_Supabase__execute_sql', { query: "update client_meal_plans set is_active = false where client_id = 'x'" }],
   ['mcp__claude_ai_Supabase__execute_sql', { query: "delete from zoek_log where id = 'x'" }],
   ['mcp__claude_ai_Supabase__pause_project', { project_id: 'x' }],
-  ['mcp__claude_ai_Gmail__create_draft', { to: 'x' }],
+  ['mcp__claude_ai_Gmail__send_message', { to: 'x' }],
+  ['mcp__claude_ai_Google_Calendar__update_event', { id: 'x' }],
+  ['mcp__claude_ai_Google_Drive__share_file', { id: 'x' }],
   ['mcp__claude_ai_Metricool_Social_Media_Management__createScheduledPost', {}],
   ['RemoteTrigger', { action: 'run' }],
 ]
@@ -508,7 +527,7 @@ const MOET_VRIJ = [
 ]
 const STUB = {
   'scripts/goed.mjs': "import a from './hulp.mjs'\nconsole.log(a)", 'scripts/hulp.mjs': 'export default 1',
-  'scripts/slecht.mjs': "x.from('a').insert(1)", 'scripts/laadt.mjs': "import a from './slecht.mjs'", 'scripts/mail.mjs': 'send-push',
+  'scripts/slecht.mjs': "x.from('a').insert(1)", 'scripts/laadt.mjs': "import a from './slecht.mjs'", 'scripts/mail.mjs': "sb.functions.invoke('send-push')",
   'scripts/stiekem.mjs': "await import('./slecht.mjs')",
   '~/Gino/p/overzicht.py': "import json,sys\nd=json.load(open(f'dagen/{sys.argv[1]}.json'))\nprint(d)",
   '~/Gino/p/stuur.py': "import json\nimport hulp\nhulp.x()", '~/Gino/p/hulp.py': "import urllib.request\ndef x(): pass",
@@ -644,6 +663,6 @@ export function veiligZelftest() {
   // Harde blokkades: valse meldingen weg, echte blijven.
   const blok = (c) => hardeBlokkade('Bash', { command: c })?.soort || null
   for (const c of ['echo "t:${PA_ACCESS_TOKEN:+ja}"', 'cd /tmp/x && rm -f a.txt', `node scripts/pa-db.mjs lees "select lead, mail from x"`]) if (blok(c)) fouten.push(`valse blokkade: ${c}`)
-  for (const [c, s] of [['echo $PA_ACCESS_TOKEN', 'geheim'], ['echo ${PA_ACCESS_TOKEN}', 'geheim'], ['echo ${TOKEN:+$TOKEN}', 'geheim'], ['rm -f a.txt', 'verwijderen'], ['cd /tmp/x && cd ~/workapp && rm a.txt', 'verwijderen'], ['cd /tmp/x && rm ../a', 'verwijderen'], ['cd /tmp/x && rm -rf /Users/x/y', 'verwijderen'], ['stuur mail naar klanten', 'melding'], [`node scripts/pa-db.mjs lees "select stuur_push(id) from clients"`, 'melding'], ['git push', 'git']]) if (blok(c) !== s) fouten.push(`moet blokkeren (${s}): ${c}`)
+  for (const [c, s] of [['echo $PA_ACCESS_TOKEN', 'geheim'], ['echo ${PA_ACCESS_TOKEN}', 'geheim'], ['echo ${TOKEN:+$TOKEN}', 'geheim'], ['rm -f a.txt', 'verwijderen'], ['cd /tmp/x && cd ~/workapp && rm a.txt', 'verwijderen'], ['cd /tmp/x && rm ../a', 'verwijderen'], ['cd /tmp/x && rm -rf /Users/x/y', 'verwijderen'], ['curl -X POST https://api.resend.com/emails -d x', 'melding'], [`node scripts/pa-db.mjs lees "select stuur_push(id) from clients"`, 'melding'], ['git push', 'git']]) if (blok(c) !== s) fouten.push(`moet blokkeren (${s}): ${c}`)
   return fouten
 }

@@ -230,7 +230,9 @@ async signIn(email, password) {
 
   async signOut() {
     try {
-      const { error } = await supabase.auth.signOut()
+      // Alleen dit apparaat (19 nov 2026). Zonder scope logt Supabase het account overal
+      // uit, ook de PA op de Mac ("Login kwijt" na elke uitlog of portaalwissel).
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) throw error
       
       this.currentUser = null

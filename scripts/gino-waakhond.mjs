@@ -44,7 +44,14 @@ export function cpuOnder(pid) {
 // Zelfde vorm als maakKlok in business-os-pa.mjs: pauze, verder, stop, opnieuw.
 export function maakStilteKlok({ pid, opMeld, opHersteld, opVast, meldMs = 60000, stopMs = 180000, tikMs = 15000, cpuDrempel = 0.3 }) {
   let teken = Date.now(), gepauzeerd = false, uit = false, gemeld = false, vorigeCpu = null, bezigMeten = false
+  let vorigeTik = Date.now()
   const tik = async () => {
+    // Sliep de Mac? Dan valt er een groot gat tussen twee tikken. Die tijd telt niet als
+    // stilte: anders stopte hij een ronde direct na het wakker worden (19 nov 2026, nachtrondes).
+    const nu = Date.now()
+    const gat = nu - vorigeTik - tikMs
+    vorigeTik = nu
+    if (gat > tikMs * 2) teken += gat
     if (uit || gepauzeerd || bezigMeten) return
     bezigMeten = true
     const cpu = await cpuOnder(pid())

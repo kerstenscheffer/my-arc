@@ -385,8 +385,10 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
 
   // 19 nov 2026: een code-opdracht werkt zo vrij als Claude Code in de terminal.
   // Alleen live zetten, git-geschiedenis, klantplannen en 'delete from' houden een kaart.
-  if (veiligAan && ctx.code && vrijInCode(tool, invoer)) {
-    console.log(`${tijd()} ✓ code, zonder vraag: ${tool === 'Bash' ? maskeer(String(invoer?.command || '')).split('\n')[0].slice(0, 140) : tool}`)
+  // Later die dag ook de chat en de rondes (Kersten: "geef zoveel mogelijk recht"); de chat
+  // houdt wel de strengere harde blokkade (rm alleen in tijdelijke mappen, delete from dicht).
+  if (veiligAan && vrijInCode(tool, invoer)) {
+    console.log(`${tijd()} ✓ ${ctx.code ? 'code' : 'chat'}, zonder vraag: ${tool === 'Bash' ? maskeer(String(invoer?.command || '')).split('\n')[0].slice(0, 140) : tool}`)
     return toegestaan
   }
 
@@ -421,6 +423,12 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
       sb.from('business_os_toestemming_regels').update({ laatst_gebruikt_at: new Date().toISOString() }).eq('id', regel[0].id).then(() => {}, () => {})
       return toegestaan
     }
+  }
+
+  // Groeironde: niemand kijkt mee, dus geen kaart en niet wachten.
+  if (ctx.onbewaakt) {
+    console.log(`${tijd()} ⤫ ronde, niet vrij: ${cmd ? maskeer(cmd).split('\n')[0].slice(0, 120) : tool}`)
+    return weigerTool('Dit kan in een ronde niet: er kijkt niemand mee om het toe te staan. Ga door met wat wel kan en zet het bij NODIG.')
   }
 
   // 3. Kaart direct in de chat. Push pas als hij na 60 s nog open staat, max. 1 per 15 min
@@ -653,11 +661,16 @@ async function maakWarm(slim = null) {
   }
   // dontAsk weigert zonder de vraag-tool aan te roepen, dus met vragen: default.
   // Groeirondes vragen nooit: daar kijkt niemand mee.
-  const ctx = toestemmingAan && !slim?.zonderVragen ? nieuweVraagContext(null, VRAAG_CHAT_MS) : null
+  // 19 nov 2026: een groeironde (zonder eigen smalle toolset) krijgt ook het loket, maar
+  // onbewaakt: wat vrij is gaat door, de rest wordt meteen geweigerd zonder kaart. Eerst
+  // stond hij op dontAsk en liep hij vast op alles buiten de vaste lijst.
+  const onbewaakt = toestemmingAan && !!slim?.zonderVragen && !slim?.toegestaan
+  const ctx = toestemmingAan && (!slim?.zonderVragen || onbewaakt) ? nieuweVraagContext(null, VRAAG_CHAT_MS) : null
+  if (ctx && onbewaakt) ctx.onbewaakt = true
   const basis = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--permission-mode', ctx ? 'default' : 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS,
     '--mcp-config', ctx ? vraagMcp(ctx) : '{"mcpServers":{}}', ...(ctx ? ['--permission-prompt-tool', VRAAG_TOOL] : [])]
-  const prompt = chatPrompt({ skills: skills || [], geheugen: geheugen || [], vragen: !!ctx })
+  const prompt = chatPrompt({ skills: skills || [], geheugen: geheugen || [], vragen: !!ctx && !ctx.onbewaakt })
   const args = slim ? [
     ...basis,
     '--append-system-prompt', prompt,
@@ -1151,11 +1164,26 @@ async function rondeGroei() {
     const t0 = Date.now()
     const dagNL = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' })).getDay()
     const vraag = taken ? TAKEN_VRAAG(taken) : project ? PROJECT_VRAAG(project) : klanten ? klantenVraag(dagNL) : statscheck ? statscheckVraag(statscheck) : todocheck ? todocheckVraag(todocheck.dag, todocheck.taken) : ginotaak ? ginoTaakVraag(ginotaak) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
+    // Sliep de Mac tijdens de ronde (gat van >1 min tussen tikken)? Dan telt de poging niet:
+    // 's nachts mislukten bijna alle rondes zo, drie keer op rij (19 nov 2026).
+    let sliep = false, vorigeTik = Date.now()
+    const slaapTik = setInterval(() => { const nu = Date.now(); if (nu - vorigeTik > 60000) sliep = true; vorigeTik = nu }, 5000)
     const r = await wakkerTijdens(() => beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f), { rijId: rij.id, zonderVragen: true, toegestaan: statscheck ? STATSCHECK_TOEGESTAAN : (todocheck || ginotaak) ? TODOCHECK_TOEGESTAAN : null }))
+    clearInterval(slaapTik)
     lopend.delete(rij.id)
-    // Mislukt, meestal doordat de Mac sliep: nog twee keer proberen als hij weer wakker is.
+    const slaapPogingen = Number(rij.invoer?.slaap_pogingen) || 0
+    if (!r.ok && sliep && slaapPogingen < 6) {
+      console.log(`${tijd()} ↻ groeironde opnieuw: de Mac sliep (${slaapPogingen + 1}/6)`)
+      const { data: terug } = await sb.from('business_os_opdrachten').update({ status: 'wacht', invoer: { ...(rij.invoer || {}), slaap_pogingen: slaapPogingen + 1 } })
+        .eq('id', rij.id).eq('status', 'bezig').select('id')
+      if (taken && !terug?.length) await kaartenVastNaRonde(sb, taken, TAKEN_GEEN_UITKOMST)
+      if (ginotaak && !terug?.length) await ginoTaakKlaar(ginotaak.taak_id, false, 'Gestopt.')
+      return
+    }
+    if (!r.ok && sliep && r.antwoord) r.antwoord = { ...r.antwoord, tekst: `De Mac sliep steeds tijdens deze ronde (${slaapPogingen + 1} keer geprobeerd), dus hij is niet afgekomen. Laat de Mac aan de lader aan staan als je deze ronde wilt.` }
+    // Mislukt om een andere reden: nog twee keer proberen.
     const poging = Number(rij.invoer?.poging) || 0
-    if (!r.ok && poging < 2) {
+    if (!r.ok && !sliep && poging < 2) {
       console.log(`${tijd()} ↻ groeironde opnieuw (poging ${poging + 2})`)
       const { data: terug } = await sb.from('business_os_opdrachten').update({ status: 'wacht', invoer: { ...(rij.invoer || {}), poging: poging + 1 } })
         .eq('id', rij.id).eq('status', 'bezig').select('id')

@@ -55,11 +55,13 @@ const TEKST_REGELS = [
   ['melding', new RegExp(`\\b${MELD_WOORD}\\w*\\b[^\\n]{0,60}\\b${ONTVANGER}\\b`, 'i')],
   ['melding', new RegExp(`\\b${ONTVANGER}\\b[^\\n]{0,60}\\b(${MELD_WOORD.slice(1, -1)}|melding|meldingen|notificatie|notificaties|bericht|berichten)\\w*\\b`, 'i')],
   ['melding', /\bnet\.http_(post|get)\b|\bhttp_post\s*\(/i],
-  ['melding', /\b(select|perform|call)\b[\s\S]{0,200}?\b\w*(notif|push|melding|verstuur|stuur_|send_)\w*\s*\(/i],
+  // (?<![.\w$]): rijen.push( of b.select().push( in JavaScript is geen meldfunctie (19 nov 2026).
+  ['melding', /\b(select|perform|call)\b[\s\S]{0,200}?(?<![.\w$])\w*(notif|push|melding|verstuur|stuur_|send_)\w*\s*\(/i],
   ['melding', /(^|[\s;|&(])(sendmail|mailx|mutt|msmtp|mail\s+-s)\b/i],
   ['melding', /osascript[\s\S]*\b(mail|messages|whatsapp)\b/i],
   ['melding', /api\.resend\.com|api\.sendgrid\.com|api\.twilio\.com|api\.postmarkapp\.com|mandrillapp\.com|mailgun\.net|graph\.(facebook|instagram)\.com\/[^\s'"]*\/messages|api\.whatsapp|manychat\.com\/fb\/sending|fcm\.googleapis\.com|api\.(sandbox\.)?push\.apple\.com|onesignal\.com/i],
-  ['melding', /scripts\/\S*(push|notif|melding|mail|send|stuur|bericht)\S*/i],
+  // Alleen draaien telt; grep of sed op zo'n bestand verstuurt niets (19 nov 2026).
+  ['melding', /(^|[\s;|&(])(node|deno|bun|tsx|ts-node|python3?|bash|sh|zsh)\s+(-\S+\s+)*\S*scripts\/\S*(push|notif|melding|mail|send|stuur|bericht)\S*|(^|[\s;|&(])\.\/scripts\/\S*(push|notif|melding|mail|send|stuur|bericht)\S*/i],
   // Stripe
   ['stripe', /\bapi\.stripe\.com\b/i],
   ['stripe', /\bstripe\s+(charges|payment_intents|paymentintents|subscriptions|refunds|invoices|checkout|customers|payouts|transfers|payment_links|setup_intents|trigger|post|delete)\b/i],
@@ -73,12 +75,17 @@ const TEKST_REGELS = [
   ['git', /\bgit\s+(?:(?:-[cC]|--git-dir|--work-tree)\s+\S+\s+|--?[\w-]+(?:=\S+)?\s+)*push\b/i],
   // Rechten en algemene shell
   ['rechten', /--dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions|skipDangerousModePermissionPrompt|--permission-mode\b|--permission-prompt-tool\b|\bdefaultMode\b/i],
-  ['rechten', /\.claude\/settings|\.claude\.json/i],
+  // Lezen van .claude/settings mag (19 nov 2026); schrijven niet, en .claude.json helemaal niet.
+  ['rechten', /(>>?\s*|\btee\s+(-\w+\s+)*|\b(cp|mv|ln|install)\s+(-\w+\s+)*\S+\s+|\brm\s+(-\w+\s+)*|\bsed\s+-i\S*\s+('[^']*'|"[^"]*"|\S+)\s+|\bperl\s+-[a-z]*i\S*\s+('[^']*'|"[^"]*"|\S+)\s+|writeFile\w*\(\s*['"`]?|appendFile\w*\(\s*['"`]?)[^\s;|&'"`]*\.claude\/settings|\.claude\.json/i],
   ['rechten', /(>|\btee\b|\bcp\b|\bmv\b|\bln\b|\bsed\s+-i|\bperl\s+-[a-z]*i)[^\n]*(gino-blokkade|gino-toestemming|gino-veilig|gino-waakhond)/i],
   ['rechten', /(^|[\s;|&(])(bash|sh|zsh|dash|fish|ksh)\s+-[a-z]*c\b|(^|[\s;|&(])eval\s|\|\s*(sudo\s+)?(bash|sh|zsh)\b|(^|[\s;|&(])sudo\s/i],
   // Geheimen
-  ['geheim', /(^|[;&|]\s*)(env|printenv|set|export\s+-p)\s*($|[|;&>])/i],
-  ['geheim', /(^|[\s'"=/])\.env(\.[\w-]+)?($|[\s'"/;|&])/i],
+  // env | grep -c X of -q X toont alleen óf iets er is, geen waarde (19 nov 2026).
+  ['geheim', /(^|[;&|]\s*)(env|printenv|set|export\s+-p)\s*($|[;&>]|\|(?!\s*grep\s+-[a-zA-Z]*[cq][a-zA-Z]*\s))/i],
+  // .env: alleen het bestand tonen, kopiëren of inladen in de shell. Een script dat er zelf
+  // de Supabase-sleutel uit leest (--env-file, readFileSync('.env.local')) mag (19 nov 2026).
+  ['geheim', /(^|[;&|\n(`]\s*|\$\(\s*)(cat|head|tail|less|more|bat|grep|rg|egrep|fgrep|sed|awk|strings|xxd|od|hexdump|source|\.|cp|mv|scp|rsync|base64|open|pbcopy|tee|diff|cmp|nl|sort|uniq|cut|tr|wc|column|jq|xargs)\b[^;&|\n]*?(^|[\s'"=/<])\.env(\.[\w-]+)?($|[\s'"/;|&)])/i],
+  ['geheim', /(console\.\w+|print|pprint|JSON\.stringify|util\.inspect|Object\.(entries|keys|values))\s*\(\s*(process\.env|os\.environ|Deno\.env\.toObject\(\))\s*[),]/i],
   ['geheim', /\bsecurity\s+(find|dump)-|\bgcloud\s+auth\s+print|\bgh\s+auth\s+token|\bvercel\s+env\s|\bsupabase\s+secrets\b/i],
   ['geheim', /\.ssh\/|\.aws\/credentials|\.netrc|\.npmrc|myarc-pa\/|sessie\.json|\.config\/gcloud|\/Keychains\//i],
   ['geheim', /\b(echo|printf|cat|print)\b[^\n]*\$\{?\w*(KEY|TOKEN|SECRET|PASSWORD|WACHTWOORD)\w*/i],
@@ -90,9 +97,33 @@ for (const re of schrijfNaar(GELD_TABELLEN)) TEKST_REGELS.push(['stripe', re])
 // raakten vooral gewone code en uitleg ("melding voor klanten bouwen"); de concrete
 // regels (tabellen, verzendfuncties, mail-API's, Stripe, geheimen) blijven allemaal.
 const TEKST_REGELS_CODE = TEKST_REGELS.slice(2).map(([s, re]) => (re === DB_WEG ? [s, DB_WEG_CODE] : [s, re]))
+// ── Valse treffers weghalen vóór het toetsen (19 nov 2026) ──
+// Uit de kaarten van 1-19 nov: Gino werd hierop geblokkeerd terwijl er niets verstuurd,
+// verwijderd of getoond werd.
+//   · `drop policy|trigger|index|view|function if exists X` gevolgd door `create … X`:
+//     dat is opnieuw aanmaken (zo staan al onze SQL-bestanden), geen weghalen.
+//   · `[ -n "$TOKEN" ]` / `test -z "$X"`: toont alleen óf er iets staat.
+//   · `update coach_notifications set read_status = true`: gelezen zetten bij de coach zelf.
+const HERBOUW = /\bdrop\s+(policy|trigger|index|view|function|procedure|type)\s+if\s+exists\s+("?[\w.]+"?(?:\s*\([^)]*\))?)[^;]*;?/gi
+function zonderValseTreffers(tekst) {
+  let t = String(tekst || '')
+  t = t.replace(HERBOUW, (heel, soort, naam) => {
+    const kaal = naam.replace(/"/g, '').replace(/\s*\(.*$/, '').split('.').pop()
+    const opnieuw = new RegExp(`\\bcreate\\s+(or\\s+replace\\s+)?(unique\\s+)?(constraint\\s+)?${soort}\\s+(if\\s+not\\s+exists\\s+)?("?[\\w]+"?\\.)?"?${kaal.replace(/[^\w]/g, '')}"?\\b`, 'i')
+    return opnieuw.test(t) ? `herbouw ${soort};` : heel
+  })
+  // grep -c / -q / -l telt of noemt alleen bestanden, nooit de inhoud.
+  t = t.replace(/\bgrep\s+(-[a-zA-Z]*[cql][a-zA-Z]*\s+)+[^;|&\n<>]*/g, 'grep_telt ')
+  t = t.replace(/\[\s+-[nz]\s+"?\$\{?\w+\}?"?\s+\]|\btest\s+-[nz]\s+"?\$\{?\w+\}?"?/g, '[ test ]')
+  t = t.replace(/\bupdate\s+(only\s+)?("?public"?\.)?"?coach_notifications"?\s+set\s+((read_status|is_read|read_at|gelezen|gelezen_at|gezien_at)\s*=\s*[^,;)]+?\s*,\s*)*(read_status|is_read|read_at|gelezen|gelezen_at|gezien_at)\s*=\s*[^,;)]+?(?=\s+(where|returning|from)\b|\s*;|\s*\)|\s*$)/gi, 'gelezen_zetten')
+  return t
+}
+
 // Naam van een bestaande functie die klanten bereikt: alleen als er geen leescommando staat.
 const NOEM_REGELS = [
-  ['melding', /send-push|send-email|send_email|push-notification|mail-lead-pdf|manychat-webhook|functions\/v1\/\S*(push|mail|notif|send|bericht|melding)|functions\s+invoke\s+\S*(push|mail|notif|send)|functions\.invoke\(\s*['"]\S*(push|mail|notif|send)/i],
+  // Alleen aanroepen telt: de naam in een pad (node_modules/@capacitor/push-notifications) of
+  // een grep erop verstuurt niets (19 nov 2026).
+  ['melding', /functions\/v1\/\S*(push|mail|notif|send|bericht|melding|manychat)|functions\s+(invoke|serve)\s+\S*(push|mail|notif|send|manychat)|functions\.invoke\(\s*['"`]\S*(push|mail|notif|send|manychat)/i],
 ]
 
 const LEESCOMMANDO = /^\s*(grep|rg|cat|ls|head|tail|wc|git\s+(diff|log|show|status))\b[^;|&]*$/
@@ -109,7 +140,7 @@ const isTijdelijk = (p) => {
 // of T=/tmp/x. Alleen als het een echte, eenmalige toewijzing is: niet in een heredoc of
 // tussen quotes, en nooit een naam die al iets betekent (HOME, PWD).
 const VASTE_NAMEN = new Set(['HOME', 'PWD', 'OLDPWD', 'PATH', 'USER', 'TMPDIR', 'SHELL', 'IFS', 'LOGNAME', 'CDPATH'])
-export function tijdelijkeVars(cmd) {
+export function tijdelijkeVars(cmd, opties = {}) {
   const tekst = String(cmd || '').replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\2(?=\n|$)/g, '<<H$3')
   const uit = new Map()
   const toewijzing = /(^|[;&|\n]\s*)([A-Za-z_]\w*)=("?\$\(mktemp(?:\s+[-\w./%~]+)*\)"?|[^\s;&|"'`$()]+)(?=\s*(?:$|[;&|\n]))/g
@@ -121,7 +152,8 @@ export function tijdelijkeVars(cmd) {
     if ((tekst.match(new RegExp(`(^|[^\\w$])${naam}=`, 'g')) || []).length !== 1) continue
     if (new RegExp(`\\b(read|for|export|local|declare|unset)\\s[^;&|\\n]*\\b${naam}\\b`).test(tekst)) continue
     const waarde = m[3].includes('mktemp') ? `/tmp/mktemp-${naam}` : m[3]
-    if (isTijdelijk(waarde)) uit.set(naam, waarde)
+    // Code-opdracht (19 nov 2026): ook een vaste map in ~/Gino (D=~/Gino/plannen; rm $D/*-oud.json).
+    if (isTijdelijk(waarde) || (opties.code && GINO_ABS.test(waarde) && !waarde.includes('..'))) uit.set(naam, waarde)
   }
   return uit
 }
@@ -150,7 +182,7 @@ const werkPad = (p, plek) => {
 }
 
 function verwijdertTeVeel(cmd, opties = {}) {
-  const vars = tijdelijkeVars(cmd)
+  const vars = tijdelijkeVars(cmd, opties)
   let plek = opties.code ? 'repo' : null
   if (/\bgit\s+clean\b|\brimraf\b|\bxargs\b[^|;&]*\brm\b|-exec\s+(rm|shred|unlink)\b|\bdd\b[^|;&]*\bof=|\btruncate\s+-|\bfs\.(rm|rmSync|unlink|unlinkSync|rmdir|rmdirSync)\b|\bshutil\.rmtree\b|\bos\.(remove|unlink|rmdir)\b/.test(cmd)) return true
   // Relatief pad na "cd /tmp/...": ligt dan ook in de tijdelijke map.
@@ -169,7 +201,10 @@ function verwijdertTeVeel(cmd, opties = {}) {
       const paden = woorden.slice(1).filter(w => !w.startsWith('-'))
       // Alleen de kale variabele: is hij toch leeg, dan krijgt rm geen pad en doet hij niets.
       const kaleVar = (p) => vars.has(p.match(/^"?\$\{?(\w+)\}?"?$/)?.[1])
-      const magWeg = (p) => isTijdelijk(p) || kaleVar(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..')) || (!!opties.code && werkPad(p, plek))
+      // $D/x of ${D}/x: de variabele invullen en dan gewoon toetsen.
+      const ingevuld = (p) => p.replace(/^"?\$\{?(\w+)\}?(?=\/)/, (h, n) => (vars.has(n) ? vars.get(n) : h)).replace(/"$/, '')
+      const magWeg = (p0) => { const p = ingevuld(p0); return p !== p0 && /^\$/.test(p) ? false : magWeg0(p) }
+      const magWeg0 = (p) => isTijdelijk(p) || kaleVar(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..')) || (!!opties.code && werkPad(p, plek))
       if (!paden.length || !paden.every(magWeg)) return true
     }
     if (woorden[0] === 'find' && /\s-delete\b/.test(stuk)) {
@@ -197,8 +232,11 @@ const PAD_TOOLS = new Set(['Read', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Gre
 // null = geen blokkade; anders { soort, reden }.
 // opties.code: een code-opdracht op de Mac (zie TEKST_REGELS_CODE en werkPad).
 export function hardeBlokkade(tool, invoer = {}, opties = {}) {
-  const regels = opties.code ? TEKST_REGELS_CODE : TEKST_REGELS
-  const woordRegels = opties.code ? 0 : 2
+  // 19 nov 2026: de woordregels (stuur … klant) toetsen in de chat alleen nog de uitleg
+  // van het model, niet het commando: een skilltekst of SQL met "klant" en "appje" is geen
+  // bericht. Echte verzendwegen (tabellen, functies, mail-API's) vangen de andere regels.
+  const regels = opties.code ? TEKST_REGELS_CODE : TEKST_REGELS.slice(2)
+  const woordRegels = opties.code ? [] : TEKST_REGELS.slice(0, 2)
   const geef = (soort) => ({ soort, reden: SOORT[soort] })
   const naam = String(tool || '')
   if (!naam) return geef('rechten')
@@ -219,18 +257,19 @@ export function hardeBlokkade(tool, invoer = {}, opties = {}) {
     // De uitleg komt van het model; bij een vast bekend commando telt alleen het commando.
     const metUitleg = BEKEND_VEILIG.test(opdracht.trim()) ? opdracht : `${opdracht}\n${invoer.description || ''}`
     // ${NAAM:+ja} toont alleen óf een variabele bestaat, niet de waarde.
-    const teToetsen = metUitleg.replace(/\$\{\w+:\+[^}$`]*\}/g, '')
+    const teToetsen = zonderValseTreffers(metUitleg.replace(/\$\{\w+:\+[^}$`]*\}/g, ''))
     // Een leesvraag verstuurt niets: "lead" en "mail" naast elkaar in de SQL is geen bericht.
     // Alleen de twee woordregels slaan die SQL over; de regel op functie-aanroepen niet.
-    const zonderLees = teToetsen.replace(/pa-db\.mjs\s+lees\s+("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, 'pa-db.mjs lees')
-    for (const [i, [soort, re]] of regels.entries()) if (re.test(i < woordRegels ? zonderLees : teToetsen)) return geef(soort)
+    for (const [soort, re] of regels) if (re.test(teToetsen)) return geef(soort)
+    const uitleg = BEKEND_VEILIG.test(opdracht.trim()) ? '' : String(invoer.description || '')
+    for (const [soort, re] of woordRegels) if (re.test(uitleg)) return geef(soort)
     if (!LEESCOMMANDO.test(opdracht)) for (const [soort, re] of NOEM_REGELS) if (re.test(opdracht)) return geef(soort)
     return null
   }
   let tekst
   try { tekst = JSON.stringify(invoer) } catch { return geef('rechten') }
   // JSON zet regeleinden om naar \n; terug, zodat zinnen en SQL echt op regels staan.
-  tekst = tekst.replace(/\\n/g, '\n').replace(/\\"/g, '"')
+  tekst = zonderValseTreffers(tekst.replace(/\\n/g, '\n').replace(/\\"/g, '"'))
   for (const [soort, re] of regels) if (re.test(tekst)) return geef(soort)
   for (const [soort, re] of NOEM_REGELS) if (re.test(tekst)) return geef(soort)
   return null
@@ -360,7 +399,6 @@ export function kaartInvoer(tool, invoer = {}) {
 // De PA draait deze bij het starten. Geeft hij fouten, dan gaat het vragen niet
 // aan en blijft alles geweigerd zoals voorheen.
 const MOET_BLOKKEREN = [
-  ['Bash', { command: 'node -e "stuur alle klanten een pushmelding"' }],
   ['Bash', { command: 'node scripts/x.mjs', description: 'Stuur klanten een pushmelding' }],
   ['Bash', { command: 'curl -X POST https://xlaycpwpnhjmulfsnynh.supabase.co/functions/v1/send-push-notification -d "{}"' }],
   ['Bash', { command: 'curl -X POST https://x.supabase.co/rest/v1/notifications -d "{}"' }],

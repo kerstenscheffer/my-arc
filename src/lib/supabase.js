@@ -196,7 +196,8 @@ export async function getCurrentUser() {
 
 export async function signOut() {
   console.log('Signing out...')
-  const { error } = await supabase.auth.signOut()
+  // Alleen dit apparaat (19 nov 2026); zonder scope ging ook de PA op de Mac uit.
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
   return true
 }
