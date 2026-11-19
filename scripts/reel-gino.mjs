@@ -202,18 +202,23 @@ function maakConcept(datum, lokaal, caption, video, cover, droog) {
     const p = spawn('claude', ['-p', prompt, '--model', 'sonnet', '--no-session-persistence', '--setting-sources', 'project',
       '--permission-mode', 'dontAsk', '--allowedTools', `${gebruik},ToolSearch`, '--output-format', 'stream-json', '--verbose', '--max-budget-usd', '1'],
     { cwd: os.tmpdir(), env: omgeving, stdio: ['ignore', 'pipe', 'pipe'] })
-    const delen = []
+    const delen = [], mis2 = []
     p.stdout.on('data', d => delen.push(d))
-    p.stderr.resume()
+    p.stderr.on('data', d => mis2.push(d))
     const tik = setTimeout(() => p.kill('SIGTERM'), 8 * 60 * 1000)
     p.on('error', e => { clearTimeout(tik); mis(e) })
-    p.on('close', () => {
+    p.on('close', (code) => {
       clearTimeout(tik)
       let data = null, fout = null
       const ids = new Set()
+      // Waarom het misging als de tool nooit is aangeroepen: zonder dit zie je alleen "connector niet bereikt".
+      const detail = { exit: code, connector: null, einde: null, laatste: null, stderr: Buffer.concat(mis2).toString('utf8').trim().slice(-300) || null }
       for (const regel of Buffer.concat(delen).toString('utf8').split('\n')) {
         let r
         try { r = JSON.parse(regel) } catch { continue }
+        if (r.type === 'system' && r.subtype === 'init') detail.connector = (r.mcp_servers || []).filter(m => /metricool/i.test(m.name)).map(m => `${m.name}: ${m.status}`).join(', ') || 'niet geladen'
+        if (r.type === 'result') detail.einde = `${r.subtype}${r.is_error ? ' (fout)' : ''}: ${String(r.result || '').slice(0, 300)}`
+        if (r.type === 'assistant') for (const c of r.message?.content || []) if (c.type === 'text' && c.text.trim()) detail.laatste = c.text.trim().slice(0, 300)
         if (r.type === 'assistant') for (const c of r.message?.content || []) if (c.type === 'tool_use' && c.name === gebruik) ids.add(c.id)
         if (r.type !== 'user' || !Array.isArray(r.message?.content)) continue
         for (const c of r.message.content) {
@@ -223,7 +228,7 @@ function maakConcept(datum, lokaal, caption, video, cover, droog) {
           try { data = r.tool_use_result?.structuredContent || JSON.parse(tekst) } catch { fout = tekst.slice(0, 400) }
         }
       }
-      klaar({ post: data?.data || data, fout, aanroepen: ids.size })
+      klaar({ post: data?.data || data, fout, aanroepen: ids.size, detail })
     })
   })
 }
@@ -368,7 +373,7 @@ async function short(id) {
   const links = await uploadVoorMetricool(pad, mp4, omslag)
   const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
   if (droog) { uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, fout: r.fout }); return }
-  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || 'geen concept terug; connector niet bereikt'}`)
+  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || `geen concept terug; connector niet bereikt (${JSON.stringify(r.detail)})`}`)
   if (r.post.draft !== true || r.post.autoPublish !== false) stop(`LET OP: post ${r.post.id} staat niet als concept in Metricool. Controleer hem meteen.`)
   const link = r.post.plannerUrl || `https://app.metricool.com/planner/calendar?blogId=${METRICOOL_MERK}&openWithPostUuid=${r.post.uuid}`
   const media = r.post.media?.[0]
@@ -401,10 +406,10 @@ async function concept(b) {
   const r = await maakConcept(datum, lokaal, caption, links.video, links.cover, droog)
   if (droog) {
     // Droog: uploadt wel (test van de token), leest Metricool en maakt geen concept.
-    uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, aanroepen: r.aanroepen, fout: r.fout })
+    uit({ droog: true, upload: 'gelukt', metricool_bereikbaar: !r.fout && !!r.post, aanroepen: r.aanroepen, fout: r.fout, detail: r.post ? undefined : r.detail })
     return
   }
-  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || 'geen concept terug; connector niet bereikt'}`)
+  if (r.fout || !r.post?.id) stop(`Metricool: ${r.fout || `geen concept terug; connector niet bereikt (${JSON.stringify(r.detail)})`}`)
   if (r.post.draft !== true || r.post.autoPublish !== false) stop(`LET OP: post ${r.post.id} staat niet als concept in Metricool. Controleer hem meteen.`)
   const link = r.post.plannerUrl || `https://app.metricool.com/planner/calendar?blogId=${METRICOOL_MERK}&openWithPostUuid=${r.post.uuid}`
   const media = r.post.media?.[0]
