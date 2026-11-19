@@ -26,10 +26,11 @@ RAND, SCHADUW = 3, 9                     # donkere rand om de letters plus een z
 DIM = 60                                 # zwart over de B-roll (0-255); de rand doet de rest
 MASCOTTE_H, MASCOTTE_B, MASCOTTE_LUCHT = 300, 430, 14   # hoogte, grootste breedte, ruimte tot de tekst (nooit eroverheen)
 MASCOTTE_IN = 0.45                       # rustig binnenkomen: in 0,45 s zichtbaar en iets groter, onderkant blijft staan
+MASCOTTE_PLEK = {'midden': 0, 'links': -260, 'rechts': 260}   # opzij als hij anders over Kerstens gezicht staat
 FADE = 0.15                              # zachte overgang tussen clips (briefing punt 6)
 ZOOM = 0.045                             # rustige schaalbeweging per clip: 100% naar 104,5%
 TEMPO, BASIS, MIN_SHOT = 0.28, 0.7, 2.5  # leestijd per shot: BASIS + TEMPO per woord, nooit korter dan MIN_SHOT
-MIN_BLOK = 1.0                           # een tekstblok staat minstens een seconde
+BLOK_VAST, MIN_BLOK = 1.0, 0.9           # elk tekstblok krijgt een vaste seconde, de rest van het shot gaat naar rato van de woorden
 
 snap = lambda t: round(t * FPS) / FPS
 
@@ -191,11 +192,13 @@ def tekstlaag(regels, ft, grootte):
     return img
 
 
-def mascotte(naam):
+def mascotte(naam, plek='midden'):
     """Mascotte op maat met een zachte schaduw eromheen. Alleen PNG's met een transparante achtergrond."""
     pad = os.path.join(MASCOTTES, f'{naam}.png')
     if naam not in mascottes():
         sys.exit(f"Mascotte niet gevonden: {naam}. Kies uit: {', '.join(mascottes())}. Past er geen, laat \"mascotte\" dan weg.")
+    if plek not in MASCOTTE_PLEK:
+        sys.exit(f'"mascotte_plek" is midden, links of rechts (nu: {plek}).')
     im = Image.open(pad).convert('RGBA')
     a = im.getchannel('A').point(lambda v: 0 if v < 24 else 255 if v > 240 else v)
     if a.histogram()[0] < 0.1 * im.width * im.height:
@@ -210,20 +213,20 @@ def mascotte(naam):
     doek = Image.new('RGBA', sch.size, (0, 0, 0, 0))
     doek.putalpha(sch.filter(ImageFilter.GaussianBlur(12)).point(lambda v: v * 150 // 255))
     doek.alpha_composite(im, (r, r))
-    return doek, r
+    return doek, r, MASCOTTE_PLEK[plek]
 
 
 def kader(tekst, sprite, p):
     """Eén beeld van de laag over de B-roll: zwart waas, mascotte (p = hoe ver hij binnen is, 0-1) en daaroverheen de tekst."""
     img = Image.new('RGBA', (W, H), (0, 0, 0, DIM))
     if sprite:
-        doek, r = sprite
+        doek, r, dx = sprite
         s = 0.88 + 0.12 * p
         m = doek if p >= 1 else doek.resize((round(doek.width * s), round(doek.height * s)), Image.BILINEAR)
         if p < 1:
             m.putalpha(m.getchannel('A').point(lambda v: int(v * p)))
         # De onderkant van de mascotte staat vast boven de tekst; groeien doet hij naar boven.
-        img.alpha_composite(m, (round((W - m.width) / 2), round(TEKST_Y - MASCOTTE_LUCHT + r * s - m.height)))
+        img.alpha_composite(m, (round((W - m.width) / 2) + dx, round(TEKST_Y - MASCOTTE_LUCHT + r * s - m.height)))
     img.alpha_composite(tekst)
     return img
 
@@ -243,9 +246,9 @@ def monteer(map_, cfg_pad):
         blokken = [ontleed(b) for b in ruw]
         woorden = [sum(len(r) for r in b) for b in blokken]
         d = snap(float(s.get('duur') or max(MIN_SHOT, BASIS + tempo * sum(woorden))))
-        # Blokduur naar rato van het aantal woorden, met een vaste opslag zodat een kort blok niet wegflitst.
-        gewicht = [w + 1.5 for w in woorden]
-        duren = [snap(d * g / sum(gewicht)) for g in gewicht[:-1]]
+        # Elk blok een vaste seconde, de rest naar rato van het aantal woorden: een kort blok flitst niet weg.
+        vast = min(BLOK_VAST, d / len(woorden) / 2)
+        duren = [snap(vast + (d - vast * len(woorden)) * w / sum(woorden)) for w in woorden[:-1]]
         duren.append(snap(d - sum(duren)))
         if min(duren) < MIN_BLOK:
             sys.exit(f'Shot {n + 1}: een tekstblok staat korter dan {MIN_BLOK} s. Geef het shot een langere "duur" of minder blokken.')
@@ -257,7 +260,7 @@ def monteer(map_, cfg_pad):
                 sys.exit(f'B-roll niet gevonden in {BROLL}: {rel}. Alleen Kerstens eigen beelden uit die map, geen stock.')
             delen.append({'shot': n, 'clip': rel, 'pad': pad, 'duur': per if i < len(bron) - 1 else snap(d - per * (len(bron) - 1))})
         shots.append({'tekst': [b.replace('*', '') for b in ruw], 'duur': d, 'clips': bron, 'mascotte': s.get('mascotte') or None,
-                      '_blokken': blokken, '_duren': duren})
+                      'mascotte_plek': s.get('mascotte_plek') or 'midden', '_blokken': blokken, '_duren': duren})
     totaal = snap(sum(s['duur'] for s in shots))
     for i, x in enumerate(delen):
         x['nodig'] = x['duur'] + (FADE if i < len(delen) - 1 else 0)
@@ -279,7 +282,7 @@ def monteer(map_, cfg_pad):
 
     for n, s in enumerate(shots):
         ft, grootte, gezet = zet_shot(s.pop('_blokken'), f'Shot {n + 1}')
-        sprite = mascotte(s['mascotte']) if s['mascotte'] else None
+        sprite = mascotte(s['mascotte'], s['mascotte_plek']) if s['mascotte'] else None
         s.update(van=round(t, 2), tot=round(t + s['duur'], 2), lettergrootte=grootte, blokken=[])
         for j, (blok, duur) in enumerate(zip(gezet, s.pop('_duren'))):
             tekst, rest = tekstlaag(blok, ft, grootte), duur
