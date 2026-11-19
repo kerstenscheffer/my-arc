@@ -7,6 +7,7 @@ import { X, Trash2, Pencil, Check, ChevronRight, Copy, AlertTriangle, Bookmark }
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 import Keuze from '../../../meal-plan/components/Keuze'
 import { pasSupplementenToe, dagIndicesNaarSleutels, extrasSamenvatting } from './sjabloonExtras'
+import { macrosVoorKopie } from './kopieMacros'
 
 export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, onClose, isMobile, embedded = false }) {
   const modalHost = useModalHost()
@@ -150,16 +151,13 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const handleCopyTemplate = async (template) => {
     setCopyingId(template.id)
     try {
-      // Macros uit base_macros of directe kolommen
-      const macros = template.base_macros || {}
-
       // Trainingsdagen van déze klant: workout_schedule gefilterd op de dagen
       // die in zijn actieve schema bestaan, anders preferred_training_days.
       // Beide kopieerpaden hieronder hebben ze nodig.
       const lib = new TemplateLibrary(db.supabase)
       const { data: clientData } = await db.supabase
         .from('clients')
-        .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
+        .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id, target_calories, target_protein, target_carbs, target_fat')
         .eq('id', clientId)
         .single()
 
@@ -211,10 +209,9 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         client_id: clientId,
         template_name: `${template.name} (kopie)`,
         template_id: template.id,
-        daily_calories: template.daily_calories || macros.calories,
-        daily_protein: template.daily_protein || macros.protein,
-        daily_carbs: template.daily_carbs || macros.carbs,
-        daily_fat: template.daily_fat || macros.fat,
+        // De doelen van de klant, anders de macro's van het template, anders
+        // de standaard (19 nov 2026). Stond op de template-macro's.
+        ...macrosVoorKopie(clientData, template),
         week_structure: expandedWeek,
         // Plan-brede pre-workout uit het sjabloon; de analyzer zet 'm vanzelf
         // op de trainingsdagen van deze klant.

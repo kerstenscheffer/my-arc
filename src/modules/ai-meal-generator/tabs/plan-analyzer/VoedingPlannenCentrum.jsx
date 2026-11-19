@@ -20,6 +20,7 @@ import { Archive, ArchiveRestore, BadgeCheck, Bookmark, Check, ChevronDown, Down
 import { PRIVE } from '../../../coach-command-center/utils/privacyModus'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { supplementenVoorSjabloon } from './sjabloonExtras'
+import { macrosVoorKopie, haalKlantDoelen } from './kopieMacros'
 
 const GROEN = '#10b981'
 const BLAUW = '#3b82f6'
@@ -110,7 +111,7 @@ export default function VoedingPlannenCentrum({
   // De week van één template pas ophalen als hij nodig is.
   const haalWeek = async (t) => {
     if (weken[t.id]) return weken[t.id]
-    const { data, error } = await veilig(sb.from('meal_plan_templates').select('week_structure, pre_workout_meal, supplements').eq('id', t.id).single())
+    const { data, error } = await veilig(sb.from('meal_plan_templates').select('week_structure, pre_workout_meal, supplements, base_macros').eq('id', t.id).single())
     if (error || !data) throw (error || new Error('Plan niet gevonden'))
     setWeken(w => ({ ...w, [t.id]: data }))
     return data
@@ -190,7 +191,11 @@ export default function VoedingPlannenCentrum({
     setBezig(t.id); setFout(null)
     try {
       const w = await haalWeek(t)
-      await onLoad(w.week_structure, tNaam(t), { pre_workout_meal: w.pre_workout_meal || null, supplements: w.supplements || [], template_id: t.id })
+      // macros: terugval voor het plan als de klant geen doelen heeft (kopieMacros.js).
+      await onLoad(w.week_structure, tNaam(t), {
+        pre_workout_meal: w.pre_workout_meal || null, supplements: w.supplements || [], template_id: t.id,
+        macros: { daily_calories: t.daily_calories, daily_protein: t.daily_protein, daily_carbs: t.daily_carbs, daily_fat: t.daily_fat, base_macros: w.base_macros },
+      })
     } catch (e) { setFout(e?.message || 'Laden mislukt') }
     finally { setBezig(null) }
   }
@@ -203,10 +208,13 @@ export default function VoedingPlannenCentrum({
     setBezig(sleutel); setFout(null)
     try {
       const w = await haalWeek(t)
+      // Macro's = de doelen van déze klant, anders die van het template,
+      // anders de standaard (19 nov 2026). Stond op de template-macro's.
+      const doelen = await haalKlantDoelen(sb, k.id)
       const { error } = await sb.from('client_meal_plans').insert([{
         client_id: k.id, template_name: tNaam(t), week_structure: w.week_structure, created_via: 'template_copy', is_active: false,
         pre_workout_meal: w.pre_workout_meal || null, template_id: t.id,
-        daily_calories: t.daily_calories || null, daily_protein: t.daily_protein || null, daily_carbs: t.daily_carbs || null, daily_fat: t.daily_fat || null,
+        ...macrosVoorKopie(doelen, { ...t, base_macros: w.base_macros }),
       }])
       if (error) throw error
       setToegewezen(x => ({ ...x, [sleutel]: true }))

@@ -35,6 +35,7 @@ import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryMod
 // Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
 import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
 import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
+import { macrosVoorKopie, haalKlantDoelen } from './plan-analyzer/kopieMacros'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import { weekplanVoorWeek, lokaleDatum } from '../../meal-plan/DayTemplateService'
@@ -1571,9 +1572,15 @@ export default function PlanAnalyzer({
       days.forEach(d => { wsToSave[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
       setWeekSaveState('saving')
       try {
+        // Macro's van het plan = de doelen van de klant, anders die van het
+        // template, anders de standaard (19 nov 2026). Hier ging niets mee,
+        // dus vulde de database 2000/150/200/67 in en zag de klant na het
+        // activeren andere macro's dan zijn doelen.
+        const doelen = await haalKlantDoelen(db.supabase, resolvedClientId)
+        const planMacros = macrosVoorKopie(doelen || clientRecord, extra?.macros)
         const { data, error } = await db.supabase
           .from('client_meal_plans')
-          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false, pre_workout_meal: preWorkoutUitSjabloon, ...(extra?.template_id ? { template_id: extra.template_id } : {}) }])
+          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false, pre_workout_meal: preWorkoutUitSjabloon, ...planMacros, ...(extra?.template_id ? { template_id: extra.template_id } : {}) }])
           .select('id').single()
         if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
         setSelectedConceptId(data.id)
