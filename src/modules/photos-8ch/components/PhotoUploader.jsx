@@ -6,18 +6,25 @@ import {
   Clock, Target, Loader
 } from 'lucide-react'
 
-export default function PhotoUploader({ 
-  service, 
-  clientId, 
-  onUploaded, 
+export default function PhotoUploader({
+  service,
+  clientId,
+  onUploaded,
   uploadType = null,
+  initialSubtype = null,
   todayPhotos = null,
   isMobile = false
 }) {
+  // If a subtype is pre-selected for a progress photo, skip the angle picker
+  const deriveInitialView = () => {
+    if (uploadType === 'progress' && initialSubtype) return 'upload'
+    if (uploadType) return 'upload'
+    return 'type-select'
+  }
   // State management
-  const [currentView, setCurrentView] = useState(uploadType ? 'upload' : 'type-select')
+  const [currentView, setCurrentView] = useState(deriveInitialView)
   const [selectedType, setSelectedType] = useState(uploadType)
-  const [selectedSubtype, setSelectedSubtype] = useState(null)
+  const [selectedSubtype, setSelectedSubtype] = useState(initialSubtype)
   const [previewImage, setPreviewImage] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -329,7 +336,10 @@ export default function PhotoUploader({
       }}>
         {[
           { angle: 'front', label: 'Voorkant' },
-          { angle: 'side', label: 'Zijkant' }
+          { angle: 'back', label: 'Achterkant' },
+          { angle: 'side', label: 'Zijkant' },
+          { angle: 'flex-front', label: 'Flex voor' },
+          { angle: 'flex-back', label: 'Flex achter' }
         ].map(item => (
           <button
             key={item.angle}

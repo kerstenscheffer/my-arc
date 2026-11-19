@@ -416,6 +416,24 @@ class Photos8CHService {
     return streak
   }
 
+  // Get uploaded progress subtypes for the current challenge week
+  async getWeekProgressSubtypes(clientId) {
+    try {
+      const weekNumber = await this.getWeekNumber(clientId)
+      const { data, error } = await this.supabase
+        .from(this.tableName)
+        .select('metadata')
+        .eq('client_id', clientId)
+        .eq('photo_type', 'progress')
+        .eq('week_number', weekNumber)
+      if (error) throw error
+      return (data || []).map(p => p.metadata?.subtype).filter(Boolean)
+    } catch (error) {
+      console.error('getWeekProgressSubtypes failed:', error)
+      return []
+    }
+  }
+
   // === CHALLENGE COMPLIANCE ===
 
   // Get Friday photo sets for challenge requirement (now only front/side)

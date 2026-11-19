@@ -4,8 +4,8 @@ import { fotoWeergaveUrl } from '../progress/fotoWeergave'
 import Photos8CHService from './Photos8CHService'
 import PhotoUploader from './components/PhotoUploader'
 import FridayTracker from './components/FridayTracker'
-import { 
-  Camera, Calendar, Check, X, Image, Grid, 
+import {
+  Camera, Calendar, Check, X, Image, Grid,
   ChevronLeft, ChevronRight, Trash2, Star,
   Award, AlertCircle, Clock, Utensils, Dumbbell,
   Trophy, TrendingUp, Zap, Target, Flame
@@ -24,6 +24,8 @@ export default function Photos8CH({ db, client }) {
   const [viewMode, setViewMode] = useState('overview') // overview | gallery | stats
   const [filterType, setFilterType] = useState('all') // all | progress | meal | workout | victory
   const [refreshKey, setRefreshKey] = useState(0)
+  const [weekProgressSubtypes, setWeekProgressSubtypes] = useState([])
+  const [preSelectedSubtype, setPreSelectedSubtype] = useState(null)
   
   const isMobile = window.innerWidth <= 768
   const isToday = new Date().getDay() === 5 // Is it Friday?
@@ -58,6 +60,10 @@ export default function Photos8CH({ db, client }) {
       const challengeStart = new Date('2025-01-01')
       const progress = await service.getChallengePhotoProgress(client.id, challengeStart)
       setFridayProgress(progress)
+
+      // Load this week's progress subtypes for the slot overview
+      const subtypes = await service.getWeekProgressSubtypes(client.id)
+      setWeekProgressSubtypes(subtypes)
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -68,6 +74,7 @@ export default function Photos8CH({ db, client }) {
   const handlePhotoUploaded = () => {
     setShowUploader(false)
     setUploadType(null)
+    setPreSelectedSubtype(null)
     setRefreshKey(prev => prev + 1)
   }
 
@@ -409,6 +416,109 @@ export default function Photos8CH({ db, client }) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    )
+  }
+
+  const PROGRESS_SLOTS = [
+    { key: 'front', label: 'Voorkant' },
+    { key: 'back', label: 'Achterkant' },
+    { key: 'side', label: 'Zijkant' },
+    { key: 'flex-front', label: 'Flex voor' },
+    { key: 'flex-back', label: 'Flex achter' }
+  ]
+
+  const renderProgressSlots = () => {
+    const openSlots = PROGRESS_SLOTS.filter(s => !weekProgressSubtypes.includes(s.key))
+    if (openSlots.length === 0 && weekProgressSubtypes.length === 0) return null
+
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9))',
+        borderRadius: isMobile ? '12px' : '16px',
+        padding: isMobile ? '1rem' : '1.25rem',
+        marginBottom: isMobile ? '1rem' : '1.5rem',
+        border: '1px solid rgba(139, 92, 246, 0.2)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginBottom: '0.5rem'
+        }}>
+          <Camera size={18} color="#a855f7" />
+          <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '600', color: 'white' }}>
+            Progress foto's deze ronde
+          </span>
+        </div>
+        {openSlots.length > 0 && (
+          <p style={{
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            color: 'rgba(255,255,255,0.55)',
+            marginBottom: '0.75rem'
+          }}>
+            Nog open: {openSlots.map(s => s.label).join(', ')}
+          </p>
+        )}
+        {openSlots.length === 0 && (
+          <p style={{
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            color: '#10b981',
+            marginBottom: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem'
+          }}>
+            <Check size={14} /> Alle foto's voor deze ronde zijn gedaan!
+          </p>
+        )}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: isMobile ? '0.4rem' : '0.6rem'
+        }}>
+          {PROGRESS_SLOTS.map(slot => {
+            const done = weekProgressSubtypes.includes(slot.key)
+            return (
+              <button
+                key={slot.key}
+                onClick={() => {
+                  if (!done) {
+                    setPreSelectedSubtype(slot.key)
+                    setUploadType('progress')
+                    setShowUploader(true)
+                  }
+                }}
+                style={{
+                  background: done ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.07)',
+                  border: done ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(139, 92, 246, 0.25)',
+                  borderRadius: '10px',
+                  padding: isMobile ? '0.6rem 0.3rem' : '0.75rem 0.4rem',
+                  cursor: done ? 'default' : 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {done
+                  ? <Check size={isMobile ? 18 : 20} color="#10b981" />
+                  : <Camera size={isMobile ? 18 : 20} color="#a855f7" />
+                }
+                <span style={{
+                  fontSize: isMobile ? '0.6rem' : '0.68rem',
+                  color: done ? '#10b981' : 'rgba(255,255,255,0.65)',
+                  fontWeight: '500',
+                  textAlign: 'center',
+                  lineHeight: 1.2
+                }}>
+                  {slot.label}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
     )
@@ -805,6 +915,7 @@ export default function Photos8CH({ db, client }) {
       {/* Content based on view mode */}
       {viewMode === 'overview' && (
         <>
+          {renderProgressSlots()}
           {renderDailyGoals()}
           {renderWeeklyStats()}
           {fridayProgress && (
@@ -950,9 +1061,11 @@ export default function Photos8CH({ db, client }) {
           onClose={() => {
             setShowUploader(false)
             setUploadType(null)
+            setPreSelectedSubtype(null)
           }}
           onUploaded={handlePhotoUploaded}
           uploadType={uploadType}
+          initialSubtype={preSelectedSubtype}
           todayPhotos={todayPhotos}
           isMobile={isMobile}
         />
