@@ -40,6 +40,7 @@ import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
 import Notities from './Notities'
 import { useNotities, notitiesVoorGino } from './notitiesData'
+import GinoDocument, { AVATAR, useGinoDocument, useDocumentDicht, documentVoorGino } from './GinoDocument'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 import { typeLabel } from './contentStand'
@@ -888,6 +889,12 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   // Prioriteiten = zwevend venster (Eisenhower-matrix), geen blad.
   const [matrix, setMatrix] = useState(false)
   const [denkt, setDenkt] = useState(false)
+  // Avatar-document boven de bol (19 nov 2026); na elk Gino-antwoord opnieuw laden, hij kan hem aanpassen.
+  const avatar = useGinoDocument(AVATAR)
+  const [docDicht, setDocDicht] = useDocumentDicht()
+  const laadAvatar = avatar.laad
+  const dachtNet = useRef(false)
+  useEffect(() => { if (dachtNet.current && !denkt) laadAvatar(); dachtNet.current = denkt }, [denkt, laadAvatar])
   const [herinnertPraat, setHerinnertPraat] = useState(false)
   // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
   // dan wisselt het beeld mee (geen beeld = leeg). Blijft staan tot het
@@ -1437,14 +1444,15 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         {!zwevend && !beperkt && !kalender && !podiumOpen && (
           <div style={{
             flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: isMobile ? 8 : 14,
-            paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0, boxSizing: 'border-box',
-            pointerEvents: 'none', userSelect: 'none',
+            alignItems: 'center', justifyContent: docDicht ? 'center' : 'flex-start', textAlign: 'center', gap: isMobile ? 8 : 14,
+            paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : docDicht ? 0 : 8, boxSizing: 'border-box',
           }}>
-            {/* Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026). */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: docDicht ? (isMobile ? 8 : 14) : 6, pointerEvents: 'none', userSelect: 'none', flexShrink: 0 }}>
+            {/* Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026).
+                Met het document open kleiner, zodat het document het midden is. */}
             <div style={{
               ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1, opacity: 0.2,
-              fontSize: isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
+              fontSize: !docDicht ? (isMobile ? 'clamp(1.6rem, 8vw, 2.4rem)' : 'clamp(2.4rem, 4.5vw, 3.6rem)') : isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
             }}>
               {/* Rechts: binnengekomen van de 1e t/m vandaag (get_business_os.nu.binnen, 19 nov 2026);
                   een oudere RPC zonder dat veld valt terug op de nieuwe sales. */}
@@ -1455,7 +1463,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'stretch', gap: isMobile ? 4 : 6, opacity: 0.2 }}>
               <div style={{
                 color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
+                fontSize: !docDicht ? (isMobile ? 'clamp(0.95rem, 4.4vw, 1.4rem)' : 'clamp(1.2rem, 2.4vw, 1.9rem)') : isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
               }}>
                 Kill the bitch inside
               </div>
@@ -1475,6 +1483,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
                 ) })}
               </div>
             </div>
+            </div>
+            <GinoDocument document={avatar} titel={AVATAR.titel} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
           </div>
         )}
         {kalender && !zwevend && (
@@ -1521,6 +1531,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onPrioriteiten={beperkt ? undefined : () => setMatrix(true)} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
+            // Avatar van de ideale klant: Kersten bewerkt hem boven de bol; Gino mag hem aanvullen.
+            Avatar: documentVoorGino(avatar, 1200),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
             geldplan: geldplanVoorGino(geldplan),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,

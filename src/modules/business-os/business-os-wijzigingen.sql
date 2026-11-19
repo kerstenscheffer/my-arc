@@ -89,7 +89,7 @@ declare
     'output_pdfs', 'call_leads', 'lead_movements', 'client_doorstap', 'lead_notes', 'lead_campaign_tags', 'lead_kpi_targets',
     'lead_templates', 'lead_sections', 'agenda_blocks', 'business_os_skills', 'business_os_geheugen',
     'business_os_herinneringen', 'business_os_schermen', 'business_os_experimenten', 'business_os_projecten',
-    'business_os_geldplan', 'business_os_tijd_regels', 'app_issues', 'ideas', 'quick_notes', 'coach_daily_checks',
+    'business_os_geldplan', 'business_os_documenten', 'business_os_tijd_regels', 'app_issues', 'ideas', 'quick_notes', 'coach_daily_checks',
     'coach_action_snoozes', 'coach_actions_dismissed', 'sales_scripts', 'sales_pieces', 'client_coaching_logs', 'client_notes'
   ];
   -- Gecontroleerd: deze triggers melden alleen aan de coach of hebben hieronder een eigen regel.
