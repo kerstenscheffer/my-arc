@@ -2030,15 +2030,20 @@ export default function KanbanBoard({
   // Inhoud van het zoekveld: op telefoon een eigen rij, op desktop in de balk.
   const zoekInhoud = (
     <>
-      <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
+      <Search size={isMobile ? 20 : 12} strokeWidth={isMobile ? 2.8 : 2} color={searchQuery ? '#10b981' : isMobile ? '#fff' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
       <input ref={searchInputRef} type="text" value={searchQuery}
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={() => searchQuery && setShowSearchResults(true)}
         placeholder={isMobile ? 'Zoek op naam of Instagram...' : 'Zoek op naam, Instagram, email...'}
-        style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '0.7rem' : '0.75rem', minWidth: 0 }} />
+        // Telefoon (19 nov 2026, Kersten): groot en dik wit. 16 px voorkomt ook dat
+        // iOS inzoomt zodra je het veld aantikt.
+        style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '1.05rem' : '0.75rem', fontWeight: isMobile ? 800 : undefined, letterSpacing: isMobile ? '-0.01em' : undefined, fontFamily: 'inherit', minWidth: 0, height: isMobile ? 48 : undefined }} />
       {searchQuery && (
-        <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-          <X size={10} />
+        <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} aria-label="Zoekveld leegmaken"
+          style={isMobile
+            ? { flexShrink: 0, width: 40, height: 40, padding: 0, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+            : { padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <X size={isMobile ? 22 : 10} strokeWidth={isMobile ? 3 : 2} />
         </button>
       )}
     </>
@@ -2117,12 +2122,12 @@ export default function KanbanBoard({
                 zit het vooraan IN de balk, zie hieronder. */}
             {isMobile && (
             <div style={{
-              flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
+              flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.6rem',
               order: 2, flexBasis: '100%',
-              padding: '0.4rem 0.6rem',
-              background: 'rgba(255,255,255,0.03)',
-              border: showSearchResults && displayedSearchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '30px'
+              padding: '0 0.4rem 0 0.9rem',
+              background: 'rgba(255,255,255,0.05)',
+              border: showSearchResults && displayedSearchResults.length > 0 ? '1px solid rgba(16,185,129,0.45)' : '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 14, transition: 'all 0.2s ease', minHeight: 56
             }}>
               {zoekInhoud}
             </div>
@@ -2496,8 +2501,8 @@ export default function KanbanBoard({
                 return (
                   <div style={{ width: '100%' }}>
                     <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden' }}>
-                      <div style={{ padding: '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Search size={10} />
+                      <div style={{ padding: isMobile ? '0.7rem 0.85rem' : '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: isMobile ? '0.88rem' : '0.6rem', fontWeight: isMobile ? 800 : undefined, color: isMobile ? '#fff' : 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.35rem' }}>
+                        <Search size={isMobile ? 15 : 10} />
                         {dbCheckLoading
                           ? <>Zoeken in database…</>
                           : <>Geen lead gevonden voor {display}</>
