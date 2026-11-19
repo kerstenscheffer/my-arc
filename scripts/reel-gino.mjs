@@ -5,6 +5,9 @@
 //   node scripts/reel-gino.mjs ophalen <bestand>         download + transcript met tijden
 //   node scripts/reel-gino.mjs monteer <bestand>         render uit ~/Gino/reels/<naam>/config.json, maakt vN
 //   node scripts/reel-gino.mjs concept <bestand> --datum 2026-11-10T20:00 [--versie v2] [--droog]
+//   node scripts/reel-gino.mjs broll-clips               eigen B-roll in ~/Gino/reel-assets/broll, met overzichtsbladen
+//   node scripts/reel-gino.mjs broll <naam>              B-roll met tekst (geen stem): render uit ~/Gino/reels/<naam>/config.json, maakt vN
+//                                                        daarna: concept <naam> --datum … (zelfde commando als bij een praatreel)
 //   node scripts/reel-gino.mjs shorts                    kant-en-klare YouTube-shorts die nog geen concept hebben
 //   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
 //   node scripts/reel-gino.mjs reeks                     de volgende 8 open shorts met caption, elk op de eerstvolgende di/do 18:00
@@ -50,6 +53,12 @@ const bestandNaam = (b) => {
   return b
 }
 const stam = (b) => b.replace(/\.[^.]+$/, '')
+// Een B-roll-reel heeft geen bronvideo: de naam is de map (bv. menu-rekensom).
+const brollNaam = (n) => {
+  if (!n || !/^[a-z0-9][a-z0-9-]{1,60}$/.test(n)) stop('Geef een naam met kleine letters, cijfers en streepjes (bv. menu-rekensom).')
+  return n
+}
+const reelNaam = (a) => (/\.(mov|mp4|m4v)$/i.test(a || '') ? bestandNaam(a) : brollNaam(a))
 const mapVan = (b) => path.join(REELS, stam(b))
 const versies = (m) => fs.existsSync(m)
   ? fs.readdirSync(m).filter(x => /^v\d+$/.test(x)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : []
@@ -113,6 +122,42 @@ async function monteer(b) {
     bron_s: lang.bron_duur, uit_s: lang.uit_duur, knippen: lang.knippen_uit.length, knippen_binnen_2s: lang.knippen_binnen_2s,
     streams: JSON.parse(info).streams, decodeert_zonder_fouten: !dec.trim(), mb: Math.round(fs.statSync(mp4).size / 1e6),
     ondertitels: stdout.split('\n').at(-2),
+  })
+}
+
+// B-roll met tekst (19 nov 2026): eigen variant naast de praatreel, zie scripts/reel_broll.py.
+async function brollClips() {
+  const { stdout } = await run(PY, [path.join(MAP, 'scripts', 'reel_broll.py'), 'blad', path.join(ASSETS, 'broll', '_overzicht')], { maxBuffer: 1 << 24 })
+  uit(JSON.parse(stdout))
+}
+
+async function broll(naam) {
+  const m = mapVan(naam)
+  const cfgPad = path.join(m, 'config.json')
+  if (!fs.existsSync(cfgPad)) stop(`Schrijf eerst ${cfgPad}, zie docs/reel-werkwijze.md (B-roll met tekst).`)
+  const cfg = JSON.parse(fs.readFileSync(cfgPad, 'utf8'))
+  if (!Array.isArray(cfg.shots) || !cfg.shots.length || cfg.shots.some(s => !s.tekst || !s.broll)) stop('config.json: "shots" moet een lijst zijn met per shot "tekst" en "broll".')
+  if (!cfg.caption) stop('config.json mist "caption".')
+  const v = `v${versies(m).reduce((n, x) => Math.max(n, Number(x.slice(1))), 0) + 1}`
+  const muziekMap = path.join(ASSETS, 'muziek')
+  const muziek = cfg.muziek ? path.join(muziekMap, path.basename(cfg.muziek)) : null
+  if (muziek && !fs.existsSync(muziek)) stop(`Muziek niet gevonden. Kies uit: ${fs.readdirSync(muziekMap).join(', ')}`)
+  const tijdelijk = path.join(m, `config.${v}.json`)
+  fs.writeFileSync(tijdelijk, JSON.stringify({ ...cfg, uit: v, naam: `${naam}_${v}`, muziek }, null, 1))
+  await run(PY, [path.join(MAP, 'scripts', 'reel_broll.py'), 'monteer', m, tijdelijk], { maxBuffer: 1 << 24 })
+  const mp4 = path.join(m, v, `${naam}_${v}.mp4`)
+  fs.writeFileSync(path.join(m, v, 'caption.txt'), `${cfg.caption.trim()}\n`)
+  fs.renameSync(tijdelijk, path.join(m, v, 'config.json'))
+  // Controle op de echte render: decodeert hij, en kloppen formaat, lengte en grootte.
+  const { stdout: info } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,duration', '-of', 'json', mp4])
+  const dec = await run('ffmpeg', ['-v', 'error', '-i', mp4, '-f', 'null', '-'], { maxBuffer: 1 << 24 }).then(r => r.stderr, e => e.stderr || String(e))
+  const lang = JSON.parse(fs.readFileSync(path.join(m, v, 'montage.json'), 'utf8'))
+  const mb = fs.statSync(mp4).size / 1e6
+  uit({
+    versie: v, video: mp4, omslag: path.join(m, v, 'omslag.jpg'), controle_frames: path.join(m, v, 'controle.jpg'), omslag_uitsneden: path.join(m, v, 'omslag_check.jpg'),
+    uit_s: lang.uit_duur, shots: lang.shots.map(s => ({ van: s.van, tot: s.tot, lettergrootte: s.lettergrootte, clips: s.clips, tekst: s.tekst })),
+    dubbele_clips: lang.dubbele_clips, streams: JSON.parse(info).streams, decodeert_zonder_fouten: !dec.trim(),
+    mb: Math.round(mb * 10) / 10, te_groot_voor_upload: mb > 24,
   })
 }
 
@@ -343,7 +388,7 @@ async function concept(b) {
   const m = mapVan(b)
   const v = optie('--versie') || versies(m).at(-1)
   if (!lokaal) stop('Geef --datum 2026-11-10T20:00 mee.')
-  if (!v || !fs.existsSync(path.join(m, v))) stop('Nog geen montage: draai eerst `monteer`.')
+  if (!v || !fs.existsSync(path.join(m, v))) stop('Nog geen montage: draai eerst `monteer` (praatreel) of `broll` (B-roll met tekst).')
   const datum = metVerschuiving(lokaal)
   const vm = path.join(m, v)
   const klaarPad = path.join(vm, 'concept.json')
@@ -370,6 +415,6 @@ async function concept(b) {
 }
 
 const cmd = args.shift()
-const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(bestandNaam(args.shift())), shorts, short: () => short(args.shift()), reeks, kalender, overzicht: async () => console.log(schrijfOverzicht()) }[cmd]
-if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | concept <bestand> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00 | reeks | kalender | overzicht')
+const klus = { lijst, ophalen: () => ophalen(bestandNaam(args.shift())), monteer: () => monteer(bestandNaam(args.shift())), concept: () => concept(reelNaam(args.shift())), 'broll-clips': brollClips, broll: () => broll(brollNaam(args.shift())), shorts, short: () => short(args.shift()), reeks, kalender, overzicht: async () => console.log(schrijfOverzicht()) }[cmd]
+if (!klus) stop('Gebruik: lijst | ophalen <bestand> | monteer <bestand> | broll-clips | broll <naam> | concept <bestand of naam> --datum 2026-11-10T20:00 | shorts | short <video-id> --datum 2026-11-10T18:00 | reeks | kalender | overzicht')
 klus().catch(e => stop(String(e.stderr || e.message || e).slice(0, 800)))
