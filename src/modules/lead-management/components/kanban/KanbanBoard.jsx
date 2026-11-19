@@ -388,6 +388,7 @@ export default function KanbanBoard({
   }
   const searchInputRef = useRef(null)
   const leadRefs = useRef({})
+  const [gezochtLeadId, setGezochtLeadId] = useState(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
   // Zoek-toolbar "pin-on-scroll": bovenaan de pagina staat de balk op z'n
   // natuurlijke plek; zodra die plek voorbij de bovenrand scrolt, klemt 'ie
@@ -664,7 +665,8 @@ export default function KanbanBoard({
   // Overkoepelende sort + filter (geldt voor alle secties). Filters eerst, dan sort.
   const getSortedLeads = (section) => {
     const f = boardFilter
-    const leads = (section.leads || []).filter(lead => sectionPassesFilter(lead, f, section))
+    // De lead die je net via zoeken opende blijft staan, ook als het filter hem zou verbergen.
+    const leads = (section.leads || []).filter(lead => lead.id === gezochtLeadId || sectionPassesFilter(lead, f, section))
     const mode = f.sort || 'default'
     const num = (v) => Number(v) || 0
     const t = (v) => v ? new Date(v).getTime() : 0
@@ -877,7 +879,9 @@ export default function KanbanBoard({
     // erin zetten; de hele sectie openen kost seconden. _setSections: het
     // aantal in de sectie verandert niet, de lead stond er al.
     const doel = sections.find(s => s.id === sectionId)
-    if (doel?.gesloten && !(doel.leads || []).some(l => l.id === leadId)) {
+    // Ook bij een open sectie kan de kaart ontbreken: het bord laadt standaard
+    // geen vrouwen, dus een lead als irenemuller11 stond nergens (19 nov 2026).
+    if (doel && !(doel.leads || []).some(l => l.id === leadId)) {
       try {
         const lead = await leadService.getBoardLead(leadId)
         _setSections(prev => prev.map(s => s.id === sectionId ? { ...s, leads: [lead, ...(s.leads || [])] } : s))
@@ -889,22 +893,31 @@ export default function KanbanBoard({
     if (isMobile && sectionId) setActiveMobileSectionId(sectionId)
     setExpandedSections(prev => ({ ...prev, [sectionId]: true }))
     setHighlightedLeadId(leadId)
+    setGezochtLeadId(leadId)
     setShowSearchResults(false)
     setSearchQuery('')
-    setTimeout(() => {
+    // Wachten tot de kaart er echt staat, dan meteen naar het midden (19 nov
+    // 2026). Eerst was dit één poging na 0,2 s met een zachte scroll: in een
+    // grote sectie die net uitklapt was de kaart dan nog niet getekend en
+    // gebeurde er niets, of de scroll strandde halverwege omdat de kolom nog
+    // groeide. Nu: elke 80 ms kijken (tot 5 s), direct springen, en daarna
+    // twee keer bijsturen voor als de pagina nog verschoof.
+    const naarMidden = () => {
       const el = leadRefs.current[leadId]
-      if (el) {
-        if (isFullscreen && fullscreenContentRef.current) {
-          const container = fullscreenContentRef.current
-          const eRect = el.getBoundingClientRect()
-          const cRect = container.getBoundingClientRect()
-          container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top) - (cRect.height / 2) + (eRect.height / 2), behavior: 'smooth' })
-        } else {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
-        }
-      }
-    }, isMobile ? 350 : 200)
-    setTimeout(() => setHighlightedLeadId(null), 3000)
+      if (!el || !el.isConnected) return false
+      el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' })
+      return true
+    }
+    let pogingen = 0
+    const zoek = setInterval(() => {
+      pogingen += 1
+      if (naarMidden()) {
+        clearInterval(zoek)
+        setTimeout(naarMidden, 250)
+        setTimeout(naarMidden, 700)
+      } else if (pogingen > 60) clearInterval(zoek)
+    }, 80)
+    setTimeout(() => setHighlightedLeadId(null), 4000)
   }
 
   // DATA LOADING — PRESERVED 1:1
