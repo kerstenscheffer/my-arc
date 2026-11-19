@@ -16,7 +16,7 @@
 // Deze code-opdrachten mogen dit bestand niet aanpassen (deny-regel in de PA).
 
 import path from 'node:path'
-import { hardeBlokkade, tijdelijkeVars } from './gino-blokkade.mjs'
+import { hardeBlokkade, schrijfNaar, tijdelijkeVars } from './gino-blokkade.mjs'
 
 const ALTIJD_LEZEN = new Set([
   'ls', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'rg', 'cut', 'tr', 'uniq', 'pwd', 'which', 'stat', 'du', 'df',
@@ -403,6 +403,65 @@ export function leesSql(query) {
   return true
 }
 
+// ── Code-opdracht: zo vrij als Claude Code in de terminal (19 nov 2026) ──
+// Kersten: "ik wil Gino even sterk in code als jij". Na hardeBlokkade(…, { code: true })
+// gaat in een code-opdracht alles zonder kaart door, behalve wat hieronder staat:
+// dat blijft een kaart (zijn besluit), geen blokkade.
+//   → live zetten (release, productie-deploy, store), git-geschiedenis, launchctl
+//   → schrijven in klantplannen en klantgegevens, en 'delete from'
+//   → andere koppelingen dan Supabase (Gmail, Agenda, Metricool…): oude regels
+const PLAN_TABELLEN = ['client_meal_plans', 'client_day_overrides', 'workout_schemas', 'clients', 'client_plan_versies']
+const PLAN_SCHRIJVEN = schrijfNaar(PLAN_TABELLEN)
+const GIT_OPTIES = '(?:(?:-[cC]|--git-dir|--work-tree)\\s+\\S+\\s+|--?[\\w-]+(?:=\\S+)?\\s+)*'
+const CODE_KAART_BASH = new RegExp([
+  '\\bnpm\\s+run\\s+release\\b', '\\bnpm\\s+publish\\b',
+  '\\bvercel\\b[^\\n;|&]*(--prod\\b|\\bdeploy\\b|\\bpromote\\b|\\balias\\b|\\brm\\b|\\benv\\b)', '\\bvercel\\s*($|[;|&\\n])',
+  '\\blaunchctl\\b', '\\bfastlane\\b',
+  `\\bgit\\s+${GIT_OPTIES}(commit|merge|rebase|reset|checkout|restore|switch|clean|stash|tag|branch\\s+-[dD])\\b`,
+  '\\bsupabase\\s+(db\\s+(reset|push)|functions\\s+delete|projects|branches)\\b',
+].join('|'), 'i')
+const SUPABASE_VRIJ = /^mcp__claude_ai_Supabase__(execute_sql|apply_migration|deploy_edge_function|get_\w+|list_\w+|query_logs|search_docs|generate_typescript_types)$/
+const INGEBOUWD_KAART = /^(RemoteTrigger|Cron\w+|PushNotification|SendToProject\w*|EnterWorktree|ExitWorktree)$/
+export function vrijInCode(tool, invoer = {}) {
+  const naam = String(tool || '')
+  const shell = naam === 'Bash' || naam === 'Monitor'
+  let tekst
+  try { tekst = shell ? String(invoer?.command || '') : JSON.stringify(invoer || {}).replace(/\\n/g, '\n').replace(/\\"/g, '"') } catch { return false }
+  if (PLAN_SCHRIJVEN.some(re => re.test(tekst)) || /\bdelete\s+from\b/i.test(tekst)) return false
+  if (shell) return !!tekst.trim() && !CODE_KAART_BASH.test(tekst)
+  if (naam.startsWith('mcp__')) return SUPABASE_VRIJ.test(naam)
+  return !!naam && !INGEBOUWD_KAART.test(naam)
+}
+const CODE_VRIJ = [
+  ['Bash', { command: 'npm install recharts && npm run build' }],
+  ['Bash', { command: 'mv src/a.jsx src/b.jsx && rm src/oud.jsx' }],
+  ['Bash', { command: "node -e \"fetch('https://xlaycpwpnhjmulfsnynh.supabase.co/functions/v1/zoek-verrijking',{method:'POST'})\"" }],
+  ['Bash', { command: 'git log --oneline -5 && git diff --stat && git show HEAD:src/a.jsx | head' }],
+  ['Bash', { command: 'npx vercel ls' }],
+  ['Bash', { command: 'supabase functions deploy feedback-regel --project-ref x' }],
+  ['mcp__claude_ai_Supabase__apply_migration', { name: 'x', query: 'alter table zoek_log add column if not exists bron text' }],
+  ['mcp__claude_ai_Supabase__execute_sql', { query: "insert into zoek_log (zoekterm) values ('test') returning id" }],
+  ['mcp__claude_ai_Supabase__execute_sql', { query: 'create or replace function public.f() returns int language sql as $$ select 1 $$' }],
+  ['mcp__claude_ai_Supabase__deploy_edge_function', { name: 'feedback-regel', files: [] }],
+  ['WebSearch', { query: 'supabase edge function deno npm import' }],
+  ['Agent', { description: 'zoek', prompt: 'Zoek waar MealCard gebruikt wordt' }],
+]
+const CODE_KAART = [
+  ['Bash', { command: 'npm run release' }],
+  ['Bash', { command: 'npm run build && npm run release 2>&1 | tail -5' }],
+  ['Bash', { command: 'npx vercel --prod' }],
+  ['Bash', { command: 'git commit -am x' }],
+  ['Bash', { command: 'git -C . reset --hard HEAD~1' }],
+  ['Bash', { command: 'launchctl kickstart -k gui/501/nl.myarc.pa' }],
+  ['Bash', { command: "node scripts/pa-db.mjs lees \"update clients set target_calories = 1\"" }],
+  ['mcp__claude_ai_Supabase__execute_sql', { query: "update client_meal_plans set is_active = false where client_id = 'x'" }],
+  ['mcp__claude_ai_Supabase__execute_sql', { query: "delete from zoek_log where id = 'x'" }],
+  ['mcp__claude_ai_Supabase__pause_project', { project_id: 'x' }],
+  ['mcp__claude_ai_Gmail__create_draft', { to: 'x' }],
+  ['mcp__claude_ai_Metricool_Social_Media_Management__createScheduledPost', {}],
+  ['RemoteTrigger', { action: 'run' }],
+]
+
 export const FAMILIE_NAAM = {
   python: 'Python-scripts', node: 'losse Node-scripts', 'yt-dlp': 'YouTube ophalen', curl: 'webpagina’s ophalen', ffmpeg: 'video bewerken',
 }
@@ -563,6 +622,8 @@ const SQL_NEE = [
 
 export function veiligZelftest() {
   const fouten = []
+  for (const [t, i] of CODE_VRIJ) if (hardeBlokkade(t, i, { code: true }) || !vrijInCode(t, i)) fouten.push(`code-opdracht moet vrij: ${t} ${JSON.stringify(i).slice(0, 100)}`)
+  for (const [t, i] of CODE_KAART) if (vrijInCode(t, i)) fouten.push(`code-opdracht moet een kaart blijven: ${t} ${JSON.stringify(i).slice(0, 100)}`)
   for (const c of MOET_VRIJ) if (veiligeBash(c) !== 'lezen') fouten.push(`moet zonder kaart: ${c}`)
   for (const c of BLIJFT_KAART) if (veiligeBash(c)) fouten.push(`moet een kaart blijven: ${c}`)
   for (const [c, f] of VRIJE_FAMILIE) if (!vrijeBash(c, stubLees)) fouten.push(`moet vrij zijn (${f}): ${c}`)

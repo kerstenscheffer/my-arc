@@ -60,7 +60,7 @@ import { startTijdmeter } from './gino-tijd.mjs'
 import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 import { maakStilteKlok } from './gino-waakhond.mjs'
 import { maakKaartMelder } from './gino-kaart-melding.mjs'
-import { FAMILIE_NAAM, familieVan, leesSql, leesTool, veiligeBash, veiligZelftest, vrijeBash } from './gino-veilig.mjs'
+import { FAMILIE_NAAM, familieVan, leesSql, leesTool, veiligeBash, veiligZelftest, vrijeBash, vrijInCode } from './gino-veilig.mjs'
 import { gewoneTaal, hardeBlokkade, kaartInvoer, maskeer, patroonMagVast, patroonVoor, zelftest } from './gino-blokkade.mjs'
 import { kaartenVastNaRonde, kiesTaken, leesLopendeProjecten, vandaagNL } from './takenronde.mjs'
 import { KLANTEN_TITEL, klantenVraag, vulRonde } from './klantenronde.mjs'
@@ -161,7 +161,7 @@ const GEHEIMEN_NIET_LEZEN = ['Read(./.env*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**
 const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN, ...GEHEIMEN_NIET_LEZEN, ...NIET_AANRAKEN]
 // Met vragen aan: git push en rm gaan niet stil dood op een deny-regel maar komen
 // bij de permissiecode, zodat ze als 'Geblokkeerd' in de chat staan (rm in /tmp mag).
-const VERBODEN_MET_VRAGEN = VERBODEN.filter(v => v !== 'Bash(git push*)' && v !== 'Bash(rm *)')
+const VERBODEN_MET_VRAGEN = VERBODEN.filter(v => v !== 'Bash(git push*)' && v !== 'Bash(rm *)' && v !== 'Bash(mv *)')
 
 const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat. Voer hem uit in deze repo.
 - Volg CLAUDE.md (lees het eerst) en zijn memory.
@@ -171,8 +171,7 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Bestanden die je voor Kersten maakt (uittreksels, transcripts, notities) zet je in ${GINO_MAP}, nooit in /tmp. Zeg in je samenvatting het pad.
 - Database lezen: node scripts/pa-db.mjs (lees, schema, bijlage …). Pdf lezen: Read met pages, of pdftotext <bestand> -.
 - Begin met een check van 1 minuut: kun je dit helemaal afmaken? Kijk wat er nodig is (SQL, edge function, sleutel, iets dat alleen Kersten kan). Kan een onmisbaar deel niet, stop dan meteen en zeg wat er nodig is, in plaats van eerst alles te bouwen.
-- Schemawijzigingen kun je hier niet doen, ook niet via de Supabase-MCP: de bevestiging daarvan wordt automatisch geannuleerd. Heb je er een nodig, schrijf de SQL dan in een bestand onder src/modules/ en zeg bij NODIG welk bestand gedraaid moet worden.
-- Een release kun je hier ook niet zelf doen. Moet het live, dan is de uitkomst wacht_op_jou met bij NODIG: npm run release.
+- Een release doe je niet uit jezelf. Moet het live, dan is de uitkomst wacht_op_jou met bij NODIG: npm run release.
 - Af = het doet wat Kersten vroeg, en dat heb je getest: build en eslint op de gewijzigde bestanden groen, en je hebt de echte uitkomst nagelezen met pa-db (getallen vergelijken, niet aannemen). Wat je niet kon testen, noem je.
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.
 - De allerlaatste regels zijn precies:
@@ -184,9 +183,11 @@ live = hij kan het nu gebruiken. wacht_op_jou = gebouwd of deels klaar, maar het
 // hierboven over wat hier niet kan.
 const INSTRUCTIE_VRAGEN = `
 
-Toestemming vragen (dit gaat voor wat hierboven staat over dingen die hier niet kunnen):
-- Heb je een commando of tool nodig dat niet op de lijst staat (node scripts/pa-sql.mjs, npm run release, yt-dlp, een connector, een routine), roep het dan gewoon aan in plaats van te stoppen: Kersten krijgt een kaart in de chat met Toestaan en Afwijzen en jij wacht op zijn antwoord, zodat hij niet de terminal in hoeft. Geef bij Bash altijd een korte Nederlandse description, die leest hij.
-- Vraag één specifiek commando per keer, geen algemene toegang. npm run release alleen als de opdracht zegt dat Kersten akkoord is.
+Wat je hier zelf mag (dit gaat voor wat hierboven staat over dingen die hier niet kunnen):
+- Je werkt zo vrij als Claude Code in Kerstens terminal. Zonder te vragen: elk shell-commando, bestanden in de repo verplaatsen en weghalen, pakketten installeren, internet (WebSearch, WebFetch), subagents voor groot zoekwerk, en de Supabase-koppeling: execute_sql, apply_migration (schemawijzigingen) en deploy_edge_function. Maak het dus af in plaats van SQL of een deploy bij NODIG te zetten.
+- Database en edge functions staan direct live voor alle klanten, ook op oude app-versies. Alleen toevoegen, nooit iets weghalen of hernoemen (CLAUDE.md, punt 5). Controleer of een kolom bestaat voor je ernaar schrijft, test met een echte aanroep en lees na een deploy de live versie terug.
+- Een kaart (Kersten kiest Toestaan of Afwijzen, jij wacht) komt er alleen nog bij: npm run release en andere productie-deploys, git commit en ander geschiedeniswerk, schrijven in klantplannen of klantgegevens (clients, client_meal_plans, client_day_overrides, workout_schemas), delete from, en andere koppelingen dan Supabase. Roep het gewoon aan met een korte Nederlandse description; die leest hij.
+- npm run release alleen als de opdracht zegt dat Kersten akkoord is.
 - Afgewezen of verlopen: probeer het niet opnieuw of via een omweg; ga door met wat wel kan en zet bij NODIG wat er nog nodig is.
 - Geblokkeerd: daar is geen knop voor (berichten aan klanten of leads, Stripe-acties, verwijderen buiten tijdelijke mappen, git push, rechten omzeilen, geheimen tonen). Nooit omzeilen; meld het bij NODIG.`
 
@@ -228,6 +229,11 @@ const SLIM_ARGS = [
   '--setting-sources', 'project',
   '--disable-slash-commands',
 ]
+// Code-opdracht (19 nov 2026, "even sterk in code als jij"): meer denkwerk, ruimer
+// budget en langer de tijd dan de chat.
+const CODE_EFFORT = process.env.PA_CODE_EFFORT || 'xhigh'
+const CODE_BUDGET = Number(process.env.PA_CODE_BUDGET) || 50
+const CODE_MAX_MS = (Number(process.env.PA_CODE_MINUTEN) || 120) * 60 * 1000
 const GESPREK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SLIM_SESSIES = path.join(os.homedir(), '.config', 'myarc-pa', 'slim-sessies.json')
 const slimSessies = new Set((() => { try { return JSON.parse(fs.readFileSync(SLIM_SESSIES, 'utf8')) } catch { return [] } })())
@@ -369,12 +375,19 @@ async function besluitTool(ctx, tool, invoer, opGesloten) {
   }
 
   // 1. Harde blokkade: geen knop, ook niet via een regel. Alleen tonen.
-  const blok = hardeBlokkade(tool, invoer)
+  const blok = hardeBlokkade(tool, invoer, { code: !!ctx.code })
   if (blok) {
     await sb.from('business_os_toestemmingen').insert({ ...basis, status: 'geblokkeerd', reden: `${basis.reden} · ${blok.reden}`, beslist_at: new Date().toISOString() })
       .then(({ error }) => { if (error) console.error(tijd(), 'Blokkade opslaan mislukt:', error.message) }, () => {})
     console.log(`${tijd()} ⛔ geblokkeerd (${blok.soort}): ${tool}`)
     return weigerTool(`Geblokkeerd: ${blok.reden}. Hier is geen knop voor en Kersten kan dit hier niet toestaan. Probeer het niet op een andere manier; zet bij NODIG wat hij zelf moet doen.`)
+  }
+
+  // 19 nov 2026: een code-opdracht werkt zo vrij als Claude Code in de terminal.
+  // Alleen live zetten, git-geschiedenis, klantplannen en 'delete from' houden een kaart.
+  if (veiligAan && ctx.code && vrijInCode(tool, invoer)) {
+    console.log(`${tijd()} ✓ code, zonder vraag: ${tool === 'Bash' ? maskeer(String(invoer?.command || '')).split('\n')[0].slice(0, 140) : tool}`)
+    return toegestaan
   }
 
   // 2. Alleen lezen, of schrijven in ~/Gino en /tmp: geen kaart (gino-veilig.mjs).
@@ -508,7 +521,7 @@ function wakkerTijdens(werk) {
 
 // opStap: met stream-json meelezen welke tool er loopt.
 // ctx: toestemmingscontext; de klok staat stil zolang Kersten aan zet is.
-function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
+function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null, maxMs = 30 * 60 * 1000) {
   return new Promise((klaar) => {
     const p = spawn('claude', args, { cwd: MAP, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...extraEnv } })
     // Stoppen: eerst de commando's die Claude startte (build, lint…), dan Claude zelf.
@@ -546,7 +559,7 @@ function claude(args, extraEnv = {}, opStop = null, opStap = null, ctx = null) {
       regels.forEach(regel)
     })
     p.stderr.on('data', d => { fout += d })
-    const stop = maakKlok(30 * 60 * 1000, () => p.kill('SIGTERM'))
+    const stop = maakKlok(maxMs, () => p.kill('SIGTERM'))
     if (ctx) ctx.klok = hond ? beideKlokken(stop, hond.klok) : stop
     p.on('close', (code) => {
       stop.stop()
@@ -593,11 +606,12 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
     : ''
   const ctx = toestemmingAan && rijId ? nieuweVraagContext(rijId) : null
   if (ctx) ctx.repoSchrijven = true // een code-opdracht mag scripts laten schrijven in de repo; de chat niet
+  if (ctx) ctx.code = true // 19 nov 2026: zo vrij als Claude Code in de terminal (vrijInCode)
   const r = await claude([
     '-p', `${INSTRUCTIE}${ctx ? INSTRUCTIE_VRAGEN : ''}${regels}\n\nOpdracht:\n${opdracht}`,
     // Partial messages: ook denkwerk geeft tekens van leven aan de waakhond.
     '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-    '--model', SLIM_MODEL, '--effort', 'high',
+    '--model', SLIM_MODEL, '--effort', CODE_EFFORT,
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
     '--disallowedTools', (ctx ? VERBODEN_MET_VRAGEN : VERBODEN).join(','),
@@ -607,8 +621,8 @@ async function voerCodeUit(opdracht, opStop, opStap, rijId = null) {
     // memory blijven gewoon laden (zelfde vlag als Slim).
     ...(ctx ? ['--setting-sources', 'project', '--mcp-config', vraagMcp(ctx), '--permission-prompt-tool', VRAAG_TOOL] : []),
     ...EIGEN_ARGS,
-    '--max-budget-usd', '10',
-  ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap, ctx)
+    '--max-budget-usd', String(CODE_BUDGET),
+  ], { PA_ACCESS_TOKEN: await versToken() }, opStop, opStap, ctx, CODE_MAX_MS)
   const ruw = r.vast || r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
   // De afsluitregels zijn voor het systeem; Kersten leest de samenvatting.
   const uitkomst = ruw.match(/^UITKOMST:\s*(live|wacht_op_jou|mislukt)\s*$/im)?.[1]?.toLowerCase() || null

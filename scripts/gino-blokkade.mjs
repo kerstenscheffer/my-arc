@@ -22,7 +22,7 @@ const MELD_TABELLEN = [
 ]
 const GELD_TABELLEN = ['payments', 'subscriptions', 'payment_plans']
 
-const schrijfNaar = (tabellen) => {
+export const schrijfNaar = (tabellen) => {
   const t = tabellen.join('|')
   return [
     new RegExp(`\\b(insert\\s+into|update|merge\\s+into|delete\\s+from|copy)\\s+(only\\s+)?("?public"?\\.)?"?(${t})\\b`, 'i'),
@@ -47,6 +47,9 @@ export const HARDE_BLOKKADES = Object.values(SOORT)
 const MELD_WOORD = '(stuur|stuurt|sturen|verstuur|verstuurt|versturen|verzend|verzenden|mail|mailen|mailtje|push|pushen|pushmelding|pushbericht|appen|appje|whatsapp|sms|send|notify|notificeer|broadcast)'
 const ONTVANGER = '(klant|klanten|lead|leads|client|clients|customer|customers|deelnemer|deelnemers|gebruikers)'
 
+const DB_WEG = /\bdrop\s+(table|schema|column|function|procedure|view|materialized|database|policy|trigger|type|index)\b|\btruncate\s+(table\s+)?["\w]|\bdelete\s+from\b|\balter\s+table\b[^;]*\bdrop\b/i
+// Code-opdracht: 'delete from' is daar een kaart (testrij opruimen), geen blokkade.
+const DB_WEG_CODE = /\bdrop\s+(table|schema|column|function|procedure|view|materialized|database|policy|trigger|type|index)\b|\btruncate\s+(table\s+)?["\w]|\balter\s+table\b[^;]*\bdrop\b/i
 const TEKST_REGELS = [
   // Melding, push, mail, bericht
   ['melding', new RegExp(`\\b${MELD_WOORD}\\w*\\b[^\\n]{0,60}\\b${ONTVANGER}\\b`, 'i')],
@@ -65,9 +68,9 @@ const TEKST_REGELS = [
   ['stripe', /\bstripe\b[^\n]{0,80}\b(refund|refunds|charge|charges|afschrijv\w*|incasso\w*|terugbetal\w*|terugstort\w*|subscription|subscriptions|abonnement\w*|cancel)\b/i],
   ['stripe', /\b(refund|refunds|charge|charges|afschrijv\w*|incasso\w*|terugbetal\w*|terugstort\w*)\b[^\n]{0,80}\bstripe\b/i],
   // Verwijderen in de database (CLAUDE.md: oude app-versies moeten blijven werken)
-  ['verwijderen', /\bdrop\s+(table|schema|column|function|procedure|view|materialized|database|policy|trigger|type|index)\b|\btruncate\s+(table\s+)?["\w]|\bdelete\s+from\b|\balter\s+table\b[^;]*\bdrop\b/i],
+  ['verwijderen', DB_WEG],
   // Git
-  ['git', /\bgit\b[^;|&\n]*\bpush\b/i],
+  ['git', /\bgit\s+(?:(?:-[cC]|--git-dir|--work-tree)\s+\S+\s+|--?[\w-]+(?:=\S+)?\s+)*push\b/i],
   // Rechten en algemene shell
   ['rechten', /--dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions|skipDangerousModePermissionPrompt|--permission-mode\b|--permission-prompt-tool\b|\bdefaultMode\b/i],
   ['rechten', /\.claude\/settings|\.claude\.json/i],
@@ -83,6 +86,10 @@ const TEKST_REGELS = [
 ]
 for (const re of schrijfNaar(MELD_TABELLEN)) TEKST_REGELS.push(['melding', re])
 for (const re of schrijfNaar(GELD_TABELLEN)) TEKST_REGELS.push(['stripe', re])
+// Code-opdracht (19 nov 2026): de twee woordregels (stuur … klant) vallen weg. Die
+// raakten vooral gewone code en uitleg ("melding voor klanten bouwen"); de concrete
+// regels (tabellen, verzendfuncties, mail-API's, Stripe, geheimen) blijven allemaal.
+const TEKST_REGELS_CODE = TEKST_REGELS.slice(2).map(([s, re]) => (re === DB_WEG ? [s, DB_WEG_CODE] : [s, re]))
 // Naam van een bestaande functie die klanten bereikt: alleen als er geen leescommando staat.
 const NOEM_REGELS = [
   ['melding', /send-push|send-email|send_email|push-notification|mail-lead-pdf|manychat-webhook|functions\/v1\/\S*(push|mail|notif|send|bericht|melding)|functions\s+invoke\s+\S*(push|mail|notif|send)|functions\.invoke\(\s*['"]\S*(push|mail|notif|send)/i],
@@ -119,21 +126,50 @@ export function tijdelijkeVars(cmd) {
   return uit
 }
 
-function verwijdertTeVeel(cmd) {
+// Code-opdracht: ook bestanden in de repo (git en de auto-sync hebben ze nog) en in
+// ~/Gino. Nooit een hele hoofdmap, niets dat met een punt begint (.git, .env, .claude).
+const THUIS_PAD = '(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[\\w.-]+)'
+const REPO_ROOT = new RegExp(`^${THUIS_PAD}/workapp/?$`)
+const REPO_ABS = new RegExp(`^${THUIS_PAD}/workapp/(.+)$`)
+const GINO_ROOT = new RegExp(`^${THUIS_PAD}/Gino(/[^$\`]*)?$`)
+const GINO_ABS = new RegExp(`^${THUIS_PAD}/Gino/[^$\`]+$`)
+const inRepoPad = (rel) => {
+  const r = rel.replace(/^\.\//, '')
+  if (!r || /[$`]/.test(r) || r.includes('..') || /^[/~.-]/.test(r) || /(^|\/)\.(git|env|claude)/.test(r)) return false
+  return r.includes('/') ? !/^[^/]+\/?\*?$/.test(r) : /^[\w-]+\.\w+$/.test(r)
+}
+const werkPad = (p, plek) => {
+  const pad = p.replace(/^['"]|['"]$/g, '')
+  if (pad.includes('..')) return false
+  const abs = pad.match(REPO_ABS)
+  if (abs) return inRepoPad(abs[1])
+  if (GINO_ABS.test(pad)) return true
+  if (plek === 'repo') return inRepoPad(pad)
+  if (plek === 'gino') return /^[^/~$`-][^$`]*$/.test(pad)
+  return false
+}
+
+function verwijdertTeVeel(cmd, opties = {}) {
   const vars = tijdelijkeVars(cmd)
+  let plek = opties.code ? 'repo' : null
   if (/\bgit\s+clean\b|\brimraf\b|\bxargs\b[^|;&]*\brm\b|-exec\s+(rm|shred|unlink)\b|\bdd\b[^|;&]*\bof=|\btruncate\s+-|\bfs\.(rm|rmSync|unlink|unlinkSync|rmdir|rmdirSync)\b|\bshutil\.rmtree\b|\bos\.(remove|unlink|rmdir)\b/.test(cmd)) return true
   // Relatief pad na "cd /tmp/...": ligt dan ook in de tijdelijke map.
   let inTijdelijk = false
   for (const stuk of cmd.split(/[;&|\n]+/)) {
     const woorden = stuk.trim().split(/\s+/).filter(Boolean)
-    if (woorden[0] === 'cd') { inTijdelijk = woorden.length === 2 && isTijdelijk(woorden[1]) && !/[$`]/.test(woorden[1]); continue }
+    if (woorden[0] === 'cd') {
+      inTijdelijk = woorden.length === 2 && isTijdelijk(woorden[1]) && !/[$`]/.test(woorden[1])
+      const doel = (woorden[1] || '').replace(/^['"]|['"]$/g, '')
+      plek = !opties.code || woorden.length !== 2 ? null : REPO_ROOT.test(doel) ? 'repo' : GINO_ROOT.test(doel) && !doel.includes('..') ? 'gino' : null
+      continue
+    }
     while (woorden[0] && (/^\w+=/.test(woorden[0]) || ['sudo', 'env', 'time', 'command', 'nohup'].includes(woorden[0]))) woorden.shift()
     if (!woorden.length) continue
     if (VERWIJDER_CMD.test(woorden[0])) {
       const paden = woorden.slice(1).filter(w => !w.startsWith('-'))
       // Alleen de kale variabele: is hij toch leeg, dan krijgt rm geen pad en doet hij niets.
       const kaleVar = (p) => vars.has(p.match(/^"?\$\{?(\w+)\}?"?$/)?.[1])
-      const magWeg = (p) => isTijdelijk(p) || kaleVar(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..'))
+      const magWeg = (p) => isTijdelijk(p) || kaleVar(p) || (inTijdelijk && /^[\w.-]+$/.test(p) && !p.startsWith('..')) || (!!opties.code && werkPad(p, plek))
       if (!paden.length || !paden.every(magWeg)) return true
     }
     if (woorden[0] === 'find' && /\s-delete\b/.test(stuk)) {
@@ -159,7 +195,10 @@ function mcpBlokkade(tool, invoer) {
 const PAD_TOOLS = new Set(['Read', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep'])
 
 // null = geen blokkade; anders { soort, reden }.
-export function hardeBlokkade(tool, invoer = {}) {
+// opties.code: een code-opdracht op de Mac (zie TEKST_REGELS_CODE en werkPad).
+export function hardeBlokkade(tool, invoer = {}, opties = {}) {
+  const regels = opties.code ? TEKST_REGELS_CODE : TEKST_REGELS
+  const woordRegels = opties.code ? 0 : 2
   const geef = (soort) => ({ soort, reden: SOORT[soort] })
   const naam = String(tool || '')
   if (!naam) return geef('rechten')
@@ -176,7 +215,7 @@ export function hardeBlokkade(tool, invoer = {}) {
   const opdracht = naam === 'Bash' ? String(invoer.command || '') : ''
   if (naam === 'Bash') {
     if (!opdracht.trim()) return geef('rechten')
-    if (verwijdertTeVeel(opdracht)) return geef('verwijderen')
+    if (verwijdertTeVeel(opdracht, opties)) return geef('verwijderen')
     // De uitleg komt van het model; bij een vast bekend commando telt alleen het commando.
     const metUitleg = BEKEND_VEILIG.test(opdracht.trim()) ? opdracht : `${opdracht}\n${invoer.description || ''}`
     // ${NAAM:+ja} toont alleen óf een variabele bestaat, niet de waarde.
@@ -184,7 +223,7 @@ export function hardeBlokkade(tool, invoer = {}) {
     // Een leesvraag verstuurt niets: "lead" en "mail" naast elkaar in de SQL is geen bericht.
     // Alleen de twee woordregels slaan die SQL over; de regel op functie-aanroepen niet.
     const zonderLees = teToetsen.replace(/pa-db\.mjs\s+lees\s+("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, 'pa-db.mjs lees')
-    for (const [i, [soort, re]] of TEKST_REGELS.entries()) if (re.test(i < 2 ? zonderLees : teToetsen)) return geef(soort)
+    for (const [i, [soort, re]] of regels.entries()) if (re.test(i < woordRegels ? zonderLees : teToetsen)) return geef(soort)
     if (!LEESCOMMANDO.test(opdracht)) for (const [soort, re] of NOEM_REGELS) if (re.test(opdracht)) return geef(soort)
     return null
   }
@@ -192,7 +231,7 @@ export function hardeBlokkade(tool, invoer = {}) {
   try { tekst = JSON.stringify(invoer) } catch { return geef('rechten') }
   // JSON zet regeleinden om naar \n; terug, zodat zinnen en SQL echt op regels staan.
   tekst = tekst.replace(/\\n/g, '\n').replace(/\\"/g, '"')
-  for (const [soort, re] of TEKST_REGELS) if (re.test(tekst)) return geef(soort)
+  for (const [soort, re] of regels) if (re.test(tekst)) return geef(soort)
   for (const [soort, re] of NOEM_REGELS) if (re.test(tekst)) return geef(soort)
   return null
 }
@@ -373,6 +412,16 @@ export function zelftest() {
     const b = hardeBlokkade(t, i)
     if (b) fouten.push(`onterecht geblokkeerd (${b.soort}): ${t} ${JSON.stringify(i).slice(0, 120)}`)
   }
+  // Code-opdracht: ruimer, maar klanten, geld, geheimen en rechten blijven dicht.
+  const code = (t, i) => hardeBlokkade(t, i, { code: true })
+  for (const [t, i] of MOET_BLOKKEREN.filter(([, i]) => !/^(rm -rf src|node -e "stuur|node scripts\/x\.mjs)/.test(i.command || ''))) if (!code(t, i)) fouten.push(`code: niet geblokkeerd: ${t} ${JSON.stringify(i).slice(0, 120)}`)
+  for (const [t, i] of MOET_DOOR) if (code(t, i)) fouten.push(`code: onterecht geblokkeerd: ${t} ${JSON.stringify(i).slice(0, 120)}`)
+  for (const c of ['rm src/a.jsx', 'rm -rf src/modules/oud', 'git mv a b && rm scripts/x.mjs', 'rm /Users/k/workapp/src/a.jsx', 'rm -rf ~/Gino/plannen/oud', 'cd ~/Gino/x && rm a.json', 'git show abc:node_modules/@capacitor/push-notifications/x.swift', 'grep -rn "stuur klanten een melding" src', "node scripts/pa-db.mjs lees \"select 1\" # delete from test"]) if (code('Bash', { command: c })) fouten.push(`code: moet door: ${c}`)
+  for (const c of ['rm -rf src', 'rm -rf .', 'rm -rf *', 'rm -rf .git', 'rm .env.local', 'rm -rf src/..', 'rm -rf ~/Documents/x', 'rm -rf /Users/k/workapp', 'rm -rf ~/Gino', 'cd src && rm -rf modules', 'rm -rf src/*', 'rm vite.config.*', 'git -C . push', 'cat .env.local', 'git push']) if (!code('Bash', { command: c })) fouten.push(`code: moet blokkeren: ${c}`)
+  if (!code('mcp__claude_ai_Supabase__execute_sql', { query: 'drop table clients' })) fouten.push('code: drop table moet blokkeren')
+  if (code('mcp__claude_ai_Supabase__execute_sql', { query: "delete from zoek_log where id = 'x'" })) fouten.push('code: delete from is een kaart, geen blokkade')
+  if (!hardeBlokkade('mcp__claude_ai_Supabase__execute_sql', { query: "delete from zoek_log where id = 'x'" })) fouten.push('chat: delete from moet blokkeren')
+  if (hardeBlokkade('Bash', { command: 'git show abc:node_modules/@capacitor/push-notifications/x.swift' })) fouten.push('git show met push in het pad is geen git push')
   const pat = (t, i, want) => { const p = patroonVoor(t, i); if (p !== want) fouten.push(`patroon ${t}: ${p} i.p.v. ${want}`) }
   pat('Bash', { command: 'npm run release' }, 'Bash(npm run release)')
   pat('Bash', { command: 'yt-dlp https://youtu.be/a' }, 'Bash(yt-dlp *)')
