@@ -4,7 +4,7 @@
 // videospeler met eigen bediening, de modal en de keuzevakken van het
 // formulier. Meting van de video via meet() (challenge_events, pad = pagina).
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
+import { Check, ChevronLeft, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
 import { meet, volgTijdOpPagina } from '../challengeTracking'
 import { appSafeEmbedUrl } from '../../modules/videos/utils/youtubeHelpers'
 import { WIT, ZWAK, CTA_GROEN, BG, HERO_BG, FONT, invoer } from './stijl'
@@ -470,6 +470,18 @@ export function LeadMagnetPagina({ cfg, children }) {
     return () => obs.disconnect()
   }, [])
 
+  // Terug-knop (20 nov 2026, Kersten): wie vanaf de eigen site komt (homepage,
+  // menu, kaart) kon niet terug. Alleen bij een verwijzing van de eigen site,
+  // zodat advertentiebezoekers geen uitgang krijgen. Geen vorige pagina in dit
+  // tabblad (nieuw tabblad): naar de homepage.
+  const [vanSite] = useState(() => {
+    try { return !!document.referrer && new URL(document.referrer).origin === window.location.origin } catch { return false }
+  })
+  const terug = () => {
+    if (window.history.length > 1) window.history.back()
+    else window.location.href = '/'
+  }
+
   return (
     <div style={{ background: BG, color: WIT, minHeight: '100vh', fontFamily: FONT }}>
       {/* Vaste balk: logo en witte pil samen in het midden. */}
@@ -478,6 +490,15 @@ export function LeadMagnetPagina({ cfg, children }) {
         display: 'flex', justifyContent: 'center', alignItems: 'center',
         padding: `calc(env(safe-area-inset-top, 0px) + ${m ? '0.6rem' : '0.75rem'}) 1rem ${m ? '0.6rem' : '0.75rem'}`,
       }}>
+        {vanSite && (
+          <button type="button" onClick={terug} aria-label="Terug" style={{
+            position: 'absolute', left: m ? 6 : 16, bottom: m ? 4 : 8, height: 40, minWidth: 40, padding: m ? 0 : '0 12px 0 6px',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'none', border: 'none',
+            color: WIT, fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <ChevronLeft size={m ? 26 : 22} strokeWidth={2.6} />{!m && 'Terug'}
+          </button>
+        )}
         <img src="/ma-logo-header.png" alt="MY ARC" style={{ height: m ? 30 : 36, width: 'auto', display: 'block', flexShrink: 0, marginRight: m ? 8 : 12 }} />
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 8, padding: m ? '0.45rem 0.85rem' : '0.5rem 1.1rem', borderRadius: 6,

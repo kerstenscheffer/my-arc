@@ -83,21 +83,53 @@
     
     <!-- Link-previews (WhatsApp, iMessage, LinkedIn, Slack) -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="MY ARC" />
-    <meta property="og:title" content="MY ARC" />
-    <meta property="og:description" content="Online coaching: training, voeding en persoonlijke begeleiding in één app." />
+    <meta property="og:site_name" content="MY ARC Coaching" />
+    <meta property="og:title" content="MY ARC Coaching | Top shape zonder je weekend op te geven" />
+    <meta property="og:description" content="Online coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel." />
     <meta property="og:url" content="https://www.myarcfitness.com/" />
     <meta property="og:image" content="https://www.myarcfitness.com/og-image.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="MY ARC — online coaching" />
+    <meta property="og:image:alt" content="MY ARC Coaching: online coaching voor mannen" />
     <meta property="og:locale" content="nl_NL" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="MY ARC" />
-    <meta name="twitter:description" content="Online coaching: training, voeding en persoonlijke begeleiding in één app." />
+    <meta name="twitter:title" content="MY ARC Coaching | Top shape zonder je weekend op te geven" />
+    <meta name="twitter:description" content="Online coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel." />
     <meta name="twitter:image" content="https://www.myarcfitness.com/og-image.jpg" />
 
-    <title>MY ARC</title>
+    <!-- SEO (20 nov 2026): titel en omschrijving staan ook in de vaste HTML, niet alleen
+         in NieuwHome; dit is wat Google en link-previews zien vóór JavaScript. -->
+    <title>MY ARC Coaching | Online coaching voor mannen</title>
+    <meta name="description" content="MY ARC Coaching: online coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten, de borrel en je weekend. Gratis weekmenu, trainingsschema en gidsen." />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://www.myarcfitness.com/#organisatie",
+          "name": "MY ARC Coaching",
+          "alternateName": ["MY ARC", "MyArc Fitness"],
+          "url": "https://www.myarcfitness.com/",
+          "logo": "https://www.myarcfitness.com/favicon-512x512.png",
+          "founder": { "@type": "Person", "name": "Kersten Scheffer" },
+          "sameAs": [
+            "https://www.instagram.com/kerstenscheffer",
+            "https://www.youtube.com/@kerstenscheffer",
+            "https://nl.trustpilot.com/review/myarcfitness.com"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.myarcfitness.com/#website",
+          "name": "MY ARC Coaching",
+          "url": "https://www.myarcfitness.com/",
+          "inLanguage": "nl-NL",
+          "publisher": { "@id": "https://www.myarcfitness.com/#organisatie" }
+        }
+      ]
+    }
+    </script>
     
     <style>
       * {

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /client-login
+Disallow: /reset-password
+Disallow: /onboarding
+
+Sitemap: https://www.myarcfitness.com/sitemap.xml

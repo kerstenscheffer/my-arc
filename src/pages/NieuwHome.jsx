@@ -23,8 +23,8 @@ import { INLOG_PAD } from '../startPagina'
 
 // Titel en omschrijving voor Google, alleen op deze pagina. index.html houdt
 // 'MY ARC' voor de app en de klantpagina's.
-const TITEL = 'MY ARC | Droger worden zonder je weekend op te geven'
-const OMSCHRIJVING = 'Droger worden en je etentjes, borrels en weekend houden. Online coaching voor mannen met de 80/20 methode. Start met de gratis tools of de 6 weken challenge.'
+const TITEL = 'MY ARC Coaching | Top shape zonder je weekend op te geven'
+const OMSCHRIJVING = 'MY ARC Coaching: online coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel. Gratis weekmenu, trainingsschema en 8 gidsen.'
 
 const CHALLENGE_START = '/6week-checkout'
 const CHALLENGE_INFO = '/6weekchallenge'
@@ -302,7 +302,9 @@ const CSS = `
 .nh-over h2 { margin-bottom:24px; }
 .nh-over-foto { width:100%; max-width:420px; height:auto; margin:0 auto; aspect-ratio:1/1; object-fit:cover; border-radius:24px; background:#fff; }
 .nh-over-tekst { max-width:420px; margin:22px auto 0; padding:0 10px; }
-.nh-over-tekst p { font-size:19px; font-weight:600; line-height:1.45; }
+.nh-over-tekst p { font-size:17px; font-weight:500; line-height:1.55; color:rgba(0,0,0,.82); }
+.nh-over-tekst p.nh-over-kop { font-size:20px; font-weight:800; line-height:1.4; color:#000; }
+.nh-over-knop { margin-top:22px; background:#000; color:#fff !important; }
 .nh-over-tekst p + p { margin-top:16px; }
 
 /* 10 voet: wit vlak, op telefoon uitklapbare kolommen */
@@ -358,7 +360,8 @@ const CSS = `
   .nh-over-rij { display:flex; align-items:center; justify-content:center; gap:44px; }
   .nh-over-foto { width:340px; max-width:none; margin:0; flex-shrink:0; }
   .nh-over-tekst { max-width:560px; margin:0; padding:0; }
-  .nh-over-tekst p { font-size:21px; }
+  .nh-over-tekst p { font-size:18px; }
+  .nh-over-tekst p.nh-over-kop { font-size:23px; }
   .nh-voet-kolommen { display:grid; grid-template-columns:repeat(4, 1fr); gap:24px; margin-top:26px; }
   .nh-voet-kolom { border-bottom:none; }
   .nh-voet-kolom button { padding:0 0 12px; cursor:default; }
@@ -438,14 +441,18 @@ export default function NieuwHome() {
     // index.html heeft geen omschrijving en geen canonical: hier erbij, en
     // weer weg als de pagina verdwijnt. De canonical wijst naar '/', zodat
     // /nieuw niet als tweede homepage in Google komt.
-    const omschrijving = document.createElement('meta')
-    omschrijving.name = 'description'
-    omschrijving.content = OMSCHRIJVING
+    // index.html heeft nu een vaste omschrijving: die tijdelijk vervangen, niet een tweede erbij.
+    const vast = document.querySelector('meta[name="description"]')
+    const vorigeOmschrijving = vast?.content
+    const omschrijving = vast ? null : document.createElement('meta')
+    if (vast) vast.content = OMSCHRIJVING
+    else { omschrijving.name = 'description'; omschrijving.content = OMSCHRIJVING }
     const canoniek = document.createElement('link')
     canoniek.rel = 'canonical'
-    canoniek.href = `${window.location.origin}/`
-    document.head.append(omschrijving, canoniek)
-    return () => { document.title = vorige; omschrijving.remove(); canoniek.remove() }
+    // Vast op www: myarcfitness.com zonder www stuurt daarheen door.
+    canoniek.href = 'https://www.myarcfitness.com/'
+    document.head.append(...[omschrijving, canoniek].filter(Boolean))
+    return () => { document.title = vorige; if (vast) vast.content = vorigeOmschrijving; omschrijving?.remove(); canoniek.remove() }
   }, [])
 
   const wissel = (naam) => setUitklap((nu) => (nu === naam ? null : naam))
@@ -638,9 +645,14 @@ export default function NieuwHome() {
           <div className="nh-over-rij">
             <img className="nh-over-foto" src="/nieuw/over-kersten.jpg" alt="Kersten" width="780" height="780" loading="lazy" />
             <div className="nh-over-tekst">
-              <p>Ik ben Kersten en ik help mannen droger worden.</p>
-              <p>Dat doe ik met de 80/20 methode: je richt je op de paar gewoontes die het meeste opleveren.</p>
-              <p>Zo blijft er ruimte voor uit eten, de borrel en je weekend.</p>
+              {/* Bronnen (20 nov 2026): Avatar-document in Gino (business_os_documenten), eigen IG-caption
+                  'Vanaf dag één ging ik er vol voor', transformatie op de funnel en de coachtekst van /challenge. */}
+              <p className="nh-over-kop">Ik ben Kersten, oprichter van MY ARC Coaching. Ik help mannen van 25 tot 55 droger worden, zonder hun weekend op te geven.</p>
+              <p>Toen ik begon met sporten ging ik er vanaf dag één vol voor. Maar ik deed van alles fout. Pas toen ik snapte hoe voeding, training en gewoontes samenwerken, ging ik van een zachte buik naar een sixpack.</p>
+              <p>Nu zie ik steeds dezelfde man. Goede baan, gezin, leuke vrienden, alles op orde. Hij traint, drinkt zijn shake, maar die buik blijft. En hij denkt dat hij moet kiezen: zijn weekend, of het lichaam dat hij wil.</p>
+              <p>Dat hoeft niet. Met de 80/20 methode richt je je op de paar gewoontes die het meeste opleveren. Zo blijft er ruimte voor uit eten, de borrel en je weekend.</p>
+              <p>Als ondernemer heb ik zelf ook niet altijd tijd om lang in de sportschool te staan. Ik begeleid inmiddels tientallen mannen, en ik ben direct en eerlijk: dit zijn de verwachtingen, dit is wat je moet doen.</p>
+              <a className="nh-knop is-groot nh-over-knop" href={CHALLENGE_START}>Start de challenge</a>
             </div>
           </div>
         </section>
