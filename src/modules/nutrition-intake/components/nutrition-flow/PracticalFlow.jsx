@@ -37,6 +37,15 @@ const VARIATIE_MOMENTEN = [
   { key: 'snack',   label: 'Snacks', icoon: Apple },
 ]
 
+// Kant-en-klare maaltijden (Prep My Meal, 20 nov 2026). Het antwoord stuurt het
+// concept na de intake: paar_keer = 3 lunches op werkdagen, elke_werkdag = de
+// lunch van maandag t/m vrijdag. Niets gekozen telt als nee.
+const KANT_EN_KLAAR_OPTIES = [
+  { value: 'nee',          label: 'Nee, ik kook zelf' },
+  { value: 'paar_keer',    label: 'Ja, een paar keer per week' },
+  { value: 'elke_werkdag', label: 'Ja, elke werkdag' },
+]
+
 // Guidance level — pre-selectie op basis van kennis niveau
 // macros_kennis: ja → flexible/free, beetje → flexible, nee → strict
 function getPreselectedGuidance(macrosKennis) {
@@ -70,8 +79,8 @@ const GUIDANCE_OPTIONS = [
 ]
 
 export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile }) {
-  // Budget, kookvoorkeur en maaltijden per dag zijn op 10 nov 2026 weggehaald;
-  // alleen de begeleidingsvraag is over.
+  // Budget, kookvoorkeur en maaltijden per dag zijn op 10 nov 2026 weggehaald.
+  // Over: variatie (3), kant-en-klare maaltijden (4) en begeleiding (5).
   const [step, setStep] = useState(3)
 
   const update = (field, value) => onChange({ ...data, [field]: value })
@@ -170,8 +179,33 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
     </div>
   )
 
-  // Stap 4 — Guidance level (met pre-selectie)
+  // Stap 4: kant-en-klare maaltijden. "Nee" staat voor, dus doorklikken kan direct.
+  const kantEnKlaar = data.kant_en_klaar || 'nee'
   if (step === 4) return (
+    <div style={{ padding: pad }}>
+      <Q isMobile={isMobile}>Wil je kant-en-klare maaltijden in je plan?</Q>
+      <Hint isMobile={isMobile}>Bezorgd aan huis, met korting via je coach.</Hint>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.5rem' }}>
+        {KANT_EN_KLAAR_OPTIES.map(opt => (
+          <BigOption
+            key={opt.value}
+            label={opt.label}
+            selected={kantEnKlaar === opt.value}
+            onClick={() => update('kant_en_klaar', opt.value)}
+            isMobile={isMobile}
+          />
+        ))}
+      </div>
+      <NextBtn
+        onClick={() => { if (!data.kant_en_klaar) update('kant_en_klaar', 'nee'); setStep(5) }}
+        isMobile={isMobile}
+        onBack={goBack}
+      />
+    </div>
+  )
+
+  // Stap 5 — Guidance level (met pre-selectie)
+  if (step === 5) return (
     <div style={{ padding: pad }}>
       <Q isMobile={isMobile}>Hoe wil je begeleid worden?</Q>
       <Hint isMobile={isMobile}>

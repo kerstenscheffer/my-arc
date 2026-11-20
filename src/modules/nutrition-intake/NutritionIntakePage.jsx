@@ -138,6 +138,10 @@ function mapToNutritionPreferences(flowData) {
       // Variatie per maaltijd: vast (1 gerecht) / afwisselen (2, A/B) /
       // variatie (7). Zie VARIATIE_OPTIES in PracticalFlow.
       variatie_per_maaltijd: flowData.variatie_per_maaltijd || null,
+      // Kant-en-klare maaltijden (Prep My Meal) in het plan: nee / paar_keer /
+      // elke_werkdag. In practical_info (jsonb), dus geen kolom erbij; leeg =
+      // nee. Het concept na de intake leest dit (prepmymeal-concept.sql).
+      kant_en_klaar: flowData.kant_en_klaar || null,
       // Oude veld (clients.variety_preference via IntakeFlowService) alleen
       // als alle maaltijden hetzelfde zijn: dan klopt één woord nog.
       ...(() => {

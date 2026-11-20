@@ -278,6 +278,12 @@ begin
     'nakijken', v_nakijken, 'keuzes', v_keuzes, 'geblokkeerd', null);
 end $function$;
 
+-- STAND 20 nov 2026: alles hierboven staat in de database en is droog getest.
+-- De functie hieronder (de enige die schrijft) staat er NOG NIET in: de kaart
+-- voor Kersten verliep. Zolang hij ontbreekt doet het antwoord uit de intake
+-- niets. Daarna nog: edge functions intake-maaltijden en concept-nakijker
+-- uitrollen, en één keer echt testen op een testaccount.
+--
 -- Zet de partnermaaltijden in het nieuwste concept van de klant en schrijft de
 -- brief bij. Eén keer per concept (generation_settings.partner_maaltijden).
 -- p_keuze alleen om te testen; anders geldt het antwoord uit de intake.

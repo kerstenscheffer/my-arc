@@ -17,6 +17,10 @@
 //   4. De maaltijd komt als eigen maaltijd van de klant (ai_custom_meals) in
 //      het concept, op de dagen waar het vervangen gerecht stond. De brief
 //      zegt wat er is overgenomen en wat niet, met de reden.
+//   5. Vroeg de klant in de intake om kant-en-klare maaltijden (Prep My Meal,
+//      practical_info.kant_en_klaar), dan zet de database-functie
+//      zet_partner_maaltijden_in_concept die daarna op de werkdag-lunches
+//      (src/modules/meal-plan/prepmymeal-concept.sql).
 //
 // Body: { client_id, opnieuw? }. Toegang zoals concept-nakijker: coach van de
 // klant, de testsleutel uit de Vault, of anoniem binnen 15 minuten na het
@@ -262,6 +266,8 @@ async function kandidaten(sb: SupabaseClient, zoek: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
+  // Loopt de stap met eigen maaltijden stuk, dan komen de kant-en-klare maaltijden er alsnog in.
+  let partnerNaFout: null | (() => Promise<unknown>) = null
   try {
     // proef: { ontbijt, lunch, diner, snack } met eigen tekst. Rekent alles door tegen het concept van de klant, maar schrijft niets weg (alleen coach of testsleutel).
     const { client_id, opnieuw, proef } = await req.json()
@@ -293,8 +299,20 @@ Deno.serve(async (req) => {
     const droog = !!proef && typeof proef === 'object' && isCoach
     if (!droog && al && (!opnieuw || heeftEigen)) return json({ ok: true, overgeslagen: heeftEigen ? 'eigen maaltijden staan er al in; maak het concept eerst opnieuw' : 'al verwerkt', eigen_maaltijden: al })
 
-    const { data: np } = await sb.from('nutrition_preferences').select('current_habits, wishes, wat_werkt_goed, allergens')
+    const { data: np } = await sb.from('nutrition_preferences').select('current_habits, wishes, wat_werkt_goed, allergens, practical_info')
       .eq('client_id', client_id).order('updated_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle()
+    // Kant-en-klare maaltijden van de partner (Prep My Meal, 20 nov 2026): alleen
+    // als de klant er in de intake om vroeg. Na de eigen maaltijden en vóór de
+    // nakijker. De database kiest de gerechten en schrijft de brief bij.
+    const wilPartner = ['paar_keer', 'elke_werkdag'].includes(String(np?.practical_info?.kant_en_klaar || ''))
+    const partner = async () => {
+      partnerNaFout = null
+      if (droog || !wilPartner) return null
+      const { data, error } = await sb.rpc('zet_partner_maaltijden_in_concept', { p_client: client_id })
+      if (error) { console.error('intake-maaltijden partner', error.message); return { fout: error.message } }
+      return data
+    }
+    partnerNaFout = partner
     const ch = np?.current_habits || {}
     const teksten: Record<string, string> = {}
     for (const m of ['ontbijt', 'lunch', 'diner', 'snack']) {
@@ -317,7 +335,8 @@ Deno.serve(async (req) => {
     }
     if (!Object.keys(teksten).length) {
       await klaar({ op: new Date().toISOString(), overgenomen: 0, reden: 'niets ingevuld' })
-      return json({ ok: true, overgenomen: 0, reden: 'de klant vulde niet in wat hij nu eet' })
+      const partnerUit = await partner()
+      return json({ ok: true, overgenomen: 0, reden: 'de klant vulde niet in wat hij nu eet', ...(isCoach && partnerUit ? { partner: partnerUit } : {}) })
     }
 
     // Per moment: welk gerecht staat er nu, op welke dagen, met welke macro's.
@@ -477,10 +496,13 @@ Deno.serve(async (req) => {
     }
     const gem = n ? { daily_calories: Math.round(tk / n), daily_protein: Math.round(te / n), daily_carbs: Math.round(tkh / n), daily_fat: Math.round(tv / n) } : {}
     await klaar({ op: new Date().toISOString(), overgenomen: geplaatst.length, maaltijden: geplaatst }, { keuzes, nakijken }, geplaatst.length ? ws : null, geplaatst.length ? gem : {})
+    const partnerUit = await partner()
 
-    return json(isCoach ? { ok: true, ...(droog ? { proef: true } : {}), overgenomen: geplaatst, keuzes, nakijken, gelezen: gelezen.map(m => ({ moment: m.moment, naam: m.naam, soort: m.soort })), usage: [lees.usage, kiesUsage] } : { ok: true, overgenomen: geplaatst.length })
+    return json(isCoach ? { ok: true, ...(droog ? { proef: true } : {}), overgenomen: geplaatst, keuzes, nakijken, gelezen: gelezen.map(m => ({ moment: m.moment, naam: m.naam, soort: m.soort })), usage: [lees.usage, kiesUsage], ...(partnerUit ? { partner: partnerUit } : {}) } : { ok: true, overgenomen: geplaatst.length })
   } catch (e) {
     console.error('intake-maaltijden', e)
+    const alsnog = partnerNaFout as null | (() => Promise<unknown>)
+    if (alsnog) await alsnog().then(x => x, () => null)
     return json({ error: String((e as any)?.message || e) }, 500)
   }
 })

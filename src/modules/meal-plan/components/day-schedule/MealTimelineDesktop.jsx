@@ -4,6 +4,7 @@
 
 import React, { useRef, useEffect } from 'react'
 import MealCard from './MealCard'
+import { PartnerLabel } from '../PartnerBestellen'
 import CurrentTimeIndicator from './CurrentTimeIndicator'
 
 // Hour slots for timeline - ALL HOURS (6:00 - 22:00)
@@ -86,6 +87,7 @@ export default function MealTimelineDesktop({
                   <MealCard
                     key={`${meal.slot}-${idx}`}
                     meal={meal}
+                    label={meal.partner ? <PartnerLabel meal={meal} /> : null}
                     isChecked={checkedMeals[meal.slot]}
                     onCheck={() => onMealCheck(meal)}
                     onInfo={() => onOpenInfo(meal)}

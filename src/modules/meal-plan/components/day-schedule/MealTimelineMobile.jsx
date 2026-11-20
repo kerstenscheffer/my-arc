@@ -7,6 +7,7 @@
 import React, { useState } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import MealCard from './MealCard'
+import { PartnerLabel } from '../PartnerBestellen'
 import { Trash2, Edit3, Info, Check, Plus, Sunrise, Salad, Apple, UtensilsCrossed, Zap, Pill, ChevronDown } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../../supplements/utils/productFoto'
@@ -164,6 +165,8 @@ export default function MealTimelineMobile({
             <MealCard
               key={item.sleutel}
               meal={meal}
+              // Kant-en-klaar van een partner (Prep My Meal): label met de prijs boven de naam.
+              label={meal.partner ? <PartnerLabel meal={meal} /> : null}
               isChecked={checkedMeals[meal.slot]}
               onCheck={() => handlePlanCheck(meal)}
               onInfo={() => onOpenInfo(meal)}

@@ -70,7 +70,7 @@ Werkwijze:
 - Verander niets wat de feedback niet raakt. Geen verbeteringen op eigen initiatief.
 
 Training: 'vervang' en 'verwijder' werken op één oefening op één dag (of dag 'alle'). 'sets' zet het aantal sets. 'verplaats' zet de oefening op een plek in de dag. 'voeg_toe' zet een oefening uit "toegestaan" achteraan de dag.
-Voeding: 'vervang' vervangt de maaltijd in een slot door een gerecht uit "toegestaan". 'verwijder' haalt de maaltijd uit het slot. 'ingredient_gram' zet de grammen van één ingrediënt in die maaltijd (0 = weghalen). Houd bij voeding rekening met het kcal- en eiwitdoel: compenseer een grote wijziging zo nodig met een tweede actie. Het vetdoel in "doel_trainingsdag" is een minimum: haal je een vetbron weg of verklein je hem (ei, kaas, olie, noten), zet er dan in dezelfde maaltijd een andere vetbron tegenover of vergroot een bestaande, zodat geen dag onder dat minimum komt. Lukt dat niet met deze acties, zet het punt dan in "niet_opgelost".`
+Voeding: 'vervang' vervangt de maaltijd in een slot door een gerecht uit "toegestaan". 'verwijder' haalt de maaltijd uit het slot. 'ingredient_gram' zet de grammen van één ingrediënt in die maaltijd (0 = weghalen). Houd bij voeding rekening met het kcal- en eiwitdoel: compenseer een grote wijziging zo nodig met een tweede actie. Het vetdoel in "doel_trainingsdag" is een minimum: haal je een vetbron weg of verklein je hem (ei, kaas, olie, noten), zet er dan in dezelfde maaltijd een andere vetbron tegenover of vergroot een bestaande, zodat geen dag onder dat minimum komt. Lukt dat niet met deze acties, zet het punt dan in "niet_opgelost". Een maaltijd met kant_en_klaar: true is een kant-en-klare maaltijd waar de klant zelf om vroeg: die vervang, verwijder of wijzig je niet.`
 
 // ── Training ────────────────────────────────────────────────────────────────
 function groepeerOpSpier(oef: any[]) {
@@ -155,7 +155,8 @@ async function voedingContext(sb: SupabaseClient, clientId: string) {
   for (const m of [...alleMeals(plan.week_structure), ...toegestaan.values()]) for (const i of m.ingredients_list || []) if (i.ingredient_id) ids.add(i.ingredient_id)
   const { data: ingr } = await sb.from('ai_ingredients').select('id, name').in('id', [...ids])
   const naamVan = new Map((ingr || []).map((i: any) => [i.id, i.name]))
-  const kort = (m: any) => ({ naam: m.name, kcal: Math.round(m.calories || 0), eiwit: Math.round(m.protein || 0), koolh: Math.round(m.carbs || 0), vet: Math.round(m.fat || 0), ingredienten: (m.ingredients_list || []).map((i: any) => ({ naam: naamVan.get(i.ingredient_id) || i.name || '?', gram: i.amount })) })
+  // kant_en_klaar: een maaltijd van de partner (Prep My Meal) waar de klant in de intake om vroeg.
+  const kort = (m: any) => ({ naam: m.name, kcal: Math.round(m.calories || 0), eiwit: Math.round(m.protein || 0), koolh: Math.round(m.carbs || 0), vet: Math.round(m.fat || 0), ...(m.partner ? { kant_en_klaar: true } : {}), ingredienten: (m.ingredients_list || []).map((i: any) => ({ naam: naamVan.get(i.ingredient_id) || i.name || '?', gram: i.amount })) })
   const mv = plan.generation_settings?.macro_voorstel || {}
   const voorAI = {
     doel_trainingsdag: { kcal: mv.target_calories, eiwit: mv.target_protein, koolh: mv.target_carbs, vet: mv.target_fat },
@@ -176,6 +177,8 @@ async function pasVoedingToe(sb: SupabaseClient, ctx: any, acties: any[]) {
     for (const k of dagen) {
       const dag = ws[k]; const m = dag?.[a.doel]
       if (!dag || !m || typeof m !== 'object') continue
+      // Kant-en-klare maaltijd waar de klant om vroeg: die blijft staan.
+      if (m.partner) continue
       if (a.soort === 'verwijder') { delete dag[a.doel]; raak = true }
       else if (a.soort === 'vervang') {
         const nieuw = ctx.toegestaan.get(String(a.door || '').toLowerCase())

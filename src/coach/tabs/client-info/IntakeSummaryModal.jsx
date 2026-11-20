@@ -120,6 +120,8 @@ const isEmpty = (v) =>
 const N = {
   // Zelfde woorden als de klant in de intake zag (PracticalFlow GUIDANCE_OPTIONS).
   guidance: { strict: 'Strak voedingsplan', flexible: 'Plan met targets en flexibiliteit', free: 'Alleen richtlijnen' },
+  // Zelfde woorden als in de intake (PracticalFlow KANT_EN_KLAAR_OPTIES).
+  kantEnKlaar: { nee: 'Nee, ik kook zelf', paar_keer: 'Ja, een paar keer per week', elke_werkdag: 'Ja, elke werkdag' },
   budget: { '30-40': '€30–40 p/w', '40-60': '€40–60 p/w', '60-80': '€60–80 p/w', '80+': '€80+ p/w' },
   cooking: { graag: 'Kookt graag', neutraal: 'Neutraal', niet_graag: 'Kookt niet graag' },
   diet: { geen: 'Geen', vegetarisch: 'Vegetarisch', veganistisch: 'Veganistisch', halal: 'Halal', pescotarisch: 'Pescotarisch' },
@@ -188,6 +190,8 @@ function flattenNp(np) {
       .filter(k => pi.variatie_per_maaltijd[k])
       .map(k => `${naam[k]}: ${tekst[pi.variatie_per_maaltijd[k]] || pi.variatie_per_maaltijd[k]}`).join('\n') || null)
   }
+  // Kant-en-klare maaltijden (Prep My Meal) in het plan, sinds 20 nov 2026.
+  put('intake_kant_en_klaar', pi.kant_en_klaar)
   put('intake_supps', sp.openness)
   put('intake_supps_huidige', sp.huidige)
   put('intake_wat_werkt_goed', np.wat_werkt_goed)
@@ -437,6 +441,7 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_guidance_level', label: 'Hoe wil je begeleid worden', fmt: fmtMap(N.guidance) },
       { key: 'intake_variatie', label: 'Variatie per maaltijd', alleenIngevuld: true },
+      { key: 'intake_kant_en_klaar', label: 'Kant-en-klare maaltijden', fmt: fmtMap(N.kantEnKlaar), alleenIngevuld: true },
       { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum(), alleenIngevuld: true },
       { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget), alleenIngevuld: true },
       { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking), alleenIngevuld: true }
@@ -579,6 +584,7 @@ const VRAGEN = {
   intake_nu_diner: 'Wat eet je meestal als avondeten?',
   intake_nu_snack: 'Wat snack je meestal tussendoor?',
   intake_variatie: 'Hoeveel variatie wil je per maaltijd?',
+  intake_kant_en_klaar: 'Wil je kant-en-klare maaltijden in je plan?',
   intake_eerder_geprobeerd: 'Wat heb je al geprobeerd met je voeding om je doel te bereiken?',
   intake_ontbijt: 'Ontbijt: wat eet je of vind je lekker?',
   intake_lunch: 'Lunch: wat eet je of vind je lekker?',
