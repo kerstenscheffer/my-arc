@@ -3,7 +3,7 @@
 // Data voor de documenten boven de Gino-bol (tabel business_os_documenten,
 // business-os-documenten.sql). Het scherm staat in GinoDocument.jsx.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const TABEL = 'business_os_documenten'
@@ -34,6 +34,16 @@ export const AVATAR = {
   ].join('\n'),
 }
 
+// Tweede tab (20 nov 2026): Kerstens antwoorden uit de contentmap
+// (07-KERSTENS-ANTWOORDEN.md). De starttekst staat in antwoordenStart.md en
+// wordt pas geladen (eigen bestand) en opgeslagen als de tab voor het eerst open gaat.
+export const ANTWOORDEN = {
+  slug: 'antwoorden',
+  titel: 'Antwoorden',
+  inhoud: '',
+  laadStart: () => import('./antwoordenStart.md?raw').then(m => m.default),
+}
+
 // { doc, laad, bewaar, stand } — doc is null zolang er nog niets is opgeslagen.
 export function useGinoDocument(standaard) {
   const [doc, setDoc] = useState(null)
@@ -56,7 +66,15 @@ export function useGinoDocument(standaard) {
     setDoc(data)
     return true
   }, [standaard.slug, standaard.titel])
-  return { doc, geladen, laad, bewaar, tekst: doc?.inhoud ?? standaard.inhoud }
+  // Eenmalig de starttekst opslaan als er nog geen rij is (alleen voor documenten met laadStart).
+  const vult = useRef(false)
+  const vulStart = useCallback(async () => {
+    if (vult.current || !standaard.laadStart) return
+    vult.current = true
+    const tekst = await standaard.laadStart().then(t => t, () => null)
+    if (tekst == null || !(await bewaar(tekst))) vult.current = false
+  }, [standaard, bewaar])
+  return { doc, geladen, laad, bewaar, vulStart: standaard.laadStart ? vulStart : null, tekst: doc?.inhoud ?? standaard.inhoud }
 }
 
 // Voor Gino's context: waar hij staat en de tekst (ingekort).

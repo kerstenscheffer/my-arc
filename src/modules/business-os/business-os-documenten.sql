@@ -42,3 +42,10 @@ create trigger business_os_documenten_bijgewerkt before update on public.busines
 -- Op de veilige lijst: in de live definitie van business_os_wijziging_bewaakt
 -- staat 'business_os_documenten' achter 'business_os_geldplan' in v_veilig
 -- (toegevoegd met replace() op pg_get_functiondef, 19 nov 2026).
+
+-- Tabs zoals Google Docs (20 nov 2026): elke rij is een tab. Subtabs via parent_id,
+-- volgorde voor de lijst, verwijderen = verwijderd_op zetten (rij blijft bestaan).
+-- Alleen toevoegen: oude app-versies lezen nog per slug en merken hier niets van.
+alter table public.business_os_documenten add column if not exists parent_id uuid references public.business_os_documenten(id) on delete set null;
+alter table public.business_os_documenten add column if not exists volgorde integer not null default 0;
+alter table public.business_os_documenten add column if not exists verwijderd_op timestamptz;
