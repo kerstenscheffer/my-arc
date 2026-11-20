@@ -8,7 +8,8 @@
 //                                                        upload + Metricool samen hoogstens 120 s; verloop per poging in <versie>/concept-log.json
 //   node scripts/reel-gino.mjs broll-clips               eigen B-roll in ~/Gino/reel-assets/broll en de mascottes, met overzichtsbladen
 //   node scripts/reel-gino.mjs broll <naam>              B-roll met tekst (geen stem): render uit ~/Gino/reels/<naam>/config.json, maakt vN
-//                                                        stijl: groot wit, één kernwoord geel, mascotte boven de tekst (docs/reel-werkwijze.md)
+//                                                        "stijl" in de config: licht (standaard: groot wit, één kernwoord geel, mascotte) of
+//                                                        donker (mindset/training: donkere B-roll, strak wit, muziek uit muziek/donker); docs/reel-werkwijze.md
 //                                                        daarna: concept <naam> --datum … (zelfde commando als bij een praatreel)
 //   node scripts/reel-gino.mjs shorts                    kant-en-klare YouTube-shorts die nog geen concept hebben
 //   node scripts/reel-gino.mjs short <video-id> --datum 2026-11-10T18:00   download + concept (docs/shorts-werkwijze.md)
@@ -71,6 +72,7 @@ const restMs = () => (eindtijd ? eindtijd - Date.now() : GRENS_S * 1000)
 // Voortgang op stderr: de uitvoer op stdout blijft één JSON-object.
 const stap = (t) => console.error(`[${new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' })}] ${t}`)
 const mapVan = (b) => path.join(REELS, stam(b))
+const mp3s = (m) => fs.readdirSync(m).filter(x => /\.(mp3|m4a|wav)$/i.test(x))
 const versies = (m) => fs.existsSync(m)
   ? fs.readdirSync(m).filter(x => /^v\d+$/.test(x)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : []
 
@@ -114,7 +116,7 @@ async function monteer(b) {
   const v = `v${versies(m).reduce((n, x) => Math.max(n, Number(x.slice(1))), 0) + 1}`
   const muziekMap = path.join(ASSETS, 'muziek')
   const muziek = cfg.muziek ? path.join(muziekMap, path.basename(cfg.muziek)) : null
-  if (muziek && !fs.existsSync(muziek)) stop(`Muziek niet gevonden. Kies uit: ${fs.readdirSync(muziekMap).join(', ')}`)
+  if (muziek && !fs.existsSync(muziek)) stop(`Muziek niet gevonden. Kies uit: ${mp3s(muziekMap).join(', ')}`)
   const volledig = { ...cfg, bron: b, uit: v, naam: `${stam(b)}_${v}`, muziek }
   const tijdelijk = path.join(m, `config.${v}.json`)
   fs.writeFileSync(tijdelijk, JSON.stringify(volledig, null, 1))
@@ -149,12 +151,15 @@ async function broll(naam) {
   const cfg = JSON.parse(fs.readFileSync(cfgPad, 'utf8'))
   if (!Array.isArray(cfg.shots) || !cfg.shots.length || cfg.shots.some(s => !s.tekst || !s.broll)) stop('config.json: "shots" moet een lijst zijn met per shot "tekst" en "broll".')
   if (!cfg.caption) stop('config.json mist "caption".')
+  // Twee stijlen (20 nov 2026): licht (standaard) en donker. Muziek voor donker komt alleen uit muziek/donker.
+  const stijl = cfg.stijl || 'licht'
+  if (!['licht', 'donker'].includes(stijl)) stop('config.json: "stijl" is licht of donker.')
   const v = `v${versies(m).reduce((n, x) => Math.max(n, Number(x.slice(1))), 0) + 1}`
-  const muziekMap = path.join(ASSETS, 'muziek')
+  const muziekMap = stijl === 'donker' ? path.join(ASSETS, 'muziek', 'donker') : path.join(ASSETS, 'muziek')
   const muziek = cfg.muziek ? path.join(muziekMap, path.basename(cfg.muziek)) : null
-  if (muziek && !fs.existsSync(muziek)) stop(`Muziek niet gevonden. Kies uit: ${fs.readdirSync(muziekMap).join(', ')}`)
+  if (muziek && !fs.existsSync(muziek)) stop(`Muziek niet gevonden in ${muziekMap}. Kies uit: ${mp3s(muziekMap).join(', ')}`)
   const tijdelijk = path.join(m, `config.${v}.json`)
-  fs.writeFileSync(tijdelijk, JSON.stringify({ ...cfg, uit: v, naam: `${naam}_${v}`, muziek }, null, 1))
+  fs.writeFileSync(tijdelijk, JSON.stringify({ ...cfg, stijl, uit: v, naam: `${naam}_${v}`, muziek }, null, 1))
   await run(PY, [path.join(MAP, 'scripts', 'reel_broll.py'), 'monteer', m, tijdelijk], { maxBuffer: 1 << 24 })
   const mp4 = path.join(m, v, `${naam}_${v}.mp4`)
   fs.writeFileSync(path.join(m, v, 'caption.txt'), `${cfg.caption.trim()}\n`)
@@ -164,14 +169,15 @@ async function broll(naam) {
   const dec = await run('ffmpeg', ['-v', 'error', '-i', mp4, '-f', 'null', '-'], { maxBuffer: 1 << 24 }).then(r => r.stderr, e => e.stderr || String(e))
   const lang = JSON.parse(fs.readFileSync(path.join(m, v, 'montage.json'), 'utf8'))
   const mb = fs.statSync(mp4).size / 1e6
+  const donker = stijl === 'donker' // donker heeft geen geel kernwoord en geen mascotte
   uit({
-    versie: v, video: mp4, omslag: path.join(m, v, 'omslag.jpg'), controle_frames: path.join(m, v, 'controle.jpg'), omslag_uitsneden: path.join(m, v, 'omslag_check.jpg'),
-    uit_s: lang.uit_duur,
+    versie: v, stijl, video: mp4, omslag: path.join(m, v, 'omslag.jpg'), controle_frames: path.join(m, v, 'controle.jpg'), omslag_uitsneden: path.join(m, v, 'omslag_check.jpg'),
+    uit_s: lang.uit_duur, muziek: muziek ? path.basename(muziek) : null,
     shots: lang.shots.map(s => ({
-      van: s.van, tot: s.tot, lettergrootte: s.lettergrootte, mascotte: s.mascotte, clips: s.clips,
-      blokken: s.blokken.map(b => ({ regels: b.regels, geel: b.geel, s: Math.round((b.tot - b.van) * 10) / 10 })),
+      van: s.van, tot: s.tot, lettergrootte: s.lettergrootte, ...(donker ? {} : { mascotte: s.mascotte }), clips: s.clips,
+      blokken: s.blokken.map(b => ({ regels: b.regels, ...(donker ? {} : { geel: b.geel }), s: Math.round((b.tot - b.van) * 10) / 10 })),
     })),
-    shots_zonder_mascotte: lang.shots.map((s, i) => (s.mascotte ? null : i + 1)).filter(Boolean),
+    ...(donker ? {} : { shots_zonder_mascotte: lang.shots.map((s, i) => (s.mascotte ? null : i + 1)).filter(Boolean) }),
     dubbele_clips: lang.dubbele_clips, streams: JSON.parse(info).streams, decodeert_zonder_fouten: !dec.trim(),
     mb: Math.round(mb * 10) / 10, te_groot_voor_upload: mb > 24,
   })

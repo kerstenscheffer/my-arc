@@ -5,10 +5,13 @@ Staat naast reel_edit.py (praatreel) en raakt die niet. Aanroep via scripts/reel
   reel_broll.py monteer <map> <config.json>    render naar <map>/<uit>/
   reel_broll.py blad <uit-map>                 overzichtsbladen van alle clips in ~/Gino/reel-assets/broll en van de mascottes
 
-Config (docs/reel-werkwijze.md): shots = [{tekst, mascotte?, broll: "map/clip.mp4" of een lijst, duur?}], muziek, caption.
+Config (docs/reel-werkwijze.md): stijl?, shots = [{tekst, mascotte?, broll: "map/clip.mp4" of een lijst, duur?}], muziek, caption.
 tekst = één blok of een lijst blokken. Een blok is 2 tot 3 regels groot wit, met precies één kernwoord tussen *sterretjes*:
 dat woord wordt geel. De blokken van een shot komen na elkaar; de B-roll loopt eronder door en de mascotte blijft staan.
-Stijl (Kersten, 19 nov 2026): Poppins Bold wit met donkere rand, één kernwoord geel, mascotte boven de tekst waar hij past.
+Stijl 'licht' (standaard; Kersten, 19 nov 2026): Poppins Bold wit met donkere rand, één kernwoord geel, mascotte boven de tekst waar hij past.
+Stijl 'donker' (20 nov 2026, "stijl": "donker"): voor mindset, training en motivatie. B-roll donkerder met meer contrast en minder kleur,
+tekst kleiner in strak wit (Poppins Medium) midden in beeld, zonder geel en zonder mascotte, langere shots en de tekst komt zacht in beeld.
+Sterretjes en "mascotte" in de config worden in deze stijl overgeslagen, dus dezelfde config kan in beide stijlen.
 """
 import itertools, json, math, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -33,6 +36,22 @@ FADE = 0.15                              # zachte overgang tussen clips (briefin
 ZOOM = 0.045                             # rustige schaalbeweging per clip: 100% naar 104,5%
 TEMPO, BASIS, MIN_SHOT = 0.28, 0.7, 2.5  # leestijd per shot: BASIS + TEMPO per woord, nooit korter dan MIN_SHOT
 BLOK_VAST, MIN_BLOK = 1.0, 0.9           # elk tekstblok krijgt een vaste seconde, de rest van het shot gaat naar rato van de woorden
+
+
+# Stijl 'donker': rustig en strak. Eén lettergrootte voor de hele reel, het tekstblok staat midden in beeld.
+FONT_DONKER = os.path.expanduser('~/Gino/reel-assets/fonts/Poppins-Medium.ttf')   # SIL Open Font License (Google Fonts)
+D_TEKST_MAX, D_TEKST_MIN = 64, 56        # kleiner dan de lichte stijl (96)
+D_MAX_B, D_MAX_REGELS, D_REGEL = 860, 4, 1.5   # smallere regels, ruime regelafstand
+D_MIDDEN_Y = 930                         # midden van het tekstblok, net boven het midden van het beeld
+D_SCHADUW = 12                           # alleen een zachte schaduw, geen rand
+D_TEKST_IN, D_TEKST_UIT = 0.4, 0.3       # tekst komt zacht in beeld en gaat zacht weg
+# Beeld: donkerder met meer contrast (curve), minder verzadiging en een lichte vignet. Getest op lichte en donkere gym-clips.
+D_KLEUR = "curves=all='0/0 0.25/0.12 0.5/0.36 0.75/0.62 1/0.86',eq=saturation=0.45,vignette=angle=PI/4.2,"
+# Per stijl: overgang tussen clips, zoom, leestempo (seconden per woord, basis, kortste shot), vaste tijd en kortste tijd per tekstblok.
+STIJLEN = {
+    'licht': {'fade': FADE, 'zoom': ZOOM, 'tempo': TEMPO, 'basis': BASIS, 'min_shot': MIN_SHOT, 'blok_vast': BLOK_VAST, 'min_blok': MIN_BLOK, 'kleur': ''},
+    'donker': {'fade': 0.4, 'zoom': 0.03, 'tempo': 0.40, 'basis': 1.8, 'min_shot': 3.4, 'blok_vast': 1.6, 'min_blok': 2.0, 'kleur': D_KLEUR},
+}
 
 snap = lambda t: round(t * FPS) / FPS
 
@@ -116,12 +135,17 @@ def blad(uit):
                       'bladen': bladen, 'mascottes': namen, 'mascotte_blad': mblad}, ensure_ascii=False))
 
 
-def ontleed(blok):
-    """'Niet gokken, maar *uitrekenen*' wordt per vaste regel een lijst (woord, geel). Precies één kernwoord per blok."""
+def ontleed(blok, kern=True):
+    """'Niet gokken, maar *uitrekenen*' wordt per vaste regel een lijst (woord, geel). Precies één kernwoord per blok.
+    kern=False (stijl donker): geen geel, de sterretjes vallen weg en de tekst blijft woordelijk."""
     stukken, geel = [], 0
     for alinea in blok.split('\n'):
         woorden = []
         for w in alinea.split():
+            if not kern:
+                if w.replace('*', ''):
+                    woorden.append((w.replace('*', ''), False))
+                continue
             g = len(w) > 2 and w.startswith('*') and w.endswith('*')
             if g:
                 w = w[1:-1]
@@ -131,22 +155,22 @@ def ontleed(blok):
             woorden.append((w, g))
         if woorden:
             stukken.append(woorden)
-    if geel != 1:
+    if kern and geel != 1:
         sys.exit(f'Elk tekstblok heeft precies één kernwoord tussen *sterretjes* (nu {geel}): {blok}')
     return stukken
 
 
-def verdeel(woorden, ft, minimaal):
+def verdeel(woorden, ft, minimaal, max_b=MAX_B, max_regels=MAX_REGELS):
     """Beste verdeling over hoogstens 3 regels binnen MAX_B: gelijkmatig gevuld, liever breken na een leesteken,
     en het kernwoord mag alleen op de laatste regel staan (zoals in Kerstens voorbeeld). None als het niet past.
     Bevalt de uitkomst niet, zet dan zelf een regeleinde in de tekst."""
     n, beste = len(woorden), None
-    for regels in range(min(minimaal, n), min(MAX_REGELS, n) + 1):
+    for regels in range(min(minimaal, n), min(max_regels, n) + 1):
         for sneden in itertools.combinations(range(1, n), regels - 1):
             grenzen = [0, *sneden, n]
             delen = [woorden[grenzen[i]:grenzen[i + 1]] for i in range(regels)]
             breed = [ft.getlength(' '.join(w for w, _ in d)) for d in delen]
-            if max(breed) > MAX_B:
+            if max(breed) > max_b:
                 continue
             kost = (max(breed) - min(breed)) / 2 + 60 * regels
             kost -= sum(90 if woorden[x - 1][0][-1] in '.!?:' else 60 if woorden[x - 1][0][-1] in ',;' else 0 for x in sneden)
@@ -202,6 +226,53 @@ def tekstlaag(regels, ft, grootte):
     return img
 
 
+def zet_donker(shots):
+    """Stijl donker: één lettergrootte voor de hele reel, de grootste waarbij elk blok in hoogstens 4 regels past.
+    Eén regel als het past; anders gelijkmatig verdeeld, liever breken na een leesteken. Een eigen regeleinde blijft staan."""
+    for grootte in range(D_TEKST_MAX, D_TEKST_MIN - 1, -4):
+        ft = ImageFont.truetype(FONT_DONKER, grootte)
+        gezet, past = [], True
+        for blokken in shots:
+            rij = []
+            for stukken in blokken:
+                regels = []
+                for woorden in stukken:
+                    r = verdeel(woorden, ft, 1, D_MAX_B, D_MAX_REGELS)
+                    regels = None if r is None or regels is None else regels + r
+                past = past and bool(regels) and len(regels) <= D_MAX_REGELS
+                rij.append(regels)
+            gezet.append(rij)
+        if past:
+            return ft, grootte, gezet
+    sys.exit(f'Stijl donker: een tekstblok past niet in {D_MAX_REGELS} regels. Verdeel de tekst over meer blokken (woordelijk, niets schrappen).')
+
+
+def tekstlaag_donker(regels, ft, grootte):
+    """Doorzichtige laag met één tekstblok in strak wit, gecentreerd rond D_MIDDEN_Y, met alleen een zachte schaduw."""
+    stap = round(grootte * D_REGEL)
+    y0 = D_MIDDEN_Y - (len(regels) - 1) * stap / 2
+
+    def masker(dy=0):
+        m = Image.new('L', (W, H), 0)
+        d = ImageDraw.Draw(m)
+        for i, regel in enumerate(regels):
+            d.text((W / 2, y0 + i * stap + dy), ' '.join(w for w, _ in regel), font=ft, fill=255, anchor='mm')
+        return m
+
+    img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    img.putalpha(masker(3).filter(ImageFilter.GaussianBlur(D_SCHADUW)).point(lambda v: min(255, int(v * 1.3)) * 170 // 255))
+    wit = Image.new('RGBA', (W, H), WIT + (0,))
+    wit.putalpha(masker())
+    return Image.alpha_composite(img, wit)
+
+
+def doorzichtig(laag, p):
+    """Dezelfde laag, p (0-1) zichtbaar: voor het zacht in- en uitkomen van de tekst."""
+    uit = laag.copy()
+    uit.putalpha(laag.getchannel('A').point(lambda v: int(v * p)))
+    return uit
+
+
 def mascotte(naam, plek='midden'):
     """Mascotte op maat met een zachte schaduw eromheen. Alleen PNG's met een transparante achtergrond."""
     pad = os.path.join(MASCOTTES, f'{naam}.png')
@@ -246,22 +317,27 @@ def monteer(map_, cfg_pad):
     cfg = json.load(open(cfg_pad))
     uit = cfg['uit']
     os.makedirs(f'{uit}/lagen', exist_ok=True)
-    tempo = float(cfg.get('tempo', TEMPO))
-    zoom = float(cfg.get('zoom', ZOOM))
+    stijl = cfg.get('stijl') or 'licht'
+    if stijl not in STIJLEN:
+        sys.exit(f'"stijl" is licht of donker (nu: {stijl}).')
+    st, donker = STIJLEN[stijl], stijl == 'donker'
+    fade = st['fade']
+    tempo = float(cfg.get('tempo', st['tempo']))
+    zoom = float(cfg.get('zoom', st['zoom']))
 
     # 1. Shots en de clips eronder. Elke clip krijgt FADE extra aan het eind voor de overgang naar de volgende.
     shots, delen = [], []
     for n, s in enumerate(cfg['shots']):
         ruw = [b.strip() for b in (s['tekst'] if isinstance(s['tekst'], list) else [s['tekst']])]
-        blokken = [ontleed(b) for b in ruw]
+        blokken = [ontleed(b, kern=not donker) for b in ruw]
         woorden = [sum(len(r) for r in b) for b in blokken]
-        d = snap(float(s.get('duur') or max(MIN_SHOT, BASIS + tempo * sum(woorden))))
+        d = snap(float(s.get('duur') or max(st['min_shot'], st['basis'] + tempo * sum(woorden))))
         # Elk blok een vaste seconde, de rest naar rato van het aantal woorden: een kort blok flitst niet weg.
-        vast = min(BLOK_VAST, d / len(woorden) / 2)
+        vast = min(st['blok_vast'], d / len(woorden) / 2)
         duren = [snap(vast + (d - vast * len(woorden)) * w / sum(woorden)) for w in woorden[:-1]]
         duren.append(snap(d - sum(duren)))
-        if min(duren) < MIN_BLOK:
-            sys.exit(f'Shot {n + 1}: een tekstblok staat korter dan {MIN_BLOK} s. Geef het shot een langere "duur" of minder blokken.')
+        if min(duren) < st['min_blok']:
+            sys.exit(f'Shot {n + 1}: een tekstblok staat korter dan {st["min_blok"]} s. Geef het shot een langere "duur" of minder blokken.')
         bron = s['broll'] if isinstance(s['broll'], list) else [s['broll']]
         per = snap(d / len(bron))
         for i, rel in enumerate(bron):
@@ -269,11 +345,11 @@ def monteer(map_, cfg_pad):
             if not pad:
                 sys.exit(f'B-roll niet gevonden in {BROLL} of {BROLL_GYM}: {rel}. Alleen Kerstens eigen beelden uit die mappen, geen stock.')
             delen.append({'shot': n, 'clip': rel, 'pad': pad, 'duur': per if i < len(bron) - 1 else snap(d - per * (len(bron) - 1))})
-        shots.append({'tekst': [b.replace('*', '') for b in ruw], 'duur': d, 'clips': bron, 'mascotte': s.get('mascotte') or None,
+        shots.append({'tekst': [b.replace('*', '') for b in ruw], 'duur': d, 'clips': bron, 'mascotte': None if donker else s.get('mascotte') or None,
                       'mascotte_plek': s.get('mascotte_plek') or 'midden', '_blokken': blokken, '_duren': duren})
     totaal = snap(sum(s['duur'] for s in shots))
     for i, x in enumerate(delen):
-        x['nodig'] = x['duur'] + (FADE if i < len(delen) - 1 else 0)
+        x['nodig'] = x['duur'] + (fade if i < len(delen) - 1 else 0)
         beschikbaar = duur_van(x['pad'])
         if x['nodig'] > beschikbaar + 0.02:
             sys.exit(f"Shot {x['shot'] + 1}: clip {x['clip']} duurt {beschikbaar:.1f} s en er is {x['nodig']:.1f} s nodig. "
@@ -290,7 +366,27 @@ def monteer(map_, cfg_pad):
         img.save(p, compress_level=1)
         regels.append(f"file '{os.path.abspath(p)}'\nduration {duur:.6f}")
 
+    if donker:
+        d_ft, d_grootte, d_gezet = zet_donker([s['_blokken'] for s in shots])
+        n_in, n_uit = round(D_TEKST_IN * FPS), round(D_TEKST_UIT * FPS)
     for n, s in enumerate(shots):
+        if donker:
+            # Donker: alleen tekst in de laag (het beeld is al donker gemaakt), elk blok komt zacht in beeld en gaat zacht weg.
+            # Het allerlaatste blok (de CTA) blijft staan tot het einde.
+            s.pop('_blokken')
+            s.update(van=round(t, 2), tot=round(t + s['duur'], 2), lettergrootte=d_grootte, blokken=[])
+            for j, (blok, duur) in enumerate(zip(d_gezet[n], s.pop('_duren'))):
+                tekst = tekstlaag_donker(blok, d_ft, d_grootte)
+                weg = 0 if n == len(shots) - 1 and j == len(d_gezet[n]) - 1 else n_uit
+                for i in range(n_in):
+                    beeld(doorzichtig(tekst, 1 - (1 - (i + 1) / (n_in + 1)) ** 2), f'{n:02d}-{j}-i{i:02d}', 1 / FPS)
+                beeld(tekst, f'{n:02d}-{j}', duur - (n_in + weg) / FPS)
+                for i in range(weg):
+                    beeld(doorzichtig(tekst, (1 - (i + 1) / (weg + 1)) ** 2), f'{n:02d}-{j}-u{i:02d}', 1 / FPS)
+                s['blokken'].append({'regels': [' '.join(w for w, _ in r) for r in blok], 'geel': None, 'van': round(t, 2), 'tot': round(t + duur, 2)})
+                kijk.append(t + duur * 0.6)
+                t += duur
+            continue
         ft, grootte, gezet = zet_shot(s.pop('_blokken'), f'Shot {n + 1}')
         sprite = mascotte(s['mascotte'], s['mascotte_plek']) if s['mascotte'] else None
         s.update(van=round(t, 2), tot=round(t + s['duur'], 2), lettergrootte=grootte, blokken=[])
@@ -316,12 +412,12 @@ def monteer(map_, cfg_pad):
         beelden = round(x['nodig'] * FPS)
         beweging = (f"scale={W * 2}:{H * 2}:flags=bicubic,zoompan=z='1+{zoom}*on/{beelden}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
                     f':d=1:s={W}x{H}:fps={FPS},') if zoom else ''
-        fc += (f'[{i}:v]fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,{beweging}'
+        fc += (f'[{i}:v]fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,{beweging}{st["kleur"]}'
                f"trim=duration={x['nodig']:.4f},setpts=PTS-STARTPTS,format=yuv420p[s{i}];")
     vorige, start = '[s0]', 0.0
     for i in range(1, len(delen)):
         start += delen[i - 1]['duur']
-        fc += f'{vorige}[s{i}]xfade=transition=fade:duration={FADE}:offset={start:.4f}[x{i}];'
+        fc += f'{vorige}[s{i}]xfade=transition=fade:duration={fade}:offset={start:.4f}[x{i}];'
         vorige = f'[x{i}]'
     n_laag, n_geluid = len(delen), len(delen) + 1
     fc += f'[{n_laag}:v]fps={FPS},format=rgba[o];{vorige}[o]overlay=0:0:eof_action=pass:format=auto,format=yuv420p[v];'
@@ -344,7 +440,8 @@ def monteer(map_, cfg_pad):
 
     # 5. Omslag = het eerste tekstblok van de hook met de mascotte erbij, plus de uitsneden zoals Instagram ze toont (feed 4:5, grid 1:1).
     eerste = shots[0]['blokken'][0]['tot']
-    run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', f'{max(MASCOTTE_IN + 0.1, min(1.0, eerste - 0.2)):.2f}', '-i', mp4, '-frames:v', '1', '-q:v', '2',
+    omslag_t = max(D_TEKST_IN + 0.1, min(1.2, eerste - D_TEKST_UIT - 0.1)) if donker else max(MASCOTTE_IN + 0.1, min(1.0, eerste - 0.2))
+    run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', f'{omslag_t:.2f}', '-i', mp4, '-frames:v', '1', '-q:v', '2',
          f'{uit}/omslag.jpg'])
     g = Image.open(f'{uit}/omslag.jpg').convert('RGB')
     o = Image.new('RGB', (680, 384), 'black')
@@ -369,7 +466,7 @@ def monteer(map_, cfg_pad):
     os.remove(tmp)
     cb.save(f'{uit}/controle.jpg', quality=90)
 
-    json.dump({'soort': 'broll', 'uit_duur': totaal, 'shots': shots, 'clips': [{k: x[k] for k in ('shot', 'clip', 'van', 'duur')} for x in delen],
+    json.dump({'soort': 'broll', 'stijl': stijl, 'uit_duur': totaal, 'shots': shots, 'clips': [{k: x[k] for k in ('shot', 'clip', 'van', 'duur')} for x in delen],
                'dubbele_clips': dubbel}, open(f'{uit}/montage.json', 'w'), ensure_ascii=False, indent=1)
     import shutil
     shutil.rmtree(f'{uit}/lagen', ignore_errors=True)
