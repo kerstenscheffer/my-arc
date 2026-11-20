@@ -16,6 +16,8 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react'
 import ReviewSlider, { Sterren } from './nieuw-home/ReviewSlider'
 import { useTrustpilot } from './nieuw-home/trustpilotData'
+import GidsenBibliotheek from './nieuw-home/GidsenBibliotheek'
+import { GIDSEN } from './nieuw-home/gidsenLijst'
 import { FONT } from './leadmagnet/stijl'
 import { INLOG_PAD } from '../startPagina'
 
@@ -28,8 +30,6 @@ const CHALLENGE_START = '/6week-checkout'
 const CHALLENGE_INFO = '/6weekchallenge'
 const INSTAGRAM = 'https://www.instagram.com/kerstenscheffer'
 const YOUTUBE = 'https://www.youtube.com/@kerstenscheffer'
-const PDF_EIWIT = '/gratis/eiwit-ranglijst.pdf'
-const PDF_PREP = '/gratis/meal-prep-kookboek.pdf'
 // De uitlegvideo's van de twee tools, dezelfde als op /mijn-menu en /mijn-split.
 const VIDEO_MENU = 'https://www.youtube.com/watch?v=vhcQgldADCc'
 const VIDEO_SPLIT = 'https://www.youtube.com/watch?v=WshSHiHN0Cw'
@@ -44,8 +44,7 @@ const PREPMYMEAL_CODE = 'KERSTENSCHEFFER'
 const GRATIS = [
   { tekst: 'Weekmenu tool', href: '/mijn-menu' },
   { tekst: 'Trainingsschema tool', href: '/mijn-split' },
-  { tekst: 'Eiwit ranglijst', href: PDF_EIWIT, nieuwTab: true },
-  { tekst: 'Meal prep kookboek', href: PDF_PREP, nieuwTab: true },
+  { tekst: `Gidsen-bibliotheek (${GIDSEN.length})`, href: '#gidsen' },
   { tekst: 'PrepMyMeal 10% korting', href: PREPMYMEAL, nieuwTab: true },
 ]
 const MEDIA = [
@@ -74,12 +73,12 @@ const KAARTEN = [
     knoppen: [{ tekst: 'Maak mijn schema', href: '/mijn-split' }, { tekst: 'Kijk de uitleg', href: VIDEO_SPLIT, nieuwTab: true }],
   },
   {
-    label: 'Gratis', titel: 'Gidsen',
+    label: `${GIDSEN.length} gidsen`, titel: 'Gidsen',
     omslagen: [
       { src: '/gratis/eiwit-ranglijst-cover.jpg', alt: 'Omslag van de eiwit ranglijst' },
       { src: '/gratis/meal-prep-kookboek-cover.jpg', alt: 'Omslag van het meal prep kookboek' },
     ],
-    knoppen: [{ tekst: 'Eiwit ranglijst', href: PDF_EIWIT, nieuwTab: true }, { tekst: 'Meal prep kookboek', href: PDF_PREP, nieuwTab: true }],
+    knoppen: [{ tekst: `Bekijk alle ${GIDSEN.length} gidsen`, href: '#gidsen' }],
   },
   {
     label: '6 weken', titel: '6 weken challenge', beeld: '/waarom-kersten.jpg', alt: 'Kersten',
@@ -242,8 +241,9 @@ const CSS = `
 /* 7 vier kaarten */
 .nh-kaarten { display:grid; grid-template-columns:1fr 1fr; gap:14px 12px; padding:0 10px; max-width:1160px; margin:0 auto; }
 .nh-kaart { display:flex; flex-direction:column; min-width:0; background:#0b0b0b; color:#fff; border-radius:20px; padding:10px; }
+.nh-kaart-label.is-over { position:absolute; top:8px; right:8px; z-index:2; box-shadow:0 4px 12px rgba(0,0,0,.35); }
 .nh-kaart-label { align-self:flex-end; background:#fff; color:#000; border-radius:8px; padding:3px 9px; font-size:13px; font-weight:900; }
-.nh-kaart h3 { display:flex; align-items:center; justify-content:center; min-height:2.3em; margin:10px 0; text-align:center; font-size:15px; font-weight:900; line-height:1.15; text-transform:uppercase; hyphens:manual; }
+.nh-kaart h3 { display:flex; align-items:center; justify-content:center; min-height:2.3em; margin:2px 0 10px; text-align:center; font-size:15px; font-weight:900; line-height:1.15; text-transform:uppercase; hyphens:manual; }
 /* Verhouding van de posters (620x877): bij 1/1 viel de titel onderaan weg (UPPER / LOWER). */
 .nh-kaart-beeld { position:relative; width:100%; aspect-ratio:620/877; border-radius:16px; overflow:hidden; background:#0b0b0b; }
 .nh-kaart-beeld > img.is-vol { width:100%; height:100%; object-fit:cover; object-position:center; }
@@ -263,6 +263,28 @@ const CSS = `
 .nh-pmm-code { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:48px; padding:0 6px 0 16px; border:2px dashed rgba(255,255,255,.5); border-radius:12px; background:none; color:#fff; }
 .nh-pmm-code span { font-size:17px; font-weight:900; letter-spacing:.06em; }
 .nh-pmm-code b { padding:7px 12px; border-radius:8px; background:#2b2b2b; font-size:13px; font-weight:800; }
+
+/* 7c gidsen-bibliotheek */
+.nh-bieb { background:#fff; padding:44px 10px 20px; scroll-margin-top:70px; }
+.nh-bieb-kop { max-width:640px; margin:0 auto; text-align:center; }
+.nh-bieb-kop .nh-kaart-label { display:inline-block; background:#000; color:#fff; }
+.nh-bieb-kop h2 { margin-top:12px; font-size:30px; font-weight:900; line-height:1.15; text-transform:uppercase; }
+.nh-bieb-kop p { margin-top:10px; font-size:17px; line-height:1.45; color:rgba(0,0,0,.75); }
+.nh-bieb-rij { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; max-width:1160px; margin:24px auto 0; }
+.nh-bieb-gids { display:flex; flex-direction:column; gap:4px; padding:10px; background:#0b0b0b; color:#fff !important; border:none; border-radius:16px; text-align:left; font-family:inherit; cursor:pointer; }
+.nh-bieb-omslag { position:relative; display:block; border-radius:10px; overflow:hidden; }
+.nh-bieb-omslag img { width:100%; height:auto; aspect-ratio:496/702; object-fit:cover; }
+.nh-bieb-slot { position:absolute; top:8px; right:8px; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#fff; color:#000; box-shadow:0 4px 12px rgba(0,0,0,.35); }
+.nh-bieb-titel { margin-top:6px; font-size:15px; font-weight:900; line-height:1.25; }
+.nh-bieb-sub { font-size:12px; font-weight:700; color:rgba(255,255,255,.55); }
+.nh-bieb-form { display:flex; flex-direction:column; gap:12px; max-width:520px; margin:20px auto 0; padding:20px 16px; background:#0b0b0b; color:#fff; border-radius:20px; scroll-margin-top:90px; }
+.nh-bieb-form-kop { font-size:18px; font-weight:800; line-height:1.35; }
+.nh-bieb-form label { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:rgba(255,255,255,.7); }
+.nh-bieb-form input { min-height:50px; padding:0 14px; border-radius:12px; border:2px solid rgba(255,255,255,.2); background:#161616; color:#fff; font-family:inherit; font-size:17px; font-weight:600; text-transform:none; letter-spacing:0; }
+.nh-bieb-form input:focus { outline:none; border-color:#fff; }
+.nh-bieb-fout { font-size:14px; font-weight:800; color:#ff8a8a; }
+.nh-bieb-klein { font-size:12px; line-height:1.4; color:rgba(255,255,255,.55); text-align:center; }
+.nh-bieb-klein a { text-decoration:underline !important; }
 
 /* 8 vragen en 9 over Kersten delen een vlak, net als bij het voorbeeld */
 .nh-onder { background:#fff; }
@@ -364,6 +386,10 @@ const CSS = `
   .nh-kaarten { grid-template-columns:repeat(4, 1fr); gap:28px; padding:0 15px; }
   .nh-kaart { padding:16px; }
   .nh-kaart h3 { font-size:20px; }
+  .nh-bieb { padding:64px 15px 24px; }
+  .nh-bieb-kop h2 { font-size:38px; }
+  .nh-bieb-rij { grid-template-columns:repeat(4, 1fr); gap:20px; }
+  .nh-bieb-form { padding:28px; }
   .nh-pmm { flex-direction:row; align-items:stretch; margin:28px auto 0; width:calc(100% - 30px); }
   .nh-pmm-foto { flex:0 0 46%; }
   .nh-pmm-foto img { height:100%; aspect-ratio:auto; }
@@ -431,6 +457,7 @@ export default function NieuwHome() {
   // een hash "app-link" (CoachHub-tabs, Business OS, Supabase): met #over-kersten
   // in de URL zou verversen het inlogscherm tonen. Eerst het telefoonmenu
   // dicht, dan pas scrollen, anders klopt de plek niet.
+  const anker = (l) => (l.href.startsWith('#') ? naarAnker : undefined)
   const naarAnker = (e) => {
     const id = (e.currentTarget.getAttribute('href') || '').slice(1)
     e.preventDefault()
@@ -456,7 +483,7 @@ export default function NieuwHome() {
           <nav className="nh-menu" aria-label="Hoofdmenu">
             <div className={`nh-item${uitklap === 'gratis' ? ' is-open' : ''}`} onMouseLeave={() => setUitklap(null)}>
               <button type="button" aria-expanded={uitklap === 'gratis'} onClick={() => wissel('gratis')}>Gratis <ChevronDown size={17} strokeWidth={2.4} aria-hidden="true" /></button>
-              <div className="nh-uitklap">{GRATIS.map((l) => <Link key={l.tekst} item={l} />)}</div>
+              <div className="nh-uitklap">{GRATIS.map((l) => <Link key={l.tekst} item={l} onClick={anker(l)} />)}</div>
             </div>
             <a href={CHALLENGE_INFO}>Challenge</a>
             <div className={`nh-item${uitklap === 'media' ? ' is-open' : ''}`} onMouseLeave={() => setUitklap(null)}>
@@ -479,7 +506,7 @@ export default function NieuwHome() {
         {telefoonMenu && (
           <div className="nh-tel">
             <div className="nh-tel-kop">Gratis</div>
-            {GRATIS.map((l) => <Link key={l.tekst} item={l} className="nh-tel-link" />)}
+            {GRATIS.map((l) => <Link key={l.tekst} item={l} className="nh-tel-link" onClick={anker(l)} />)}
             <div className="nh-tel-kop">Challenge</div>
             <a className="nh-tel-link" href={CHALLENGE_INFO}>De 6 weken challenge</a>
             <div className="nh-tel-kop">Media</div>
@@ -496,7 +523,7 @@ export default function NieuwHome() {
         <img className="nh-hero-foto nh-hero-links" src="/nieuw/kersten-hero.jpg" alt="Kersten" width="1400" height="1166" />
         <div className="nh-hero-midden">
           <h1><span>Top shape bereiken zonder</span> <span>je weekend op te geven?</span></h1>
-          <p className="nh-hero-sub"><span>In 6 weken droger met de 80/20 methode.</span> <span>Uit eten en de borrel blijven gewoon.</span></p>
+          <p className="nh-hero-sub"><span>Voor mannen van 25 tot 55 jaar.</span> <span>In 6 weken droger met de 80/20 methode.</span> <span>Uit eten en de borrel blijven gewoon.</span></p>
           <a className="nh-knop is-groot" href={CHALLENGE_START}>Start de challenge</a>
         </div>
       </section>
@@ -546,16 +573,17 @@ export default function NieuwHome() {
         <div className="nh-kaarten">
           {KAARTEN.map((k) => (
             <article key={k.titel} className="nh-kaart">
-              <div className="nh-kaart-label">{k.label}</div>
               <h3>{k.titel}</h3>
               <div className="nh-kaart-beeld">
+                {/* Label over het beeld, zodat de kaart niet hoger wordt (20 nov, Kersten). */}
+                <div className="nh-kaart-label is-over">{k.label}</div>
                 {k.omslagen
                   ? k.omslagen.map((o) => <img key={o.src} className="nh-omslag" src={o.src} alt={o.alt} loading="lazy" />)
                   : <img className="is-vol" src={k.beeld} alt={k.alt} loading="lazy" />}
               </div>
               <div className="nh-kaart-knoppen">
                 {k.knoppen.map((b, i) => (
-                  <Link key={b.tekst} item={b} className={`nh-knop${i === 1 ? ' is-tweede' : ''}`} />
+                  <Link key={b.tekst} item={b} className={`nh-knop${i === 1 ? ' is-tweede' : ''}`} onClick={anker(b)} />
                 ))}
               </div>
             </article>
@@ -578,6 +606,8 @@ export default function NieuwHome() {
           </div>
         </div>
       </section>
+
+      <GidsenBibliotheek />
 
       <div className="nh-onder">
         {/* 8. Vragen: vier vragen over de challenge, uitklapbaar */}
@@ -627,7 +657,7 @@ export default function NieuwHome() {
                   {k.kop}
                   <ChevronDown size={20} strokeWidth={2.4} aria-hidden="true" />
                 </button>
-                <div className="nh-voet-links">{k.links.map((l) => <Link key={l.tekst} item={l} onClick={l.href.startsWith('#') ? naarAnker : undefined} />)}</div>
+                <div className="nh-voet-links">{k.links.map((l) => <Link key={l.tekst} item={l} onClick={anker(l)} />)}</div>
               </div>
             ))}
           </div>
