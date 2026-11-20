@@ -27,7 +27,7 @@ export default function InfoPage() {
   const socialLinks = [
     { icon: Instagram, label: 'Instagram', href: 'https://www.instagram.com/myarcfitness/', color: '#FFD700' },
     { icon: Music, label: 'TikTok', href: 'https://www.tiktok.com/@myarc.fit', color: '#D4AF37' },
-    { icon: Youtube, label: 'YouTube', href: 'https://www.youtube.com/@kerstenscheffer210', color: '#FFD700' },
+    { icon: Youtube, label: 'YouTube', href: 'https://www.youtube.com/@kerstenscheffer', color: '#FFD700' },
     { icon: MessageCircle, label: 'WhatsApp', href: 'https://wa.me/31631388756', color: '#D4AF37' },
     { icon: Mail, label: 'Email', href: 'mailto:Kersten@myarcfitness.com', color: '#FFD700' }
   ]

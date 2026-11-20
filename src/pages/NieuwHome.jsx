@@ -25,7 +25,7 @@ const OMSCHRIJVING = 'Droger worden en je etentjes, borrels en weekend houden. O
 const CHALLENGE_START = '/6week-checkout'
 const CHALLENGE_INFO = '/6weekchallenge'
 const INSTAGRAM = 'https://www.instagram.com/kerstenscheffer'
-const YOUTUBE = 'https://www.youtube.com/@kerstenscheffer210'
+const YOUTUBE = 'https://www.youtube.com/@kerstenscheffer'
 const PDF_EIWIT = '/gratis/eiwit-ranglijst.pdf'
 const PDF_PREP = '/gratis/meal-prep-kookboek.pdf'
 // De uitlegvideo's van de twee tools, dezelfde als op /mijn-menu en /mijn-split.
@@ -166,7 +166,8 @@ const CSS = `
 .nh-hero h1 { font-size:clamp(34px, 10.4vw, 50px); font-weight:900; line-height:1.13; letter-spacing:-.01em; text-transform:uppercase; text-wrap:balance; }
 .nh-hero p { margin-top:22px; font-size:20px; font-weight:500; line-height:1.35; text-wrap:balance; }
 .nh-hero .nh-knop { margin-top:22px; }
-.nh-hero-foto { width:100%; max-width:230px; aspect-ratio:3/5; object-fit:cover; border-radius:20px; background:#222; }
+/* height:auto is nodig: het height-attribuut op de img (tegen verspringen) wint anders van aspect-ratio en maakt de foto 1280 px hoog. */
+.nh-hero-foto { width:100%; max-width:230px; height:auto; aspect-ratio:3/5; object-fit:cover; border-radius:20px; background:#222; }
 .nh-hero-links { grid-area:links; justify-self:end; object-position:center; }
 .nh-hero-rechts { grid-area:rechts; justify-self:start; object-position:42% center; }
 
@@ -225,7 +226,7 @@ const CSS = `
 
 .nh-over { max-width:1125px; margin:0 auto; padding:40px 15px 64px; scroll-margin-top:70px; }
 .nh-over h2 { margin-bottom:24px; }
-.nh-over-foto { width:100%; max-width:420px; margin:0 auto; aspect-ratio:1/1; object-fit:cover; border-radius:24px; background:#fff; }
+.nh-over-foto { width:100%; max-width:420px; height:auto; margin:0 auto; aspect-ratio:1/1; object-fit:cover; border-radius:24px; background:#fff; }
 .nh-over-tekst { max-width:420px; margin:22px auto 0; padding:0 10px; }
 .nh-over-tekst p { font-size:19px; font-weight:600; line-height:1.45; }
 .nh-over-tekst p + p { margin-top:16px; }
