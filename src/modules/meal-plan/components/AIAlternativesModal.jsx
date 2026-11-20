@@ -1021,37 +1021,6 @@ export default function AIAlternativesModal({
     return 'Meer maaltijden'
   }
   filteredMealsRef.current = filteredMeals
-  const toonProducten = !embedded && searchTerm.trim().length >= 3 && producten.q === searchTerm.trim()
-    && producten.rijen.length > 0 && filteredMeals.length < 5
-  const productBlok = !toonProducten ? null : (
-    <div style={{ padding: filteredMeals.length ? '1rem 0 0.5rem' : '0.25rem 0 0.5rem' }}>
-      <div style={{ padding: '0 0.25rem 0.5rem' }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Losse producten</div>
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-          {Number(currentMeal?.calories) > 0 ? 'Portie afgestemd op de maaltijd die je wisselt. Daarna kun je de grammen aanpassen.' : 'Daarna kun je de grammen aanpassen.'}
-        </div>
-      </div>
-      {producten.rijen.map((pr, i) => {
-        const po = productPortie(pr)
-        return (
-          <button key={pr.id} onClick={() => kiesProduct(pr)} style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.25rem', background: 'transparent',
-            border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
-            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-            <img src={resolveFoodImage(pr, { size: 200 })} alt="" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</span>
-              <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
-                {po.gram} g · {po.calories} kcal · {Math.round(po.protein)} g eiwit
-              </span>
-            </span>
-            <Plus size={20} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
-          </button>
-        )
-      })}
-    </div>
-  )
 
   // Zoekterm loggen zodra de gebruiker typt (wissel-context).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1096,6 +1065,40 @@ export default function AIAlternativesModal({
       ingredients: [{ ingredient_id: pr.id, name: pr.name, amount: po.gram, unit: 'gram', calories: po.calories, protein: po.protein, carbs: po.carbs, fat: po.fat }],
     })
   }
+
+  // Na producten, productPortie en kiesProduct: eerder stond dit erboven en crashte het
+  // wisselvenster bij 3+ letters zoeken (Cannot access before initialization, 19-20 nov 2026).
+  const toonProducten = !embedded && searchTerm.trim().length >= 3 && producten.q === searchTerm.trim()
+    && producten.rijen.length > 0 && filteredMeals.length < 5
+  const productBlok = !toonProducten ? null : (
+    <div style={{ padding: filteredMeals.length ? '1rem 0 0.5rem' : '0.25rem 0 0.5rem' }}>
+      <div style={{ padding: '0 0.25rem 0.5rem' }}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Losse producten</div>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+          {Number(currentMeal?.calories) > 0 ? 'Portie afgestemd op de maaltijd die je wisselt. Daarna kun je de grammen aanpassen.' : 'Daarna kun je de grammen aanpassen.'}
+        </div>
+      </div>
+      {producten.rijen.map((pr, i) => {
+        const po = productPortie(pr)
+        return (
+          <button key={pr.id} onClick={() => kiesProduct(pr)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.25rem', background: 'transparent',
+            border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <img src={resolveFoodImage(pr, { size: 200 })} alt="" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</span>
+              <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
+                {po.gram} g · {po.calories} kcal · {Math.round(po.protein)} g eiwit
+              </span>
+            </span>
+            <Plus size={20} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
+          </button>
+        )
+      })}
+    </div>
+  )
 
   if (!isOpen && !embedded) return null
 
