@@ -21,7 +21,7 @@ export const EISEN = [
   {
     key: 'workouts', label: 'Workouts', nodig: 12, van: 12,
     uitleg: '12 workouts — twee per week',
-    info: 'Twee workouts per week, twaalf over de hele challenge. Een workout telt mee zodra je 70% van de geplande sets hebt afgevinkt. Alleen starten is dus niet genoeg, maar de laatste set laten liggen kost je hem niet.',
+    info: 'Twee workouts per week, twaalf over de hele challenge. Een workout telt mee zodra je er minstens één set van hebt gelogd.',
   },
   {
     key: 'wegingen', label: 'Wegingen', nodig: 18, van: 24,
@@ -109,7 +109,7 @@ export const allesGehaald = (stand) => {
 export const WEEK_EISEN = [
   {
     key: 'workouts', label: 'Workouts', nodig: 2,
-    info: 'Twee workouts per week uit je schema. Een workout telt zodra 70% van de sets is afgevinkt.',
+    info: 'Twee workouts per week uit je schema. Een workout telt zodra je er minstens één set van hebt gelogd.',
   },
   {
     key: 'wegingen', label: 'Wegingen', nodig: 3,

@@ -116,7 +116,7 @@ export default function WorkoutProgressView({ client, db, challengeData }) {
       )}
 
       <div style={{ marginTop: '0.8rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)' }}>
-        Een workout telt mee vanaf 70% van de geplande sets. {EIS.uitleg}.
+        Een workout telt mee vanaf één gelogde set. {EIS.uitleg}.
       </div>
     </Kader>
   )

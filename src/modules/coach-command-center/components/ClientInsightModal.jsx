@@ -86,6 +86,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showLogboek, setShowLogboek] = useState(false)
   const [gewichtSlot, setGewichtSlot] = useState(null) // plek in de bovenbalk voor de wekenstrook
   const [showGewicht, setShowGewicht] = useState(false)
+  // Foto's openklappen binnen het Gewicht-venster in plaats van een los venster eronder.
+  const [gewichtFotos, setGewichtFotos] = useState(false)
   // De looptijd stond altijd open als balkenrij onder de kop. Dat is een blok
   // dat je één keer per maand nodig hebt en de rest van de tijd meekijkt, dus
   // nu dicht tenzij je erom vraagt.
@@ -230,6 +232,45 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Eén definitie per sectie voor desktop én mobiel. Stond eerder twee keer
   // in het bestand (één blok per weergave), waardoor een prop-wijziging in de
   // ene helft stilletjes langs de andere ging.
+  // Het foto-overzicht: los venster, en ín het Gewicht-venster (20 nov 2026, Kersten:
+  // het losse venster opende ónder Gewicht).
+  const fotoGrid = () => (
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              {groupPhotosByMonthAndDay(photos).map(mo => (
+                <div key={mo.month} style={{ marginBottom: '1.5rem' }}>
+                  {/* Maand-kop */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 0.75rem', position: 'sticky', top: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', padding: '0.35rem 0', zIndex: 1 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff' }}>Maand {mo.month}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+                  </div>
+                  {/* Dag-clusters */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                    {mo.days.map(day => (
+                      <div key={day.date}>
+                        <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.4rem' }}>{formatDate(day.date)}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 100 : 140}px, 1fr))`, gap: isMobile ? '0.5rem' : '0.75rem' }}>
+                          {day.items.map(({ p, idx }) => (
+                            <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                              <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
+                                <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
+                                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
+                                <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
+                                  <Download size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+  )
+
   // `extra`: bij 'workout' de voeding voor de gecombineerde week (functie),
   // bij 'meals' de gedeelde week ({ gekozen, setGekozen, meldWeek }).
   const renderSectie = (id, klein, extra = null) => {
@@ -704,52 +745,22 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               </div>
             </div>
             {/* Grid — per maand (vanaf eerste foto), binnen maand per dag gegroepeerd */}
-            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              {groupPhotosByMonthAndDay(photos).map(mo => (
-                <div key={mo.month} style={{ marginBottom: '1.5rem' }}>
-                  {/* Maand-kop */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 0.75rem', position: 'sticky', top: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', padding: '0.35rem 0', zIndex: 1 }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff' }}>Maand {mo.month}</span>
-                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-                  </div>
-                  {/* Dag-clusters */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                    {mo.days.map(day => (
-                      <div key={day.date}>
-                        <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.4rem' }}>{formatDate(day.date)}</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 100 : 140}px, 1fr))`, gap: isMobile ? '0.5rem' : '0.75rem' }}>
-                          {day.items.map(({ p, idx }) => (
-                            <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                              <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
-                                <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
-                                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
-                                <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
-                                  <Download size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {fotoGrid()}
           </div>
         </div>
       )}
 
       {showCompare && (
-        <PhotoCompareModal db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowCompare(false)} />
+        // Wrapper zet vergelijken boven het Gewicht-venster (zIndex 11000).
+        <div style={{ position: 'relative', zIndex: 11600 }}>
+          <PhotoCompareModal db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowCompare(false)} />
+        </div>
       )}
 
       {photoZoom && photos.length > 0 && (
         <div onClick={() => setPhotoZoom(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)',
-          zIndex: 10500, display: 'flex', flexDirection: 'column',
+          zIndex: 11600, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem'
         }}>
           <button onClick={() => setPhotoZoom(false)} style={{
@@ -757,7 +768,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             width: '36px', height: '36px', borderRadius: '50%',
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
             color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 10501, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+            zIndex: 11601, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
           }}>
             <X size={18} />
           </button>
@@ -855,21 +866,38 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
       {/* Blijft altijd gemonteerd, ook dicht: van hieruit komt de wekenstrook
           in de bovenbalk, en de fase hoeft dan maar één keer te laden. */}
       {effectiveClient && !isMobile && (
-        <div onClick={(e) => { if (e.target === e.currentTarget) setShowGewicht(false) }}
+        <div onClick={(e) => { if (e.target === e.currentTarget) { setShowGewicht(false); setGewichtFotos(false) } }}
           style={{ position: 'fixed', inset: 0, zIndex: 11000, background: 'rgba(0,0,0,0.7)', display: showGewicht ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="dialog" aria-label="Gewicht" style={{ position: 'relative', width: '100%', maxWidth: 1200, height: 'min(90vh, 900px)', display: 'flex', flexDirection: 'column', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, boxShadow: '0 24px 60px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.7rem 0.2rem 1rem' }}>
-              <Scale size={15} color="#fff" strokeWidth={2.4} />
-              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Gewicht</span>
-              <button onClick={() => setShowGewicht(false)} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {gewichtFotos ? (
+                <button onClick={() => setGewichtFotos(false)} aria-label="Terug naar gewicht" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ChevronLeft size={18} strokeWidth={2.6} />
+                </button>
+              ) : <Scale size={15} color="#fff" strokeWidth={2.4} />}
+              <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+                {gewichtFotos ? <>Foto's <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{photos.length}</span></> : 'Gewicht'}
+              </span>
+              {gewichtFotos && (
+                <button onClick={() => setShowCompare(true)} style={{ height: 32, padding: '0 0.8rem', borderRadius: 9, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                  Vergelijken
+                </button>
+              )}
+              <button onClick={() => { setShowGewicht(false); setGewichtFotos(false) }} aria-label="Sluiten" style={{ width: 30, height: 30, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
+            {gewichtFotos && photos.length > 0 && (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '0.4rem 1rem 1rem' }}>
+                {fotoGrid()}
+              </div>
+            )}
+            {/* WeightColumn blijft gemonteerd (vult de wekenstrook), alleen verborgen. */}
+            <div style={{ flex: 1, minHeight: 0, display: gewichtFotos && photos.length > 0 ? 'none' : 'block' }}>
               <WeightColumn
                 client={effectiveClient} weightData={weightData} circumData={circumData}
                 photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
-                onOpenGallery={() => setShowGallery(true)}
+                onOpenGallery={() => setGewichtFotos(true)}
                 fotosNaast
                 db={db} onClientUpdate={handleClientUpdate}
                 strookSlot={gewichtSlot} onOpenVenster={() => setShowGewicht(true)}

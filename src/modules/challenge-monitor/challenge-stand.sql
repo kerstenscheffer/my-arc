@@ -190,3 +190,8 @@ select jsonb_build_object(
 $$;
 
 grant execute on function public.get_challenge_stand(uuid, date, date, numeric, numeric, int) to authenticated;
+
+-- 20 nov 2026 (Kersten): een workout telt zodra er 1 set gelogd is (was 70% van de geplande sets).
+-- Live aangepast in de functie: geldig = count(*) filter (where coalesce(l.done_sets, 0) >= 1)
+-- en in w_detail telt = (coalesce(l.done_sets, 0) >= 1). p_workout_pct blijft als parameter
+-- bestaan (oude aanroepen), maar doet niets meer. Calls: zie challenge-calls.sql.
