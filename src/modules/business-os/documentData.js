@@ -97,7 +97,8 @@ export function useGinoDocumenten() {
     await Promise.all(broers.map((b, i) => {
       // Bovenste niveau: hij komt in dezelfde sectie als het doel (Vastgezet of de gewone lijst).
       if (b.id === id) {
-        const velden = { parent_id: ouder, volgorde: i, ...(ouder ? null : { vastgezet: !!doel.vastgezet }) }
+        // Als subtab volgt hij zijn ouder (anders sprong hij los naar Vastgezet).
+        const velden = { parent_id: ouder, volgorde: i, vastgezet: ouder ? false : !!doel.vastgezet }
         return Object.entries(velden).some(([k, v]) => (tab[k] ?? null) !== v) ? wijzig(id, velden) : null
       }
       return b.volgorde !== i ? wijzig(b.id, { volgorde: i }) : null
