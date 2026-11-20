@@ -6,14 +6,14 @@
 // uit een meting van die pagina op 1440 en 390 breed; de screenshots en
 // maten staan in ~/Gino/acq-voorbeeld.
 //
-// Volgorde: 1 meldbalk, 2 menubalk, 3 hero, 4 cijferstrook, 5 nieuw-blok,
+// Volgorde: 1 meldbalk, 2 menubalk, 3 hero (wit), 4 reviews (cijferstrook weg sinds 20 nov), 5 nieuw-blok,
 // 6 kop gratis, 7 vier kaarten, 8 vragen, 9 over Kersten, 10 voet.
 // Waar zij paars hebben staat hier wit met zwarte tekst.
 //
 // Alles op deze pagina linkt naar iets dat bestaat. Geen meting en geen
 // database: de pagina leest en schrijft niets.
 import { useEffect, useState } from 'react'
-import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, Menu, Star, X } from 'lucide-react'
 import { FONT } from './leadmagnet/stijl'
 import { INLOG_PAD } from '../startPagina'
 
@@ -46,19 +46,22 @@ const MEDIA = [
   { tekst: 'YouTube', href: YOUTUBE, nieuwTab: true },
 ]
 
-// Cijferstrook. Stand van 20 november 2026, nageteld in de database:
-//  - views: som van content_ig_media.views, 1 apr t/m 19 nov 2026 (10.915.800)
-//  - gidsen: aantal gidsen in call_leads.lead_magnets_shared (per lead welke
-//    gids hij kreeg), 9 dec 2025 t/m 19 nov 2026
-//  - workouts: afgeronde workout_sessions van klanten, zonder Kerstens eigen
-//    accounts en het review-account
-//  - klanten: RPC actieve_betalende_klanten()
-// De pagina leest niets live uit; bijwerken doe je hier.
-const CIJFERS = [
-  { getal: '10,9', achter: 'mln', label: 'Views op Instagram sinds april' },
-  { getal: '7.684', label: 'Gratis gidsen verstuurd' },
-  { getal: '716', label: 'Workouts afgerond in de app' },
-  { getal: '29', label: 'Klanten nu in coaching' },
+// Reviews. Bron: nl.trustpilot.com/review/myarcfitness.com, nagekeken 20 nov
+// 2026: 11 reviews, allemaal 5 sterren (TrustScore 4,4). De teksten zijn dezelfde
+// als op de intakepagina; namen en maanden zoals ze op Trustpilot staan. Indi
+// (familie) en de review zonder naam ('Me') bewust niet.
+const TRUSTPILOT = 'https://nl.trustpilot.com/review/myarcfitness.com'
+const TRUSTPILOT_AANTAL = 11
+const REVIEWS = [
+  { naam: 'Hessel', wanneer: 'feb 2026', tekst: 'Kersten begreep het meteen! Na een week lange 0-meting kreeg ik een uitgebreid plan. Het is vooral de kennis en info die mij aanspreekt waardoor ik nu zonder teveel na te denken stabiel blijf.' },
+  { naam: 'Sassus', wanneer: 'nov 2025', tekst: 'Na 100 mislukte pogingen wilde ik mijzelf nog 1 kans geven. Met de energie van Kersten is het mij gelukt om een routine te creëren die ik kan continueren. Niet alleen fysiek maar ook mentaal heeft Kersten mij goed geholpen.' },
+  { naam: 'Toon', wanneer: 'nov 2025', tekst: 'Super Coach, leuke gesprekken en altijd enthousiast. Heeft me goed geholpen in mijn traject. Zeker een aanrader!' },
+  { naam: 'Klant via Trustpilot', wanneer: 'nov 2025', tekst: 'Alles duidelijk en gestructureerd in een overzichtelijke app. Hij volgt je progressie actief op en biedt waardevolle feedback en motivatie op de juiste momenten.' },
+]
+// Twee transformaties, dezelfde als op de funnel (/6weekchallenge-salespagina).
+const TRANSFORMATIES = [
+  { src: '/nieuw/transformatie-kersten.jpg', tekst: 'Kersten: van zachte buik naar sixpack.' },
+  { src: '/nieuw/transformatie-nitish.jpg', tekst: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 // Vier kaarten met dezelfde opmaak. De vierde heeft één knop.
@@ -123,6 +126,7 @@ const VOET = [
 const JURIDISCH = [
   { tekst: 'Privacy', href: '/privacy' },
   { tekst: 'Support', href: '/support' },
+  { tekst: 'Trustpilot', href: TRUSTPILOT, nieuwTab: true },
 ]
 
 const CSS = `
@@ -161,23 +165,34 @@ const CSS = `
 .nh-tel .nh-knop { margin-top:18px; }
 
 /* 3 hero */
-.nh-hero { background:#161616; display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"tekst tekst" "links rechts"; gap:22px 10px; padding:40px 15px 24px; }
+.nh-hero { background:#fff; color:#000; display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"tekst tekst" "links rechts"; gap:22px 10px; padding:40px 15px 24px; }
 .nh-hero-midden { grid-area:tekst; width:100%; max-width:640px; margin:0 auto; text-align:center; }
 .nh-hero h1 { font-size:clamp(34px, 10.4vw, 50px); font-weight:900; line-height:1.13; letter-spacing:-.01em; text-transform:uppercase; text-wrap:balance; }
 .nh-hero p { margin-top:22px; font-size:20px; font-weight:500; line-height:1.35; text-wrap:balance; }
-.nh-hero .nh-knop { margin-top:22px; }
+/* Hero is wit (20 nov 2026, Kersten): de knop wordt daar zwart. */
+.nh-hero .nh-knop { margin-top:22px; background:#000; color:#fff !important; }
 /* height:auto is nodig: het height-attribuut op de img (tegen verspringen) wint anders van aspect-ratio en maakt de foto 1280 px hoog. */
-.nh-hero-foto { width:100%; max-width:230px; height:auto; aspect-ratio:3/5; object-fit:cover; border-radius:20px; background:#222; }
+.nh-hero-foto { width:100%; max-width:230px; height:auto; aspect-ratio:3/5; object-fit:cover; border-radius:20px; background:#eee; }
 .nh-hero-links { grid-area:links; justify-self:end; object-position:center; }
 .nh-hero-rechts { grid-area:rechts; justify-self:start; object-position:42% center; }
 
-/* 4 cijferstrook */
-.nh-cijfers { background:#000; padding:40px 0; }
-.nh-cijfers-rij { display:grid; grid-template-columns:1fr 1fr; gap:32px 14px; }
-.nh-cijfer { border-left:3px solid #fff; padding-left:16px; }
-.nh-getal { font-size:34px; font-weight:900; line-height:1; letter-spacing:-.01em; white-space:nowrap; }
-.nh-getal small { font-size:18px; font-weight:900; margin-left:5px; }
-.nh-cijfer-label { margin-top:10px; font-size:13px; font-weight:700; line-height:1.35; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.78); }
+/* 4b reviews: transformaties + Trustpilot */
+.nh-reviews { background:#0b0b0b; padding:48px 0 52px; }
+.nh-reviews h2 { text-align:center; font-size:28px; font-weight:900; line-height:1.15; text-transform:uppercase; }
+.nh-tp { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px 10px; margin:14px auto 0; padding:0 15px; font-size:15px; font-weight:800; }
+.nh-tp-sterren { display:inline-flex; gap:3px; }
+.nh-tp-ster { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#00b67a; }
+.nh-tp-alle { flex-basis:100%; text-align:center; color:rgba(255,255,255,.75); }
+.nh-tp a { text-decoration:underline !important; text-underline-offset:3px; }
+.nh-trans { display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:720px; margin:28px auto 0; padding:0 15px; }
+.nh-trans img { width:100%; height:auto; aspect-ratio:4/5; object-fit:cover; border-radius:14px; background:#161616; }
+.nh-trans p { margin-top:8px; font-size:14px; font-weight:700; line-height:1.35; text-align:center; color:rgba(255,255,255,.85); }
+.nh-quotes { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; margin-top:28px; padding:0 15px 6px; scrollbar-width:none; }
+.nh-quotes::-webkit-scrollbar { display:none; }
+.nh-quote { flex:0 0 82%; scroll-snap-align:center; display:flex; flex-direction:column; gap:12px; background:#161616; border-radius:18px; padding:18px; }
+.nh-quote p { font-size:16px; font-weight:600; line-height:1.5; }
+.nh-quote-wie { margin-top:auto; font-size:14px; font-weight:800; color:rgba(255,255,255,.65); }
+.nh-quotes-hint { margin-top:10px; text-align:center; font-size:13px; font-weight:700; color:rgba(255,255,255,.5); }
 
 /* 5 nieuw-blok */
 .nh-nieuw { background:#0b0b0b; padding:20px 10px; }
@@ -243,8 +258,12 @@ const CSS = `
 .nh-voet-links { display:none; padding:0 0 12px; }
 .nh-voet-kolom.is-open .nh-voet-links { display:block; }
 .nh-voet-links a { display:block; padding:8px 0; font-size:16px; font-weight:500; }
-.nh-juridisch { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 20px; margin-top:26px; font-size:16px; font-weight:800; }
-.nh-copyright { margin-top:12px; text-align:center; font-size:14px; font-weight:500; }
+.nh-juridisch { display:flex; flex-wrap:wrap; justify-content:center; gap:0 16px; margin-top:16px; font-size:16px; font-weight:800; }
+/* Tikdoel 44 px: Privacy en Support waren 26 px hoog. */
+.nh-juridisch a { display:inline-flex; align-items:center; min-height:44px; padding:0 4px; }
+.nh-bedrijf { margin-top:10px; text-align:center; font-size:14px; font-weight:600; line-height:1.5; }
+.nh-bedrijf a { text-decoration:underline !important; text-underline-offset:2px; }
+.nh-copyright { margin-top:6px; text-align:center; font-size:14px; font-weight:500; }
 
 @media (hover:hover) {
   .nh-knop:hover { opacity:.88; }
@@ -254,16 +273,19 @@ const CSS = `
 
 @media (min-width:900px) {
   .nh-meld { padding:21px 15px; font-size:17px; }
-  .nh-cijfers { padding:56px 0; }
-  .nh-cijfers-rij { grid-template-columns:repeat(4, 1fr); gap:24px; }
-  .nh-getal { font-size:42px; }
-  .nh-getal small { font-size:22px; }
   .nh-nieuw { padding:32px 15px; }
   .nh-nieuw-kaart { display:grid; grid-template-columns:54% 1fr; align-items:center; gap:10px; padding:36px 40px 36px 24px; }
   .nh-waaier { height:190px; }
   .nh-nieuw h2 { margin:0 0 18px; font-size:26px; }
   .nh-nieuw .nh-knop { min-height:54px; }
   .nh-gratis-kop h2 { font-size:40px; }
+  .nh-reviews { padding:72px 0; }
+  .nh-reviews h2 { font-size:32px; }
+  .nh-trans { gap:20px; }
+  .nh-quotes { display:grid; grid-template-columns:repeat(4, 1fr); max-width:1160px; margin:36px auto 0; overflow:visible; }
+  .nh-quotes-hint { display:none; }
+  .nh-tp-alle { flex-basis:auto; }
+  .nh-tp-alle::before { content:'· '; }
   .nh-faq { padding-top:76px; }
   .nh-faq h2, .nh-over h2 { font-size:32px; }
   .nh-vraag button { font-size:22px; }
@@ -366,7 +388,7 @@ export default function NieuwHome() {
       {/* 1. Meldbalk: één regel met link */}
       <a className="nh-meld" href="/mijn-menu">
         <span className="nh-pil">NIEUW</span>
-        <b>De Weekmenu tool staat online:</b> Maak hem gratis
+        <b>De Voedingsschema tool staat online:</b> Maak hem gratis
         <ArrowRight size={22} strokeWidth={2.2} aria-hidden="true" />
       </a>
 
@@ -424,16 +446,36 @@ export default function NieuwHome() {
         <img className="nh-hero-foto nh-hero-rechts" src="/nieuw/kersten-training.jpg" alt="Kersten in de sportschool" width="940" height="1280" />
       </section>
 
-      {/* 4. Cijferstrook: vier getallen met een kort label */}
-      <section className="nh-cijfers">
-        <div className="nh-bak nh-cijfers-rij">
-          {CIJFERS.map((c) => (
-            <div key={c.label} className="nh-cijfer">
-              <div className="nh-getal">{c.getal}{c.achter && <small>{c.achter}</small>}</div>
-              <div className="nh-cijfer-label">{c.label}</div>
-            </div>
+      {/* 4b. Reviews: wat klanten bereikten en wat ze op Trustpilot schreven */}
+      <section className="nh-reviews">
+        <h2>Wat klanten zeggen</h2>
+        <div className="nh-tp">
+          <span className="nh-tp-sterren" aria-label="5 sterren">
+            {[0, 1, 2, 3, 4].map((i) => <span key={i} className="nh-tp-ster"><Star size={14} fill="#fff" color="#fff" strokeWidth={0} /></span>)}
+          </span>
+          <a href={TRUSTPILOT} {...buiten}>{TRUSTPILOT_AANTAL} reviews op Trustpilot</a>
+          <span className="nh-tp-alle">allemaal 5 sterren</span>
+        </div>
+        <div className="nh-trans">
+          {TRANSFORMATIES.map((t) => (
+            <figure key={t.src} style={{ margin: 0 }}>
+              <img src={t.src} alt={t.tekst} width="720" height="900" loading="lazy" />
+              <p>{t.tekst}</p>
+            </figure>
           ))}
         </div>
+        <div className="nh-quotes">
+          {REVIEWS.map((r) => (
+            <blockquote key={r.naam} className="nh-quote" style={{ margin: 0 }}>
+              <span className="nh-tp-sterren" aria-label="5 sterren">
+                {[0, 1, 2, 3, 4].map((i) => <span key={i} className="nh-tp-ster" style={{ width: 18, height: 18 }}><Star size={11} fill="#fff" color="#fff" strokeWidth={0} /></span>)}
+              </span>
+              <p>“{r.tekst}”</p>
+              <div className="nh-quote-wie">{r.naam} · {r.wanneer}</div>
+            </blockquote>
+          ))}
+        </div>
+        <div className="nh-quotes-hint">Veeg voor meer reviews</div>
       </section>
 
       {/* 5. Nieuw-blok: label, beeld, titel, één knop */}
@@ -533,7 +575,9 @@ export default function NieuwHome() {
             ))}
           </div>
           <div className="nh-juridisch">{JURIDISCH.map((l) => <Link key={l.tekst} item={l} />)}</div>
-          <p className="nh-copyright">Copyright © {new Date().getFullYear()} MY ARC. Alle rechten voorbehouden</p>
+          {/* Zelfde gegevens als op /privacy. */}
+          <p className="nh-bedrijf">Jino · KvK 92854486 · <a href="mailto:kerstenscheffer@gmail.com">kerstenscheffer@gmail.com</a></p>
+          <p className="nh-copyright">Copyright © {new Date().getFullYear()} MY ARC. Alle rechten voorbehouden.</p>
         </div>
       </footer>
     </div>
