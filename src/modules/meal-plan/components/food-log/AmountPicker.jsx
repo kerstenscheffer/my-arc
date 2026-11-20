@@ -419,6 +419,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     : standaardMacros
 
 
+  // Alleen een lege hoeveelheid zet 'Loggen' uit. Eerder ook 0 kcal, en dan kon
+  // je cola zero, water of thee nooit loggen (20 nov 2026, klantmelding).
+  const geenHoeveelheid = !(Number(quantity) > 0)
+
   const handleLog = async () => {
     setSaving(true)
     try {
@@ -855,7 +859,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
         borderTop: '1px solid rgba(255, 255, 255, 0.06)',
         paddingBottom: isMobile ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' : '1.5rem'
       }}>
-        <button onClick={handleLog} disabled={saving || macros.calories === 0} style={{
+        <button onClick={handleLog} disabled={saving || geenHoeveelheid} style={{
           width: '100%', padding: isMobile ? '0.875rem' : '1rem',
           background: '#fff',
           border: 'none',
@@ -865,7 +869,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '0.5rem', minHeight: '48px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          opacity: (saving || macros.calories === 0) ? 0.5 : 1
+          opacity: (saving || geenHoeveelheid) ? 0.5 : 1
         }}
           onTouchStart={(e) => { if (isMobile && !saving) e.currentTarget.style.transform = 'scale(0.98)' }}
           onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
