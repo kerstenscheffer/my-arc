@@ -1455,15 +1455,15 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         {!zwevend && !beperkt && !kalender && !podiumOpen && (
           <div style={{
             flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: docDicht ? 'center' : 'flex-start', textAlign: 'center', gap: isMobile ? 8 : 14,
-            paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : docDicht ? 0 : 8, boxSizing: 'border-box',
+            alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: isMobile ? 8 : 14,
+            paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0, boxSizing: 'border-box',
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: docDicht ? (isMobile ? 8 : 14) : 6, pointerEvents: 'none', userSelect: 'none', flexShrink: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 8 : 14, pointerEvents: 'none', userSelect: 'none', flexShrink: 1, minHeight: 0, overflow: 'hidden' }}>
             {/* Vaag en zonder gloed, zodat het als achtergrond leest (Kersten, 19 nov 2026).
-                Met het document open kleiner, zodat het document het midden is. */}
+                Het avatar-document zweeft er sinds 20 nov los overheen. */}
             <div style={{
               ...NUM, color: C.wit, fontWeight: 900, lineHeight: 1, opacity: 0.2,
-              fontSize: !docDicht ? (isMobile ? 'clamp(1.6rem, 8vw, 2.4rem)' : 'clamp(2.4rem, 4.5vw, 3.6rem)') : isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
+              fontSize: isMobile ? 'clamp(2.2rem, 12vw, 3.8rem)' : 'clamp(4rem, 9vw, 8.5rem)',
             }}>
               {/* Rechts: binnengekomen van de 1e t/m vandaag (get_business_os.nu.binnen, 19 nov 2026);
                   een oudere RPC zonder dat veld valt terug op de nieuwe sales. */}
@@ -1474,11 +1474,11 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'stretch', gap: isMobile ? 4 : 6, opacity: 0.2 }}>
               <div style={{
                 color: C.wit, fontWeight: 900, lineHeight: 1.05, letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                fontSize: !docDicht ? (isMobile ? 'clamp(0.95rem, 4.4vw, 1.4rem)' : 'clamp(1.2rem, 2.4vw, 1.9rem)') : isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
+                fontSize: isMobile ? 'clamp(1.25rem, 6.6vw, 2.1rem)' : 'clamp(2.2rem, 4.8vw, 4.5rem)',
               }}>
                 Kill the bitch inside
               </div>
-              <div style={{ display: docDicht ? 'flex' : 'none', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {[
                   ['mannen', User, 'Nieuwe mannelijke leads deze maand'],
                   ['callsVoorgesteld', PhoneForwarded, 'Calls voorgesteld'],
@@ -1495,8 +1495,11 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               </div>
             </div>
             </div>
-            {!docDicht && <GinoDocument document={avatar} titel={AVATAR.titel} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />}
           </div>
+        )}
+        {/* Avatar zweeft sleepbaar over de pagina (Kersten, 20 nov 2026). */}
+        {!docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && (
+          <GinoDocument document={avatar} titel={AVATAR.titel} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
         )}
         {kalender && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
