@@ -7,6 +7,7 @@ import { resetRedirectUrl } from '../../lib/supabase'
 import { inlogPad } from '../../startPagina'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
+import AccountWisselKnop from '../../components/AccountWisselKnop'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
 const db = DatabaseService
 
@@ -478,9 +479,10 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         )}
       </div>
 
-      {/* GEEN portal-switch aan de client-kant. Die knop heeft hier gestaan en
-          gaf elke klant een route naar de coach-hub (zie PortalSwitchButton).
-          Wisselen tussen coach en client hoort alleen thuis in CoachHub. */}
+      {/* GEEN wachtwoord-wisselknop voor klanten: die gaf elke klant een route naar de
+          coach-hub (zie PortalSwitchButton). Wel de wisselknop van 20 nov 2026: die rendert
+          alleen voor Kerstens eigen klantaccount en bewaart geen wachtwoord (src/accountWissel.js). */}
+      <AccountWisselKnop style={{ width: '100%', marginBottom: 10 }} />
 
       {/* Uitloggen */}
       <button onClick={handleLogout} style={{

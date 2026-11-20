@@ -196,6 +196,8 @@ export async function getCurrentUser() {
 
 export async function signOut() {
   console.log('Signing out...')
+  // Ook de bewaarde wisselsessies van dit toestel weg (zelfde sleutel als src/accountWissel.js).
+  try { localStorage.removeItem('myarc_account_wissel') } catch { /* geen opslag */ }
   // Alleen dit apparaat (19 nov 2026); zonder scope ging ook de PA op de Mac uit.
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error

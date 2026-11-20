@@ -1,20 +1,22 @@
 // src/pages/nieuw-home/ReviewSlider.jsx (20 nov 2026)
-// Reviews op de homepage als slider. Bron: tabel trustpilot_reviews (SQL in
-// trustpilot.sql), elke dag aangevuld door een cloud-routine uit de mails van
-// Trustpilot. Lukt laden niet, dan staat de vaste lijst hieronder er.
-// Per kaart: de kern (highlight) groot en vet, de volledige tekst achter
-// 'Lees volledige review'. Schuift vanzelf door; stopt zodra iemand de slider
-// aanraakt of een review openklapt.
+// Reviews op de homepage als doorlopende band. Bron: tabel trustpilot_reviews
+// (SQL in trustpilot.sql), elke dag aangevuld door een cloud-routine uit de
+// mails van Trustpilot.
+// Schuift langzaam en constant (geen sprongen, Kersten 20 nov); stopt zolang je
+// erop staat, eraan zit of een review openklapt. De lijst staat er twee keer in,
+// zodat de band naadloos rondloopt. Per kaart: sterren + score + naam + datum op
+// één regel, de kern groot en vet, de volledige tekst achter 'Lees volledige review'.
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react'
 
 const MAANDEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 const maand = (iso) => { const [j, m] = String(iso).split('-'); return `${MAANDEN[Number(m) - 1]} ${j}` }
-const DOOR_MS = 7000
+const SNELHEID = 32 // px per seconde
+const NA_AANRAKEN_MS = 2500
 
 // Trustpilot-sterren: groene vakjes, het laatste half gevuld bij een halve ster.
 export function Sterren({ score = 5, groot = false }) {
-  const maat = groot ? 22 : 18
+  const maat = groot ? 22 : 16
   const afgerond = Math.round(score * 2) / 2
   return (
     <span className="nh-tp-sterren" aria-label={`${String(score).replace('.', ',')} van 5 sterren`}>
@@ -22,7 +24,7 @@ export function Sterren({ score = 5, groot = false }) {
         const vol = afgerond >= i ? 100 : afgerond >= i - 0.5 ? 50 : 0
         return (
           <span key={i} className="nh-tp-ster" style={{ width: maat, height: maat, background: `linear-gradient(90deg, #00b67a ${vol}%, #3a3a3a ${vol}%)` }}>
-            <Star size={groot ? 14 : 11} fill="#fff" color="#fff" strokeWidth={0} />
+            <Star size={groot ? 14 : 10} fill="#fff" color="#fff" strokeWidth={0} />
           </span>
         )
       })}
@@ -30,80 +32,86 @@ export function Sterren({ score = 5, groot = false }) {
   )
 }
 
+function Kaart({ r, isOpen, onWissel, kopie }) {
+  return (
+    <article className="nh-quote" aria-hidden={kopie || undefined}>
+      <div className="nh-quote-kop">
+        <Sterren score={r.sterren || 5} />
+        <span className="nh-quote-wie"><b>{r.sterren || 5}/5</b> · {r.naam} · {maand(r.datum)}</span>
+      </div>
+      {r.highlight && <p className="nh-quote-kern">“{r.highlight}”</p>}
+      <p className={`nh-quote-tekst${isOpen ? '' : ' is-kort'}`}>{r.tekst}</p>
+      <button type="button" className="nh-quote-meer" tabIndex={kopie ? -1 : undefined} aria-expanded={isOpen} onClick={onWissel}>
+        {isOpen ? 'Minder tonen' : 'Lees volledige review'}
+      </button>
+    </article>
+  )
+}
+
 export default function ReviewSlider({ reviews }) {
   const baan = useRef(null)
-  const [actief, setActief] = useState(0)
   const [open, setOpen] = useState(null)
-  const [vast, setVast] = useState(false) // aangeraakt of opengeklapt: niet meer vanzelf doorschuiven
+  const pauze = useRef({ hover: false, tot: 0 })
+  const openRef = useRef(null)
+  openRef.current = open
 
-  const naar = (i) => {
-    const el = baan.current
-    if (!el) return
-    const n = reviews.length
-    const doel = ((i % n) + n) % n
-    const kaart = el.children[doel]
-    if (kaart) el.scrollTo({ left: kaart.offsetLeft - el.offsetLeft - (el.clientWidth - kaart.clientWidth) / 2, behavior: 'smooth' })
-  }
-
-  // Welke kaart staat in het midden.
   useEffect(() => {
     const el = baan.current
-    if (!el) return
-    const kijk = () => {
-      const midden = el.scrollLeft + el.clientWidth / 2
-      let beste = 0, afstand = Infinity
-      ;[...el.children].forEach((k, i) => {
-        const d = Math.abs(k.offsetLeft - el.offsetLeft + k.clientWidth / 2 - midden)
-        if (d < afstand) { afstand = d; beste = i }
-      })
-      setActief(beste)
+    if (!el || reviews.length < 2) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    let zichtbaar = true
+    const obs = new IntersectionObserver(([e]) => { zichtbaar = e.isIntersecting }, { threshold: 0.2 })
+    obs.observe(el)
+    let pos = el.scrollLeft
+    let vorige = performance.now()
+    let id
+    const stap = (nu) => {
+      const dt = Math.min(64, nu - vorige)
+      vorige = nu
+      const helft = el.scrollWidth / 2
+      // Iemand scrollde zelf (vegen, pijl): daar verder gaan.
+      if (Math.abs(el.scrollLeft - pos) > 2) pos = el.scrollLeft
+      const stil = pauze.current.hover || nu < pauze.current.tot || openRef.current || !zichtbaar || document.hidden
+      if (!stil) {
+        pos += (SNELHEID * dt) / 1000
+        if (pos >= helft) pos -= helft
+        el.scrollLeft = pos
+      } else if (el.scrollLeft >= helft) {
+        pos = el.scrollLeft - helft
+        el.scrollLeft = pos
+      }
+      id = requestAnimationFrame(stap)
     }
-    el.addEventListener('scroll', kijk, { passive: true })
-    return () => el.removeEventListener('scroll', kijk)
+    id = requestAnimationFrame(stap)
+    return () => { cancelAnimationFrame(id); obs.disconnect() }
   }, [reviews])
 
-  // Vanzelf doorschuiven, alleen als de slider in beeld is en niemand eraan zit.
-  useEffect(() => {
-    if (vast || reviews.length < 2) return
+  const even = () => { pauze.current.tot = performance.now() + NA_AANRAKEN_MS }
+  const schuif = (richting) => {
     const el = baan.current
-    let zichtbaar = false
-    const obs = new IntersectionObserver(([e]) => { zichtbaar = e.isIntersecting }, { threshold: 0.5 })
-    if (el) obs.observe(el)
-    const t = setInterval(() => { if (zichtbaar && !document.hidden) naar(actief + 1) }, DOOR_MS)
-    return () => { clearInterval(t); obs.disconnect() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vast, actief, reviews])
-
-  const stop = () => setVast(true)
+    const kaart = el?.firstElementChild
+    if (!el || !kaart) return
+    even()
+    pauze.current.tot = performance.now() + NA_AANRAKEN_MS + 600
+    el.scrollBy({ left: richting * (kaart.clientWidth + 12), behavior: 'smooth' })
+  }
 
   return (
-    <div className="nh-slider" onPointerDown={stop} onWheel={stop}>
-      <div className="nh-slider-baan" ref={baan}>
-        {reviews.map((r, i) => {
-          const isOpen = open === r.id
-          const kern = r.highlight || null
-          return (
-            <article key={r.id} className={`nh-quote${isOpen ? ' is-open' : ''}`} aria-roledescription="review" aria-label={`Review ${i + 1} van ${reviews.length}`}>
-              <Sterren score={r.sterren || 5} />
-              {kern && <p className="nh-quote-kern">“{kern}”</p>}
-              <p className={`nh-quote-tekst${isOpen ? '' : ' is-kort'}`}>{r.tekst}</p>
-              <button type="button" className="nh-quote-meer" aria-expanded={isOpen} onClick={() => { stop(); setOpen(isOpen ? null : r.id) }}>
-                {isOpen ? 'Minder tonen' : 'Lees volledige review'}
-              </button>
-              <div className="nh-quote-wie">{r.naam} · {maand(r.datum)}</div>
-            </article>
-          )
-        })}
+    <div className="nh-slider">
+      <div className={`nh-slider-baan${open ? ' is-open' : ''}`} ref={baan}
+        onMouseEnter={() => { pauze.current.hover = true }} onMouseLeave={() => { pauze.current.hover = false }}
+        onPointerDown={even} onPointerUp={even} onTouchMove={even} onWheel={even}>
+        {reviews.map((r) => (
+          <Kaart key={r.id} r={r} isOpen={open === r.id} onWissel={() => setOpen(open === r.id ? null : r.id)} />
+        ))}
+        {reviews.length > 1 && reviews.map((r) => (
+          <Kaart key={`${r.id}-2`} r={r} kopie isOpen={open === r.id} onWissel={() => setOpen(open === r.id ? null : r.id)} />
+        ))}
       </div>
       {reviews.length > 1 && (
         <div className="nh-slider-bediening">
-          <button type="button" className="nh-slider-pijl" aria-label="Vorige review" onClick={() => { stop(); naar(actief - 1) }}><ChevronLeft size={22} strokeWidth={2.6} /></button>
-          <div className="nh-slider-punten">
-            {reviews.map((r, i) => (
-              <button key={r.id} type="button" aria-label={`Naar review ${i + 1}`} aria-current={i === actief} className={i === actief ? 'is-actief' : ''} onClick={() => { stop(); naar(i) }} />
-            ))}
-          </div>
-          <button type="button" className="nh-slider-pijl" aria-label="Volgende review" onClick={() => { stop(); naar(actief + 1) }}><ChevronRight size={22} strokeWidth={2.6} /></button>
+          <button type="button" className="nh-slider-pijl" aria-label="Vorige review" onClick={() => schuif(-1)}><ChevronLeft size={22} strokeWidth={2.6} /></button>
+          <button type="button" className="nh-slider-pijl" aria-label="Volgende review" onClick={() => schuif(1)}><ChevronRight size={22} strokeWidth={2.6} /></button>
         </div>
       )}
     </div>

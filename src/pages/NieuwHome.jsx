@@ -140,7 +140,10 @@ const CSS = `
 
 /* 1 meldbalk */
 .nh-meld { display:flex; align-items:center; justify-content:center; gap:12px; background:#fff; color:#000 !important; padding:10px 15px; font-size:16px; line-height:1.35; border-bottom:1px solid rgba(0,0,0,.08); }
-.nh-meld-pdf { flex-shrink:0; width:34px; height:48px; object-fit:cover; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,.25); transform:rotate(-4deg); }
+.nh-meld-gids { position:relative; flex-shrink:0; padding-top:6px; }
+/* Label bovenop het gidsfotootje (20 nov, Kersten). */
+.nh-meld-label { position:absolute; top:0; left:50%; transform:translateX(-50%); background:#000; color:#fff; border:1.5px solid #fff; border-radius:100px; padding:1px 6px; font-size:9px; font-weight:900; letter-spacing:.05em; line-height:1.3; }
+.nh-meld-pdf { display:block; flex-shrink:0; width:34px; height:48px; object-fit:cover; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,.25); transform:rotate(-4deg); }
 .nh-meld b { font-weight:900; }
 .nh-pil { display:inline-block; background:#000; color:#fff; border-radius:100px; padding:2px 10px; margin-right:8px; font-size:13px; font-weight:900; letter-spacing:.04em; vertical-align:1px; }
 .nh-meld svg { display:inline-block; vertical-align:-5px; margin-left:6px; flex-shrink:0; }
@@ -149,8 +152,10 @@ const CSS = `
 .nh-nav { position:sticky; top:0; z-index:50; background:#000; }
 .nh-nav-rij { display:flex; align-items:center; justify-content:space-between; height:62px; }
 .nh-logo { display:inline-flex; align-items:center; gap:9px; color:#fff; white-space:nowrap; }
-.nh-logo img { height:30px; width:auto; }
-.nh-logo-woord { font-size:15px; font-weight:900; letter-spacing:.06em; }
+/* Telefoon: klein logo + woordmerk, zo past Inloggen er nog naast. */
+.nh-logo { gap:7px; }
+.nh-logo img { height:24px; width:auto; }
+.nh-logo-woord { font-size:13px; font-weight:900; letter-spacing:.04em; }
 .nh-logo-woord span { font-weight:500; }
 .nh-menu, .nh-nav-knop { display:none; }
 .nh-nav-rechts { display:flex; align-items:center; gap:6px; margin-left:auto; }
@@ -168,11 +173,19 @@ const CSS = `
 .nh-hero-midden { grid-area:tekst; width:100%; max-width:640px; margin:0 auto; text-align:center; }
 .nh-hero h1 { font-size:clamp(34px, 10.4vw, 50px); font-weight:900; line-height:1.13; letter-spacing:-.01em; text-transform:uppercase; text-wrap:balance; }
 .nh-hero p { margin-top:22px; font-size:20px; font-weight:500; line-height:1.35; text-wrap:balance; }
+/* Telefoon: titel altijd 2 regels; de lettergrootte volgt de schermbreedte zodat de langste regel past. */
+.nh-hero h1 span { display:block; white-space:nowrap; }
+@media (max-width:899px) { .nh-hero h1 { font-size:min(calc((100vw - 34px) / 15.4), 50px); line-height:1.15; } }
+@media (min-width:900px) { .nh-hero h1 span { display:inline; white-space:normal; } }
+/* Twee zinnen, elk op een eigen regel; lettergrootte schaalt mee zodat het ook op 360 breed past. */
+.nh-hero .nh-hero-sub { font-size:clamp(15px, 4.4vw, 20px); }
+.nh-hero-sub span { display:block; white-space:nowrap; }
 /* Hero is wit (20 nov 2026, Kersten): de knop wordt daar zwart. */
 .nh-hero .nh-knop { margin-top:22px; background:#000; color:#fff !important; }
 /* height:auto is nodig: het height-attribuut op de img (tegen verspringen) wint anders van aspect-ratio en maakt de foto 1280 px hoog. */
-.nh-hero-foto { width:100%; max-width:260px; height:auto; aspect-ratio:4/5; object-fit:cover; border-radius:20px; background:#eee; }
-.nh-hero-links { grid-area:links; justify-self:center; object-position:center 30%; }
+/* Telefoon: foto schermbreed, van rand tot rand (20 nov, Kersten). */
+.nh-hero-foto { width:calc(100% + 30px); max-width:none; margin:0 -15px -24px; height:auto; aspect-ratio:1400/1166; object-fit:cover; border-radius:0; background:#eee; }
+.nh-hero-links { grid-area:links; justify-self:center; object-position:52% 30%; }
 
 /* 4b reviews: transformaties + Trustpilot */
 .nh-reviews { background:#fff; padding:48px 0 52px; }
@@ -186,20 +199,20 @@ const CSS = `
 .nh-trans p { margin-top:8px; font-size:14px; font-weight:700; line-height:1.35; text-align:center; color:rgba(0,0,0,.8); }
 /* slider */
 .nh-slider { max-width:1160px; margin:28px auto 0; }
-.nh-slider-baan { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; padding:0 15px 4px; scrollbar-width:none; overscroll-behavior-x:contain; }
+.nh-slider-baan { display:flex; align-items:stretch; gap:12px; overflow-x:auto; padding:0 15px 4px; scrollbar-width:none; overscroll-behavior-x:contain; }
 .nh-slider-baan::-webkit-scrollbar { display:none; }
-.nh-quote { flex:0 0 86%; scroll-snap-align:center; display:flex; flex-direction:column; gap:10px; background:#0b0b0b; color:#fff; border-radius:18px; padding:20px; }
-.nh-quote-kern { font-size:21px; font-weight:900; line-height:1.25; letter-spacing:-.01em; }
-.nh-quote-tekst { font-size:15px; font-weight:500; line-height:1.5; color:rgba(255,255,255,.72); }
+.nh-quote { flex:0 0 82%; display:flex; flex-direction:column; gap:6px; background:#0b0b0b; color:#fff; border-radius:18px; padding:16px 18px 12px; }
+.nh-quote-kop { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; margin-bottom:4px; }
+.nh-quote-wie { font-size:13px; font-weight:700; color:rgba(255,255,255,.6); }
+.nh-quote-wie b { color:#fff; font-weight:900; }
+/* Alle kaarten even hoog: kern max 3 regels, tekst 3 regels, link onderaan. */
+.nh-slider-baan.is-open { align-items:flex-start; }
+.nh-quote-kern { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:20px; font-weight:900; line-height:1.22; letter-spacing:-.01em; }
+.nh-quote-tekst { font-size:15px; font-weight:500; line-height:1.45; color:rgba(255,255,255,.72); }
 .nh-quote-tekst.is-kort { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.nh-quote-meer { align-self:flex-start; min-height:36px; padding:0; background:none; border:none; color:#fff; font-size:14px; font-weight:800; text-decoration:underline; text-underline-offset:3px; }
-.nh-quote-wie { margin-top:auto; padding-top:4px; font-size:14px; font-weight:800; color:rgba(255,255,255,.6); }
-.nh-slider-bediening { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:16px; padding:0 15px; }
+.nh-quote-meer { margin-top:auto; align-self:flex-start; min-height:32px; padding:0; background:none; border:none; color:#fff; font-size:14px; font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+.nh-slider-bediening { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:14px; padding:0 15px; }
 .nh-slider-pijl { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; border:2px solid rgba(0,0,0,.25); background:none; color:#000; }
-.nh-slider-punten { display:flex; flex-wrap:wrap; justify-content:center; }
-.nh-slider-punten button { width:24px; height:44px; padding:0; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; }
-.nh-slider-punten button::after { content:''; width:8px; height:8px; border-radius:50%; background:rgba(0,0,0,.25); transition:all .2s ease; }
-.nh-slider-punten button.is-actief::after { width:20px; border-radius:6px; background:#000; }
 
 /* 5 nieuw-blok */
 .nh-nieuw { background:#fff; padding:20px 10px; }
@@ -272,6 +285,13 @@ const CSS = `
 .nh-bedrijf a { text-decoration:underline !important; text-underline-offset:2px; }
 .nh-copyright { margin-top:6px; text-align:center; font-size:14px; font-weight:500; }
 
+/* Smalle telefoons (360): logo en Inloggen raakten elkaar. */
+@media (max-width:379px) {
+  .nh-inlog { padding:7px 12px; font-size:14px; }
+  .nh-logo-woord { font-size:12px; }
+  .nh-logo img { height:22px; }
+}
+
 @media (hover:hover) {
   .nh-knop:hover { opacity:.88; }
   .nh-inlog:hover { background:#fff; color:#000; }
@@ -289,7 +309,7 @@ const CSS = `
   .nh-reviews { padding:72px 0; }
   .nh-reviews h2 { font-size:32px; }
   .nh-trans { gap:20px; }
-  .nh-quote { flex-basis:calc((100% - 24px) / 3); }
+  .nh-quote { flex-basis:360px; }
   .nh-slider-pijl:hover { border-color:#000; }
   .nh-faq { padding-top:76px; }
   .nh-faq h2, .nh-over h2 { font-size:32px; }
@@ -311,6 +331,7 @@ const CSS = `
 
 @media (min-width:1000px) {
   .nh-nav-rij { height:86px; justify-content:flex-start; gap:34px; }
+    .nh-logo { gap:10px; }
   .nh-logo img { height:36px; }
   .nh-logo-woord { font-size:18px; }
   .nh-ham, .nh-tel { display:none; }
@@ -337,7 +358,7 @@ const CSS = `
   .nh-hero h1 { font-size:46px; }
   .nh-hero p { font-size:19px; }
   .nh-hero .nh-knop { max-width:420px; }
-  .nh-hero-foto { width:300px; max-width:none; height:400px; aspect-ratio:auto; border-radius:24px; }
+  .nh-hero-foto { width:300px; max-width:none; margin:0; height:400px; aspect-ratio:auto; border-radius:24px; }
 }
 `
 
@@ -394,7 +415,7 @@ export default function NieuwHome() {
 
       {/* 1. Meldbalk: één regel met link */}
       <a className="nh-meld" href="/mijn-menu">
-        <img className="nh-meld-pdf" src="/mijn-menu/voorbeeld-1.jpg" alt="" width="34" height="48" />
+        <span className="nh-meld-gids"><img className="nh-meld-pdf" src="/mijn-menu/voorbeeld-1.jpg" alt="" width="34" height="48" /><span className="nh-meld-label">NIEUW</span></span>
         <span><b>Krijg jouw persoonlijke voedingsschema, gratis!</b><ArrowRight size={20} strokeWidth={2.4} aria-hidden="true" /></span>
       </a>
 
@@ -443,10 +464,10 @@ export default function NieuwHome() {
 
       {/* 3. Hero: kop als vraag, één zin, één knop, grote foto's */}
       <section className="nh-hero">
-        <img className="nh-hero-foto nh-hero-links" src="/nieuw/kersten-uit-eten.jpg" alt="Kersten uit eten" width="718" height="1280" />
+        <img className="nh-hero-foto nh-hero-links" src="/nieuw/kersten-hero.jpg" alt="Kersten" width="1400" height="1166" />
         <div className="nh-hero-midden">
-          <h1>Top shape bereiken zonder je weekend op te geven?</h1>
-          <p>In 6 weken droger met de 80/20 methode. Uit eten en de borrel blijven gewoon.</p>
+          <h1><span>Top shape bereiken zonder</span> <span>je weekend op te geven?</span></h1>
+          <p className="nh-hero-sub"><span>In 6 weken droger met de 80/20 methode.</span> <span>Uit eten en de borrel blijven gewoon.</span></p>
           <a className="nh-knop is-groot" href={CHALLENGE_START}>Start de challenge</a>
         </div>
       </section>
@@ -568,7 +589,7 @@ export default function NieuwHome() {
           <div className="nh-juridisch">{JURIDISCH.map((l) => <Link key={l.tekst} item={l} />)}</div>
           {/* Zelfde gegevens als op /privacy. */}
           <p className="nh-bedrijf">MY ARC Coaching · KvK 92854486 · <a href="mailto:kerstenscheffer@gmail.com">kerstenscheffer@gmail.com</a></p>
-          <p className="nh-copyright">Copyright © {new Date().getFullYear()} MY ARC. Alle rechten voorbehouden.</p>
+          <p className="nh-copyright">Copyright © {new Date().getFullYear()} MY ARC Coaching. Alle rechten voorbehouden.</p>
         </div>
       </footer>
     </div>

@@ -15,7 +15,7 @@ import CoachCommandCenter from '../modules/coach-command-center/CoachCommandCent
 import '../modules/supplements/SupplementPlanService'
 import DMBibleModal from '../modules/lead-management/components/DMBibleModal'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
-import PortalSwitchButton from '../components/PortalSwitchButton'
+import AccountWisselKnop from '../components/AccountWisselKnop'
 import IssueNotesWidget from '../components/IssueNotesWidget'
 import QuickTodoModal from '../components/QuickTodoModal'
 import IntakeLookupModal from '../components/IntakeLookupModal'
@@ -1243,10 +1243,10 @@ export default function CoachHub() {
               )
             })()}
 
-            {/* Wissel naar het client-portaal. Stond als los icoon in de
-                onderbalk; daar kwam het nergens anders terug, dus nu hier. */}
+            {/* Wissel naar Kerstens klantaccount (20 nov 2026). Alleen zichtbaar voor zijn
+                twee eigen accounts, geen wachtwoord bewaard: zie src/accountWissel.js. */}
             <div style={{ padding: '0.6rem 1.1rem 0.8rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <PortalSwitchButton target="client" db={db} style={{ width: '100%', padding: '0.65rem' }} />
+              <AccountWisselKnop style={{ width: '100%' }} />
             </div>
           </div>
         </>

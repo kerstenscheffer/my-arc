@@ -2,6 +2,7 @@
 // 🔧 FIXED VERSION - Met correcte tabel namen en error handling
 
 import { supabase, signUpNewClient, resetRedirectUrl } from '../lib/supabase'
+import { wisAlleWisselSessies } from '../accountWissel'
 import { KLASSIEKE_SJABLONEN_FILTER } from '../lib/mealTemplateTypes'
 import { standaardWeekindeling } from '../modules/client-agenda/standaardWeekindeling'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
@@ -232,6 +233,8 @@ async signIn(email, password) {
     try {
       // Alleen dit apparaat (19 nov 2026). Zonder scope logt Supabase het account overal
       // uit, ook de PA op de Mac ("Login kwijt" na elke uitlog of portaalwissel).
+      // Uitloggen wist ook de bewaarde wisselsessies van dit toestel (src/accountWissel.js).
+      wisAlleWisselSessies()
       const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) throw error
       
