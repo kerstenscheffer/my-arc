@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import DatabaseService from '../services/DatabaseService'
+import { inlogPad } from '../startPagina'
 import useIsMobile from '../hooks/useIsMobile'
 
 // Hoofdpagina imports
@@ -158,7 +159,7 @@ const initializeCoach = async () => {
   const handleLogout = async () => {
     try {
       await db.signOut()
-      window.location.href = '/'
+      window.location.href = inlogPad()
     } catch (error) {
       console.error('Logout error:', error)
     }

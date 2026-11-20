@@ -1,6 +1,7 @@
 // src/components/ResetPassword.jsx
 import { useState, useEffect } from 'react'
 import PasswordResetService from '../services/PasswordResetService'
+import { inlogPad } from '../startPagina'
 
 const passwordReset = PasswordResetService
 
@@ -69,7 +70,7 @@ export default function ResetPassword() {
     if (result.success) {
       setDone(true)
       // Even laten zien dat het gelukt is, dan door naar de login.
-      setTimeout(() => { window.location.href = '/' }, 3000)
+      setTimeout(() => { window.location.href = inlogPad() }, 3000)
     } else {
       setMessage({ ok: false, text: result.error || 'Kon wachtwoord niet bijwerken' })
     }
@@ -138,7 +139,7 @@ export default function ResetPassword() {
         <Logo />
         <h1 style={titel}>Wachtwoord opgeslagen</h1>
         <p style={tekst}>Je gaat zo door naar inloggen. Gebruik je de app? Open MY ARC en log in met je nieuwe wachtwoord.</p>
-        <button type="button" style={{ ...knop, marginTop: 24 }} onClick={() => window.location.href = '/'}>Naar inloggen</button>
+        <button type="button" style={{ ...knop, marginTop: 24 }} onClick={() => window.location.href = inlogPad()}>Naar inloggen</button>
       </div>
     </div>
   )
@@ -156,7 +157,7 @@ export default function ResetPassword() {
         )}
 
         {!isValidToken && (
-          <button type="button" style={{ ...knop, marginTop: 8 }} onClick={() => window.location.href = '/'}>
+          <button type="button" style={{ ...knop, marginTop: 8 }} onClick={() => window.location.href = inlogPad()}>
             Terug naar login
           </button>
         )}
@@ -208,7 +209,7 @@ export default function ResetPassword() {
 
         {isValidToken && (
           <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <button type="button" style={linkKnop} onClick={() => window.location.href = '/'}>Terug naar login</button>
+            <button type="button" style={linkKnop} onClick={() => window.location.href = inlogPad()}>Terug naar login</button>
           </div>
         )}
       </div>

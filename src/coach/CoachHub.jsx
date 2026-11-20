@@ -6,6 +6,7 @@ import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import { createPortal } from '../client/paginaPortal'
 import DatabaseService from '../services/DatabaseService'
+import { inlogPad } from '../startPagina'
 import useIsMobile from '../hooks/useIsMobile'
 import { ModalHostProvider } from './ModalHost'
 
@@ -510,7 +511,7 @@ export default function CoachHub() {
   const handleLogout = async () => {
     try {
       await db.signOut()
-      window.location.href = '/'
+      window.location.href = inlogPad()
     } catch (error) {
       console.error('Error logging out:', error)
     }

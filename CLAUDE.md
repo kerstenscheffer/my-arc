@@ -92,7 +92,9 @@ The "isClientMode" flag is stored in `localStorage` and toggled by login type. B
 
 | Path | Component | File |
 |---|---|---|
-| `/` `/client-login` | Login → CoachHub or ClientDashboard | App.jsx:363 |
+| `/` | Website-bezoeker zonder sessie, hash of auth-parameters → NieuwHome (homepage). Anders (app, geïnstalleerde web-app, ingelogd, app-link) Login → CoachHub or ClientDashboard. Regel in `src/startPagina.js` | App.jsx |
+| `/client-login` | Altijd Login → CoachHub or ClientDashboard. "Naar inloggen" (uitloggen, wachtwoord hersteld) gaat via `inlogPad()`, nooit hard naar `/` | App.jsx |
+| `/nieuw` | NieuwHome (proefroute van de homepage) | `src/pages/NieuwHome.jsx` |
 | `/info` `/home` | InfoPage | `src/pages/InfoPage.jsx` |
 | `/12-week-info` | SalesInfoPage | `src/pages/SalesInfoPage.jsx` |
 | `/myarcslide` | SalesSlider | `src/pages/SalesSlider.jsx` |

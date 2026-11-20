@@ -1,6 +1,7 @@
 // src/pages/NieuwHome.jsx
-// Proefhomepage op /nieuw (20 nov 2026): nabouw van de homepage van
-// acquisition.com, blok voor blok in dezelfde volgorde, in zwart-wit en met
+// Homepage (20 nov 2026). Staat op '/' voor bezoekers van de gewone website
+// (zie startPagina.js en App.jsx) en op de proefroute /nieuw. Nabouw van de
+// homepage van acquisition.com, blok voor blok in dezelfde volgorde, in zwart-wit en met
 // Kerstens inhoud. De maten (hoogte hero, koppen, kaarten, afstanden) komen
 // uit een meting van die pagina op 1440 en 390 breed; de screenshots en
 // maten staan in ~/Gino/acq-voorbeeld.
@@ -14,6 +15,12 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react'
 import { FONT } from './leadmagnet/stijl'
+import { INLOG_PAD } from '../startPagina'
+
+// Titel en omschrijving voor Google, alleen op deze pagina. index.html houdt
+// 'MY ARC' voor de app en de klantpagina's.
+const TITEL = 'MY ARC | Droger worden zonder je weekend op te geven'
+const OMSCHRIJVING = 'Droger worden en je etentjes, borrels en weekend houden. Online coaching voor mannen met de 80/20 methode. Start met de gratis tools of de 6 weken challenge.'
 
 const CHALLENGE_START = '/6week-checkout'
 const CHALLENGE_INFO = '/6weekchallenge'
@@ -41,14 +48,15 @@ const MEDIA = [
 
 // Cijferstrook. Stand van 20 november 2026, nageteld in de database:
 //  - views: som van content_ig_media.views, 1 apr t/m 19 nov 2026 (10.915.800)
-//  - gidsen: aantal gidsen in call_leads.lead_magnets_shared, sinds 9 dec 2025
+//  - gidsen: aantal gidsen in call_leads.lead_magnets_shared (per lead welke
+//    gids hij kreeg), 9 dec 2025 t/m 19 nov 2026
 //  - workouts: afgeronde workout_sessions van klanten, zonder Kerstens eigen
 //    accounts en het review-account
 //  - klanten: RPC actieve_betalende_klanten()
 // De pagina leest niets live uit; bijwerken doe je hier.
 const CIJFERS = [
   { getal: '10,9', achter: 'mln', label: 'Views op Instagram sinds april' },
-  { getal: '7.684', label: 'Gratis gidsen aangevraagd' },
+  { getal: '7.684', label: 'Gratis gidsen verstuurd' },
   { getal: '716', label: 'Workouts afgerond in de app' },
   { getal: '29', label: 'Klanten nu in coaching' },
 ]
@@ -109,7 +117,7 @@ const VOET = [
   { kop: 'Media', links: MEDIA },
   {
     kop: 'MY ARC',
-    links: [{ tekst: 'Over Kersten', href: '#over-kersten' }, { tekst: 'Inloggen', href: '/' }, { tekst: 'Support', href: '/support' }],
+    links: [{ tekst: 'Over Kersten', href: '#over-kersten' }, { tekst: 'Inloggen', href: INLOG_PAD }],
   },
 ]
 const JURIDISCH = [
@@ -119,11 +127,11 @@ const JURIDISCH = [
 
 const CSS = `
 .nh { background:#000; color:#fff; min-height:100vh; font-family:${FONT}; -webkit-font-smoothing:antialiased; }
-.nh *, .nh *::before, .nh *::after { box-sizing:border-box; }
-.nh a { color:inherit; text-decoration:none; }
-.nh img { display:block; max-width:100%; }
-.nh h1, .nh h2, .nh h3, .nh p { margin:0; }
-.nh button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+:where(.nh) *, :where(.nh) *::before, :where(.nh) *::after { box-sizing:border-box; }
+:where(.nh) a { color:inherit; text-decoration:none; }
+:where(.nh) img { display:block; max-width:100%; }
+:where(.nh) h1, :where(.nh) h2, :where(.nh) h3, :where(.nh) p { margin:0; }
+:where(.nh) button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .nh-bak { width:100%; max-width:1160px; margin:0 auto; padding:0 15px; }
 
 /* knoppen: wit met zwarte tekst, rond */
@@ -143,8 +151,11 @@ const CSS = `
 .nh-nav-rij { display:flex; align-items:center; justify-content:space-between; height:62px; }
 .nh-logo img { height:34px; width:auto; }
 .nh-menu, .nh-nav-knop { display:none; }
+.nh-nav-rechts { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.nh-inlog { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:8px 16px; border:2px solid #fff; border-radius:100px;
+  color:#fff; font-size:15px; font-weight:800; line-height:1.2; white-space:nowrap; }
 .nh-ham { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; margin-right:-8px; background:none; border:none; color:#fff; }
-.nh-tel { background:#000; padding:4px 15px 24px; border-top:1px solid rgba(255,255,255,.14); }
+.nh-tel { background:#000; padding:4px 15px 24px; border-top:1px solid rgba(255,255,255,.14); max-height:calc(100vh - 62px); overflow-y:auto; }
 .nh-tel-kop { padding:18px 0 6px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.7); }
 .nh-tel a.nh-tel-link { display:block; padding:11px 0; font-size:18px; font-weight:800; }
 .nh-tel .nh-knop { margin-top:18px; }
@@ -173,9 +184,9 @@ const CSS = `
 .nh-nieuw-label { position:absolute; top:0; right:0; background:#fff; color:#000; padding:7px 16px; border-radius:0 20px 0 14px; font-size:14px; font-weight:900; font-style:italic; letter-spacing:.04em; text-transform:uppercase; }
 .nh-waaier { display:flex; align-items:center; justify-content:center; height:150px; perspective:900px; }
 .nh-waaier img { height:100%; width:auto; border-radius:8px; box-shadow:0 10px 28px rgba(0,0,0,.6); }
-.nh-waaier img:nth-child(1) { transform:rotateY(34deg) scale(.86); margin-right:-14px; }
+.nh-waaier img:nth-child(1) { transform:rotateY(-34deg) scale(.86); margin-right:-14px; }
 .nh-waaier img:nth-child(2) { position:relative; z-index:2; }
-.nh-waaier img:nth-child(3) { transform:rotateY(-34deg) scale(.86); margin-left:-14px; }
+.nh-waaier img:nth-child(3) { transform:rotateY(34deg) scale(.86); margin-left:-14px; }
 .nh-nieuw h2 { margin:20px 0 16px; text-align:center; font-size:22px; font-weight:900; line-height:1.15; text-transform:uppercase; }
 .nh-nieuw .nh-knop { min-height:60px; font-size:16px; }
 
@@ -235,6 +246,7 @@ const CSS = `
 
 @media (hover:hover) {
   .nh-knop:hover { opacity:.88; }
+  .nh-inlog:hover { background:#fff; color:#000; }
   .nh-voet-links a:hover, .nh-juridisch a:hover { text-decoration:underline; }
 }
 
@@ -244,7 +256,7 @@ const CSS = `
   .nh-cijfers-rij { grid-template-columns:repeat(4, 1fr); gap:24px; }
   .nh-getal { font-size:42px; }
   .nh-getal small { font-size:22px; }
-  .nh-nieuw { padding:56px 15px; }
+  .nh-nieuw { padding:32px 15px; }
   .nh-nieuw-kaart { display:grid; grid-template-columns:54% 1fr; align-items:center; gap:10px; padding:36px 40px 36px 24px; }
   .nh-waaier { height:190px; }
   .nh-nieuw h2 { margin:0 0 18px; font-size:26px; }
@@ -276,10 +288,12 @@ const CSS = `
   .nh-menu > a, .nh-item > button { display:inline-flex; align-items:center; gap:5px; padding:10px 0; background:none; border:none; color:#fff; font-size:16px; font-weight:600; }
   .nh-item { position:relative; }
   .nh-uitklap { display:none; position:absolute; top:100%; left:-24px; min-width:270px; padding:14px 0; background:#fff; color:#000; border-radius:16px; box-shadow:0 18px 44px rgba(0,0,0,.5); }
-  .nh-item:hover .nh-uitklap, .nh-item:focus-within .nh-uitklap, .nh-item.is-open .nh-uitklap { display:block; }
+  .nh-item:hover .nh-uitklap, .nh-item.is-open .nh-uitklap { display:block; }
   .nh-uitklap a { display:block; padding:9px 32px; font-size:16px; font-weight:500; white-space:nowrap; }
   .nh-uitklap a:hover { text-decoration:underline; }
-  .nh-nav-knop { display:inline-flex; margin-left:auto; min-height:45px; padding:10px 22px; font-size:16px; }
+  .nh-nav-rechts { gap:12px; }
+  .nh-inlog { min-height:45px; padding:10px 22px; font-size:16px; }
+  .nh-nav-knop { display:inline-flex; min-height:45px; padding:10px 22px; font-size:16px; }
   .nh-kaarten { grid-template-columns:repeat(4, 1fr); gap:28px; padding:0 15px; }
   .nh-kaart { padding:16px; }
   .nh-kaart h3 { font-size:20px; }
@@ -297,9 +311,9 @@ const CSS = `
 }
 `
 
-function Link({ item, className, children }) {
+function Link({ item, className, children, onClick }) {
   return (
-    <a href={item.href} className={className} {...(item.nieuwTab ? buiten : {})}>
+    <a href={item.href} className={className} onClick={onClick} {...(item.nieuwTab ? buiten : {})}>
       {children ?? item.tekst}
     </a>
   )
@@ -313,11 +327,35 @@ export default function NieuwHome() {
 
   useEffect(() => {
     const vorige = document.title
-    document.title = 'MY ARC | Droger worden zonder je weekend op te geven'
-    return () => { document.title = vorige }
+    document.title = TITEL
+    // index.html heeft geen omschrijving en geen canonical: hier erbij, en
+    // weer weg als de pagina verdwijnt. De canonical wijst naar '/', zodat
+    // /nieuw niet als tweede homepage in Google komt.
+    const omschrijving = document.createElement('meta')
+    omschrijving.name = 'description'
+    omschrijving.content = OMSCHRIJVING
+    const canoniek = document.createElement('link')
+    canoniek.rel = 'canonical'
+    canoniek.href = `${window.location.origin}/`
+    document.head.append(omschrijving, canoniek)
+    return () => { document.title = vorige; omschrijving.remove(); canoniek.remove() }
   }, [])
 
   const wissel = (naam) => setUitklap((nu) => (nu === naam ? null : naam))
+
+  // Het logo gaat naar de pagina waar je bent: '/' of de proefroute.
+  const thuis = window.location.pathname === '/nieuw' ? '/nieuw' : '/'
+
+  // Ankers scrollen zonder de hash in de adresbalk te zetten. Op '/' betekent
+  // een hash "app-link" (CoachHub-tabs, Business OS, Supabase): met #over-kersten
+  // in de URL zou verversen het inlogscherm tonen. Eerst het telefoonmenu
+  // dicht, dan pas scrollen, anders klopt de plek niet.
+  const naarAnker = (e) => {
+    const id = (e.currentTarget.getAttribute('href') || '').slice(1)
+    e.preventDefault()
+    setTelefoonMenu(false)
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 
   return (
     <div className="nh" lang="nl">
@@ -333,7 +371,7 @@ export default function NieuwHome() {
       {/* 2. Menubalk: logo links, uitklapmenu's, rechts één knop */}
       <header className="nh-nav">
         <div className="nh-bak nh-nav-rij">
-          <a className="nh-logo" href="/nieuw" aria-label="MY ARC"><img src="/ma-logo-header.png" alt="MY ARC" width="80" height="40" /></a>
+          <a className="nh-logo" href={thuis} aria-label="MY ARC"><img src="/ma-logo-header.png" alt="MY ARC" width="80" height="40" /></a>
 
           <nav className="nh-menu" aria-label="Hoofdmenu">
             <div className={`nh-item${uitklap === 'gratis' ? ' is-open' : ''}`} onMouseLeave={() => setUitklap(null)}>
@@ -345,14 +383,17 @@ export default function NieuwHome() {
               <button type="button" aria-expanded={uitklap === 'media'} onClick={() => wissel('media')}>Media <ChevronDown size={17} strokeWidth={2.4} aria-hidden="true" /></button>
               <div className="nh-uitklap">{MEDIA.map((l) => <Link key={l.tekst} item={l} />)}</div>
             </div>
-            <a href="#over-kersten">Over Kersten</a>
+            <a href="#over-kersten" onClick={naarAnker}>Over Kersten</a>
           </nav>
 
-          <a className="nh-knop nh-nav-knop" href={CHALLENGE_START}>Start de challenge</a>
-
-          <button type="button" className="nh-ham" aria-label={telefoonMenu ? 'Menu sluiten' : 'Menu openen'} aria-expanded={telefoonMenu} onClick={() => setTelefoonMenu((o) => !o)}>
-            {telefoonMenu ? <X size={30} strokeWidth={2.2} /> : <Menu size={30} strokeWidth={2.2} />}
-          </button>
+          {/* Rechts: Inloggen staat ook op telefoon in de balk, naast het menu */}
+          <div className="nh-nav-rechts">
+            <a className="nh-inlog" href={INLOG_PAD}>Inloggen</a>
+            <a className="nh-knop nh-nav-knop" href={CHALLENGE_START}>Start de challenge</a>
+            <button type="button" className="nh-ham" aria-label={telefoonMenu ? 'Menu sluiten' : 'Menu openen'} aria-expanded={telefoonMenu} onClick={() => setTelefoonMenu((o) => !o)}>
+              {telefoonMenu ? <X size={30} strokeWidth={2.2} /> : <Menu size={30} strokeWidth={2.2} />}
+            </button>
+          </div>
         </div>
 
         {telefoonMenu && (
@@ -364,7 +405,7 @@ export default function NieuwHome() {
             <div className="nh-tel-kop">Media</div>
             {MEDIA.map((l) => <Link key={l.tekst} item={l} className="nh-tel-link" />)}
             <div className="nh-tel-kop">MY ARC</div>
-            <a className="nh-tel-link" href="#over-kersten" onClick={() => setTelefoonMenu(false)}>Over Kersten</a>
+            <a className="nh-tel-link" href="#over-kersten" onClick={naarAnker}>Over Kersten</a>
             <a className="nh-knop is-groot" href={CHALLENGE_START}>Start de challenge</a>
           </div>
         )}
@@ -485,7 +526,7 @@ export default function NieuwHome() {
                   {k.kop}
                   <ChevronDown size={20} strokeWidth={2.4} aria-hidden="true" />
                 </button>
-                <div className="nh-voet-links">{k.links.map((l) => <Link key={l.tekst} item={l} />)}</div>
+                <div className="nh-voet-links">{k.links.map((l) => <Link key={l.tekst} item={l} onClick={l.href.startsWith('#') ? naarAnker : undefined} />)}</div>
               </div>
             ))}
           </div>

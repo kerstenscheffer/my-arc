@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import lazy from './lazyMetHerlaad'
 import LaadScherm from './components/LaadScherm'
 import { kiesPortaal, ROL_SLEUTEL, heeftOpgeslagenSessie } from './portaalKeuze'
+import { HOMEPAGE_BIJ_START } from './startPagina'
 import Login from './components/Login'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -251,8 +252,8 @@ function App() {
     return <MijnMenu />
   }
 
-  // Proefhomepage: nabouw van acquisition.com in zwart-wit. De huidige
-  // homepage en alle andere routes blijven zoals ze zijn.
+  // Proefroute van de homepage (nabouw van acquisition.com in zwart-wit).
+  // Dezelfde pagina staat op '/' voor bezoekers van de website, zie onderaan.
   if (currentPath === '/nieuw') {
     return <NieuwHome />
   }
@@ -540,6 +541,13 @@ function App() {
   // ==============================================
   if (currentPath === '/' || currentPath === '/client-login') {
     if (!user) {
+      // Gewone website, niemand ingelogd, geen sessie op het toestel en geen
+      // hash of auth-parameters in de URL: de homepage (20 nov 2026). De app,
+      // de geïnstalleerde web-app en elke app-link houden het inlogscherm;
+      // dat staat voor iedereen op /client-login. Zie startPagina.js.
+      if (currentPath === '/' && HOMEPAGE_BIJ_START && !heeftOpgeslagenSessie()) {
+        return <NieuwHome />
+      }
       // Not logged in → Show client login
       return (
         <LanguageProvider>

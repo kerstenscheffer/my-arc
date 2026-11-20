@@ -10,6 +10,7 @@ import { PaginaSkelet } from './PaginaSkeletten'
 import { PAGINA_TERUG, PAGINA_GEWISSELD } from './usePaginaTerug'
 import { PaginaZichtbaar } from './paginaPortal'
 import DatabaseService from '../services/DatabaseService'
+import { inlogPad } from '../startPagina'
 import { useLanguage } from '../contexts/LanguageContext'
 
 // Component Imports - ALLEEN ESSENTIEEL
@@ -321,7 +322,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   }
 
   const handleLogout = async () => {
-    try { await db.signOut(); window.location.href = '/' }
+    try { await db.signOut(); window.location.href = inlogPad() }
     catch (error) { console.error('Error logging out:', error) }
   }
 

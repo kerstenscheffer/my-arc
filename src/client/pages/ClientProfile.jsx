@@ -4,6 +4,7 @@ import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, C
 import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
 import { resetRedirectUrl } from '../../lib/supabase'
+import { inlogPad } from '../../startPagina'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
@@ -113,7 +114,7 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
 
   const handleLogout = async () => {
     await db.signOut()
-    window.location.href = '/'
+    window.location.href = inlogPad()
   }
 
   // Account + alle gegevens echt weggooien.
@@ -135,7 +136,7 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
       const { error } = await db.supabase.rpc('verwijder_mijn_account')
       if (error) throw error
       await db.signOut()
-      window.location.href = '/'
+      window.location.href = inlogPad()
     } catch (error) {
       alert('Fout bij verwijderen: ' + (error.message || error))
       setDeleting(false)
