@@ -35,6 +35,10 @@ const VIDEO_MENU = 'https://www.youtube.com/watch?v=vhcQgldADCc'
 const VIDEO_SPLIT = 'https://www.youtube.com/watch?v=WshSHiHN0Cw'
 
 const buiten = { target: '_blank', rel: 'noopener noreferrer' }
+// PrepMyMeal-samenwerking: 10% met de code, de ref-link zet hem al klaar (zelfde
+// afspraak als in de app, meal-plan/utils/partner.js).
+const PREPMYMEAL = 'https://prepmymeal.nl/?ref=KERSTENSCHEFFER'
+const PREPMYMEAL_CODE = 'KERSTENSCHEFFER'
 
 // Uitklapmenu's van de menubalk. Zelfde lijst in het telefoonmenu en de voet.
 const GRATIS = [
@@ -42,6 +46,7 @@ const GRATIS = [
   { tekst: 'Trainingsschema tool', href: '/mijn-split' },
   { tekst: 'Eiwit ranglijst', href: PDF_EIWIT, nieuwTab: true },
   { tekst: 'Meal prep kookboek', href: PDF_PREP, nieuwTab: true },
+  { tekst: 'PrepMyMeal 10% korting', href: PREPMYMEAL, nieuwTab: true },
 ]
 const MEDIA = [
   { tekst: 'Instagram', href: INSTAGRAM, nieuwTab: true },
@@ -248,6 +253,17 @@ const CSS = `
 .nh-kaart-knoppen { display:flex; flex-direction:column; gap:7px; margin-top:auto; padding-top:12px; }
 .nh-kaart-knoppen .nh-knop { width:100%; padding:10px 6px; font-size:14px; white-space:nowrap; }
 
+/* 7b PrepMyMeal-blok: zwart, foto + korting */
+.nh-pmm { display:flex; flex-direction:column; max-width:1160px; margin:14px 10px 0; background:#0b0b0b; color:#fff; border-radius:20px; overflow:hidden; }
+.nh-pmm-foto img { width:100%; height:auto; aspect-ratio:800/560; object-fit:cover; }
+.nh-pmm-tekst { display:flex; flex-direction:column; gap:10px; padding:16px 16px 18px; }
+.nh-pmm-tekst .nh-kaart-label { align-self:flex-start; }
+.nh-pmm h3 { font-size:24px; font-weight:900; line-height:1.15; text-transform:uppercase; }
+.nh-pmm p { font-size:16px; line-height:1.45; color:rgba(255,255,255,.8); }
+.nh-pmm-code { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:48px; padding:0 6px 0 16px; border:2px dashed rgba(255,255,255,.5); border-radius:12px; background:none; color:#fff; }
+.nh-pmm-code span { font-size:17px; font-weight:900; letter-spacing:.06em; }
+.nh-pmm-code b { padding:7px 12px; border-radius:8px; background:#2b2b2b; font-size:13px; font-weight:800; }
+
 /* 8 vragen en 9 over Kersten delen een vlak, net als bij het voorbeeld */
 .nh-onder { background:#fff; }
 .nh-faq { max-width:1125px; margin:0 auto; padding:52px 25px 20px; }
@@ -348,6 +364,12 @@ const CSS = `
   .nh-kaarten { grid-template-columns:repeat(4, 1fr); gap:28px; padding:0 15px; }
   .nh-kaart { padding:16px; }
   .nh-kaart h3 { font-size:20px; }
+  .nh-pmm { flex-direction:row; align-items:stretch; margin:28px auto 0; width:calc(100% - 30px); }
+  .nh-pmm-foto { flex:0 0 46%; }
+  .nh-pmm-foto img { height:100%; aspect-ratio:auto; }
+  .nh-pmm-tekst { justify-content:center; padding:32px 36px; gap:14px; }
+  .nh-pmm h3 { font-size:30px; }
+  .nh-pmm .nh-knop, .nh-pmm-code { max-width:360px; width:100%; }
   .nh-kaart-knoppen { flex-direction:row; gap:8px; padding-top:16px; }
   .nh-kaart-knoppen .nh-knop { flex:1 1 0; min-width:0; min-height:62px; font-size:15px; white-space:normal; }
   .nh-kaart-knoppen .nh-knop:only-child { font-size:16px; font-weight:900; }
@@ -376,6 +398,13 @@ export default function NieuwHome() {
   const [vraagOpen, setVraagOpen] = useState(null)
   const [voetOpen, setVoetOpen] = useState(null)
   const tp = useTrustpilot()
+  const [codeGekopieerd, setCodeGekopieerd] = useState(false)
+  const kopieerCode = () => {
+    navigator.clipboard?.writeText(PREPMYMEAL_CODE).then(() => {
+      setCodeGekopieerd(true)
+      setTimeout(() => setCodeGekopieerd(false), 2000)
+    }, () => {})
+  }
 
   useEffect(() => {
     const vorige = document.title
@@ -531,6 +560,22 @@ export default function NieuwHome() {
               </div>
             </article>
           ))}
+        </div>
+
+        {/* PrepMyMeal: kant-en-klare maaltijden met korting */}
+        <div className="nh-pmm">
+          <a className="nh-pmm-foto" href={PREPMYMEAL} {...buiten} aria-label="Naar PrepMyMeal">
+            <img src="/nieuw/prepmymeal.jpg" alt="Maaltijd van PrepMyMeal: kip met groenten en witte kaas" width="800" height="560" loading="lazy" />
+          </a>
+          <div className="nh-pmm-tekst">
+            <div className="nh-kaart-label">10% korting</div>
+            <h3>Geen tijd om te koken?</h3>
+            <p>Kant-en-klare, eiwitrijke maaltijden van PrepMyMeal. Met mijn code krijg je 10% korting.</p>
+            <button type="button" className="nh-pmm-code" onClick={kopieerCode} aria-label={`Kortingscode ${PREPMYMEAL_CODE} kopiëren`}>
+              <span>{PREPMYMEAL_CODE}</span><b>{codeGekopieerd ? 'Gekopieerd' : 'Kopieer'}</b>
+            </button>
+            <a className="nh-knop is-groot" href={PREPMYMEAL} {...buiten}>Bestel met korting</a>
+          </div>
         </div>
       </section>
 
