@@ -61,3 +61,28 @@ $$;
 
 revoke all on function public.get_challenge_calls(uuid, date, date) from public, anon;
 grant execute on function public.get_challenge_calls(uuid, date, date) to authenticated, service_role;
+
+-- 20 nov 2026: de klant zag 0 calls, want get_challenge_calls is alleen voor de coach (rls_is_coach)
+-- en client_calls wordt niet meer gevuld. Daarom een interne kopie zonder coachcheck, die niemand
+-- zelf kan aanroepen, en get_challenge_stand telt die dagen mee in call_d. Zo zien klant en coach
+-- hetzelfde getal, ook in oude app-versies (de vorm van de uitkomst blijft gelijk).
+do $$
+declare d text;
+begin
+  d := pg_get_functiondef('public.get_challenge_calls'::regproc);
+  d := replace(d, 'public.get_challenge_calls(', 'public.get_challenge_calls_intern(');
+  d := replace(d, 'where id = p_client_id and rls_is_coach()', 'where id = p_client_id');
+  execute d;
+end $$;
+revoke all on function public.get_challenge_calls_intern(uuid, date, date) from public, anon, authenticated;
+
+-- In get_challenge_stand (challenge-stand.sql) is call_d nu:
+--   call_d as (
+--     select distinct dag from (
+--       select completed_date::date as dag from client_calls
+--        where client_id = p_client_id and status = 'completed'
+--          and completed_date::date between p_start and p_eind
+--       union all
+--       select (x->>'dag')::date from jsonb_array_elements(coalesce(get_challenge_calls_intern(p_client_id, p_start, p_eind)->'dagen', '[]'::jsonb)) x
+--     ) c
+--   )
