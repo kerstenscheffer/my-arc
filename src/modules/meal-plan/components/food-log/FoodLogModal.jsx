@@ -576,17 +576,18 @@ function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = nu
     // 'Coach'; 'Recepten' zegt wat je er vindt (kant-en-klare maaltijden).
     { id: 'coach', label: 'Recepten' },
     // Een etentje loggen zonder zoeken of wegen (18 nov 2026).
-    { id: 'uiteten', label: 'Uiteten' },
+    { id: 'uiteten', label: 'Uiteten', nieuw: true },
   ]
   const favAan = filter === 'favorieten'
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
-      padding: isMobile ? '0 0.75rem 0.55rem' : '0 1rem 0.65rem',
+      // Bovenruimte voor het gouden 'Nieuw'-labeltje boven Uiteten (20 nov 2026).
+      padding: isMobile ? '0.3rem 0.75rem 0.55rem' : '0.3rem 1rem 0.65rem',
       overflowX: 'auto', scrollbarWidth: 'none',
     }}>
       {!coachModus && <button onClick={() => zet('favorieten')} title="Favorieten" aria-label="Favorieten" style={{
-        flexShrink: 0, width: 38, height: 34, padding: 0,
+        flexShrink: 0, width: 30, height: 34, padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
         opacity: favAan ? 1 : 0.55,
@@ -601,7 +602,9 @@ function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = nu
             key={k.id}
             onClick={() => zet(k.id)}
             style={{
-              flexShrink: 0, height: 34, padding: '0 0.9rem',
+              position: 'relative',
+              // Dichter op elkaar zodat Uiteten op mobiel in beeld past (20 nov 2026).
+              flexShrink: 0, height: 34, padding: isMobile ? '0 0.62rem' : '0 0.75rem',
               background: aan ? '#fff' : 'transparent', border: 'none', borderRadius: 999,
               color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
               fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 900,
@@ -610,6 +613,13 @@ function FilterKnoppen({ filter, zet, isMobile, coachModus = false, onNieuw = nu
               transition: 'background 0.15s ease, color 0.15s ease',
             }}
           >
+            {k.nieuw && !aan && (
+              <span style={{
+                position: 'absolute', top: -3, left: '50%', transform: 'translateX(-50%)',
+                color: '#FFD700', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.04em',
+                whiteSpace: 'nowrap', pointerEvents: 'none', lineHeight: 1,
+              }}>★ Nieuw</span>
+            )}
             {k.label}
           </button>
         )

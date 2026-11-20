@@ -41,7 +41,7 @@ import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from 
 import Notities from './Notities'
 import { useNotities, notitiesVoorGino } from './notitiesData'
 import GinoDocument from './GinoDocument'
-import { AVATAR, ANTWOORDEN, useGinoDocument, useDocumentDicht, documentVoorGino } from './documentData'
+import { useGinoDocumenten, useDocumentDicht, documentenVoorGino } from './documentData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 import { typeLabel } from './contentStand'
@@ -891,13 +891,11 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   const [matrix, setMatrix] = useState(false)
   const [denkt, setDenkt] = useState(false)
   // Avatar-document boven de bol (19 nov 2026); na elk Gino-antwoord opnieuw laden, hij kan hem aanpassen.
-  const avatar = useGinoDocument(AVATAR)
-  const antwoorden = useGinoDocument(ANTWOORDEN)
+  const docs = useGinoDocumenten()
   const [docDicht, setDocDicht] = useDocumentDicht()
-  const laadAvatar = avatar.laad
-  const laadAntwoorden = antwoorden.laad
+  const laadDocs = docs.laad
   const dachtNet = useRef(false)
-  useEffect(() => { if (dachtNet.current && !denkt) { laadAvatar(); laadAntwoorden() } dachtNet.current = denkt }, [denkt, laadAvatar, laadAntwoorden])
+  useEffect(() => { if (dachtNet.current && !denkt) laadDocs(); dachtNet.current = denkt }, [denkt, laadDocs])
   const [herinnertPraat, setHerinnertPraat] = useState(false)
   // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
   // dan wisselt het beeld mee (geen beeld = leeg). Blijft staan tot het
@@ -1406,7 +1404,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       </button>}
 
       {/* ── Avatar-knop links van de agenda: document boven de bol open/dicht (19 nov 2026) ── */}
-      {!zwevend && !beperkt && !kalender && !podiumOpen && <button type="button" onClick={() => setDocDicht(!docDicht)} title={docDicht ? 'Avatar openen' : 'Avatar sluiten'} aria-label="Avatar" aria-pressed={!docDicht} style={{
+      {!zwevend && !beperkt && !kalender && !podiumOpen && <button type="button" onClick={() => setDocDicht(!docDicht)} title={docDicht ? 'Document openen' : 'Document sluiten'} aria-label="Document" aria-pressed={!docDicht} style={{
         position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 92, zIndex: 20,
         width: 36, height: 36, borderRadius: '50%', border: 'none',
         background: 'transparent', color: docDicht ? C.wit : colors.success, cursor: 'pointer',
@@ -1501,7 +1499,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         )}
         {/* Avatar zweeft sleepbaar over de pagina (Kersten, 20 nov 2026). */}
         {!docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && (
-          <GinoDocument documenten={[{ document: avatar, titel: AVATAR.titel }, { document: antwoorden, titel: ANTWOORDEN.titel, hoog: true }]} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
+          <GinoDocument docs={docs} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
         )}
         {kalender && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
@@ -1548,9 +1546,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             // Avatar van de ideale klant: Kersten bewerkt hem boven de bol; Gino mag hem aanvullen.
-            Avatar: documentVoorGino(avatar, 1200),
-            // Kerstens eigen aanpak per onderwerp (lang): alleen waar hij staat, Gino leest de rij zelf als hij hem nodig heeft.
-            Antwoorden: { tabel: 'business_os_documenten', id: antwoorden.doc?.id || null, let_op: 'Kerstens aanpak per onderwerp; lees inhoud als je die nodig hebt.' },
+            // Document met tabs (zoals Google Docs): Kersten en Gino schrijven erin, avatar-tekst ingekort mee.
+            Document: documentenVoorGino(docs, 1000),
             nieuweMannen: nieuweMannenVoorGino(mannen.weken),
             geldplan: geldplanVoorGino(geldplan),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,

@@ -49,3 +49,6 @@ create trigger business_os_documenten_bijgewerkt before update on public.busines
 alter table public.business_os_documenten add column if not exists parent_id uuid references public.business_os_documenten(id) on delete set null;
 alter table public.business_os_documenten add column if not exists volgorde integer not null default 0;
 alter table public.business_os_documenten add column if not exists verwijderd_op timestamptz;
+
+-- Vastgezette tabs bovenaan de zijbalk (20 nov 2026).
+alter table public.business_os_documenten add column if not exists vastgezet boolean not null default false;
