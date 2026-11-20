@@ -308,3 +308,196 @@ grant execute on function public.get_dm_list_v2(uuid, uuid, integer, integer, in
 -- Lead tijdelijk overslaan:
 --   insert into dm_lijst_overslaan (lead_id, tot, reden) values ('<lead>', '2026-12-03', 'call-voorstel')
 --   on conflict (lead_id) do update set tot = excluded.tot, reden = excluded.reden;
+
+-- ---------------------------------------------------------------------------
+-- 5. dm_list_fill_v3 (20 nov 2026): "gestuurd" hangt niet meer aan één campagne
+-- ---------------------------------------------------------------------------
+-- Waarom v3: op 19 nov stuurde Kersten 97 DM's via de megafoon onder een andere
+-- campagne ('Follow up - Ben je nog bezig?') dan die van de ronde. v2 kijkt in
+-- stap 1 alleen naar de tag van de ronde-campagne, zag dus 99 "open" leads
+-- (drempel 50), sloeg elke ochtend over en de rest van de groep kwam nooit in
+-- de kolom. v2 en de oudere functies blijven ongewijzigd staan.
+--
+-- Wat anders is dan v2:
+--   Stap 1  Gestuurd = een tag van WELKE campagne dan ook met tagged_at na het
+--           moment dat de lead in de kolom kwam (lead_section_items.moved_at).
+--           De ronde-tag zelf telt nog steeds (v2). Vangnet erbij:
+--           call_leads.campaign_message_sent_at na plaatsing. De paarse DM-knop
+--           zet die altijd; tag_lead_campaign maakt géén nieuwe rij als de lead
+--           de gekozen campagne al als open tag had, en dan zou de kolom alsnog
+--           vastlopen.
+--   Stap 2  Herstel gebruikt dezelfde betekenis van gestuurd: een lead die al
+--           een DM kreeg (onder welke campagne ook) komt niet terug in de lijst.
+--   Stap 5  Wie in deze ronde al als 'dm_gestuurd' is gelogd (sinds created_at
+--           van de ronde-campagne) komt niet opnieuw op de lijst. Zonder dit
+--           komen leads die onder een andere campagne zijn gestuurd na de
+--           tag-afkoeling van 14 dagen terug: get_dm_list_v2 sluit alleen de
+--           tag van de ronde-campagne uit.
+-- Stap 3 en 4 zijn gelijk aan v2. De waarschuwing blijft: nooit twee keer op
+-- één ochtend draaien.
+create or replace function public.dm_list_fill_v3(
+  p_coach_id       uuid,
+  p_campaign_id    uuid,
+  p_limit          integer default 100,
+  p_skip_threshold integer default 50
+)
+returns table(actie text, gestuurd integer, hersteld integer, teruggezet integer, geplaatst integer, staat_nu integer)
+language plpgsql
+security definer
+set search_path to 'public'
+set work_mem to '16MB'
+as $function$
+declare
+  v_sec_id uuid;
+  v_ronde_start timestamptz;
+  v_sent int := 0;
+  v_fix int := 0;
+  v_back int := 0;
+  v_put int := 0;
+  v_cnt int := 0;
+begin
+  select id into v_sec_id from lead_sections
+   where coach_id = p_coach_id and trim(title) = '📨 DM vandaag' limit 1;
+  if v_sec_id is null then raise exception 'sectie DM vandaag ontbreekt'; end if;
+  select created_at into v_ronde_start from outreach_campaigns where id = p_campaign_id;
+  if not found then raise exception 'campagne % bestaat niet', p_campaign_id; end if;
+
+  -- STAP 1: DM gestuurd sinds de lead in de kolom kwam (welke campagne ook) -> uit de kolom
+  with done as (
+    select i.id as item_id, i.lead_id, i.previous_section_id, i.previous_section_title,
+           l.first_name, l.last_name
+    from lead_section_items i
+    join call_leads l on l.id = i.lead_id
+    where i.section_id = v_sec_id and i.previous_section_id is not null
+      and (
+        exists (select 1 from lead_campaign_tags t
+                where t.lead_id = i.lead_id
+                  and (t.campaign_id = p_campaign_id or t.tagged_at > i.moved_at))
+        or l.campaign_message_sent_at > i.moved_at
+      )
+  ), mv as (
+    insert into lead_movements (lead_id, from_section_id, from_section_title, to_section_id, to_section_title, moved_at, coach_id, lead_first_name, lead_last_name, lead_name, outcome_type)
+    select lead_id, v_sec_id, '📨 DM vandaag', previous_section_id, previous_section_title, now(), p_coach_id,
+           first_name, last_name, trim(coalesce(first_name,'')||' '||coalesce(last_name,'')), 'dm_gestuurd'
+    from done returning lead_id
+  ), upd as (
+    update lead_section_items i
+       set section_id = d.previous_section_id, moved_at = now(),
+           previous_section_id = null, previous_section_title = null, previous_section_color = null
+      from done d where i.id = d.item_id
+    returning 1
+  )
+  select count(*) into v_sent from upd;
+
+  -- STAP 2: herstel leads die automatisch naar een stil-kolom zijn geschoven
+  --         (alleen als er sinds de plaatsing geen DM uit is gegaan)
+  with placed as (
+    select lm.lead_id, max(lm.moved_at) as placed_at
+    from lead_movements lm
+    where lm.coach_id = p_coach_id and lm.outcome_type = 'dm_lijst'
+      and lm.moved_at > now() - interval '3 days'
+    group by lm.lead_id
+  ), lost as (
+    select p.lead_id, i.id as item_id, i.section_id as from_id,
+           s.title as from_title, s.color as from_color, l.first_name, l.last_name
+    from placed p
+    join lead_section_items i on i.lead_id = p.lead_id
+    join lead_sections s on s.id = i.section_id
+    join call_leads l on l.id = p.lead_id and l.deleted_at is null
+    where i.section_id <> v_sec_id
+      and trim(s.title) in ('1 Dag Stil','2 Dagen Stil','3+ Dagen Stil','📵 Follow up stil')
+      and not exists (select 1 from lead_campaign_tags t
+                      where t.lead_id = p.lead_id
+                        and (t.campaign_id = p_campaign_id or t.tagged_at > p.placed_at))
+      and not coalesce(l.campaign_message_sent_at > p.placed_at, false)
+      and not exists (
+        select 1 from lead_movements m
+        where m.lead_id = p.lead_id and trim(m.from_section_title) = '📨 DM vandaag'
+          and m.moved_at >= p.placed_at
+      )
+  ), mv as (
+    insert into lead_movements (lead_id, from_section_id, from_section_title, to_section_id, to_section_title, moved_at, coach_id, lead_first_name, lead_last_name, lead_name, outcome_type)
+    select lead_id, from_id, from_title, v_sec_id, '📨 DM vandaag', now(), p_coach_id,
+           first_name, last_name, trim(coalesce(first_name,'')||' '||coalesce(last_name,'')), 'dm_hersteld'
+    from lost returning lead_id
+  ), upd as (
+    update lead_section_items i
+       set section_id = v_sec_id, moved_at = now(),
+           previous_section_id = o.from_id, previous_section_title = o.from_title, previous_section_color = o.from_color
+      from lost o where i.id = o.item_id
+    returning 1
+  )
+  select count(*) into v_fix from upd;
+
+  -- STAP 3: staat de lijst nog te vol? Dan geen nieuwe lijst.
+  select count(*) into v_cnt from lead_section_items where section_id = v_sec_id;
+  if v_cnt >= p_skip_threshold then
+    return query select 'overgeslagen'::text, v_sent, v_fix, 0, 0, v_cnt;
+    return;
+  end if;
+
+  -- STAP 4: rest = niet gestuurd -> terug naar de oude kolom
+  with old as (
+    select i.id as item_id, i.lead_id, i.previous_section_id, i.previous_section_title,
+           l.first_name, l.last_name
+    from lead_section_items i join call_leads l on l.id = i.lead_id
+    where i.section_id = v_sec_id and i.previous_section_id is not null
+  ), mv as (
+    insert into lead_movements (lead_id, from_section_id, from_section_title, to_section_id, to_section_title, moved_at, coach_id, lead_first_name, lead_last_name, lead_name, outcome_type)
+    select lead_id, v_sec_id, '📨 DM vandaag', previous_section_id, previous_section_title, now(), p_coach_id,
+           first_name, last_name, trim(coalesce(first_name,'')||' '||coalesce(last_name,'')), 'dm_niet_gestuurd'
+    from old returning lead_id
+  ), upd as (
+    update lead_section_items i
+       set section_id = o.previous_section_id, moved_at = now(),
+           previous_section_id = null, previous_section_title = null, previous_section_color = null
+      from old o where i.id = o.item_id
+    returning 1
+  )
+  select count(*) into v_back from upd;
+
+  -- STAP 5: nieuwe lijst erin (selectie van de tweede ronde), zonder wie in
+  --         deze ronde al een DM kreeg
+  with pick as (
+    select d.lead_id, (row_number() over (order by d.pos))::integer as pos
+    from get_dm_list_v2(p_coach_id, p_campaign_id, 100000) d
+    where not exists (select 1 from lead_movements m
+                      where m.lead_id = d.lead_id and m.outcome_type = 'dm_gestuurd'
+                        and m.moved_at >= v_ronde_start)
+    order by d.pos
+    limit p_limit
+  ), cur as (
+    select distinct on (p.lead_id)
+           p.lead_id, p.pos, i.id as item_id, i.section_id as from_id, s.title as from_title, s.color as from_color,
+           l.first_name, l.last_name
+    from pick p
+    join lead_section_items i on i.lead_id = p.lead_id
+    join lead_sections s on s.id = i.section_id
+    join call_leads l on l.id = p.lead_id
+    where i.section_id <> v_sec_id
+    order by p.lead_id, i.moved_at desc nulls last
+  ), mv as (
+    insert into lead_movements (lead_id, from_section_id, from_section_title, to_section_id, to_section_title, moved_at, coach_id, lead_first_name, lead_last_name, lead_name, outcome_type)
+    select lead_id, from_id, from_title, v_sec_id, '📨 DM vandaag', now(), p_coach_id,
+           first_name, last_name, trim(coalesce(first_name,'')||' '||coalesce(last_name,'')), 'dm_lijst'
+    from cur returning lead_id
+  ), upd as (
+    update lead_section_items i
+       set section_id = v_sec_id, position = c.pos, moved_at = now(),
+           previous_section_id = c.from_id, previous_section_title = c.from_title, previous_section_color = c.from_color
+      from cur c where i.id = c.item_id
+    returning 1
+  )
+  select count(*) into v_put from upd;
+
+  select count(*) into v_cnt from lead_section_items where section_id = v_sec_id;
+  return query select 'gevuld'::text, v_sent, v_fix, v_back, v_put, v_cnt;
+end $function$;
+
+-- Net als v2: verplaatst leads voor de hele coach, dus niet aanroepbaar vanuit de app.
+revoke all on function public.dm_list_fill_v3(uuid, uuid, integer, integer) from public, anon, authenticated;
+grant execute on function public.dm_list_fill_v3(uuid, uuid, integer, integer) to service_role;
+
+-- Dagelijkse run (routine, sinds 20 nov 2026):
+--   select * from dm_list_fill_v3('5a0135ac-3188-499d-8682-ed6a179e5541',
+--                                 'fee25b17-793a-4b18-8278-64c767304a99', 100, 50);
