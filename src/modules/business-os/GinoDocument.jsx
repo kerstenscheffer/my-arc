@@ -17,9 +17,12 @@
 // Formaat aan te passen via de hoek rechtsonder (bos_doc_maat).
 // Zijbalk: tabs slepen (bovenrand = ervoor, midden = subtab, onderrand = erna),
 // in-/uitspringen via ⋮ (ook op telefoon) en vastzetten (sectie Vastgezet bovenaan).
+// Opmaakbalk tijdens bewerken: titel/kop/subkop, opsomming, genummerd, pijl, lijn,
+// vet en schuin (ook ⌘B / ⌘I; Tab = inspringen). Het blijft gewone markdown,
+// zodat Gino het kan lezen en schrijven.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, FileText, MoreVertical, PanelLeft, Pin } from 'lucide-react'
+import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus } from 'lucide-react'
 import { createPortal } from '../../client/paginaPortal'
 
 const POS_SLEUTEL = 'bos_doc_pos'
@@ -94,13 +97,21 @@ function Weergave({ tekst }) {
       uit.push(<div key={i} style={{ ...stijl, marginBottom: 2 }}><Inline tekst={kop[2]} /></div>)
       continue
     }
-    const punt = r.match(/^\s*[-•]\s?(.*)$/)
-    const nummer = r.match(/^\s*(\d+)\.\s+(.*)$/)
-    if (punt || nummer) {
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(r)) {
+      uit.push(<div key={i} style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />)
+      continue
+    }
+    const pijl = r.match(/^(\s*)(?:→|->)\s?(.*)$/)
+    const punt = r.match(/^(\s*)[-•*]\s(.*)$/) || r.match(/^(\s*)[-•]()$/)
+    const nummer = r.match(/^(\s*)(\d+)\.\s+(.*)$/)
+    if (pijl || punt || nummer) {
+      const m = pijl || punt || nummer
+      const inhoud = nummer ? nummer[3] : m[2]
+      const teken = pijl ? '→' : nummer ? `${nummer[2]}.` : m[1].length >= 2 ? '◦' : '•'
       uit.push(
-        <div key={i} style={{ ...TEKST, display: 'flex', gap: 8 }}>
-          <span style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{nummer ? `${nummer[1]}.` : '•'}</span>
-          <span style={{ minWidth: 0 }}>{(nummer ? nummer[2] : punt[1]) ? <Inline tekst={nummer ? nummer[2] : punt[1]} /> : <span style={{ color: 'rgba(255,255,255,0.25)' }}>leeg</span>}</span>
+        <div key={i} style={{ ...TEKST, display: 'flex', gap: 8, marginLeft: Math.floor(m[1].replace(/\t/g, '  ').length / 2) * 18 }}>
+          <span style={{ color: pijl ? WIT : 'rgba(255,255,255,0.35)', fontWeight: pijl ? 800 : 400, flexShrink: 0 }}>{teken}</span>
+          <span style={{ minWidth: 0 }}>{inhoud ? <Inline tekst={inhoud} /> : <span style={{ color: 'rgba(255,255,255,0.25)' }}>leeg</span>}</span>
         </div>
       )
       continue
@@ -134,6 +145,84 @@ const WIT = '#fff'
 const ZACHT = 'rgba(255,255,255,0.55)'
 const knop = { width: 30, height: 30, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: WIT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }
 const menuRegel = { display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: WIT, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 600, padding: '8px 12px', cursor: 'pointer', borderRadius: 8 }
+
+// ── Opmaak in het tekstvak (markdown) ──
+const REGEL_PREFIX = /^(\s*)(#{1,4}\s+|[-•*]\s+|\d+\.\s+|(?:→|->)\s*)/
+
+// Zet (of haal weg) een regel-begin voor alle geselecteerde regels.
+function regelOpmaak(tekst, van, tot, soort) {
+  const begin = tekst.lastIndexOf('\n', van - 1) + 1
+  const eindN = tekst.indexOf('\n', tot > van && tekst[tot - 1] === '\n' ? tot - 1 : tot)
+  const eind = eindN === -1 ? tekst.length : eindN
+  const regels = tekst.slice(begin, eind).split('\n')
+  const voorvoegsel = { h1: '# ', h2: '## ', h3: '### ', lijst: '- ', pijl: '→ ' }
+  const isAl = (r) => {
+    const m = r.match(REGEL_PREFIX)
+    if (!m) return false
+    return soort === 'nummer' ? /^\d+\./.test(m[2]) : m[2].trim() === voorvoegsel[soort].trim() || (soort === 'pijl' && /^->/.test(m[2]))
+  }
+  const weg = regels.filter(x => x.trim()).every(isAl)
+  let n = 0
+  const nieuw = regels.map(r => {
+    if (!r.trim() && regels.length > 1) return r
+    const [, inspring = ''] = r.match(/^(\s*)/)
+    const kaal = r.replace(REGEL_PREFIX, '$1').slice(inspring.length)
+    if (weg) return inspring + kaal
+    const pre = soort === 'nummer' ? `${++n}. ` : voorvoegsel[soort]
+    // Koppen niet inspringen.
+    return (soort.startsWith('h') ? '' : inspring) + pre + kaal
+  }).join('\n')
+  const uit = tekst.slice(0, begin) + nieuw + tekst.slice(eind)
+  return { tekst: uit, van: begin, tot: begin + nieuw.length }
+}
+
+// Omhul de selectie met ** of *; nog een keer = weghalen.
+function omhul(tekst, van, tot, teken) {
+  const l = teken.length
+  const sel = tekst.slice(van, tot)
+  if (tekst.slice(van - l, van) === teken && tekst.slice(tot, tot + l) === teken && !(l === 1 && tekst[van - 2] === '*' && tekst[tot + 1] === '*')) {
+    return { tekst: tekst.slice(0, van - l) + sel + tekst.slice(tot + l), van: van - l, tot: tot - l }
+  }
+  if (sel.startsWith(teken) && sel.endsWith(teken) && sel.length >= 2 * l) {
+    return { tekst: tekst.slice(0, van) + sel.slice(l, -l) + tekst.slice(tot), van, tot: tot - 2 * l }
+  }
+  return { tekst: tekst.slice(0, van) + teken + sel + teken + tekst.slice(tot), van: van + l, tot: tot + l }
+}
+
+// Tab / Shift+Tab: geselecteerde regels in- of uitspringen.
+function springRegels(tekst, van, tot, uit) {
+  const begin = tekst.lastIndexOf('\n', van - 1) + 1
+  const eindN = tekst.indexOf('\n', tot)
+  const eind = eindN === -1 ? tekst.length : eindN
+  const nieuw = tekst.slice(begin, eind).split('\n').map(r => (uit ? r.replace(/^ {1,2}|^\t/, '') : `  ${r}`)).join('\n')
+  return { tekst: tekst.slice(0, begin) + nieuw + tekst.slice(eind), van: begin, tot: begin + nieuw.length, cursor: van === tot }
+}
+
+function Opmaakbalk({ pas, isMobile }) {
+  const groepen = [
+    [['h1', Heading1, 'Titel'], ['h2', Heading2, 'Kop'], ['h3', Heading3, 'Subkop']],
+    [['b', Bold, 'Vet (⌘B)'], ['i', Italic, 'Schuin (⌘I)']],
+    [['lijst', List, 'Opsomming'], ['nummer', ListOrdered, 'Genummerd'], ['pijl', ArrowRight, 'Pijltje'], ['lijn', Minus, 'Scheidingslijn']],
+  ]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', padding: isMobile ? '6px 10px' : '8px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+      {groepen.map((g, gi) => (
+        <Fragment key={gi}>
+          {gi > 0 && <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />}
+          {g.map(([k, icoon, titel]) => ({ k, icoon, titel })).map((b) => (
+            <button key={b.k} type="button" title={b.titel} aria-label={b.titel}
+              onMouseDown={e => e.preventDefault()} onClick={() => pas(b.k)}
+              style={{ width: 32, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: WIT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+              <b.icoon size={16} strokeWidth={2.4} />
+            </button>
+          ))}
+        </Fragment>
+      ))}
+    </div>
+  )
+}
 
 // Eén regel in de tabbladenlijst, met zijn subtabs eronder.
 function TabRegel({ tab, alle, sectie, diepte, actief, kies, dicht, wisselDicht, menuVoor, setMenuVoor, hernoemVoor, setHernoemVoor, acties }) {
@@ -311,6 +400,60 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
   const klaar = () => { clearTimeout(timer.current); opslaan(concept); setBewerk(false) }
 
+  // Opmaak toepassen op de selectie in het tekstvak; selectie blijft daarna staan.
+  const zetSelectie = (u) => {
+    setConcept(u.tekst)
+    requestAnimationFrame(() => {
+      const el = vak.current
+      if (!el) return
+      el.focus()
+      el.selectionStart = u.van
+      el.selectionEnd = u.tot
+    })
+  }
+  const pasOpmaak = (soort) => {
+    const el = vak.current
+    if (!el) return
+    const { selectionStart: van, selectionEnd: tot, value } = el
+    if (soort === 'b') return zetSelectie(omhul(value, van, tot, '**'))
+    if (soort === 'i') return zetSelectie(omhul(value, van, tot, '*'))
+    if (soort === 'lijn') {
+      const begin = value.lastIndexOf('\n', van - 1) + 1
+      const ins = `${begin === van ? '' : '\n'}---\n`
+      const pos = van + ins.length
+      return zetSelectie({ tekst: value.slice(0, van) + ins + value.slice(tot), van: pos, tot: pos })
+    }
+    zetSelectie(regelOpmaak(value, van, tot, soort))
+  }
+  const toets = (e) => {
+    const el = e.currentTarget
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'i')) { e.preventDefault(); pasOpmaak(e.key); return }
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const u = springRegels(el.value, el.selectionStart, el.selectionEnd, e.shiftKey)
+      if (u.cursor) {
+        const d = u.tekst.length - el.value.length
+        const pos = Math.max(u.van, el.selectionStart + d)
+        return zetSelectie({ tekst: u.tekst, van: pos, tot: pos })
+      }
+      return zetSelectie(u)
+    }
+    // Enter in een lijst: volgende regel krijgt hetzelfde teken; lege lijstregel = lijst stoppen.
+    if (e.key === 'Enter' && !e.shiftKey && el.selectionStart === el.selectionEnd) {
+      const v = el.value
+      const pos = el.selectionStart
+      const begin = v.lastIndexOf('\n', pos - 1) + 1
+      const regel = v.slice(begin, pos)
+      const m = regel.match(/^(\s*)([-•*]|→|->|(\d+)\.)\s+(.*)$/)
+      if (!m) return
+      e.preventDefault()
+      if (!m[4].trim()) return zetSelectie({ tekst: v.slice(0, begin) + v.slice(pos), van: begin, tot: begin })
+      const pre = `${m[1]}${m[3] ? `${Number(m[3]) + 1}.` : m[2]} `
+      const ins = `\n${pre}`
+      zetSelectie({ tekst: v.slice(0, pos) + ins + v.slice(pos), van: pos + ins.length, tot: pos + ins.length })
+    }
+  }
+
   const start = (extra = '') => {
     if (!actief) return
     const basis = (actief.inhoud || '') + extra
@@ -446,13 +589,16 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
           {/* Het document zelf. */}
           {bewerk ? (
-            <textarea ref={vak} value={concept} onChange={e => setConcept(e.target.value)} onBlur={() => { clearTimeout(timer.current); opslaan(concept) }}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <Opmaakbalk pas={pasOpmaak} isMobile={isMobile} />
+            <textarea ref={vak} value={concept} onChange={e => setConcept(e.target.value)} onKeyDown={toets} onBlur={() => { clearTimeout(timer.current); opslaan(concept) }}
               spellCheck={false}
               style={{
-                flex: 1, minWidth: 0, minHeight: 120, boxSizing: 'border-box', resize: 'none', border: 'none', outline: 'none',
+                flex: 1, minWidth: 0, minHeight: 120, width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none', outline: 'none',
                 background: 'transparent', color: WIT, fontFamily: 'inherit', fontSize: '0.92rem', lineHeight: 1.55,
                 padding: isMobile ? '12px 14px' : '20px 28px',
               }} />
+            </div>
           ) : (
             <div key={actief?.id || 'leeg'} onClick={tikBewerk && actief ? () => start() : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
               style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 16px' : '20px 28px 24px' }}>
