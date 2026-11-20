@@ -204,13 +204,14 @@ const CSS = `
 .nh-kaart { display:flex; flex-direction:column; min-width:0; background:#161616; border-radius:20px; padding:10px; }
 .nh-kaart-label { align-self:flex-end; background:#fff; color:#000; border-radius:8px; padding:3px 9px; font-size:13px; font-weight:900; }
 .nh-kaart h3 { display:flex; align-items:center; justify-content:center; min-height:2.3em; margin:10px 0; text-align:center; font-size:15px; font-weight:900; line-height:1.15; text-transform:uppercase; hyphens:manual; }
-.nh-kaart-beeld { position:relative; width:100%; aspect-ratio:1/1; border-radius:16px; overflow:hidden; background:#0b0b0b; }
-.nh-kaart-beeld > img.is-vol { width:100%; height:100%; object-fit:cover; object-position:center top; }
-.nh-omslag { position:absolute; top:9%; width:55%; border-radius:6px; box-shadow:0 8px 22px rgba(0,0,0,.65); }
-.nh-omslag:nth-child(1) { left:7%; transform:rotate(-6deg); }
-.nh-omslag:nth-child(2) { right:7%; top:13%; transform:rotate(6deg); }
+/* Verhouding van de posters (620x877): bij 1/1 viel de titel onderaan weg (UPPER / LOWER). */
+.nh-kaart-beeld { position:relative; width:100%; aspect-ratio:620/877; border-radius:16px; overflow:hidden; background:#0b0b0b; }
+.nh-kaart-beeld > img.is-vol { width:100%; height:100%; object-fit:cover; object-position:center; }
+.nh-omslag { position:absolute; top:24%; width:48%; border-radius:6px; box-shadow:0 8px 22px rgba(0,0,0,.65); }
+.nh-omslag:nth-child(1) { left:3%; transform:rotate(-6deg); }
+.nh-omslag:nth-child(2) { right:3%; top:30%; transform:rotate(6deg); }
 .nh-kaart-knoppen { display:flex; flex-direction:column; gap:7px; margin-top:auto; padding-top:12px; }
-.nh-kaart-knoppen .nh-knop { width:100%; padding:10px 8px; }
+.nh-kaart-knoppen .nh-knop { width:100%; padding:10px 6px; font-size:14px; white-space:nowrap; }
 
 /* 8 vragen en 9 over Kersten delen een vlak, net als bij het voorbeeld */
 .nh-onder { background:#111; }
@@ -299,7 +300,7 @@ const CSS = `
   .nh-kaart { padding:16px; }
   .nh-kaart h3 { font-size:20px; }
   .nh-kaart-knoppen { flex-direction:row; gap:8px; padding-top:16px; }
-  .nh-kaart-knoppen .nh-knop { flex:1 1 0; min-width:0; min-height:62px; }
+  .nh-kaart-knoppen .nh-knop { flex:1 1 0; min-width:0; min-height:62px; font-size:15px; white-space:normal; }
   .nh-kaart-knoppen .nh-knop:only-child { font-size:16px; font-weight:900; }
 }
 
