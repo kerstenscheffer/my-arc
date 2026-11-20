@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
         }}>Laatst bijgewerkt: april 2026</p>
 
         <Section title="1. Wie zijn wij">
-          MY ARC is een platform voor persoonlijke coaching, ontwikkeld en beheerd door Jino (KvK-nummer: 92854486). Je kunt contact opnemen via: kerstenscheffer@gmail.com
+          MY ARC is een platform voor persoonlijke coaching, ontwikkeld en beheerd door MY ARC Coaching (KvK-nummer: 92854486). Je kunt contact opnemen via: kerstenscheffer@gmail.com
         </Section>
 
         <Section title="2. Welke gegevens verzamelen wij">
@@ -146,7 +146,7 @@ export default function PrivacyPolicy() {
           color: 'rgba(255,255,255,0.2)',
           fontWeight: '500'
         }}>
-          © 2026 Jino — MY ARC. Alle rechten voorbehouden.
+          © 2026 MY ARC Coaching. Alle rechten voorbehouden.
         </div>
       </div>
     </div>
