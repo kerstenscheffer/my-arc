@@ -42,6 +42,7 @@ const TwelveWeekCheckout = lazy(() => import('./pages/TwelveWeekCheckout'))
 const CalorieCalculator = lazy(() => import('./pages/CalorieCalculator'))
 const MijnSplit = lazy(() => import('./pages/MijnSplit'))
 const MijnMenu = lazy(() => import('./pages/MijnMenu'))
+const NieuwHome = lazy(() => import('./pages/NieuwHome'))
 const SixteenWeekCheckout = lazy(() => import('./pages/SixteenWeekCheckout'))
 const SixteenWeekMonthlyCheckout = lazy(() => import('./pages/SixteenWeekMonthlyCheckout'))
 const MonthlySubscriptionCheckout = lazy(() => import('./pages/MonthlySubscriptionCheckout'))
@@ -248,6 +249,12 @@ function App() {
   // Lead magnet: weekmenu op calorieën uit de dagmenu-gerechten, met PDF.
   if (currentPath === '/mijn-menu' || currentPath === '/mijnmenu') {
     return <MijnMenu />
+  }
+
+  // Proefhomepage: nabouw van acquisition.com in zwart-wit. De huidige
+  // homepage en alle andere routes blijven zoals ze zijn.
+  if (currentPath === '/nieuw') {
+    return <NieuwHome />
   }
 
   // 16-weken offer — zelfde opbouw als de 6-weken challenge: banner met de
