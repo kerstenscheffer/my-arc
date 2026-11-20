@@ -23,6 +23,12 @@
 -- "Gestuurd" = de lead heeft een tag van de campagne van deze ronde. Die tag
 -- zet het bord zelf: megafoon → campagne kiezen → paarse DM-knop op de kaart
 -- (KanbanCard.handleCampaignDM → updateLead → tag_lead_campaign).
+--
+-- SINDS 20 NOV 2026 draait de routine dm_list_fill_v3 (deel 5 onderaan):
+-- gestuurd = een DM onder welke campagne dan ook sinds de lead in de kolom
+-- kwam. Het bord zet in de kolom "📨 DM vandaag" de paarse DM-knop standaard
+-- aan met de nieuwste actieve campagne (KanbanBoard: standaardCampagne); een
+-- keuze in de megafoon gaat voor.
 
 -- ---------------------------------------------------------------------------
 -- 1. Leads die tijdelijk niet op de DM-lijst mogen (bv. net een call-voorstel).

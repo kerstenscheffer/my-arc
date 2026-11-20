@@ -342,13 +342,17 @@ export default function KanbanBoard({
   // attribution is automatic. Null when the coach has no active campaign.
   const [activeCampaignId, setActiveCampaignId] = useState(null)
   const [activeCampaignName, setActiveCampaignName] = useState('')
+  // Dezelfde nieuwste actieve campagne, maar dan met bericht: de standaard voor
+  // de paarse DM-knop in de kolom "📨 DM vandaag" zolang er in de megafoon nog
+  // niets gekozen is. Een keuze in de megafoon gaat altijd voor.
+  const [standaardCampagne, setStandaardCampagne] = useState(null)
 
   useEffect(() => {
     if (!coachId) return
     let cancelled = false
     leadService.db.supabase
       .from('outreach_campaigns')
-      .select('id, name, variant_tag')
+      .select('id, name, variant_tag, message_text')
       .eq('coach_id', coachId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -362,14 +366,18 @@ export default function KanbanBoard({
         if (!data) {
           setActiveCampaignId(null)
           setActiveCampaignName('')
+          setStandaardCampagne(null)
           return
         }
         setActiveCampaignId(data.id)
         setActiveCampaignName(data.variant_tag ? `${data.name} · ${data.variant_tag}` : data.name)
+        // Zonder bericht valt er niets te kopiëren: dan geen standaard.
+        setStandaardCampagne((data.message_text || '').trim() ? data : null)
       })
     return () => { cancelled = true }
     // Re-fetch when the logger modal closes (user may have created a new campaign).
-  }, [coachId, leadService, showOutreachLogger])
+    // Ook na het megafoon-venster: daar maak of bewerk je campagnes.
+  }, [coachId, leadService, showOutreachLogger, showCampaignModal])
   const [highlightedLeadId, setHighlightedLeadId] = useState(null)
   // Holds the just-created lead so we can prompt for its source. Cleared
   // when the source modal closes (whether attributed or skipped).
@@ -1780,7 +1788,7 @@ export default function KanbanBoard({
           onSalesCallClick={(lead) => setSalesCallLead(lead)}
           coachId={coachId} db={db} onRefresh={loadBoard}
           onMagnetAttached={handleMagnetAttachedForLead}
-          activeCampaign={runCampaign}
+          activeCampaign={runCampaign || ((section.title || '').trim() === '📨 DM vandaag' ? standaardCampagne : null)}
           verbergNaam={namenVerborgen}
           uitgesteld={uitgesteldLeads.has(lead.id)}
         />
