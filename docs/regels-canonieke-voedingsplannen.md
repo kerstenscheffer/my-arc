@@ -74,3 +74,16 @@ Geldt voor eigen maaltijden uit de intake (`intake-maaltijden`) en voor de wisse
 - Kent de database een plak, snee of stuk voor een product, dan is dat de stap (kaas per plak van 13 g, niet per 10 g).
 - Groente (onder 40 kcal per 100 g) schaalt niet mee in de wissel.
 - Een portie in de wissel blijft tussen 40% en 250% van het recept.
+
+## Prep My Meal in het concept (20 nov 2026)
+Code: `src/modules/meal-plan/prepmymeal-concept.sql` (database) en de aanroep aan het eind van `supabase/functions/intake-maaltijden/index.ts`.
+- De intake vraagt: "Wil je kant-en-klare maaltijden in je plan?" Antwoord in `nutrition_preferences.practical_info.kant_en_klaar`: `nee` (ook als het leeg is), `paar_keer` of `elke_werkdag`.
+- Nee of leeg: er verandert niets, ook de brief niet.
+- Een paar keer per week: 3 lunches op werkdagen (voorkeur maandag, woensdag, vrijdag). Elke werkdag: de lunch van maandag t/m vrijdag. Weekend en avondeten blijven eigen gerechten.
+- Per lunch het gerecht dat het dichtst bij het vervangen gerecht ligt, kcal en eiwit eerst. Zelfde marges als de eigen maaltijden: kcal binnen 10%, eiwit hooguit 5 g lager of de dag haalt het eiwitdoel nog voor 95%, en de dag zakt niet onder 95% van het vetminimum.
+- Past er niets, dan blijft die dag zoals hij was en staat het onder "Zelf nakijken".
+- Een bak van 2 porties (label `bak_2_porties`) komt op twee dagen. Eerst verschillende gerechten; pas als die op zijn komt er een terug.
+- Allergie (volledig vermijden) anders dan gluten, een eigen opmerking bij allergieën of halal: niets plaatsen, want de allergenen per gerecht staan niet in de app. Gluten: alleen gerechten met label glutenvrij. Intolerantie en "lust ik niet": filteren op de naam van het gerecht.
+- De brief zegt onder "Zelf nakijken" hoeveel maaltijden erin zitten en op welke dagen, en onder "Gekozen en waarom" per gerecht wat het vervangt.
+- De nakijker laat deze maaltijden staan.
+- Bekend (droge test op de 30 canonieke plannen): bij een lunch van rond 827 kcal past vaak maar één gerecht (Kip met kokos), en bij een lunch van 990 kcal of meer past er geen.

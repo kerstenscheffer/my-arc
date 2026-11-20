@@ -34,7 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, Minimize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus } from 'lucide-react'
+import { X, Minus, Maximize2, Minimize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus, Zap, Bot, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -47,10 +47,10 @@ const GROEN = colors.success
 // in de kopregel: erop slepen haalt een taak uit de vakken, aantikken opent
 // de lijst.
 const VAKKEN = [
-  { id: 'doen', titel: 'Nu doen', kleur: '#000', rand: '#a855f7' },
-  { id: 'plannen', titel: 'Inplannen', kleur: '#000', rand: '#3b82f6' },
-  { id: 'gino', titel: 'Gino laten doen', kleur: '#000', rand: '#22c55e' },
-  { id: 'weg', titel: 'Weg', kleur: '#000', rand: '#9ca3af' },
+  { id: 'doen', titel: 'Nu doen', kleur: '#000', rand: '#a855f7', icoon: Zap },
+  { id: 'plannen', titel: 'Inplannen', kleur: '#000', rand: '#3b82f6', icoon: CalendarDays },
+  { id: 'gino', titel: 'Gino laten doen', kleur: '#000', rand: '#22c55e', icoon: Bot },
+  { id: 'weg', titel: 'Weg', kleur: '#000', rand: '#9ca3af', icoon: Trash2 },
 ]
 
 // Nu doen verdeeld over de dag (12 nov 2026), kolom productivity_tasks.dagdeel.
@@ -376,8 +376,8 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         style={{
           display: 'flex', gap: 8, alignItems: 'flex-start',
           padding: '8px 8px 8px 10px', marginBottom: 6,
-          background: '#050505', border: `1px solid ${gloed}80`, borderRadius: 12,
-          boxShadow: `0 0 10px ${gloed}33, inset 0 0 12px ${gloed}14`,
+          // Strak (20 nov 2026, Kersten): kaart in de kleur van zijn vak, geen gloed.
+          background: `${gloed}24`, border: `1px solid ${gloed}59`, borderRadius: 12,
           WebkitTouchCallout: 'none',
           opacity: sleep?.taak.id === t.id ? 0.3 : afgevinkt === t.id ? 0.5 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
@@ -643,10 +643,12 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
                 <div key={v.id} data-kwadrant={v.id} style={{
                   minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
                   background: v.kleur,
-                  boxShadow: `inset 0 0 0 ${doel ? 2 : 1}px ${v.rand}${doel ? '' : 'aa'}, inset 0 0 ${doel ? 36 : 22}px ${v.rand}${doel ? '55' : '2e'}`,
+                  // Vakken zwart met een witte rand; alleen bij slepen naar dit vak de vakkleur.
+                  boxShadow: doel ? `inset 0 0 0 2px ${v.rand}` : 'inset 0 0 0 0.5px rgba(255,255,255,0.28)',
                   transition: 'box-shadow 0.12s',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: onderLeeg && (v.id === 'gino' || v.id === 'weg') ? '7px 12px' : '7px 12px 3px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: onderLeeg && (v.id === 'gino' || v.id === 'weg') ? '8px 12px' : '8px 12px 4px', flexShrink: 0 }}>
+                    <v.icoon size={15} color={v.rand} strokeWidth={2.6} style={{ flexShrink: 0 }} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
                       {v.titel}
                     </span>
