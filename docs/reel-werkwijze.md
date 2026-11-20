@@ -4,7 +4,7 @@ Kersten zet talking-head reels in zijn Drive-map "Reels agents test" en zegt bij
 
 Stijl: lees eerst `docs/reel-edit-briefing.md`. Actuele feedback van Kersten gaat voor.
 
-Twee varianten: de praatreel (hieronder, "Per reel") en B-roll met tekst zonder stem, bijvoorbeeld een carrousel als reel (zie "B-roll met tekst").
+Twee varianten: de praatreel (hieronder, "Per reel") en B-roll met tekst zonder stem, bijvoorbeeld een carrousel als reel (zie "B-roll met tekst"). B-roll met tekst heeft twee stijlen: licht en donker (zie "Twee stijlen").
 
 Geef bij elk commando de Bash-timeout 600000 mee; montage duurt een paar minuten.
 
@@ -28,7 +28,7 @@ Geef bij elk commando de Bash-timeout 600000 mee; montage duurt een paar minuten
 
    - `labels`: [van, tot, tekst] in brontijd. De eerste is de hook vanaf 0. Daarna maximaal 3 kernpunten, één tegelijk.
    - `correcties`: [fout, goed, vorig woord of null]. Alleen duidelijke fouten van Whisper. Twijfel je, verander niets en noem het in je bericht.
-   - `muziek`: alleen uit `~/Gino/reel-assets/muziek`. Niets anders, ook niet uit Drive: daar staan commerciële nummers.
+   - `muziek`: alleen uit `~/Gino/reel-assets/muziek` (voor een B-roll-reel in stijl donker: alleen uit `muziek/donker`, zie "Twee stijlen"). Niets anders, ook niet uit Drive: daar staan commerciële nummers.
      Kies op de sfeer van de reel en wissel af. De sfeer staat alleen in de bestandsnaam, luisteren kun je niet, dus noem in je bericht welke track je koos:
      praktische tips of verhaal: `leberch-travel`, `leberch-lofi-vlog`, `leberch-intro-vlog`, `bombinsound-background-music`;
      persoonlijk of reflectief: `leberch-inspiring`, `the_mountain-cinematic`;
@@ -42,7 +42,27 @@ Geef bij elk commando de Bash-timeout 600000 mee; montage duurt een paar minuten
 
 Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als reel te maken: de slide-tekst in dik wit over Kerstens eigen B-roll, met muziek. Code: `scripts/reel_broll.py`, de praatreel-montage blijft zoals hij is.
 
-**Vaste stijl (Kersten, 19 nov 2026).** Dit is de standaard voor elke reel in deze variant:
+### Twee stijlen (Kersten, 20 nov 2026)
+
+Kies de stijl op het onderwerp van de reel en zet hem in de config met `"stijl"`:
+
+- **Donker** (`"stijl": "donker"`): voor mindset, training en motivatie.
+- **Licht** (`"stijl": "licht"`, of niets invullen): met geel en mascottes, voor voedingstips en rekensommen.
+
+Muziek voor donker komt uit de map `~/Gino/reel-assets/muziek/donker`, muziek voor licht uit `~/Gino/reel-assets/muziek`. Het script zoekt alleen in de map van de gekozen stijl.
+
+**Stijl donker.** Sfeer: motiverend, mannelijk, clean.
+
+- Beeld: de B-roll wordt in het script duidelijk donkerder gemaakt, met meer contrast, minder kleur en een lichte vignet. Kies gym-B-roll (`broll-gym/gym` en `broll-gym/fysiek`); eten en winkel horen bij licht.
+- Tekst: Poppins Medium (`~/Gino/reel-assets/fonts/Poppins-Medium.ttf`, vrije licentie SIL OFL, bron Google Fonts), 64 px, strak wit met alleen een zachte schaduw, gecentreerd midden in beeld, ruime regelafstand. Eén lettergrootte voor de hele reel. Geen geel, geen mascotte.
+- Eén zin per tekstblok. Past hij op één regel, dan blijft het één regel; anders verdeelt het script hem gelijkmatig (hoogstens 4 regels).
+- Tempo: langere shots (minimaal 3,4 s; 1,8 s + 0,40 s per woord), elk tekstblok minimaal 2 s. De tekst komt zacht in beeld (0,4 s) en gaat zacht weg (0,3 s); clips lopen in 0,4 s in elkaar over. Een clip moet dus 0,4 s langer zijn dan zijn shot; de gym-clips duren 5 tot 10 s.
+- De CTA aan het eind staat in dezelfde stijl en blijft staan tot het einde.
+- Dezelfde config werkt in beide stijlen: sterretjes en `"mascotte"` worden in donker overgeslagen, de tekst blijft woordelijk.
+- Muziek: 8 nummers in `muziek/donker`, donker, filmisch en motiverend. Bron en licentie per nummer staan in `muziek/donker/licenties.md` (Mixkit Stock Music Free License: commercieel gebruik op social media toegestaan, geen naamsvermelding). Nieuw nummer erbij: alleen met een licentie die commercieel gebruik zonder naamsvermelding toestaat, en vul `licenties.md` aan met bron-URL en licentie. Geen bekende of trending nummers. De sfeer staat alleen in de bestandsnaam en in `licenties.md`; noem in je bericht welk nummer je koos.
+- Eerste reel in deze stijl: `~/Gino/reels/geluk-bestaat-niet` (v2).
+
+**Stijl licht (Kersten, 19 nov 2026).** Dit is de standaard als er geen `"stijl"` in de config staat:
 
 - Tekst: Poppins Bold, groot (96 px), wit met een donkere rand en zachte schaduw, gecentreerd, 2 tot 3 regels per tekstblok.
 - Per tekstblok precies één kernwoord in geel (#FFC629): het woord waar de zin om draait. Eén woord, leestekens erbij. Niet twee, niet nul.
@@ -62,6 +82,7 @@ Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als
 ```json
 {
   "soort": "broll",
+  "stijl": "licht",
   "bron": "https://www.instagram.com/p/…",
   "shots": [
     {
@@ -76,6 +97,7 @@ Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als
 }
 ```
 
+   - `stijl`: `licht` (standaard) of `donker`, zie "Twee stijlen". De punten hieronder over het kernwoord, de mascotte en het tempo gelden voor licht; in donker regelt het script dat zelf.
    - `tekst`: één slide per shot, woordelijk van de slide. Eén tekstblok, of een lijst blokken die na elkaar in beeld komen terwijl de B-roll doorloopt. Verdeel een slide op zinnen en komma's in blokken die in 2 tot 3 grote regels passen (ongeveer 3 tot 9 woorden). Past een blok niet in 3 regels, dan stopt het script en verdeel je verder. Kaarten en tabellen op een slide gaan niet mee, en ook "Swipe voor de uitleg" niet: in een reel valt niets te swipen.
    - Kernwoord: zet in elk blok precies één woord tussen sterretjes, leestekens erbinnen (`*uitrekenen.*`, `*"MENU"*`). Dat woord wordt geel. Zonder sterretjes, of met twee, stopt het script.
    - Regels verdeelt het script zelf (breekt liever na een leesteken; het kernwoord mag alleen op de laatste regel staan). Staat het in `blokken` van de uitvoer niet mooi, zet dan zelf `\n` in het blok.
@@ -86,10 +108,10 @@ Eigen variant naast de praatreel, bijvoorbeeld om een goed lopende carrousel als
    - `broll`: één clip of een lijst. De meeste clips duren 4 s. Duurt de tekst langer, geef dan twee of drie clips: de tekst blijft staan en het beeld wisselt eronder. Het script stopt met een duidelijke melding als een clip te kort is.
    - Elke clip één keer per reel (`dubbele_clips` in de uitvoer moet leeg zijn) en liefst ook niet in de reel van de dag ervoor.
    - `muziek` en `caption`: zelfde regels als hierboven. Bij een carrousel is de caption die van de oorspronkelijke post, inclusief het comment-woord.
-3. `node scripts/reel-gino.mjs broll <naam>` maakt versie vN (3 tot 6 minuten). Bekijk `controle_frames` (elk tekstblok met zijn mascotte en elke clip) en `omslag_uitsneden`. De omslag is het eerste tekstblok van de hook, met de mascotte. Let op: één geel woord per blok, mascotte niet over Kerstens gezicht, tekst volledig in beeld.
+3. `node scripts/reel-gino.mjs broll <naam>` maakt versie vN (3 tot 6 minuten). Bekijk `controle_frames` (elk tekstblok met zijn mascotte en elke clip) en `omslag_uitsneden`. De omslag is het eerste tekstblok van de hook, met de mascotte. Let op: één geel woord per blok, mascotte niet over Kerstens gezicht, tekst volledig in beeld. In stijl donker let je op: tekst leesbaar op het donkere beeld en Kersten nog te herkennen (een clip die al erg donker is wordt bijna zwart: kies dan een lichtere).
 4. `node scripts/reel-gino.mjs concept <naam> --datum 2026-11-20T20:00` zet hem als concept in Metricool, net als een praatreel.
 
-Vast in het script: 1080×1920, de stijl hierboven (Poppins Bold wit met rand, kernwoord geel, mascotte boven de tekst), de eerste regel in elk shot op dezelfde hoogte, B-roll een fractie donkerder, zachte overgang van 0,15 s en een rustige zoom per clip (briefing punt 6), muziek op vaste luidheid.
+Vast in het script: 1080×1920 en muziek op vaste luidheid. Licht: Poppins Bold wit met rand, kernwoord geel, mascotte boven de tekst, de eerste regel in elk shot op dezelfde hoogte, B-roll een fractie donkerder, zachte overgang van 0,15 s en een rustige zoom per clip (briefing punt 6). Donker: zie "Twee stijlen".
 
 ## Concept zetten: grens van 2 minuten
 
