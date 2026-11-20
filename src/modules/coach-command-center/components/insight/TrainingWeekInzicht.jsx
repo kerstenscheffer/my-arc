@@ -96,6 +96,8 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
   const [cijfer, setCijfer] = useState({}) // { 'YYYY-MM-DD': cijfer dat de klant de workout gaf }
   const [signalen, setSignalen] = useState({}) // { 'YYYY-MM-DD': [{ tekst, erg }] } — waar de coach naar moet kijken
   const [slaap, setSlaap] = useState({}) // { 'YYYY-MM-DD': uren } — de nacht die op die dag eindigt
+  // Wat de klant bij een nacht schreef, per dag: zichtbaar in de slaapbalk (20 nov 2026, Kersten).
+  const [slaapTekst, setSlaapTekst] = useState({})
   const [slaapVenster, setSlaapVenster] = useState(null) // dag (iso) waarvan de slaapband is aangeklikt
   // Dagen waarop het traject op pauze stond (ziek, vakantie): oranje in de week.
   const [pauzes, setPauzes] = useState([]) // [{ van: 'YYYY-MM-DD', tot: 'YYYY-MM-DD' | null, reden }]
@@ -156,7 +158,7 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
         .or(`week_start.is.null,week_start.eq.${weekSleutel}`)
         .then(r => r, () => ({ data: [] })),
       StappenService.haalWeek(db, clientId, ma).then(r => r, () => []),
-      db.supabase.from('sleep_logs').select('log_date, hours_slept')
+      db.supabase.from('sleep_logs').select('log_date, hours_slept, struggles, notes')
         .eq('client_id', clientId).gte('log_date', weekSleutel).lte('log_date', sleutel(plusDagen(ma, 6)))
         .then(r => r, () => ({ data: [] })),
       db.supabase.from('weight_challenge_logs').select('date, weight, created_at')
@@ -207,6 +209,15 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
       // Meerdere wegingen op één dag: de laatste telt.
       setGewicht(prev => ({ ...prev, ...Object.fromEntries((gw?.data || []).filter(r => Number(r.weight) > 0).map(r => [String(r.date).slice(0, 10), Number(r.weight)])) }))
       setSlaap(prev => ({ ...prev, ...Object.fromEntries((sl?.data || []).map(r => [String(r.log_date).slice(0, 10), Number(r.hours_slept) || 0])) }))
+      setSlaapTekst(prev => {
+        const nieuw = { ...prev }
+        for (let i = 0; i < 7; i++) delete nieuw[sleutel(plusDagen(ma, i))]
+        ;(sl?.data || []).forEach(r => {
+          const t = [r.struggles, r.notes].map(x => (x || '').trim()).filter(Boolean).join(' · ')
+          if (t) nieuw[String(r.log_date).slice(0, 10)] = t
+        })
+        return nieuw
+      })
     })
     return () => { weg = true }
   }, [clientId, db, weekSleutel, vast])
@@ -629,13 +640,14 @@ export default function TrainingWeekInzicht({ client, db, isMobile, workouts = [
                   <>
                     {/* Slaap van de nacht ervoor: paarse band, vol bij acht uur. */}
                     {/* Klik = het slaapvenster: de nachten, bedtijden en wat de klant erbij schreef. */}
-                    <span role="button" tabIndex={0} aria-label="Slaap bekijken" title="Slaap bekijken"
+                    <span role="button" tabIndex={0} aria-label="Slaap bekijken" title={slaapTekst[w.k] ? `Opmerking slaap: ${slaapTekst[w.k]}` : 'Slaap bekijken'}
                       onClick={(e) => { e.stopPropagation(); setSlaapVenster(w.k) }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSlaapVenster(w.k) } }}
                       style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'rgba(0,0,0,0.55)', overflow: 'hidden', cursor: 'pointer', zIndex: 2 }}>
                       <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(Math.min(1, (slaap[w.k] || 0) / SLAAP_DOEL) * 100)}%`, background: 'rgba(168,85,247,0.4)' }} />
                       <span style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: '0.66rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: slaap[w.k] > 0 ? '#d8b4fe' : 'rgba(255,255,255,0.4)' }}>
                         <Moon size={10} strokeWidth={2.6} color={slaap[w.k] > 0 ? PAARS : 'currentColor'} />{slaap[w.k] > 0 ? `${String(Math.round(slaap[w.k] * 10) / 10).replace('.', ',')}u` : '·'}
+                        {slaapTekst[w.k] && <><MessageSquare size={10} strokeWidth={2.8} color="#fff" style={{ marginLeft: 3, flexShrink: 0 }} /><span style={{ minWidth: 0, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 800, color: '#fff' }}>{slaapTekst[w.k]}</span></>}
                       </span>
                     </span>
                     {/* Klik = stappendoel instellen. Op de gekozen dag staat het doel erachter. */}
