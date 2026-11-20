@@ -8,9 +8,35 @@
 // Opmaak is gewone tekst: '# ' en '## ' zijn kopjes, '- ' is een opsomming.
 // Lezen = opgemaakt; tik erop of op het potlood = bewerken in een tekstvak.
 // '+ Onderdeel' zet onderaan een nieuw kopje klaar.
+//
+// Zweeft sinds 20 nov 2026 los over de pagina: sleep aan de kopbalk, de plek
+// blijft bewaard (localStorage bos_doc_pos) en wordt binnen het scherm gehouden.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Check, X } from 'lucide-react'
+import { Pencil, Plus, Check, X, GripVertical } from 'lucide-react'
+import { createPortal } from '../../client/paginaPortal'
+
+const POS_SLEUTEL = 'bos_doc_pos'
+const RAND = 8
+
+// Houdt het venster binnen beeld; de kopbalk moet altijd te pakken zijn.
+function binnenBeeld(p, el) {
+  const b = el?.offsetWidth || 680
+  const h = el?.offsetHeight || 60
+  return {
+    x: Math.min(Math.max(RAND, p.x), Math.max(RAND, window.innerWidth - b - RAND)),
+    y: Math.min(Math.max(RAND, p.y), Math.max(RAND, window.innerHeight - Math.min(h, 60) - RAND)),
+  }
+}
+
+function startPlek(isMobile) {
+  try {
+    const p = JSON.parse(localStorage.getItem(POS_SLEUTEL) || 'null')
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return p
+  } catch { /* leeg */ }
+  const b = Math.min(680, window.innerWidth - 2 * RAND)
+  return { x: Math.round((window.innerWidth - b) / 2), y: isMobile ? 70 : 120 }
+}
 
 const KOP = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#fff' }
 
@@ -42,6 +68,34 @@ export default function GinoDocument({ document: d, titel, isMobile, dicht, setD
   const vak = useRef(null)
   const timer = useRef(null)
   const laatste = useRef('')
+  const venster = useRef(null)
+  const sleep = useRef(null)
+  const [plek, setPlek] = useState(() => startPlek(isMobile))
+
+  // Na laden en bij schermwijziging terug binnen beeld.
+  useEffect(() => {
+    const pas = () => setPlek(p => binnenBeeld(p, venster.current))
+    pas()
+    window.addEventListener('resize', pas)
+    return () => window.removeEventListener('resize', pas)
+  }, [])
+
+  const pakVast = (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return
+    e.preventDefault()
+    sleep.current = { dx: e.clientX - plek.x, dy: e.clientY - plek.y, id: e.pointerId }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const beweeg = (e) => {
+    const s = sleep.current
+    if (!s || s.id !== e.pointerId) return
+    setPlek(binnenBeeld({ x: e.clientX - s.dx, y: e.clientY - s.dy }, venster.current))
+  }
+  const laatLos = (e) => {
+    if (!sleep.current || sleep.current.id !== e.pointerId) return
+    sleep.current = null
+    setPlek(p => { try { localStorage.setItem(POS_SLEUTEL, JSON.stringify(p)) } catch { /* leeg */ } return p })
+  }
 
   const start = (extra = '') => {
     const basis = d.tekst + extra
@@ -77,15 +131,17 @@ export default function GinoDocument({ document: d, titel, isMobile, dicht, setD
 
   const knop = { width: 30, height: 30, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }
 
-  return (
-    <div style={{
-      width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column',
-      background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, boxSizing: 'border-box', textAlign: 'left',
-      // Nooit platgedrukt: dicht = alleen de kop, open = minstens een leesbaar vak.
-      // Bij weinig ruimte wijkt de 10K-kop erboven (19 nov 2026: open zag je niets).
-      flexShrink: 0, ...(dicht ? null : { flexGrow: 1, flexBasis: 0, minHeight: 'min(300px, calc(100% - 16px))' }),
+  return createPortal(
+    <div ref={venster} style={{
+      position: 'fixed', left: plek.x, top: plek.y, zIndex: 59,
+      width: `min(680px, calc(100vw - ${2 * RAND}px))`, height: dicht ? 'auto' : `min(440px, calc(100dvh - ${plek.y + RAND}px))`,
+      display: 'flex', flexDirection: 'column',
+      background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, boxSizing: 'border-box', textAlign: 'left',
+      boxShadow: '0 18px 50px rgba(0,0,0,0.6)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '10px 12px' : '12px 16px', borderBottom: dicht ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+      <div onPointerDown={pakVast} onPointerMove={beweeg} onPointerUp={laatLos} onPointerCancel={laatLos}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '10px 12px' : '12px 16px', borderBottom: dicht ? 'none' : '1px solid rgba(255,255,255,0.05)', cursor: 'grab', touchAction: 'none', userSelect: 'none' }}>
+        <GripVertical size={15} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginLeft: -4 }} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#fff' }}>
           <span style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.025em' }}>{titel}</span>
           {stand === 'bezig' && <span style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Opslaan…</span>}
@@ -119,6 +175,7 @@ export default function GinoDocument({ document: d, titel, isMobile, dicht, setD
           </div>
         )
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
