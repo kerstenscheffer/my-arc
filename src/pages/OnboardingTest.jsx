@@ -252,7 +252,7 @@ function ConceptArc() {
 
 // ── D. Chat met XP: gesprek met de kettlebell, punten en level-up ───────────
 
-function ConceptChat() {
+function ConceptChat({ avatar = 'kettlebell' }) {
   const f = useFlow()
   const [xp, setXp] = useState(0)
   const [plus, setPlus] = useState(null)
@@ -289,7 +289,7 @@ function ConceptChat() {
       <div style={{ display: 'grid', gap: space[2], marginTop: space[4] }}>
         {zichtbaar.map((b, j) => (
           <div key={j} style={{ display: 'flex', justifyContent: b.van === 'ik' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: space[2], animation: 'ob-bericht .3s ease' }}>
-            {b.van === 'm' && <img src={M('kettlebell')} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} />}
+            {b.van === 'm' && <Avatar naam={avatar} />}
             <div style={{
               maxWidth: '78%', padding: `${space[2]}px ${space[3]}px`, borderRadius: 18, fontSize: 15, fontWeight: 600, lineHeight: 1.4,
               background: b.van === 'ik' ? '#fff' : colors.surface, color: b.van === 'ik' ? '#000' : '#fff',
@@ -299,7 +299,7 @@ function ConceptChat() {
         ))}
         {typt && (
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: space[2] }}>
-            <img src={M('kettlebell')} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <Avatar naam={avatar} />
             <div style={{ padding: '12px 14px', borderRadius: 18, background: colors.surface, display: 'flex', gap: 4 }}>
               {[0, 1, 2].map(d => <span key={d} style={{ width: 7, height: 7, borderRadius: '50%', background: colors.textSecondary, animation: `ob-stip 1s ${d * 0.15}s infinite` }} />)}
             </div>
@@ -329,6 +329,46 @@ function Confetti() {
   )
 }
 
+// ── E. Coach: jouw eigen 3D-figuur als gids ────────────────────────────────
+
+const COACH = '/mascottes/coach.jpg'
+
+function ConceptCoach() {
+  const f = useFlow()
+  const zin = f.klaar ? (f.uit === undefined ? 'Even rekenen… ik zet je cijfers klaar.' : 'Dit is jouw startpunt. Samen gaan we dit halen!') : (f.reactie?.tekst || f.v.vraag)
+  const getypt = useTypen(zin)
+  return (
+    <Scherm>
+      <Balk p={f.klaar ? 1 : f.i / VRAGEN.length} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: space[3] }}>
+        <div key={f.reactie?.id || f.i} style={{
+          width: 170, height: 255, transformOrigin: '50% 100%',
+          animation: f.reactie ? 'ob-spring 0.7s ease' : 'ob-adem 3.2s ease-in-out infinite',
+        }}>
+          <img src={COACH} alt="" style={{
+            width: '100%', height: '100%', objectFit: 'cover',
+            mixBlendMode: 'lighten',
+            WebkitMaskImage: 'radial-gradient(ellipse 62% 58% at 50% 50%, #000 70%, transparent 100%)',
+            maskImage: 'radial-gradient(ellipse 62% 58% at 50% 50%, #000 70%, transparent 100%)',
+          }} />
+        </div>
+        <div style={{ marginTop: -space[2] }}><Wolk>{getypt}<Cursor /></Wolk></div>
+      </div>
+      <div style={{ marginTop: space[6] }}>
+        {f.klaar ? (f.uit !== undefined && <><Confetti /><Resultaat uit={f.uit} opnieuw={f.opnieuw} /></>)
+          : !f.reactie && <Invoer v={f.v} kies={f.kies} />}
+      </div>
+    </Scherm>
+  )
+}
+
+function Avatar({ naam }) {
+  if (naam === 'coach') return (
+    <img src={COACH} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', objectPosition: '50% 4%', border: `1px solid ${colors.borderSubtle}`, flexShrink: 0 }} />
+  )
+  return <img src={M(naam)} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+}
+
 // ── Lijst ───────────────────────────────────────────────────────────────────
 
 function Scherm({ children }) {
@@ -352,6 +392,8 @@ function Wolk({ children }) {
 const Cursor = () => <span style={{ display: 'inline-block', width: 2, height: '1em', background: colors.accent, marginLeft: 2, verticalAlign: 'text-bottom', animation: 'ob-stip 1s infinite' }} />
 
 const CONCEPTEN = [
+  { k: 'E', naam: 'Coach', uitleg: 'Jouw 3D-figuur is de gids: hij ademt, springt bij elk antwoord en viert je resultaat.', C: ConceptCoach },
+  { k: 'F', naam: 'Coach-chat + XP', uitleg: 'Chat met jouw 3D-figuur, punten per antwoord, level-up en confetti.', C: () => <ConceptChat avatar="coach" /> },
   { k: 'A', naam: 'Maatje', uitleg: 'Eén vaste mascotte (de kettlebell) praat met je, springt bij elk antwoord.', C: ConceptMaatje },
   { k: 'B', naam: 'Team', uitleg: 'Elke vraag een eigen mascotte; je verzamelt het hele team bovenin.', C: ConceptTeam },
   { k: 'C', naam: 'Arc', uitleg: 'Eigen strak figuurtje: de gouden boog vult zich met je voortgang.', C: ConceptArc },
@@ -359,11 +401,12 @@ const CONCEPTEN = [
 ]
 
 export default function OnboardingTest() {
-  const [k, setK] = useState('A')
+  const [k, setK] = useState('E')
   const gekozen = CONCEPTEN.find(c => c.k === k)
   return (
     <div style={{ minHeight: '100dvh', background: colors.bg, color: '#fff', fontFamily: 'inherit' }}>
       <style>{`
+        @keyframes ob-adem { 0%,100% { transform: scale(1,1) } 50% { transform: scale(1.015,1.03) translateY(-3px) } }
         @keyframes ob-zweef { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
         @keyframes ob-spring { 0% { transform: scale(1,1) } 25% { transform: scale(1.12,0.86) translateY(6px) } 55% { transform: scale(0.94,1.1) translateY(-22px) } 80% { transform: scale(1.04,0.96) } 100% { transform: scale(1,1) } }
         @keyframes ob-inglij { 0% { transform: translateX(120px) rotate(14deg) scale(.6); opacity: 0 } 100% { transform: none; opacity: 1 } }
