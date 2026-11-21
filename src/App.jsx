@@ -18,6 +18,7 @@ import pushNotificationService from './services/PushNotificationService'
 // Pagina's als losse stukken (zie main.jsx voor het laadscherm).
 const UiDemo = lazy(() => import('./ui/UiDemo'))
 const LaadTest = lazy(() => import('./pages/LaadTest'))
+const OnboardingTest = lazy(() => import('./pages/OnboardingTest'))
 const InfoPage = lazy(() => import('./pages/InfoPage'))
 const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
 const SalesSlider = lazy(() => import('./pages/SalesSlider'))
@@ -206,8 +207,13 @@ function App() {
     return <UiDemo />
   }
 
-  // Keuzepagina voor het laadscherm (18 nov 2026) — niet gelinkt in menu's.
+  // Keuzepagina voor de onboarding-mascottes (21 nov 2026) — niet gelinkt in menu's.
   if (currentPath === '/test') {
+    return <OnboardingTest />
+  }
+
+  // Keuzepagina voor het laadscherm (18 nov 2026), verhuisd van /test.
+  if (currentPath === '/test-laad') {
     return <LaadTest />
   }
 
