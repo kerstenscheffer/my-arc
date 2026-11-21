@@ -127,6 +127,8 @@ const VOET = [
       { tekst: 'Online fitness coaching', href: '/online-coaching' },
       { tekst: 'Online coaching afvallen', href: '/online-coaching-afvallen' },
       { tekst: 'Online coaching voeding', href: '/online-coaching-voeding' },
+      { tekst: 'Beste online coaching kiezen', href: '/beste-online-fitness-coaching' },
+      { tekst: 'Buikvet verliezen als man', href: '/buikvet-verliezen-man' },
     ],
   },
 ]

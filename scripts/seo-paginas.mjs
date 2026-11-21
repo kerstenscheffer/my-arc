@@ -71,9 +71,7 @@ for (const p of PAGINAS) {
     <div class="bak">
       <nav>
         <a href="/">Home</a>
-        <a href="/online-coaching">Online coaching</a>
-        <a href="/online-coaching-afvallen">Online coaching afvallen</a>
-        <a href="/online-coaching-voeding">Online coaching voeding</a>
+        ${PAGINAS.map((x) => `<a href="/${x.slug}">${x.kruimel}</a>`).join('\n        ')}
         <a href="/6weekchallenge">6 weken challenge</a>
         <a href="/privacy">Privacy</a>
       </nav>

@@ -22,6 +22,22 @@
       "destination": "/online-coaching-voeding.html"
     },
     {
+      "source": "/beste-online-fitness-coaching",
+      "destination": "/beste-online-fitness-coaching.html"
+    },
+    {
+      "source": "/buikvet-verliezen-man",
+      "destination": "/buikvet-verliezen-man.html"
+    },
+    {
+      "source": "/afvallen-man-40-plus",
+      "destination": "/afvallen-man-40-plus.html"
+    },
+    {
+      "source": "/afvallen-met-alcohol",
+      "destination": "/afvallen-met-alcohol.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
