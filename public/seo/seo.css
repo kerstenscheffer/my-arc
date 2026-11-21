@@ -10,7 +10,7 @@ img { max-width: 100%; height: auto; display: block; }
 
 .kop { background: #000; color: #fff; }
 .kop .bak { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
-.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 900; letter-spacing: .04em; font-size: 16px; }
+.logo { display: flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 900; letter-spacing: .04em; font-size: 15px; white-space: nowrap; }
 .logo img { width: 44px; height: 22px; object-fit: contain; }
 .logo span { color: #9ca3af; }
 .kop-knop { background: #fff; color: #000; text-decoration: none; font-weight: 800; font-size: 14px; padding: 10px 16px; border-radius: 999px; white-space: nowrap; }

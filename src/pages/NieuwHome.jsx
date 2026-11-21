@@ -23,8 +23,8 @@ import { INLOG_PAD } from '../startPagina'
 
 // Titel en omschrijving voor Google, alleen op deze pagina. index.html houdt
 // 'MY ARC' voor de app en de klantpagina's.
-const TITEL = 'MY ARC Coaching | Top shape zonder je weekend op te geven'
-const OMSCHRIJVING = 'MY ARC Coaching: online coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel. Gratis weekmenu, trainingsschema en 8 gidsen.'
+const TITEL = 'Online fitness coaching voor mannen | MY ARC Coaching'
+const OMSCHRIJVING = 'Online fitness coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel. Gratis weekmenu, trainingsschema en 8 gidsen.'
 
 const CHALLENGE_START = '/6week-checkout'
 const CHALLENGE_INFO = '/6weekchallenge'
@@ -120,6 +120,15 @@ const VOET = [
     kop: 'MY ARC',
     links: [{ tekst: 'Over Kersten', href: '#over-kersten' }, { tekst: 'Inloggen', href: INLOG_PAD }],
   },
+  {
+    // Statische SEO-pagina's (public/*.html, scripts/seo-paginas.mjs): de interne links helpen Google ze vinden.
+    kop: 'Coaching',
+    links: [
+      { tekst: 'Online fitness coaching', href: '/online-coaching' },
+      { tekst: 'Online coaching afvallen', href: '/online-coaching-afvallen' },
+      { tekst: 'Online coaching voeding', href: '/online-coaching-voeding' },
+    ],
+  },
 ]
 const JURIDISCH = [
   { tekst: 'Privacy', href: '/privacy' },
@@ -182,6 +191,7 @@ const CSS = `
 @media (max-width:899px) { .nh-hero h1 { font-size:min(calc((100vw - 34px) / 15.4), 50px); line-height:1.15; } }
 @media (min-width:900px) { .nh-hero h1 span { display:inline; white-space:normal; } }
 /* Twee zinnen, elk op een eigen regel; lettergrootte schaalt mee zodat het ook op 360 breed past. */
+.nh-hero-oog { font-size:13px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#6b7280; margin:0 0 10px; }
 .nh-hero .nh-hero-sub { font-size:clamp(15px, 4.4vw, 20px); }
 .nh-hero-sub span { display:block; white-space:nowrap; }
 /* Hero is wit (20 nov 2026, Kersten): de knop wordt daar zwart. */
@@ -362,7 +372,7 @@ const CSS = `
   .nh-over-tekst { max-width:560px; margin:0; padding:0; }
   .nh-over-tekst p { font-size:18px; }
   .nh-over-tekst p.nh-over-kop { font-size:23px; }
-  .nh-voet-kolommen { display:grid; grid-template-columns:repeat(4, 1fr); gap:24px; margin-top:26px; }
+  .nh-voet-kolommen { display:grid; grid-template-columns:repeat(5, 1fr); gap:24px; margin-top:26px; }
   .nh-voet-kolom { border-bottom:none; }
   .nh-voet-kolom button { padding:0 0 12px; cursor:default; }
   .nh-voet-kolom button svg { display:none; }
@@ -529,6 +539,7 @@ export default function NieuwHome() {
       <section className="nh-hero">
         <img className="nh-hero-foto nh-hero-links" src="/nieuw/kersten-hero.jpg" alt="Kersten" width="1400" height="1166" />
         <div className="nh-hero-midden">
+          <p className="nh-hero-oog">Online fitness coaching voor mannen</p>
           <h1><span>Top shape bereiken zonder</span> <span>je weekend op te geven?</span></h1>
           <p className="nh-hero-sub"><span>Voor mannen van 25 tot 55 jaar.</span> <span>In 6 weken droger met de 80/20 methode.</span> <span>Uit eten en de borrel blijven gewoon.</span></p>
           <a className="nh-knop is-groot" href={CHALLENGE_START}>Start de challenge</a>

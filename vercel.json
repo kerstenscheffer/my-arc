@@ -10,6 +10,18 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/online-coaching",
+      "destination": "/online-coaching.html"
+    },
+    {
+      "source": "/online-coaching-afvallen",
+      "destination": "/online-coaching-afvallen.html"
+    },
+    {
+      "source": "/online-coaching-voeding",
+      "destination": "/online-coaching-voeding.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
