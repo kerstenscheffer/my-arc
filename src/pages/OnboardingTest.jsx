@@ -331,7 +331,7 @@ function Confetti() {
 
 // ── E. Coach: jouw eigen 3D-figuur als gids ────────────────────────────────
 
-const COACH = '/mascottes/coach.jpg'
+const COACH = '/mascottes/coach.png'
 
 function ConceptCoach() {
   const f = useFlow()
@@ -346,10 +346,8 @@ function ConceptCoach() {
           animation: f.reactie ? 'ob-spring 0.7s ease' : 'ob-adem 3.2s ease-in-out infinite',
         }}>
           <img src={COACH} alt="" style={{
-            width: '100%', height: '100%', objectFit: 'cover',
-            mixBlendMode: 'lighten',
-            WebkitMaskImage: 'radial-gradient(ellipse 62% 58% at 50% 50%, #000 70%, transparent 100%)',
-            maskImage: 'radial-gradient(ellipse 62% 58% at 50% 50%, #000 70%, transparent 100%)',
+            width: '100%', height: '100%', objectFit: 'contain',
+            filter: 'drop-shadow(0 10px 24px rgba(255,140,60,0.25))',
           }} />
         </div>
         <div style={{ marginTop: -space[2] }}><Wolk>{getypt}<Cursor /></Wolk></div>
