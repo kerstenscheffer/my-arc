@@ -18,6 +18,7 @@ import { colors } from '../../ui/tokens'
 import { CONTENT_SOORTEN, sleutel, soortVanType, dagScore, vakTelling } from './contentStand'
 import { STANDEN, standVak, kortGetal, openContent } from './contentStatusData'
 import { StandLegenda, StandChip } from './contentStatus'
+import { BOTS_KLEUR } from './contentBotsing'
 
 const G = colors.success
 const ICOON = { reel: Clapperboard, foto: ImageIcon, story: CircleDot, magnet: Magnet, youtube: Youtube, outreach: Send }
@@ -95,7 +96,8 @@ function Ring({ deel, vandaag, vertraging, grootte = 24 }) {
 }
 
 // focus: Set met soort-id's ('reel', 'story', …) en/of dagen ('YYYY-MM-DD') die Gino aanwijst.
-export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = false, focus = null }) {
+// botsing: { [dag]: … } met de dagen waarop posts binnen 15 minuten van elkaar staan (contentBotsing.js).
+export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = false, focus = null, botsing = null }) {
   const scroller = useRef(null)
   const [vak, setVak] = useState(null) // { dag, soort } van het open lijstje
   const sluitVak = useCallback(() => setVak(null), [])
@@ -214,9 +216,11 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                   width: KOLOM, flexShrink: 0, cursor: 'pointer', borderRadius: 10,
                   background: isVandaag ? `${G}14` : 'transparent', boxShadow: isVandaag ? `inset 0 0 0 1px ${G}55, 0 0 24px ${G}22` : 'none',
                 }}>
-                  <div style={{ height: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                  <div style={{ position: 'relative', height: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                     <span style={{ fontSize: 10, fontWeight: 800, color: isVandaag ? G : 'rgba(255,255,255,0.4)' }}>{WEEKLETTER[d.getDay()]}</span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: isVandaag ? G : '#fff', textShadow: isVandaag ? `0 0 10px ${G}` : 'none' }}>{d.getDate()}</span>
+                    {/* Posts binnen 15 minuten van elkaar: stip, uitleg staat in het dagblad. */}
+                    {botsing?.[k] && <span aria-label="Posts te dicht op elkaar" style={{ position: 'absolute', top: 5, right: 4, width: 6, height: 6, borderRadius: '50%', background: BOTS_KLEUR }} />}
                   </div>
                   {(() => {
                     const r = perStand[k]

@@ -30,6 +30,7 @@ import { laadContentStand, typeLabel } from './contentStand'
 import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
 import { useTijdPlek } from './tijdPlek'
 import { StandChip } from './contentStatus'
+import { botsingenPerDag, BOTS_KLEUR } from './contentBotsing'
 import GinoOmzet from './GinoOmzet'
 import GinoKeten from './GinoKeten'
 import GinoProjecten from './GinoProjecten'
@@ -129,7 +130,7 @@ async function laadPeriode(van, tot, beperkt = false) {
   ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => {
     const label = typeLabel(c.type, c.autopilot_woord)
     items.push({
-      id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, woord: c.autopilot_woord, dag: c.planned_date, tijd: c.planned_time || null,
+      id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, status: c.status, woord: c.autopilot_woord, dag: c.planned_date, tijd: c.planned_time || null,
       titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink, metricoolLink: c.metricool_link || null,
       sub: c.stand === 'mislukt' && c.autopilot_fout ? `${label || 'post'} · ${c.autopilot_fout}`
         : c.stand === 'ingepland' && c.autopilot_status ? `${label || 'post'} · ingepland voor ${c.planned_time || '14:00'}` : label,
@@ -396,6 +397,13 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     return m
   }, [items, concept])
 
+  // Posts binnen 15 minuten van elkaar: { [dag]: { [item-id]: tijd van de andere post } } (contentBotsing.js).
+  const botsing = useMemo(() => {
+    const content = {}
+    for (const [dag, lijst] of Object.entries(perDag)) content[dag] = lijst.filter(x => x.soort === 'content')
+    return botsingenPerDag(content)
+  }, [perDag])
+
   const vandaag = iso(new Date())
 
   const telling = useMemo(() => {
@@ -502,18 +510,22 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
               {dagLijst.map((it, i) => {
                 const Icoon = SOORT_ICOON[it.soort]
                 const groen = it.soort === 'content' || it.soort === 'concept'
+                const botstMet = botsing[gekozen]?.[it.id] || null
                 return (
                   <div key={it.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
                     animation: `gk-blad .3s ease-out ${i * 40}ms both`,
                   }}>
                     <Icoon size={16} strokeWidth={2.4} style={{ color: groen ? A : 'rgba(255,255,255,0.7)', flexShrink: 0, filter: groen && A === G ? `drop-shadow(0 0 5px ${G})` : 'none' }} />
-                    <div style={{ width: 44, flexShrink: 0, fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{it.tijd || ''}</div>
+                    <div style={{ width: 44, flexShrink: 0, fontSize: 12, fontWeight: 800, color: botstMet ? BOTS_KLEUR : 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{it.tijd || ''}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textDecoration: it.klaar ? 'line-through' : 'none', opacity: it.klaar ? 0.6 : 1 }}>{it.titel}</div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                         {[SOORT_LABEL[it.soort], it.sub, it.concept?.hook && `"${it.concept.hook}"`].filter(Boolean).join(' · ')}
                       </div>
+                      {botstMet && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Binnen 15 min van {botstMet}</div>
+                      )}
                     </div>
                     {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
                     {it.soort === 'content' && it.contentId && (
@@ -662,7 +674,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {/* Content: wat er gedaan is, gepland en voorgesteld, per soort per dag */}
       {weergave === 'content' && (
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-          <GinoContent dagen={dagen} stand={stand} perDag={perDag} onKies={setGekozen} isMobile={isMobile} focus={focus} />
+          <GinoContent dagen={dagen} stand={stand} perDag={perDag} botsing={botsing} onKies={setGekozen} isMobile={isMobile} focus={focus} />
           {items === null && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
               <span style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px dashed ${G}`, animation: 'gk-draai 1.2s linear infinite' }} />
