@@ -65,13 +65,24 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   useEffect(() => {
     if (!clientId || !db?.supabase) return
     let leeft = true
-    zoekNavraag(db.supabase, clientId).then(n => {
-      if (!leeft || !n) return
-      setNavraag(n)
+    const kijk = () => zoekNavraag(db.supabase, clientId).then(n => {
+      if (!leeft) return
+      // Opnieuw gekeken (feedback opgeslagen, app weer in beeld): niets meer te vragen = melding weg.
+      setNavraag(n || null)
+      if (!n) { setNavraagOpen(false); return }
       const id = `navraag-${n.sessie.id}`
       if (!autoGeopend.has(id)) { autoGeopend.add(id); setTimeout(() => setIsExpanded(true), 800) }
     }, () => null)
-    return () => { leeft = false }
+    kijk()
+    // Ingevuld via de workoutpagina of een ander blad: dan hoort deze melding ook weg.
+    const opZicht = () => { if (document.visibilityState === 'visible') kijk() }
+    window.addEventListener('myarc:training-feedback', kijk)
+    document.addEventListener('visibilitychange', opZicht)
+    return () => {
+      leeft = false
+      window.removeEventListener('myarc:training-feedback', kijk)
+      document.removeEventListener('visibilitychange', opZicht)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -565,7 +576,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       {navraag && (
         <FeedbackBlad open={navraagOpen} soort="workout" client={{ id: clientId }} db={db} fase={navraag.fase}
           datum={navraag.sessie.workout_date} dagTekst={navraag.dag}
-          onOpgeslagen={() => setNavraag(null)} onClose={() => setNavraagOpen(false)} />
+          onOpgeslagen={() => { navraagWeg(navraag.sessie.id); setNavraagOpen(false); setNavraag(null) }}
+          onClose={() => setNavraagOpen(false)} />
       )}
     </>
   );
