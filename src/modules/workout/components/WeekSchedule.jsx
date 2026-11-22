@@ -71,6 +71,7 @@ export default function WeekSchedule({
   const [stappenWeek, setStappenWeek] = useState([])
   const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
   const [stappenInzicht, setStappenInzicht] = useState(false)
+  const [rustMeldingDismissed, setRustMeldingDismissed] = useState(false)
   useEffect(() => {
     if (!clientId || !db?.supabase) return
     let weg = false
@@ -788,6 +789,8 @@ export default function WeekSchedule({
     dagDataVan: getWorkoutData,
     maandag: getoondeMaandag,
   })
+  // Reset melding-dismiss als de week of het schema verandert.
+  useEffect(() => { setRustMeldingDismissed(false) }, [weekOffset, clientId])
 
   // Cardio per dagindex voor de getoonde week: voor de dagkaarten en voor
   // de dagkiezer in 'Training toevoegen'.
@@ -1039,20 +1042,35 @@ export default function WeekSchedule({
             <TrainingInfoBlad open={!!infoTraining} training={infoTraining} db={db} isMobile={isMobile} onClose={() => setInfoTraining(null)} />
             <CardioInfoBlad open={!!infoCardio} cardio={infoCardio} isMobile={isMobile} onClose={() => setInfoCardio(null)} />
 
-            {rustMeldingen.length > 0 && (
+            {rustMeldingen.length > 0 && !rustMeldingDismissed && (
               <div style={{
-                padding: isMobile ? '0 0.75rem 0.35rem' : '0 1rem 0.5rem',
-                display: 'flex', flexDirection: 'column', gap: 3,
+                margin: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.6rem',
+                background: rustMeldingen[0].niveau === ROOD ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                border: `1.5px solid ${rustMeldingen[0].niveau === ROOD ? 'rgba(239,68,68,0.5)' : 'rgba(245,158,11,0.5)'}`,
+                borderRadius: 10, padding: '10px 12px',
+                display: 'flex', alignItems: 'flex-start', gap: 8,
               }}>
-                {rustMeldingen.map(m => (
-                  <div key={m.niveau} style={{
-                    fontSize: isMobile ? '0.68rem' : '0.72rem',
-                    fontWeight: 800, lineHeight: 1.3,
-                    color: m.niveau === ROOD ? '#ef4444' : '#f59e0b',
-                  }}>
-                    {waarschuwingTekst(m)}
-                  </div>
-                ))}
+                <div style={{ flex: 1 }}>
+                  {rustMeldingen.map(m => (
+                    <div key={m.niveau} style={{
+                      fontSize: isMobile ? '0.85rem' : '0.88rem',
+                      fontWeight: 700, lineHeight: 1.4,
+                      color: m.niveau === ROOD ? '#ef4444' : '#f59e0b',
+                    }}>
+                      {waarschuwingTekst(m)}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRustMeldingDismissed(true)}
+                  style={{
+                    background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer',
+                    color: 'rgba(255,255,255,0.4)', fontSize: '1rem', lineHeight: 1,
+                    flexShrink: 0, fontFamily: 'inherit',
+                  }}
+                  aria-label="Melding sluiten"
+                >✕</button>
               </div>
             )}
             {/* Zeg erbij dat je vooruit plant: de wijziging geldt voor die week
