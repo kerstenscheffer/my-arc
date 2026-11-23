@@ -1,6 +1,7 @@
 // src/coach/CoachHub.jsx - REFACTOR v3.0
 // Gold Theme | Top Tabs | Hash Routing | Categorized Dropdown | Compact
 
+import { openKlantkaart } from '../modules/coach-command-center/klantkaartOpenen'
 import PaginaVangnet, { foutContext } from '../ui/PaginaVangnet'
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
@@ -579,6 +580,21 @@ export default function CoachHub() {
     setTimeout(() => navigateTo(tabId), 50)
   }
 
+  // Vanuit Coach Inzicht naar een builder gesprongen: de terugknop linksboven
+  // brengt je dan terug in het inzicht van díe klant (23 nov 2026, Kersten).
+  const [terugInzicht, setTerugInzicht] = useState(null) // { id, naam }
+  const onthoudInzicht = (clientId) => {
+    const c = clients.find(k => k.id === clientId)
+    setTerugInzicht({ id: clientId, naam: String(c?.first_name || c?.name || '').split(' ')[0] })
+  }
+  useEffect(() => { if (activeTab === 'command') setTerugInzicht(null) }, [activeTab])
+  const terugNaarInzicht = () => {
+    const id = terugInzicht?.id
+    setTerugInzicht(null)
+    navigateTo('command')
+    setTimeout(() => openKlantkaart(id), 60)
+  }
+
   const goBack = () => {
     if (navStack.length === 0) return
     const prev = navStack[navStack.length - 1]
@@ -613,17 +629,19 @@ export default function CoachHub() {
             onSelectClient={setSelectedClient}
             setActiveTab={navigateTo}
             onNavigatePlan={(clientId, planId) => {
+              onthoudInzicht(clientId)
               const client = clients.find(c => c.id === clientId)
               if (client) setSelectedClient(client)
               setReviewPlanId(planId)
               setTimeout(() => navigateTo('ai-meals'), 50)
             }}
             onNavigateWorkout={(clientId) => {
+              onthoudInzicht(clientId)
               const client = clients.find(c => c.id === clientId)
               if (client) setSelectedClient(client)
               setTimeout(() => navigateTo('workout-builder'), 50)
             }}
-            onNavigateTab={gaNaarMetKlant}
+            onNavigateTab={(tabId, klant) => { if (klant?.id) onthoudInzicht(klant.id); gaNaarMetKlant(tabId, klant) }}
             onOpenMealPanel={(id) => setMealPanelClientId(id)}
             onOpenWorkoutPanel={(id) => setWorkoutPanelClientId(id)}
           />
@@ -1001,7 +1019,30 @@ export default function CoachHub() {
       {/* ═══ TERUG-KNOP ═══ */}
       {/* Zweeft linksboven; keert terug naar de vorige tab. Alleen zichtbaar als
           er iets is om naar terug te gaan (en niet in klantmodus). */}
-      {!clientMode && navStack.length > 0 && (
+      {!clientMode && terugInzicht && activeTab !== 'command' && (
+        <button
+          onClick={terugNaarInzicht}
+          title="Terug naar Coach Inzicht"
+          aria-label="Terug naar Coach Inzicht"
+          style={{
+            position: 'fixed',
+            top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+            left: 12,
+            zIndex: 121,
+            height: 40, padding: '0 0.95rem 0 0.7rem',
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: '#fff', color: '#0a0a0a',
+            border: 'none', borderRadius: 999,
+            fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 900, letterSpacing: '-0.01em',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <ArrowLeft size={17} strokeWidth={2.8} />
+          Inzicht{terugInzicht.naam ? ` · ${terugInzicht.naam}` : ''}
+        </button>
+      )}
+      {!clientMode && navStack.length > 0 && !(terugInzicht && activeTab !== 'command') && (
         <button
           onClick={goBack}
           title="Terug"
