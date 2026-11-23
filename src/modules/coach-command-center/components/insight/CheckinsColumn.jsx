@@ -340,7 +340,8 @@ function ProgressieKnop({ vraag, progressie, checkin, client, db, isMobile }) {
         <div
           onClick={() => setOpen(false)}
           style={{
-            position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)',
+            // Boven het Check-ins-venster van Coach Inzicht (11000), anders opent hij eronder.
+            position: 'fixed', inset: 0, zIndex: 11600, background: 'rgba(0,0,0,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
         >
