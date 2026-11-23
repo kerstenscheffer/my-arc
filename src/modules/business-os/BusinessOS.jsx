@@ -1099,8 +1099,10 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   // Aanbod in de stand Rekenen staat ook boven de bol (zelfde plek als de
   // kalender), zodat chatbalk en bol bruikbaar blijven. Eén tegelijk: de
   // kalender openen sluit het Aanbod en andersom; een beeld van Gino wacht.
+  // Schermvullend (Laten zien) sluit nooit vanzelf: in een call mag er niets
+  // van Business OS doorheen komen, ook niet als Gino net dan de agenda opent.
   const aanbodBoven = aanbodOpen && aanbod.stand !== 'tonen'
-  useEffect(() => { if (kalender) setBlad(b => (b === 'aanbod' ? null : b)) }, [kalender])
+  const openKalender = (k) => { if (aanbodBoven) setBlad(null); setKalender(k) }
   const podiumOpen = !kalender && !aanbodBoven && !!visueel
   const boven = !!kalender || podiumOpen || aanbodBoven
   // Klein venster: bol en chatbalk samen in een sleepbaar blokje, zodat de pagina de ruimte
@@ -1421,10 +1423,10 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
     }}>
       {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
           CoachHub's Terug-knop) ── */}
-      {!zwevend && <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender} style={{
+      {!zwevend && <button type="button" onClick={() => (aanbodBoven ? openKalender(kalender || { _t: Date.now() }) : setKalender(k => (k ? null : { _t: Date.now() })))} data-bos-agenda title={beperkt ? 'Content' : 'Agenda'} aria-pressed={!!kalender && !aanbodBoven} style={{
         position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 46, zIndex: 20,
         width: 36, height: 36, borderRadius: '50%', border: 'none',
-        background: 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
+        background: 'transparent', color: kalender && !aanbodBoven ? colors.success : C.wit, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <CalendarDays size={16} strokeWidth={2.6} />
@@ -1545,7 +1547,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             <Aanbod a={aanbod} onSluit={sluitBlad} />
           </div>
         )}
-        {kalender && !zwevend && (
+        {kalender && !aanbodBoven && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
             <GinoKalender beperkt={beperkt} verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
               onVraag={(t, o) => stuurRef.current?.(t, o)} inspring={telefoonKlein ? KLEIN_BOL + 6 : 0} />
@@ -1586,7 +1588,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           {/* ── Chat: de ring praat ── */}
           {/* Vaste tussenlaag: zo blijft de chat gemonteerd bij het wisselen tussen groot en klein. */}
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
-          <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onPrioriteiten={beperkt ? undefined : () => setMatrix(true)} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
+          <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onPrioriteiten={beperkt ? undefined : () => setMatrix(true)} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => openKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             // Aanbod-pagina open: de hele rij als eerste, daar praat Kersten dan over.
             ...(aanbodOpen && aanbodGino ? { Aanbod: aanbodGino } : null),
