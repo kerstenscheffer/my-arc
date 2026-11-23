@@ -33,6 +33,7 @@ import GinoKalender from './GinoKalender'
 import { useTijdPlek } from './tijdPlek'
 import Geldplan from './Geldplan'
 import { laadGeldplan, geldplanVoorGino } from './geldplanData'
+import Aanbod from './Aanbod'
 import { useNieuweMannen } from './useNieuweMannen'
 import { nieuweMannenVoorGino } from './nieuweMannenData'
 import { bewaarOordeel } from './feedback'
@@ -80,6 +81,7 @@ const ONDERDELEN = [
   ['timer', 'Timer'],
   ['prioriteiten', 'Prioriteiten'],
   ['geldplan', 'Geldplan · 6 maanden cashflow en break-even'],
+  ['aanbod', 'Aanbod'],
   ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
   ['notities', 'Notities · vastgezette antwoorden van Gino'],
   ['content', 'Content · komende 14 dagen'],
@@ -94,8 +96,8 @@ const ONDERDELEN = [
   ['agents', 'Agents'],
 ]
 
-// Niet voor teamleden: bevat agenda, privé geldplan of de Mac-agents.
-const BEPERKT_VERBORGEN = ['vandaag', 'timer', 'prioriteiten', 'geldplan', 'calls', 'agents']
+// Niet voor teamleden: bevat agenda, privé geldplan, aanbod-rekenaar of de Mac-agents.
+const BEPERKT_VERBORGEN = ['vandaag', 'timer', 'prioriteiten', 'geldplan', 'aanbod', 'calls', 'agents']
 
 // Leesbare namen voor de cron-jobs. Onbekende jobs tonen hun eigen naam.
 const AGENTS = {
@@ -135,7 +137,9 @@ const bewaar = (key, v) => {
 
 // Paneel voor één onderdeel: zijpaneel rechts op desktop, bottom sheet op
 // mobiel. Scrolt zelf; sluit met het kruisje, een klik ernaast of Escape.
-function Blad({ titel, isMobile, breed, onSluit, children }) {
+// vol = het hele scherm, dicht zwart (Aanbod: bij scherm delen in een call mag
+// er niets van Business OS doorheen schemeren).
+function Blad({ titel, isMobile, breed, vol, onSluit, children }) {
   const host = useModalHost()
   useEffect(() => {
     const toets = (e) => { if (e.key === 'Escape') onSluit() }
@@ -149,11 +153,13 @@ function Blad({ titel, isMobile, breed, onSluit, children }) {
       <div role="dialog" aria-label={titel} style={{
         position: 'fixed', zIndex: 2147483401, background: '#0a0a0a', color: C.tekst,
         display: 'flex', flexDirection: 'column',
-        ...(isMobile
-          ? { left: 0, right: 0, bottom: 0, maxHeight: breed ? '92dvh' : '80dvh', borderRadius: '20px 20px 0 0', borderTop: `1px solid ${C.rand}` }
-          : { top: 0, right: 0, bottom: 0, width: breed ? 'min(720px, 100%)' : 'min(440px, 100%)', borderLeft: `1px solid ${C.rand}` }),
+        ...(vol
+          ? { inset: 0, background: C.bg }
+          : isMobile
+            ? { left: 0, right: 0, bottom: 0, maxHeight: breed ? '92dvh' : '80dvh', borderRadius: '20px 20px 0 0', borderTop: `1px solid ${C.rand}` }
+            : { top: 0, right: 0, bottom: 0, width: breed ? 'min(720px, 100%)' : 'min(440px, 100%)', borderLeft: `1px solid ${C.rand}` }),
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px 12px 20px', borderBottom: `1px solid ${C.rand}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: vol ? 'calc(12px + env(safe-area-inset-top, 0px)) 12px 12px 20px' : '12px 12px 12px 20px', borderBottom: `1px solid ${C.rand}`, flexShrink: 0 }}>
           <span style={{ ...LABEL, color: C.wit }}>{titel}</span>
           <button type="button" onClick={onSluit} title="Sluiten" style={{
             width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent',
@@ -1235,6 +1241,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
     if (k === 'geldplan') return <Geldplan />
+    if (k === 'aanbod') return <Aanbod />
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'timer') return <TimerKiezer taken={vandaag.takenVandaag} lopend={timer.stand?.taak?.titel || null} onStart={startTimer} />
     if (k === 'content') return <ContentPaneel c={content} />
@@ -1607,7 +1614,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       {previewId && !zwevend && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 
       {blad && !zwevend && (
-        <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} onSluit={sluitBlad}>
+        <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} vol={blad === 'aanbod'} onSluit={sluitBlad}>
           {inhoud(blad)}
         </Blad>
       )}

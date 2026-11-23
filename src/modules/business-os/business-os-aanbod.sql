@@ -1,0 +1,35 @@
+-- src/modules/business-os/business-os-aanbod.sql
+--
+-- Aanbod-rekenaar (23 nov 2026). Puntjes-menu → Aanbod (Aanbod.jsx, aanbodData.js).
+-- Kersten denkt zijn vervolgaanbod uit in drie tiers (Premium, Midden, Basis) en
+-- laat het in de eindcall op zijn scherm zien. Eén rij per coach met alles wat hij
+-- invult, zodat Mac en telefoon gelijk lopen. Er gaat niets naar klanten of leads.
+-- Alleen de eigen coach: geen team, geen klanten (rls_is_coach).
+-- Alleen toevoegen: oude app-versies kennen deze tabel niet en raken niets.
+-- Vorm van gegevens (beginwaarden staan in aanbodData.js, BEGIN):
+--   { partnerPct, tiers: { premium|midden|basis: { prijs: { "4","6","12" },
+--     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst] } } }
+-- Gedraaid via de Supabase-koppeling op 23 nov 2026.
+
+create table if not exists public.business_os_aanbod (
+  coach_id uuid primary key default auth.uid(),
+  gegevens jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.business_os_aanbod enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'business_os_aanbod' and policyname = 'coach_eigen_aanbod') then
+    create policy coach_eigen_aanbod on public.business_os_aanbod
+      for all to authenticated
+      using (coach_id = auth.uid() and public.rls_is_coach())
+      with check (coach_id = auth.uid() and public.rls_is_coach());
+  end if;
+end $$;
+
+-- Supabase geeft nieuwe tabellen standaard alle rechten; de app heeft alleen
+-- lezen en schrijven van de eigen rij nodig.
+revoke all on public.business_os_aanbod from anon;
+revoke delete, truncate, references, trigger on public.business_os_aanbod from authenticated;
+grant select, insert, update on public.business_os_aanbod to authenticated;
