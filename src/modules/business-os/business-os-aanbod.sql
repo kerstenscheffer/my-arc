@@ -7,9 +7,13 @@
 -- Alleen de eigen coach: geen team, geen klanten (rls_is_coach).
 -- Alleen toevoegen: oude app-versies kennen deze tabel niet en raken niets.
 -- Vorm van gegevens (beginwaarden staan in aanbodData.js, BEGIN):
---   { partnerPct, tiers: { premium|midden|basis: { prijs: { "4","6","12" },
+--   { partnerPct, vooruitPct, borgAan, borgBedrag,
+--     tiers: { premium|midden|basis: { prijs: { "4","6","12" },
 --     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst] } } }
 -- Gedraaid via de Supabase-koppeling op 23 nov 2026.
+-- Later op 23 nov: vooruitPct (korting bij vooruitbetalen), borgAan en borgBedrag
+-- erbij in gegevens. Geen schemawijziging; een rij zonder die velden leest als
+-- 20 procent, borg uit, 300. Kerstens rij is toen gevuld met zijn drie tiers.
 
 create table if not exists public.business_os_aanbod (
   coach_id uuid primary key default auth.uid(),

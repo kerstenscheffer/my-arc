@@ -4,9 +4,13 @@
 // vervolgaanbod uit in drie tiers en laat het in de eindcall op zijn scherm zien.
 // Twee standen:
 //   Rekenen     per tier de totaalprijs bij de gekozen duur, kosten en uren, en
-//               daaruit omzet, partner-aandeel, wat overblijft en per uur.
+//               daaruit omzet, partner-aandeel, wat overblijft en per uur:
+//               gewoon en bij vooruitbetalen naast elkaar.
 //   Laten zien  alleen de drie tiers met onderdelen en prijs. Kosten, uren en
 //               partner staan dan niet in de pagina, ook niet verborgen.
+// Vooruitbetalen geeft korting (procent in de stand Rekenen, standaard 20).
+// Borg verrekenen is een losse schakelaar (standaard uit): het bedrag gaat dan
+// van het totaal af, de korting rekent over wat er daarna overblijft.
 // Sommen in aanbodData.js (reken), opslag in aanbodOpslag.js (één rij per coach
 // in business_os_aanbod). Er gaat niets naar klanten of leads.
 // De laatst gekozen stand blijft per apparaat staan, zodat hij het scherm voor
@@ -15,7 +19,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { Check, Plus, X } from 'lucide-react'
 import { colors } from '../../ui/tokens'
-import { DUREN, TIERS, HUIDIGE_PRIJZEN, reken, euro, leesGetal } from './aanbodData'
+import { DUREN, TIERS, HUIDIGE_PRIJZEN, prijzen, reken, euro, leesGetal } from './aanbodData'
 import { laadAanbod, bewaarAanbod } from './aanbodOpslag'
 
 const C = {
@@ -55,7 +59,7 @@ function GetalVeld({ waarde, onChange, label, placeholder = '', groot = false, b
 }
 
 // Tekstveld dat meegroeit, zodat een lange regel in een smalle kolom leesbaar blijft.
-function TekstVeld({ waarde, onChange, label, autoFocus }) {
+function TekstVeld({ waarde, onChange, label, autoFocus, onBlur }) {
   const el = useRef(null)
   useLayoutEffect(() => {
     if (!el.current) return
@@ -63,7 +67,7 @@ function TekstVeld({ waarde, onChange, label, autoFocus }) {
     el.current.style.height = `${el.current.scrollHeight}px`
   })
   return (
-    <textarea ref={el} rows={1} aria-label={label} value={waarde} autoFocus={autoFocus}
+    <textarea ref={el} rows={1} aria-label={label} value={waarde} autoFocus={autoFocus} onBlur={onBlur}
       onChange={e => onChange(e.target.value.replace(/\n/g, ' '))}
       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
       style={{
@@ -83,20 +87,52 @@ function Rij({ label, children }) {
   )
 }
 
-function Uitkomst({ label, waarde, kleur = C.wit, groot = false }) {
+function Bedrag({ waarde, kleur = C.wit, groot = false }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '5px 0' }}>
-      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>{label}</span>
-      <span style={{ ...NUM, fontSize: groot ? '1.35rem' : '1rem', fontWeight: 900, color: waarde === null ? C.zacht : kleur }}>
-        {waarde === null ? '–' : euro(waarde)}
+    <span style={{ ...NUM, textAlign: 'right', whiteSpace: 'nowrap', fontSize: groot ? '1.2rem' : '1rem', fontWeight: 900, color: waarde === null ? C.zacht : kleur }}>
+      {waarde === null ? '–' : euro(waarde)}
+    </span>
+  )
+}
+
+// Eén regel in de uitkomsten (drie cellen in het raster): gewoon en
+// vooruitbetalen naast elkaar. kleur krijgt het bedrag en geeft de kleur.
+function Uitkomst({ label, gewoon, vooruit, kleur, groot = false }) {
+  return (
+    <>
+      <span style={{ minWidth: 0, fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>{label}</span>
+      <Bedrag waarde={gewoon} kleur={kleur?.(gewoon)} groot={groot} />
+      <Bedrag waarde={vooruit} kleur={kleur?.(vooruit)} groot={groot} />
+    </>
+  )
+}
+
+function Schakelaar({ aan, onChange, label }) {
+  return (
+    <button type="button" role="switch" aria-checked={aan} onClick={() => onChange(!aan)} style={{
+      display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, padding: 0, border: 'none', background: 'transparent',
+      color: aan ? C.wit : C.zacht, fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+    }}>
+      <span aria-hidden="true" style={{
+        position: 'relative', flexShrink: 0, width: 40, height: 24, borderRadius: 12,
+        background: aan ? C.groen : 'rgba(255,255,255,0.16)', transition: 'background 0.15s',
+      }}>
+        <span style={{
+          position: 'absolute', top: 3, left: aan ? 19 : 3, width: 18, height: 18, borderRadius: '50%',
+          background: '#fff', transition: 'left 0.15s',
+        }} />
       </span>
-    </div>
+      {label}
+    </button>
   )
 }
 
 // ── Stand Rekenen: één tier ──
-function TierRekenen({ naam, tier, duur, partnerPct, onVeld, onPrijs, onOnderdelen }) {
-  const r = reken(tier, duur, partnerPct)
+function TierRekenen({ naam, tier, duur, g, onVeld, onPrijs, onOnderdelen }) {
+  const p = prijzen(tier, duur, g)
+  const r = reken(tier, duur, g.partnerPct, p ? p.teBetalen : null)
+  const vu = reken(tier, duur, g.partnerPct, p ? p.vooruit : null)
+  const roodOnderNul = (goed) => (w) => (w !== null && w < 0 ? C.rood : goed)
   // Alleen een net toegevoegde regel krijgt de cursor.
   const [nieuw, setNieuw] = useState(-1)
   const lijst = tier.onderdelen
@@ -119,19 +155,23 @@ function TierRekenen({ naam, tier, duur, partnerPct, onVeld, onPrijs, onOnderdel
         <Rij label="Uren eenmalig"><GetalVeld waarde={tier.urenEenmalig} onChange={v => onVeld('urenEenmalig', v)} label={`Eenmalige uren ${naam}`} placeholder="0" /></Rij>
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <Uitkomst label="Omzet" waarde={r.omzet} />
-        <Uitkomst label="Partner" waarde={r.partner === null ? null : -r.partner} />
-        <Uitkomst label="Kosten" waarde={r.omzet === null ? null : -r.kosten} />
-        <Uitkomst label="Jij houdt over" waarde={r.over} groot kleur={r.over !== null && r.over < 0 ? C.rood : C.wit} />
-        <Uitkomst label="Per uur" waarde={r.perUur} groot kleur={r.perUur !== null && r.perUur < 0 ? C.rood : C.groen} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', alignItems: 'baseline', gap: '10px 16px', marginTop: 20 }}>
+        <span />
+        <span style={{ ...LABEL, color: C.zacht, textAlign: 'right' }}>Gewoon</span>
+        <span style={{ ...LABEL, color: C.zacht, textAlign: 'right' }}>Vooruit</span>
+        {p && p.borg > 0 && <Uitkomst label="Borg verrekend" gewoon={-p.borg} vooruit={-p.borg} />}
+        <Uitkomst label="Omzet" gewoon={r.omzet} vooruit={vu.omzet} />
+        <Uitkomst label="Partner" gewoon={r.partner === null ? null : -r.partner} vooruit={vu.partner === null ? null : -vu.partner} />
+        <Uitkomst label="Kosten" gewoon={r.omzet === null ? null : -r.kosten} vooruit={vu.omzet === null ? null : -vu.kosten} />
+        <Uitkomst label="Jij houdt over" gewoon={r.over} vooruit={vu.over} groot kleur={roodOnderNul(C.wit)} />
+        <Uitkomst label="Per uur" gewoon={r.perUur} vooruit={vu.perUur} groot kleur={roodOnderNul(C.groen)} />
       </div>
 
       <div style={{ ...LABEL, color: C.zacht, marginTop: 24 }}>Onderdelen</div>
       <div style={{ marginTop: 4 }}>
         {lijst.map((tekst, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-            <TekstVeld waarde={tekst} autoFocus={i === nieuw} label={`Onderdeel ${i + 1} ${naam}`}
+            <TekstVeld waarde={tekst} autoFocus={i === nieuw} onBlur={() => setNieuw(-1)} label={`Onderdeel ${i + 1} ${naam}`}
               onChange={v => onOnderdelen(lijst.map((o, j) => (j === i ? v : o)))} />
             <button type="button" title="Weghalen" aria-label={`Onderdeel ${i + 1} weghalen`}
               onClick={() => { setNieuw(-1); onOnderdelen(lijst.filter((_, j) => j !== i)) }}
@@ -155,8 +195,8 @@ function TierRekenen({ naam, tier, duur, partnerPct, onVeld, onPrijs, onOnderdel
 }
 
 // ── Stand Laten zien: één tier. Hier komt niets van kosten, uren of partner in. ──
-function TierTonen({ naam, tier, duur }) {
-  const prijs = Number(tier.prijs[duur]) || 0
+function TierTonen({ naam, tier, duur, g }) {
+  const p = prijzen(tier, duur, g)
   const lijst = tier.onderdelen.filter(o => o.trim())
   return (
     <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -169,13 +209,23 @@ function TierTonen({ naam, tier, duur }) {
           </li>
         ))}
       </ul>
-      {prijs > 0 && (
+      {p && (
         <div style={{ marginTop: 'auto', paddingTop: 28 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0 8px' }}>
-            <span style={{ ...NUM, fontSize: 'clamp(2.6rem, 5vw, 3.6rem)', fontWeight: 900, lineHeight: 1, color: C.wit }}>{euro(prijs / duur)}</span>
+            <span style={{ ...NUM, fontSize: 'clamp(2.6rem, 5vw, 3.6rem)', fontWeight: 900, lineHeight: 1, color: C.wit }}>{euro(p.perMaand)}</span>
             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: C.zacht }}>per maand</span>
           </div>
-          <div style={{ ...NUM, fontSize: '0.85rem', fontWeight: 700, color: C.zacht, marginTop: 8 }}>{euro(prijs)} totaal</div>
+          <div style={{ ...NUM, fontSize: '0.85rem', fontWeight: 700, color: C.zacht, marginTop: 8 }}>{euro(p.totaal)} totaal</div>
+          {p.borg > 0 && (
+            <div style={{ ...NUM, fontSize: '0.85rem', fontWeight: 700, color: C.zacht, marginTop: 4 }}>
+              {euro(-p.borg)} borg verrekend, blijft {euro(p.teBetalen)}
+            </div>
+          )}
+          {p.korting > 0 && (
+            <div style={{ ...NUM, fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: C.wit, marginTop: 12 }}>
+              In één keer {euro(p.vooruit)}, <span style={{ color: C.groen, whiteSpace: 'nowrap' }}>je bespaart {euro(p.korting)}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -195,20 +245,28 @@ export default function Aanbod() {
   const gRef = useRef(null)
   const wacht = useRef(null)      // nieuwste gegevens die nog niet in de database staan
   const timer = useRef(null)
-  const onderweg = useRef(0)      // lopende schrijfacties
+  const onderweg = useRef(false)  // er loopt een schrijfactie
 
+  // Eén schrijfactie tegelijk, zodat een oudere nooit over een nieuwere heen
+  // komt: wat tijdens het schrijven getypt wordt gaat er direct achteraan.
   const schrijf = useCallback(async () => {
     clearTimeout(timer.current)
     timer.current = null
-    const wat = wacht.current
-    if (!wat) return
-    wacht.current = null
-    onderweg.current += 1
-    const ok = await bewaarAanbod(wat)
-    onderweg.current -= 1
-    // Mislukt en niets nieuwers getypt: bewaren voor de volgende poging.
-    if (!ok && !wacht.current) wacht.current = wat
-    setNietBewaard(!ok)
+    if (onderweg.current) return
+    while (wacht.current) {
+      const wat = wacht.current
+      wacht.current = null
+      onderweg.current = true
+      const ok = await bewaarAanbod(wat)
+      onderweg.current = false
+      setNietBewaard(!ok)
+      if (!ok) {
+        // Niets nieuwers getypt: bewaren voor de volgende poging (volgende
+        // wijziging, scherm uit beeld of sluiten).
+        if (!wacht.current) wacht.current = wat
+        break
+      }
+    }
   }, [])
 
   const laad = useCallback(async () => {
@@ -257,6 +315,8 @@ export default function Aanbod() {
   const zetTier = (k, maak) => wijzig(oud => ({ ...oud, tiers: { ...oud.tiers, [k]: maak(oud.tiers[k]) } }))
 
   const smal = breedte < 760
+  // Rekenen heeft per tier twee bedragen naast elkaar en dus meer breedte nodig.
+  const smalRekenen = breedte < 900
   const tonen = stand === 'tonen'
 
   return (
@@ -306,12 +366,23 @@ export default function Aanbod() {
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>Partner %</span>
               <GetalVeld waarde={g.partnerPct} onChange={v => wijzig(oud => ({ ...oud, partnerPct: v === null ? null : Math.min(100, v) }))} label="Aandeel partner in procent" placeholder="0" breedte={56} />
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>Korting vooruitbetalen %</span>
+              <GetalVeld waarde={g.vooruitPct} onChange={v => wijzig(oud => ({ ...oud, vooruitPct: v === null ? null : Math.min(100, v) }))} label="Korting bij vooruitbetalen in procent" placeholder="0" breedte={56} />
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Schakelaar aan={g.borgAan} onChange={aan => wijzig(oud => ({ ...oud, borgAan: aan }))} label="Borg verrekenen" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: g.borgAan ? 1 : 0.45 }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>€</span>
+                <GetalVeld waarde={g.borgBedrag} onChange={v => wijzig(oud => ({ ...oud, borgBedrag: v }))} label="Bedrag borg" placeholder="0" breedte={64} />
+              </span>
+            </div>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht, lineHeight: 1.5 }}>Nu: {HUIDIGE_PRIJZEN}</span>
             {nietBewaard && <span style={{ fontSize: '0.75rem', fontWeight: 800, color: C.rood }}>Niet bewaard</span>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: smal ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: smal ? 40 : 40, marginTop: 28 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: smalRekenen ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: smalRekenen ? 48 : 40, marginTop: 28 }}>
             {TIERS.map(([k, naam]) => (
-              <TierRekenen key={k} naam={naam} tier={g.tiers[k]} duur={duur} partnerPct={g.partnerPct}
+              <TierRekenen key={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g}
                 onPrijs={v => zetTier(k, t => ({ ...t, prijs: { ...t.prijs, [duur]: v } }))}
                 onVeld={(veld, v) => zetTier(k, t => ({ ...t, [veld]: v }))}
                 onOnderdelen={lijst => zetTier(k, t => ({ ...t, onderdelen: lijst }))} />
@@ -322,7 +393,7 @@ export default function Aanbod() {
 
       {g && tonen && (
         <div style={{ display: 'grid', gridTemplateColumns: smal ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: smal ? 44 : 56, marginTop: smal ? 32 : 48 }}>
-          {TIERS.map(([k, naam]) => <TierTonen key={k} naam={naam} tier={g.tiers[k]} duur={duur} />)}
+          {TIERS.map(([k, naam]) => <TierTonen key={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} />)}
         </div>
       )}
     </div>

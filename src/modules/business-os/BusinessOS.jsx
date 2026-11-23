@@ -1435,6 +1435,11 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             <div role="menu" style={{
               position: 'absolute', top: 48, right: 0, width: 240, background: '#0a0a0a',
               border: `1px solid ${C.rand}`, borderRadius: 14, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+              // De lijst groeit (23 nov: Aanbod erbij): op een laag scherm scrollen in plaats van afkappen.
+              maxHeight: isMobile
+                ? 'calc(var(--paneel-hoogte, 100dvh) - 196px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                : 'calc(var(--paneel-hoogte, 100dvh) - 200px)',
+              overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             }}>
               {ONDERDELEN.filter(([k]) => !beperkt || !BEPERKT_VERBORGEN.includes(k)).map(([k, titel]) => (
                 <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); if (k === 'prioriteiten') setMatrix(true); else setBlad(k) }}
