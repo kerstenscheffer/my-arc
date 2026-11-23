@@ -965,12 +965,34 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
   const [tekst, setTekst] = useState(() => bewerkingen.get(key) ?? origineel)
   const [klaar, setKlaar] = useState(false)
   const veld = useRef(null)
-  useLayoutEffect(() => {
+  // Het vak is zo hoog als de hele tekst. scrollHeight klopt alleen als het vak
+  // zichtbaar is: staat de chat ingeklapt (display none) als het appje
+  // binnenkomt, dan is hij 0 en bleef het vak op minHeight staan (23 nov 2026,
+  // appje Patrick: alleen de eerste regels te zien). Daarom opnieuw meten zodra
+  // het vak zichtbaar wordt of van breedte verandert. De rand telt mee, anders
+  // komt er een schuifbalk voor 2 px.
+  const meetHoogte = useCallback(() => {
     const el = veld.current
-    if (!el) return
+    if (!el || !el.offsetWidth) return
+    el.style.overflowY = 'hidden' // een schuifbalk tijdens het meten maakt de regels smaller
     el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [tekst])
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+    el.style.overflowY = 'auto'
+  }, [])
+  useLayoutEffect(() => { meetHoogte() }, [tekst, meetHoogte])
+  useEffect(() => {
+    const el = veld.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    let breedte = el.offsetWidth
+    const ro = new ResizeObserver(() => {
+      const nu = el.offsetWidth
+      if (nu === breedte) return
+      breedte = nu
+      if (nu) meetHoogte()
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [meetHoogte])
   const wijzig = (nieuw) => {
     setTekst(nieuw)
     if (nieuw === origineel) bewerkingen.delete(key)
@@ -1022,7 +1044,8 @@ function BewerkbaarBericht({ voorstel, sleutel, vastgezet, onVastzetten }) {
       </div>
       <textarea ref={veld} value={tekst} rows={10} onChange={e => wijzig(e.target.value)} spellCheck={false}
         style={{
-          width: '100%', boxSizing: 'border-box', minHeight: 160, resize: 'none', overflow: 'hidden',
+          // overflowY auto = vangnet: klopt de hoogte toch niet, dan kun je altijd scrollen.
+          width: '100%', boxSizing: 'border-box', minHeight: 160, resize: 'none', overflowX: 'hidden', overflowY: 'auto',
           background: 'transparent', color: colors.textPrimary, border: '1px solid rgba(255,255,255,.08)', borderRadius: 8,
           padding: 8, fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.8rem', lineHeight: 1.45, whiteSpace: 'pre-wrap',
         }} />
