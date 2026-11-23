@@ -17,6 +17,9 @@ alter table public.content_items add column if not exists metricool_stand text;
 create unique index if not exists content_items_metricool_post
   on public.content_items (coach_id, metricool_post_id) where metricool_post_id is not null;
 
+comment on column public.content_items.metricool_stand is
+  'Wat Metricool zegt: draft / ingepland / gepost / mislukt / weg / melding. melding = automatisch plaatsen stond uit: Metricool stuurde alleen de herinnering om zelf te plaatsen, dus NIET gepost (tenzij ig_media_id gevuld is). weg = uit Metricool verdwenen. De stand voor de app staat in de view content_items_status.';
+
 -- 2. Stand: de eerste drie regels zijn ongewijzigd, Metricool komt erachter.
 create or replace view public.content_items_status with (security_invoker = true) as
 select ci.id,
