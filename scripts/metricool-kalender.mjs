@@ -27,6 +27,7 @@
 // Instagram-sync de post echt ziet (content_koppel_ig).
 
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -132,6 +133,10 @@ const naarRij = (p) => {
 
 // Slaap herkennen aan een sprong in de klok (zelfde idee als de groeironde in de PA).
 const MAX_RONDE = 4 * 60 * 1000
+// Grote uitvoer staat in een bestand. Eerst "saved to <pad>.txt", nu (gezien 23 nov 2026, Claude Code 2.1.330)
+// "<persisted-output> … Full output saved to: <pad>.json". Herkent het script dat niet, dan leest het de melding
+// als "te groot" en halveert het venster onnodig door (9 aanroepen per run in plaats van 5).
+const BESTAND_RE = /saved to:?\s+(\S+?\/tool-results\/\S+?\.(?:txt|json))/
 let klokSprong = 0
 let vorigeTik = Date.now()
 setInterval(() => { const nu = Date.now(); if (nu - vorigeTik > 60000) klokSprong = nu; vorigeTik = nu }, 5000).unref()
@@ -150,7 +155,21 @@ function eenRonde(van, tot) {
     const begin = Date.now()
     const delen = []
     const mis2 = []
-    p.stdout.on('data', d => delen.push(d))
+    // Het bestand met grote uitvoer verdwijnt zodra de aanroep stopt (--no-session-persistence ruimt de
+    // sessiemap op). Dus lezen op het moment dat het pad voorbijkomt, niet pas na afloop.
+    const vroeg = new Map()
+    const ontcijfer = new StringDecoder('utf8')
+    let rest = ''
+    p.stdout.on('data', d => {
+      delen.push(d)
+      rest += ontcijfer.write(d)
+      const regels = rest.split('\n')
+      rest = regels.pop()
+      for (const regel of regels) {
+        const pad = regel.match(BESTAND_RE)?.[1]
+        if (pad && !vroeg.has(pad)) { try { vroeg.set(pad, fs.readFileSync(pad, 'utf8')) } catch { /* al weg: dan halveert haal() het venster */ } }
+      }
+    })
     p.stderr.on('data', d => mis2.push(d))
     let hard = null
     const tik = setTimeout(() => { p.kill('SIGTERM'); hard = setTimeout(() => p.kill('SIGKILL'), 5000) }, MAX_RONDE)
@@ -173,9 +192,9 @@ function eenRonde(van, tot) {
           if (c.type !== 'tool_result' || !ids.has(c.tool_use_id)) continue
           const tekst = typeof c.content === 'string' ? c.content : (c.content || []).map(x => x.text || '').join('')
           try {
-            const bestand = tekst.match(/saved to (\S+\/tool-results\/\S+?\.txt)/)?.[1]
+            const bestand = tekst.match(BESTAND_RE)?.[1]
             if (r.tool_use_result?.structuredContent) posts = lijstUit(r.tool_use_result.structuredContent)
-            else if (bestand) { posts = lijstUit(JSON.parse(fs.readFileSync(bestand, 'utf8'))); fs.unlinkSync(bestand) }
+            else if (bestand) posts = lijstUit(JSON.parse(vroeg.get(bestand) ?? fs.readFileSync(bestand, 'utf8')))
             else if (c.is_error) fout = tekst.slice(0, 300)
             else posts = lijstUit(JSON.parse(tekst))
           } catch { fout = tekst.slice(0, 300) }
@@ -201,8 +220,10 @@ async function haal(van, tot, stand) {
     r = await eenRonde(van, tot)
     stand.kosten += r.kosten
     const teGroot = !r.posts && /exceeds|maximum allowed|too large/i.test(r.fout)
-    if (r.posts || teGroot || !r.sliep || poging >= 3) break
-    await wacht(20000) // net wakker: wifi even de tijd geven
+    // Eén losse misser (23 nov: een aanroep kwam leeg terug terwijl de Mac wakker was) is geen reden om de
+    // hele run weg te gooien: één keer opnieuw. Sliep de Mac, dan twee keer, met tijd voor de wifi.
+    if (r.posts || teGroot || poging >= (r.sliep ? 3 : 2)) break
+    await wacht(r.sliep ? 20000 : 5000)
   }
   if (r.posts) return r.posts
   if (/exceeds|maximum allowed|too large/i.test(r.fout) && van < tot) {
