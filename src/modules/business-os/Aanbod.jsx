@@ -15,12 +15,18 @@
 // in business_os_aanbod). Er gaat niets naar klanten of leads.
 // De laatst gekozen stand blijft per apparaat staan, zodat hij het scherm voor
 // een call alvast op Laten zien kan zetten.
+// Waar hij staat (BusinessOS, 23 nov 2026): Rekenen boven de bol, zodat de
+// chatbalk en de bol van Gino bruikbaar blijven; Laten zien schermvullend zwart
+// zonder chat (Blad vol). De gegevens wonen daarom in useAanbod (aanbodOpslag.js)
+// en komen hier binnen als a: wisselen van stand verliest niets, en Gino ziet
+// dezelfde waarden in zijn context.
+// onSluit = kruisje in de eigen kop (boven de bol); schermvullend heeft het Blad
+// zijn eigen kruisje.
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Check, Plus, X } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 import { DUREN, TIERS, HUIDIGE_PRIJZEN, prijzen, reken, euro, leesGetal } from './aanbodData'
-import { laadAanbod, bewaarAanbod } from './aanbodOpslag'
 
 const C = {
   wit: colors.textPrimary,
@@ -32,11 +38,7 @@ const C = {
 }
 const NUM = { fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }
 const LABEL = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }
-const STAND_KEY = 'business_os_aanbod_stand'
 
-const leesStand = () => {
-  try { return localStorage.getItem(STAND_KEY) === 'tonen' ? 'tonen' : 'rekenen' } catch { return 'rekenen' }
-}
 const toonGetal = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','))
 
 // Getalveld: zolang je typt blijft je eigen tekst staan (ook "12,"), de
@@ -232,72 +234,10 @@ function TierTonen({ naam, tier, duur, g }) {
   )
 }
 
-export default function Aanbod() {
-  const [g, setG] = useState(null)
-  const [laadFout, setLaadFout] = useState(false)
-  const [nietBewaard, setNietBewaard] = useState(false)
-  const [duur, setDuur] = useState(6)
-  const [stand, setStand] = useState(leesStand)
+export default function Aanbod({ a, onSluit = null }) {
+  const { g, laadFout, setLaadFout, nietBewaard, duur, setDuur, stand, kiesStand, wijzig, laad } = a
   const [breedte, setBreedte] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
   const doos = useRef(null)
-
-  // Opslag: de nieuwste stand wacht kort (typen) en gaat dan in één keer weg.
-  const gRef = useRef(null)
-  const wacht = useRef(null)      // nieuwste gegevens die nog niet in de database staan
-  const timer = useRef(null)
-  const onderweg = useRef(false)  // er loopt een schrijfactie
-
-  // Eén schrijfactie tegelijk, zodat een oudere nooit over een nieuwere heen
-  // komt: wat tijdens het schrijven getypt wordt gaat er direct achteraan.
-  const schrijf = useCallback(async () => {
-    clearTimeout(timer.current)
-    timer.current = null
-    if (onderweg.current) return
-    while (wacht.current) {
-      const wat = wacht.current
-      wacht.current = null
-      onderweg.current = true
-      const ok = await bewaarAanbod(wat)
-      onderweg.current = false
-      setNietBewaard(!ok)
-      if (!ok) {
-        // Niets nieuwers getypt: bewaren voor de volgende poging (volgende
-        // wijziging, scherm uit beeld of sluiten).
-        if (!wacht.current) wacht.current = wat
-        break
-      }
-    }
-  }, [])
-
-  const laad = useCallback(async () => {
-    // Niet over eigen, nog niet bewaarde wijzigingen heen laden.
-    if (wacht.current || onderweg.current) return
-    const uit = await laadAanbod()
-    if (wacht.current || onderweg.current) return
-    if (uit.fout) { if (!gRef.current) setLaadFout(true); return }
-    gRef.current = uit.gegevens
-    setG(uit.gegevens)
-    setLaadFout(false)
-  }, [])
-
-  const wijzig = useCallback((maak) => {
-    if (!gRef.current) return
-    const nieuw = maak(gRef.current)
-    gRef.current = nieuw
-    wacht.current = nieuw
-    setG(nieuw)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(schrijf, 600)
-  }, [schrijf])
-
-  // Laden bij openen en opnieuw als het scherm weer in beeld komt (wijziging
-  // op het andere apparaat). Uit beeld of dicht: meteen wegschrijven.
-  useEffect(() => {
-    laad()
-    const zicht = () => { if (document.visibilityState === 'hidden') schrijf(); else laad() }
-    document.addEventListener('visibilitychange', zicht)
-    return () => { document.removeEventListener('visibilitychange', zicht); schrijf() }
-  }, [laad, schrijf])
 
   // Kolommen naast elkaar zolang de ruimte er is (ook in split screen meten).
   useEffect(() => {
@@ -308,10 +248,6 @@ export default function Aanbod() {
     return () => ro.disconnect()
   }, [])
 
-  const kiesStand = (s) => {
-    setStand(s)
-    try { localStorage.setItem(STAND_KEY, s) } catch { /* privé-venster */ }
-  }
   const zetTier = (k, maak) => wijzig(oud => ({ ...oud, tiers: { ...oud.tiers, [k]: maak(oud.tiers[k]) } }))
 
   const smal = breedte < 760
@@ -321,8 +257,11 @@ export default function Aanbod() {
 
   return (
     <div ref={doos} style={{ color: C.wit, width: '100%', maxWidth: 1120, margin: '0 auto' }}>
-      {/* ── Duur en stand ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      {/* ── Duur en stand. Boven de bol blijft deze rij staan tijdens het scrollen. ── */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        ...(onSluit ? { position: 'sticky', top: 0, zIndex: 1, background: colors.bg, paddingBottom: 12 } : null),
+      }}>
         <div style={{ display: 'flex', gap: 8, flex: smal ? '1 1 100%' : '0 1 auto' }}>
           {DUREN.map(d => {
             const aan = duur === d
@@ -335,16 +274,26 @@ export default function Aanbod() {
             )
           })}
         </div>
-        <div role="group" aria-label="Stand" style={{ display: 'flex', gap: 2, padding: 3, borderRadius: 12, border: `1px solid ${C.rand}`, opacity: tonen ? 0.45 : 1 }}>
-          {[['rekenen', 'Rekenen'], ['tonen', 'Laten zien']].map(([k, l]) => {
-            const aan = stand === k
-            return (
-              <button key={k} type="button" aria-pressed={aan} onClick={() => kiesStand(k)} style={{
-                minHeight: 38, padding: '0 14px', borderRadius: 9, border: 'none', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 800,
-                cursor: 'pointer', whiteSpace: 'nowrap', background: aan ? 'rgba(255,255,255,0.14)' : 'transparent', color: aan ? C.wit : C.zacht,
-              }}>{l}</button>
-            )
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+          <div role="group" aria-label="Stand" style={{ display: 'flex', gap: 2, padding: 3, borderRadius: 12, border: `1px solid ${C.rand}`, opacity: tonen ? 0.45 : 1 }}>
+            {[['rekenen', 'Rekenen'], ['tonen', 'Laten zien']].map(([k, l]) => {
+              const aan = stand === k
+              return (
+                <button key={k} type="button" aria-pressed={aan} onClick={() => kiesStand(k)} style={{
+                  minHeight: 38, padding: '0 14px', borderRadius: 9, border: 'none', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 800,
+                  cursor: 'pointer', whiteSpace: 'nowrap', background: aan ? 'rgba(255,255,255,0.14)' : 'transparent', color: aan ? C.wit : C.zacht,
+                }}>{l}</button>
+              )
+            })}
+          </div>
+          {onSluit && (
+            <button type="button" onClick={onSluit} title="Sluiten" aria-label="Aanbod sluiten" style={{
+              width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: C.wit,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <X size={20} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -361,7 +310,7 @@ export default function Aanbod() {
 
       {g && !tonen && (
         <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 24px', marginTop: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 24px', marginTop: onSluit ? 4 : 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>Partner %</span>
               <GetalVeld waarde={g.partnerPct} onChange={v => wijzig(oud => ({ ...oud, partnerPct: v === null ? null : Math.min(100, v) }))} label="Aandeel partner in procent" placeholder="0" breedte={56} />

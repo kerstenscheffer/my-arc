@@ -59,6 +59,7 @@ import VastzetKnop from './VastzetKnop'
 import { ToestemmingKaarten, ToestemmingRegels } from './GinoToestemmingen'
 import { useNieuweVersie } from './useNieuweVersie'
 import { contentUitHash, openContent } from './contentStatusData'
+import { WIJZIGING_GEDAAN } from './aanbodOpslag'
 
 const KEY = 'business_os_chat'
 // Mac telt als aan als de PA zich < 2 min geleden meldde (zelfde regel als het
@@ -2293,6 +2294,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     if (f) return
     zetActie(t, i, j, veld)
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
+    // Wie deze tabel toont (Aanbod-pagina) haalt hem opnieuw op.
+    if (ac.soort === 'wijziging_voorstel') window.dispatchEvent(new CustomEvent(WIJZIGING_GEDAAN, { detail: { tabel: ac.tabel } }))
   }
   // Alleen een status op de actie: niets uitgevoerd, en toestaan() weigert hem daarna
   // (staatOpen). Wegschrijven gaat met het tabje mee (localStorage + business_os_gesprekken).
@@ -2308,7 +2311,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     setActieStaat(s => ({ ...s, [sleutel]: { bezig: true } }))
     const { veld, fout: f } = await draaiWijzigingTerug(ac)
     setActieStaat(s => ({ ...s, [sleutel]: { bezig: false, fout: f || null } }))
-    if (!f) zetActie(t, i, j, veld)
+    if (f) return
+    zetActie(t, i, j, veld)
+    window.dispatchEvent(new CustomEvent(WIJZIGING_GEDAAN, { detail: { tabel: ac.tabel } }))
   }
   if (stuurRef) stuurRef.current = stuur
   stuurNu.current = stuur

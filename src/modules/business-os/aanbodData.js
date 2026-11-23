@@ -140,3 +140,42 @@ export function reken(tier, duur, partnerPct, omzet = null) {
 }
 
 export const euro = (v) => (Number(v) < 0 ? '−€' : '€') + Math.abs(Math.round(Number(v) || 0)).toLocaleString('nl-NL')
+
+// ── Voor Gino's context (BusinessOS, sleutel Aanbod) ──
+// Pagina open: de hele rij in de vorm van de kolom gegevens, zodat Gino hem met
+// één wijziging_voorstel terug kan sturen (de kolom is één jsonb-object: een
+// half object zou de rest wissen). Lege velden binnen een tier gaan niet mee;
+// normaliseer() leest een weggelaten veld daar weer als leeg.
+// Pagina dicht: alleen de verwijzing. De context wordt na 4000 tekens afgekapt
+// en de rij kost er ruim 1000: altijd meesturen duwt omzet en keten eruit.
+export const AANBOD_TABEL = 'business_os_aanbod'
+
+const zonderLeeg = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== null && v !== undefined))
+
+export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur = null, stand = null } = {}) {
+  if (!gegevens) return null
+  const kop = {
+    tabel: AANBOD_TABEL, id_kolom: 'coach_id', id, kolom: 'gegevens',
+    let_op: 'Aanpassen = de rij bijwerken via wijziging_voorstel',
+  }
+  if (!id) kop.rij = 'bestaat nog niet (Kersten heeft nog niets bewaard): insert met gegevens'
+  if (!open) return { ...kop, inhoud: 'Pagina Aanbod staat dicht: lees de rij voor de waarden.' }
+  const tiers = {}
+  for (const [k] of TIERS) {
+    const t = gegevens.tiers?.[k] || {}
+    tiers[k] = {
+      prijs: zonderLeeg(t.prijs),
+      ...zonderLeeg({ kostenMaand: t.kostenMaand, kostenEenmalig: t.kostenEenmalig, urenMaand: t.urenMaand, urenEenmalig: t.urenEenmalig }),
+      onderdelen: (t.onderdelen || []).filter(o => typeof o === 'string' && o.trim()),
+    }
+  }
+  return {
+    ...kop,
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin. prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen.',
+    in_beeld: { duur, stand },
+    gegevens: {
+      partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,
+      borgAan: gegevens.borgAan, borgBedrag: gegevens.borgBedrag, tiers,
+    },
+  }
+}

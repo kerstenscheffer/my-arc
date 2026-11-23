@@ -34,6 +34,8 @@ import { useTijdPlek } from './tijdPlek'
 import Geldplan from './Geldplan'
 import { laadGeldplan, geldplanVoorGino } from './geldplanData'
 import Aanbod from './Aanbod'
+import { useAanbod } from './aanbodOpslag'
+import { aanbodVoorGino } from './aanbodData'
 import { useNieuweMannen } from './useNieuweMannen'
 import { nieuweMannenVoorGino } from './nieuweMannenData'
 import { bewaarOordeel } from './feedback'
@@ -137,8 +139,9 @@ const bewaar = (key, v) => {
 
 // Paneel voor één onderdeel: zijpaneel rechts op desktop, bottom sheet op
 // mobiel. Scrolt zelf; sluit met het kruisje, een klik ernaast of Escape.
-// vol = het hele scherm, dicht zwart (Aanbod: bij scherm delen in een call mag
-// er niets van Business OS doorheen schemeren).
+// vol = het hele scherm, dicht zwart (Aanbod in de stand Laten zien: bij scherm
+// delen in een call mag er niets van Business OS doorheen schemeren). De stand
+// Rekenen van het Aanbod staat niet in een Blad maar boven de bol.
 function Blad({ titel, isMobile, breed, vol, onSluit, children }) {
   const host = useModalHost()
   useEffect(() => {
@@ -902,6 +905,15 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   const laadDocs = docs.laad
   const dachtNet = useRef(false)
   useEffect(() => { if (dachtNet.current && !denkt) laadDocs(); dachtNet.current = denkt }, [denkt, laadDocs])
+  // Aanbod-rekenaar (23 nov 2026): de gegevens wonen hier, zodat de pagina kan
+  // wisselen tussen boven de bol (Rekenen) en schermvullend (Laten zien) en Gino
+  // dezelfde waarden in zijn context krijgt. Na elk Gino-antwoord opnieuw laden
+  // als de pagina open staat: hij kan de rij hebben bijgewerkt.
+  const aanbodOpen = blad === 'aanbod' && !beperkt && !zwevend
+  const aanbod = useAanbod({ aan: !beperkt && !zwevend, open: aanbodOpen })
+  const laadAanbodNu = aanbod.laad
+  const dachtAanbod = useRef(false)
+  useEffect(() => { if (dachtAanbod.current && !denkt && aanbodOpen) laadAanbodNu(); dachtAanbod.current = denkt }, [denkt, aanbodOpen, laadAanbodNu])
   const [herinnertPraat, setHerinnertPraat] = useState(false)
   // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
   // dan wisselt het beeld mee (geen beeld = leeg). Blijft staan tot het
@@ -1084,8 +1096,13 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   const [podiumEl, setPodiumEl] = useState(null)
   // Vak boven de Gino-bol voor de Mac/API-aanduiding (BusinessChat portalt erin).
   const [macPlekEl, setMacPlekEl] = useState(null)
-  const podiumOpen = !kalender && !!visueel
-  const boven = !!kalender || podiumOpen
+  // Aanbod in de stand Rekenen staat ook boven de bol (zelfde plek als de
+  // kalender), zodat chatbalk en bol bruikbaar blijven. Eén tegelijk: de
+  // kalender openen sluit het Aanbod en andersom; een beeld van Gino wacht.
+  const aanbodBoven = aanbodOpen && aanbod.stand !== 'tonen'
+  useEffect(() => { if (kalender) setBlad(b => (b === 'aanbod' ? null : b)) }, [kalender])
+  const podiumOpen = !kalender && !aanbodBoven && !!visueel
+  const boven = !!kalender || podiumOpen || aanbodBoven
   // Klein venster: bol en chatbalk samen in een sleepbaar blokje, zodat de pagina de ruimte
   // krijgt. Blijft hetzelfde element, dus een lopend gesprek of de stem gaat gewoon door.
   // Eigen opslag voor de zwevende Gino, zodat de Business OS-pagina zelf
@@ -1238,10 +1255,13 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   const nodigPerDag = Math.max(0, doel - a.omzet) / Math.max(1, dagenInMaand - dagenVoorbij)
   const zw = a.zwakste[0]
 
+  // Aanbod voor Gino's context (sleutel Aanbod): hele rij als de pagina open staat, anders de verwijzing.
+  const aanbodGino = aanbodVoorGino({ id: aanbod.id, gegevens: aanbod.g, open: aanbodOpen, duur: aanbod.duur, stand: aanbod.stand })
+
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
     if (k === 'geldplan') return <Geldplan />
-    if (k === 'aanbod') return <Aanbod />
+    if (k === 'aanbod') return <Aanbod a={aanbod} />
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'timer') return <TimerKiezer taken={vandaag.takenVandaag} lopend={timer.stand?.taak?.titel || null} onStart={startTimer} />
     if (k === 'content') return <ContentPaneel c={content} />
@@ -1411,7 +1431,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       </button>}
 
       {/* ── Avatar-knop links van de agenda: document boven de bol open/dicht (19 nov 2026) ── */}
-      {!zwevend && !beperkt && !kalender && !podiumOpen && <button type="button" onClick={() => setDocDicht(!docDicht)} title={docDicht ? 'Document openen' : 'Document sluiten'} aria-label="Document" aria-pressed={!docDicht} style={{
+      {!zwevend && !beperkt && !kalender && !podiumOpen && !aanbodBoven && <button type="button" onClick={() => setDocDicht(!docDicht)} title={docDicht ? 'Document openen' : 'Document sluiten'} aria-label="Document" aria-pressed={!docDicht} style={{
         position: 'absolute', top: isMobile ? BOVEN_MOBIEL : 20, right: (isMobile ? 12 : 20) + 92, zIndex: 20,
         width: 36, height: 36, borderRadius: '50%', border: 'none',
         background: 'transparent', color: docDicht ? C.wit : colors.success, cursor: 'pointer',
@@ -1442,7 +1462,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
               overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             }}>
               {ONDERDELEN.filter(([k]) => !beperkt || !BEPERKT_VERBORGEN.includes(k)).map(([k, titel]) => (
-                <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); if (k === 'prioriteiten') setMatrix(true); else setBlad(k) }}
+                <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); if (k === 'prioriteiten') setMatrix(true); else { if (k === 'aanbod') setKalender(null); setBlad(k) } }}
                   onMouseEnter={e => { e.currentTarget.style.background = colors.surface }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                   style={{
@@ -1464,7 +1484,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         alignItems: 'center', justifyContent: 'flex-end',
       }}>
         {/* Standaard beeld: doel / omzet van deze maand, met de leus eronder (19 nov 2026). */}
-        {!zwevend && !beperkt && !kalender && !podiumOpen && (
+        {!zwevend && !beperkt && !kalender && !podiumOpen && !aanbodBoven && (
           <div style={{
             flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: isMobile ? 8 : 14,
@@ -1510,8 +1530,20 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           </div>
         )}
         {/* Avatar zweeft sleepbaar over de pagina (Kersten, 20 nov 2026). */}
-        {!docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && (
+        {!docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && !aanbodBoven && (
           <GinoDocument docs={docs} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
+        )}
+        {/* Aanbod, stand Rekenen: boven de bol, scrolt in zijn eigen vak. De stand
+            Laten zien opent onderaan als schermvullend Blad. */}
+        {aanbodBoven && (
+          <div role="region" aria-label="Aanbod" style={{
+            flex: 1, minHeight: 0, width: '100%', boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent',
+            // Onder de zwevende knoppen rechtsboven (en de Terug-knop van CoachHub) beginnen.
+            marginTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 44, paddingBottom: 16,
+          }}>
+            <Aanbod a={aanbod} onSluit={sluitBlad} />
+          </div>
         )}
         {kalender && !zwevend && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : 0 }}>
@@ -1556,6 +1588,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           <div style={isZij ? { display: 'none' } : isMini || telefoonKlein ? { flex: 1, minWidth: 0 } : { width: '100%' }}>
           <BusinessChat zwevend={zwevend} beperkt={beperkt} macPlek={macPlekEl ? { el: macPlekEl, links: isMini || telefoonKlein } : null} vastgezet={notities.vastgezet} onVastzetten={notities.zetVast} onPrioriteiten={beperkt ? undefined : () => setMatrix(true)} onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMini || telefoonKlein ? 0 : isMobile ? 22 : 28} klein={isMobile ? null : { aan: isMini, wissel: zwevend ? () => { window.location.hash = 'business-os' } : wisselMini, inklappen: () => zetZijkant(true) }} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
+            // Aanbod-pagina open: de hele rij als eerste, daar praat Kersten dan over.
+            ...(aanbodOpen && aanbodGino ? { Aanbod: aanbodGino } : null),
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             // Avatar van de ideale klant: Kersten bewerkt hem boven de bol; Gino mag hem aanvullen.
             // Document met tabs (zoals Google Docs): Kersten en Gino schrijven erin, avatar-tekst ingekort mee.
@@ -1566,6 +1600,9 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
             zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+            // Aanbod-pagina dicht: alleen de verwijzing (tabel en id), na de kerncijfers
+            // zodat die niet over de afkapgrens schuiven. De waarden leest Gino zelf.
+            ...(!aanbodOpen && aanbodGino ? { Aanbod: aanbodGino } : null),
             uitgesteldeSalesNietMeegeteld: data.uitgesteld || [],
             doorstapNaEvaluatie: data.doorstap || null,
             vandaag: {
@@ -1608,7 +1645,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       </div>
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
-      {!zwevend && <GinoToneel visueel={kalender ? null : visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+      {!zwevend && <GinoToneel visueel={kalender || aanbodBoven ? null : visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />}
@@ -1618,7 +1655,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
 
       {previewId && !zwevend && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 
-      {blad && !zwevend && (
+      {blad && !zwevend && !aanbodBoven && (
         <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} vol={blad === 'aanbod'} onSluit={sluitBlad}>
           {inhoud(blad)}
         </Blad>
