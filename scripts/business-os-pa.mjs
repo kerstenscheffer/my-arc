@@ -1365,22 +1365,34 @@ async function planZoomSync() {
 }
 
 // Metricool → contentkalender: elke 15 min scripts/metricool-kalender.mjs.
-// Mac uit of in slaap: de volgende ronde haalt het in. Mislukt: een uur wachten,
-// zodat een kapotte koppeling niet elk kwartier geld kost. Stand van de laatste
-// run: ~/Gino/metricool-sync/laatste.json, fouten in app_fouten (metricool-kalender).
+// Elke minuut kijken wanneer de laatste run was (laatste.json), zodat een herstart
+// van de PA of een Mac die net wakker wordt de ronde niet overslaat. Twee keer
+// achter elkaar echt mislukt: een uur wachten, zodat een kapotte koppeling niet
+// elk kwartier geld kost. Sliep de Mac tijdens de run (code 2, slaap:true), dan
+// is dat geen fout: na 2 min opnieuw. Fouten in app_fouten (metricool-kalender).
+const MC_LAATSTE = path.join(os.homedir(), 'Gino', 'metricool-sync', 'laatste.json')
 const mcSync = { bezig: false, nietVoor: 0 }
 async function planMetricool() {
   if (!gebruiker || mcSync.bezig || Date.now() < mcSync.nietVoor) return
+  let vorige = null
+  try { vorige = JSON.parse(fs.readFileSync(MC_LAATSTE, 'utf8')) } catch { /* nog geen run */ }
+  const oud = vorige?.tijd ? Date.now() - Date.parse(vorige.tijd) : Infinity
+  const wachtMin = vorige?.slaap ? 2 : vorige?.fout && (vorige.op_rij || 2) >= 2 ? 60 : 15
+  if (oud < wachtMin * 60 * 1000) return
   mcSync.bezig = true
   const t = await versToken().catch(() => '')
   if (!t) { mcSync.bezig = false; return }
   const p = spawn('caffeinate', ['-i', 'node', 'scripts/metricool-kalender.mjs'], { cwd: MAP, stdio: 'ignore', env: { ...process.env, PA_ACCESS_TOKEN: t } })
-  p.on('error', () => { mcSync.bezig = false; mcSync.nietVoor = Date.now() + 3600 * 1000 })
+  // Start het script niet eens: 15 min wachten, anders probeert de PA het elke minuut.
+  p.on('error', () => { mcSync.bezig = false; mcSync.nietVoor = Date.now() + 15 * 60 * 1000 })
   p.on('close', (code) => {
     mcSync.bezig = false
-    if (code === 0) return
+    if (code === 0 || code === 2) return
     console.log(`${tijd()} ✗ metricool-kalender`)
-    mcSync.nietVoor = Date.now() + 3600 * 1000
+    // Schreef het script zijn fout niet weg (gecrasht voor laatste.json), dan hier de rem.
+    let na = null
+    try { na = JSON.parse(fs.readFileSync(MC_LAATSTE, 'utf8')) } catch { /* geen bestand */ }
+    if (!na?.tijd || Date.now() - Date.parse(na.tijd) > 60 * 1000) mcSync.nietVoor = Date.now() + 15 * 60 * 1000
   })
 }
 
@@ -1554,6 +1566,6 @@ setInterval(() => planStatscheck().catch(fout), 60 * 1000)
 setInterval(() => planTodocheck().catch(fout), 60 * 1000)
 setInterval(() => planGinoTaken().catch(fout), 60 * 1000)
 setInterval(() => planZoomSync().catch(fout), 5 * 60 * 1000)
-setInterval(() => planMetricool().catch(fout), 15 * 60 * 1000)
+setInterval(() => planMetricool().catch(fout), 60 * 1000)
 // Gino's tijdmeter: elke minuut welke app/site voorop staat (scripts/gino-tijd.mjs).
 startTijdmeter(sb, () => gebruiker, (...x) => console.error(tijd(), ...x))

@@ -3,6 +3,8 @@
 //   node scripts/metricool-kalender.mjs                  ophalen via de connector en bijwerken (zo draait de PA hem, elke 15 min)
 //   node scripts/metricool-kalender.mjs --bestand a.json --bestand b.json --van 2026-11-05 --tot 2027-01-04 [--droog]
 //                                                        zelfde bijwerken op eerder opgehaalde uitvoer
+//   --bewaar                                             ruwe uitvoer van elke aanroep in ~/Gino/metricool-sync/diagnose/
+//                                                        (van een mislukte aanroep gebeurt dat altijd: fout-<van>-<tot>.jsonl)
 //
 // Per Instagram-post één rij in content_items, match op metricool_post_id. Metricool is leidend voor datum, tijd,
 // type, hook, woord, link en stand. De titel volgt alleen als hij nog gelijk is aan de hook, dus de titel van een
@@ -32,6 +34,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const WERKMAP = path.join(os.homedir(), 'Gino', 'metricool-sync')
+const DIAGNOSE = path.join(WERKMAP, 'diagnose')
 const COACH = '5a0135ac-3188-499d-8682-ed6a179e5541'
 const MERK = '6149311'
 const TZ = 'Europe/Amsterdam'
@@ -44,6 +47,7 @@ const args = process.argv.slice(2)
 const bestanden = args.flatMap((a, i) => (a === '--bestand' ? [args[i + 1]] : []))
 const optie = (n) => { const i = args.indexOf(n); return i < 0 ? null : args[i + 1] }
 const droog = args.includes('--droog')
+const bewaar = args.includes('--bewaar') // ook van gelukte aanroepen de ruwe uitvoer bewaren (diagnose/)
 
 const nlDag = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: TZ })
 const plusDagen = (dag, n) => new Date(Date.parse(`${dag}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10)
@@ -145,8 +149,9 @@ function eenRonde(van, tot) {
     { cwd: WERKMAP, env: omgeving, stdio: ['ignore', 'pipe', 'pipe'] })
     const begin = Date.now()
     const delen = []
+    const mis2 = []
     p.stdout.on('data', d => delen.push(d))
-    p.stderr.resume()
+    p.stderr.on('data', d => mis2.push(d))
     let hard = null
     const tik = setTimeout(() => { p.kill('SIGTERM'); hard = setTimeout(() => p.kill('SIGKILL'), 5000) }, MAX_RONDE)
     p.on('error', e => { clearTimeout(tik); clearTimeout(hard); mis(e) })
@@ -157,7 +162,8 @@ function eenRonde(van, tot) {
       const sliep = klokSprong >= begin - 3 * 60 * 1000 || Date.now() - begin > MAX_RONDE + 60000
       const ids = new Set()
       let posts = null, fout = null, kosten = 0
-      for (const regel of Buffer.concat(delen).toString('utf8').split('\n')) {
+      const ruw = Buffer.concat(delen).toString('utf8')
+      for (const regel of ruw.split('\n')) {
         let r
         try { r = JSON.parse(regel) } catch { continue }
         if (r.type === 'result') kosten = r.total_cost_usd || 0
@@ -174,6 +180,14 @@ function eenRonde(van, tot) {
             else posts = lijstUit(JSON.parse(tekst))
           } catch { fout = tekst.slice(0, 300) }
         }
+      }
+      // Geen posts: de ruwe uitvoer bewaren, anders zegt 'Metricool niet bereikt' niets over de reden.
+      if (!posts || bewaar) {
+        try {
+          fs.mkdirSync(DIAGNOSE, { recursive: true })
+          fs.writeFileSync(path.join(DIAGNOSE, `${posts ? 'goed' : 'fout'}-${van}-${tot}.jsonl`),
+            `${ruw.slice(-300000)}\n${JSON.stringify({ stderr: Buffer.concat(mis2).toString('utf8').slice(-4000), fout, sliep, seconden: Math.round((Date.now() - begin) / 1000) })}\n`)
+        } catch { /* alleen hulp bij zoeken */ }
       }
       klaar({ posts, fout: posts ? null : (fout || 'Metricool niet bereikt'), kosten, sliep })
     })
@@ -298,10 +312,15 @@ try {
   console.log(JSON.stringify(uitvoer, null, 1))
 } catch (e) {
   const melding = String(e.message || e).slice(0, 500)
-  console.log(JSON.stringify({ fout: melding }))
+  const slaap = e.slaap === true
+  console.log(JSON.stringify({ fout: melding, slaap }))
   if (!droog) {
-    fs.writeFileSync(path.join(WERKMAP, 'laatste.json'), JSON.stringify({ tijd: new Date().toISOString(), fout: melding, kosten_usd: kosten.kosten }, null, 1))
-    await sb.from('app_fouten').insert({ user_id: COACH, pagina: 'metricool-kalender', melding }).then(r => r, () => null)
+    // op_rij: hoeveel echte fouten achter elkaar. De PA wacht pas een uur vanaf de tweede.
+    let vorige = null
+    try { vorige = JSON.parse(fs.readFileSync(path.join(WERKMAP, 'laatste.json'), 'utf8')) } catch { /* nog geen run */ }
+    const opRij = slaap ? (vorige?.op_rij || 0) : (vorige?.op_rij || 0) + 1
+    fs.writeFileSync(path.join(WERKMAP, 'laatste.json'), JSON.stringify({ tijd: new Date().toISOString(), fout: melding, slaap, op_rij: opRij, kosten_usd: kosten.kosten }, null, 1))
+    if (!slaap) await sb.from('app_fouten').insert({ user_id: COACH, pagina: 'metricool-kalender', melding }).then(r => r, () => null)
   }
-  process.exit(1)
+  process.exit(slaap ? 2 : 1)
 }
