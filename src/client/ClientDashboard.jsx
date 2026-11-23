@@ -790,6 +790,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         // Niet in een meekijk-paneel: de knop zou een check-in indienen op naam
         // van de klant terwijl de coach erachter zit.
         client={client} onCheckin={ingebed ? null : () => setShowCheckinModal(true)} checkinVersie={checkinVersion}
+        onNavigate={(view) => setCurrentView(view)}
       />
 
       <ClientFAQModal

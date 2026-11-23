@@ -6,12 +6,21 @@ import { zoekNavraag, navraagWeg } from '../workout/bouwfase/trainingNavraag'
 import CheckinService from '../client-checkin/CheckinService'
 import { trajectLoopt } from '../client-checkin/trajectStatus'
 import { checkinWeek } from '../client-checkin/checkinWeek'
+import { vraagFotosOpen } from '../progress/fotosOpenen'
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
 const autoGeopend = new Set();
+
+// Klantpagina's waar een melding naartoe kan (page_context = view-id in ClientDashboard).
+const PAGINAS = { workout: 'Naar training', meal: 'Naar voeding', boodschappen: 'Naar boodschappen', tracking: 'Naar voortgang', calls: 'Naar calls', profile: 'Naar profiel' }
+function paginaVan(n) {
+  if (n?.trigger_data?.check_type === 'photo_not_uploaded') return { view: 'tracking', knop: 'Foto toevoegen', fotos: true }
+  const view = n?.page_context
+  return PAGINAS[view] ? { view, knop: PAGINAS[view] } : null
+}
 import { Bell, X, CheckCircle } from 'lucide-react';
 
-export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange, client = null, onCheckin = null, checkinVersie = 0 }) {
+export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange, client = null, onCheckin = null, checkinVersie = 0, onNavigate = null }) {
   const isMobile = window.innerWidth <= 768;
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [dbMeldingen, setNotifications] = useState([]);
@@ -37,8 +46,13 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       title: `Hoe was je training van ${navraag.dag}?`,
       message: 'Twee tikken: een cijfer en of de lengte goed was. Dan weet je coach het.',
     })
-    return eigen.length ? [...eigen, ...dbMeldingen] : dbMeldingen
-  }, [navraag, checkin, dbMeldingen]);
+    // Meldingen met een pagina krijgen een knop erheen (23 nov 2026, Kersten).
+    const metKnop = onNavigate ? dbMeldingen.map(n => {
+      const doel = paginaVan(n)
+      return doel ? { ...n, _knop: doel.knop, _doel: doel } : n
+    }) : dbMeldingen
+    return eigen.length ? [...eigen, ...metKnop] : metKnop
+  }, [navraag, checkin, dbMeldingen, onNavigate]);
   const [isExpandedInternal, setIsExpandedInternal] = useState(false);
   const isExpanded = controlled ? openProp : isExpandedInternal;
   const setIsExpanded = (val) => {
@@ -431,6 +445,13 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                   const open = () => {
                     if (notification._checkin) { setIsExpanded(false); onCheckin?.(); return }
                     if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
+                    if (notification._doel) {
+                      setIsExpanded(false)
+                      if (isActive) handleMarkAsRead(notification.id)
+                      if (notification._doel.fotos) vraagFotosOpen()
+                      onNavigate(notification._doel.view)
+                      return
+                    }
                     // Feedback op een techniekvideo: meteen de modal open.
                     if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
                     if (isActive) handleMarkAsRead(notification.id)

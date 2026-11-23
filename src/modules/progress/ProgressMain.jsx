@@ -22,6 +22,7 @@ import GewichtBandGrafiek from '../coach-command-center/components/insight/Gewic
 import { useChallenge } from '../../hooks/useChallenge'
 import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 import WeegDagKiezer from './components/WeegDagKiezer'
+import { pakFotosVerzoek } from './fotosOpenen'
 
 // Kopfoto, zelfde opbouw als de banner op de maaltijdpagina.
 const WEEG_BANNER_URL = 'https://images.unsplash.com/photo-1627903632132-ead7be18a56d?w=1200&h=700&fit=crop&q=80'
@@ -33,6 +34,13 @@ export default function ProgressMain({ db, client }) {
   // — zelfde patroon als TodaysWorkoutCard's expand-mode.
   const [photosOpen, setPhotosOpen] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
+  // Melding "Foto toevoegen": foto-sectie meteen open, ook als deze pagina nog moest laden.
+  useEffect(() => {
+    if (pakFotosVerzoek()) setPhotosOpen(true)
+    const op = () => { if (pakFotosVerzoek()) setPhotosOpen(true) }
+    window.addEventListener('myarc:fotos-open', op)
+    return () => window.removeEventListener('myarc:fotos-open', op)
+  }, [])
   const [weight, setWeight] = useState(70.0)
   const [weightStats, setWeightStats] = useState(null)
   const [fridayData, setFridayData] = useState(null)
