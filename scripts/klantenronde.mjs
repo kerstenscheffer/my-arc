@@ -17,6 +17,16 @@ const MAX_ITEMS = 80
 const tekst = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 const lijst = (v, max, n) => (Array.isArray(v) ? v.map(x => tekst(x, max)).filter(Boolean).slice(0, n) : [])
 
+// Randzaken: max 5 regels, plus het voorstel voor de statusregel ('Stand: …',
+// 24 nov 2026). Dat staat als laatste en mag niet door de limiet wegvallen:
+// het logboek vult er het statusveld mee voor (statusRegel.js, standVoorstel).
+function randzakenMetStand(v) {
+  const alle = lijst(v, 150, 20)
+  const stand = alle.filter(r => /^Stand:\s/i.test(r)).pop()
+  const rest = alle.filter(r => r !== stand).slice(0, 5)
+  return stand ? [...rest, stand] : rest
+}
+
 // Alleen de velden die het paneel kent, ingekort. Onbekend = weg.
 function schoneSuggesties(s) {
   if (!s || typeof s !== 'object') return {}
@@ -45,7 +55,7 @@ function schoneSuggesties(s) {
       precall: lijst(c.precall, 250, 6),
       struggles: lijst(c.struggles, 250, 6),
       open: lijst(c.open, 200, 6),
-      randzaken: lijst(c.randzaken, 150, 5),
+      randzaken: randzakenMetStand(c.randzaken),
       vragen: lijst(c.vragen, 200, 5),
     }).filter(([, v]) => v != null && !(Array.isArray(v) && !v.length)))
   }

@@ -63,7 +63,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, pakket = null, maandagCheckin = null }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, pakket = null, maandagCheckin = null, statusRegel = null }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
   const [lokaal, setLokaal] = useState(null)
@@ -452,6 +452,20 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
           )}
         </div>
       </div>
+
+      {/* Statusregel (24 nov 2026): de geldende stand in één regel, afgekapt.
+          Alleen op het Klantenbord; de lijst geeft hem niet mee. */}
+      {statusRegel?.tekst && (
+        <div className={PRIVE} title={`${statusRegel.tekst} · ${new Date(statusRegel.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+          style={{
+            display: 'flex', gap: 6, minWidth: 0,
+            padding: isMobile ? '0.1rem 0.7rem 0.3rem' : '0.1rem 0.8rem 0.3rem',
+            fontSize: '0.88rem', fontWeight: 800, color: '#fff', lineHeight: 1.3,
+          }}>
+          <span style={{ flexShrink: 0, color: '#22c55e', fontWeight: 900 }}>→</span>
+          <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{statusRegel.tekst}</span>
+        </div>
+      )}
 
       {/* ── ROW 2 — kerncijfers links, acties rechts, op één regel ── */}
       {/* Alleen Verschil en Sinds start: deze week / vorige week staan in de

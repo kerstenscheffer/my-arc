@@ -1,13 +1,18 @@
 // src/modules/coach-command-center/components/CoachingLogModal.jsx
 // v1.1 — Categorieën: algemeen, status, whatsapp, call_prep
+// 24 nov 2026: category 'status' is nu de statusregel per klant (statusRegel.js),
+// bovenaan het venster. Voorbereiding van Gino staat er ook zonder call.
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import CallBlad, { PrecallKnop } from '../../business-os/CallBlad'
 import BerichtVak from '../../business-os/BerichtVak'
 import { ITEM_KOLOMMEN } from '../../business-os/berichtTekst'
-import { callHeeftInhoud } from '../../business-os/callBladData'
+import { callHeeftInhoud, isEchteCall } from '../../business-os/callBladData'
 import { schrijfBijsturing, BIJSTURING } from '../bijsturing'
+import { standVoorstel } from '../statusRegel'
+import StatusRegelBalk from './StatusRegelBalk'
+import { colors } from '../../../ui/tokens'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -35,40 +40,84 @@ const CATEGORIES = [
   { id: 'onboarding', label: 'Onboarding', icon: Rocket },
 ]
 
-// Tab Call: Gino's voorbereiding (checkin_ronde_items, laatste 3 dagen) in de
-// volgorde van de call, als pijltjes-regels. De vaste vragen staan er altijd,
-// ook als Gino nog niets klaarzette. Verslag doet achteraf het transcript.
-function CallVoorbereiding({ client, db, precall }) {
-  const [item, setItem] = useState(undefined)
+const nlDag = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+
+// Gino's voorbereiding voor deze klant (checkin_ronde_items). Sinds 24 nov 2026
+// de nieuwste ronde met een gevulde suggesties.call, hoe oud ook: op maandag is
+// dat het draaiboek voor de video, ook zonder call. De status (kleur, reden,
+// actie) komt uit de ronde van de laatste 3 dagen; ouder zegt niets meer.
+// undefined = laden.
+function useVoorbereiding(clientId, db) {
+  const [stand, setStand] = useState(undefined)
   useEffect(() => {
     let weg = false
+    setStand(undefined)
+    const vandaag = nlDag()
     const van = new Date(); van.setDate(van.getDate() - 3)
-    db.supabase.from('checkin_ronde_items').select('ronde_datum, groep, suggesties')
-      .eq('client_id', client.id).gte('ronde_datum', van.toLocaleDateString('sv-SE'))
-      .lte('ronde_datum', new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' }))
-      .order('ronde_datum', { ascending: false }).limit(3)
-      .then(({ data }) => {
-        if (weg) return
-        const lijst = data || []
-        setItem(lijst.find(r => callHeeftInhoud(r.suggesties?.call)) || lijst[0] || null)
-      }, () => { if (!weg) setItem(null) })
+    const dagStart = new Date(); dagStart.setHours(0, 0, 0, 0)
+    const dagEind = new Date(dagStart); dagEind.setDate(dagEind.getDate() + 1)
+    const leeg = () => ({ data: [] })
+    Promise.all([
+      db.supabase.from('checkin_ronde_items').select('ronde_datum, groep, suggesties')
+        .eq('client_id', clientId).lte('ronde_datum', vandaag).not('suggesties->call', 'is', null)
+        .order('ronde_datum', { ascending: false }).limit(5).then(r => r, leeg),
+      db.supabase.from('checkin_ronde_items').select('ronde_datum, groep, suggesties')
+        .eq('client_id', clientId).gte('ronde_datum', nlDag(van)).lte('ronde_datum', vandaag)
+        .order('ronde_datum', { ascending: false }).limit(1).then(r => r, leeg),
+      // Call vandaag in de app-agenda: dan horen de vaste call-vragen erbij,
+      // ook als Gino nog niets klaarzette.
+      db.supabase.from('client_calls').select('id')
+        .eq('client_id', clientId).is('canceled_at', null)
+        .gte('scheduled_date', dagStart.toISOString()).lt('scheduled_date', dagEind.toISOString())
+        .limit(1).then(r => r, leeg),
+    ]).then(([metCall, recent, calls]) => {
+      if (weg) return
+      setStand({
+        item: (metCall.data || []).find(r => callHeeftInhoud(r.suggesties?.call)) || null,
+        recent: recent.data?.[0] || null,
+        callVandaag: (calls.data || []).length > 0,
+      })
+    })
     return () => { weg = true }
-  }, [client.id, db])
+  }, [clientId, db])
+  return stand
+}
+
+// Tab Call: Gino's voorbereiding als pijltjes-regels. Met een call in de
+// volgorde van de call en met de vaste vragen; zonder call (maandag check-in)
+// het draaiboek bovenaan en geen call-vragen. Verslag doet achteraf het
+// transcript.
+function CallVoorbereiding({ client, voorbereiding, precall }) {
+  if (voorbereiding === undefined) {
+    return (
+      <div style={{ flex: 1, minHeight: 0, padding: '0.75rem 0.875rem', fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>Laden…</div>
+    )
+  }
+  const { item, recent, callVandaag } = voorbereiding
   const s = item?.suggesties || {}
+  const echtCall = callVandaag || isEchteCall(s.call)
   const doel = client.primary_goal || client.goal
-  const call = callHeeftInhoud(s.call) ? s.call : (doel ? { doel: [`Doel: ${doel}`] } : {})
+  const call = item ? s.call : (echtCall && doel ? { doel: [`Doel: ${doel}`] } : {})
+  const r = recent?.suggesties || {}
+  const status = recent && (r.reden || r.actie) ? { groep: recent.groep, reden: r.reden, actie: r.actie } : null
+  const dag = !item ? '' : item.ronde_datum === nlDag() ? 'vandaag'
+    : new Date(`${item.ronde_datum}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+  const sleutel = `${client.id}-${item?.ronde_datum || 'leeg'}`
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.75rem 0.875rem 1.5rem' }}>
-      {item === undefined
-        ? <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
-        : <>
-            {!callHeeftInhoud(s.call) && (
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
-                Nog geen voorbereiding van Gino. Die staat klaar op de ochtend van de call.
-              </div>
-            )}
-            <CallBlad key={`${client.id}-${item?.ronde_datum || 'leeg'}`} sleutel={`${client.id}-${item?.ronde_datum || 'leeg'}`} precall={precall} call={call} status={item && (s.reden || s.actie) ? { groep: item.groep, reden: s.reden, actie: s.actie } : null} />
-          </>}
+      {item ? (
+        <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '2px 10px', marginBottom: 14 }}>
+          {s.call.titel && <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.3 }}>{s.call.titel}</span>}
+          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: colors.success, whiteSpace: 'nowrap' }}>
+            {dag}{isEchteCall(s.call) ? ` · ${s.call.tijd}` : ''}
+          </span>
+        </div>
+      ) : (
+        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', marginBottom: 14 }}>
+          Nog geen voorbereiding van Gino.
+        </div>
+      )}
+      <CallBlad key={sleutel} sleutel={sleutel} precall={precall} call={call} status={status} zonderCall={!echtCall} />
     </div>
   )
 }
@@ -153,6 +202,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   const dragOffset   = useRef({ x: 0, y: 0 })
   const resizeStart  = useRef({ x: 0, y: 0, w: 0, h: 0 })
   const textareaRef  = useRef(null)
+  const voorbereiding = useVoorbereiding(client.id, db)
 
   useEffect(() => { loadLogs() }, [client.id])
 
@@ -350,6 +400,15 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
 
       {!minimized && (
         <>
+          {/* Statusregel: de geldende stand van de klant, met een veld voor een
+              nieuwe. Gino's voorstel ('Stand: …' in de voorbereiding) staat
+              voorgevuld; pas bewaren zet hem vast. */}
+          <StatusRegelBalk key={client.id} client={client} db={db} coachId={coachId} status={status}
+            klaar={voorbereiding !== undefined}
+            voorstel={standVoorstel(voorbereiding?.item?.suggesties?.call)}
+            voorstelDag={voorbereiding?.item?.ronde_datum || ''}
+            onBewaard={(rij) => { setLogs(prev => [rij, ...prev]); onLogSaved?.(rij) }} />
+
           {/* Kopregel: Call | Notities links, Pre-call rechts. Klein, zoals de
               Plan-knop bij Gewicht: tekst in plaats van grote knoppen. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0.6rem 0.875rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
@@ -364,7 +423,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
             {weergave === 'call' && <PrecallKnop aan={precall} onKlik={() => setPrecall(p => !p)} />}
           </div>
 
-          {weergave === 'call' ? <CallVoorbereiding client={client} db={db} precall={precall} /> : weergave === 'bericht' ? <BerichtTab client={client} db={db} /> : (<>
+          {weergave === 'call' ? <CallVoorbereiding client={client} voorbereiding={voorbereiding} precall={precall} /> : weergave === 'bericht' ? <BerichtTab client={client} db={db} /> : (<>
           {/* ── Nieuwe notitie ── */}
           <div style={{
             padding: '0.625rem 0.75rem',
@@ -561,7 +620,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
                       }}>
                         <CatIcon size={9} />{cat.label}
                       </span>
-                      {(log.category === 'status' || log.category === 'algemeen' || !log.category) && (
+                      {(log.category === 'algemeen' || !log.category) && (
                         <span style={{
                           fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
                           background: 'rgba(255,255,255,0.06)', padding: '0.1rem 0.35rem', borderRadius: '3px',

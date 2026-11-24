@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, GripVertical, Zap } from 'lucide-react'
 import { colors } from '../../ui/tokens'
-import { BLOKKEN, heeft } from './callBladData'
+import { BLOKKEN, VOLGORDE_ZONDER_CALL, heeft } from './callBladData'
 
 // Afwerken (6 nov 2026): tik op een regel en hij verdwijnt naar "Afgewerkt"
 // bovenaan. Daar tik je hem terug. Per call bewaard in localStorage (sleutel).
@@ -56,6 +56,9 @@ const regels = (v) => (Array.isArray(v) ? v : heeft(v) ? [v] : [])
 // sleutel: per call uniek (klant + rondedatum); zonder sleutel geen afwerken.
 // precall: van buiten bestuurd (Logboek zet de knop in zijn eigen kopregel);
 // zonder prop toont het blad zelf een klein schakeltje.
+// zonderCall: voorbereiding zonder call (maandag check-in, 24 nov 2026). Dan
+// staat precall bovenaan als Draaiboek, is de volgorde vast en vallen de vaste
+// call-vragen weg (Hoe gaat het, Komende week, Afsluiten, Volgende call).
 export function PrecallKnop({ aan, onKlik }) {
   return (
     <button type="button" onClick={onKlik} style={{
@@ -68,7 +71,7 @@ export function PrecallKnop({ aan, onKlik }) {
   )
 }
 
-export default function CallBlad({ call, status = null, sleutel = null, precall: precallProp }) {
+export default function CallBlad({ call, status = null, sleutel = null, precall: precallProp, zonderCall = false }) {
   const c = call || {}
   const [af, setAf] = useState(() => (sleutel ? leesAf(sleutel) : new Set()))
   const [afOpen, setAfOpen] = useState(false)
@@ -104,17 +107,19 @@ export default function CallBlad({ call, status = null, sleutel = null, precall:
     })
   }
   const statusRegels = status ? [status.reden && `Status: ${status.reden}`, status.actie && `Zo help je: ${status.actie}`].filter(Boolean) : []
+  const rang = zonderCall ? VOLGORDE_ZONDER_CALL : volgorde
   const blokken = [
+    ...(zonderCall ? [{ id: 'precall', titel: 'Draaiboek', lijst: regels(c.precall) }] : []),
     { id: 'status', titel: 'Status', stip: KLEUR[status?.groep] || colors.textMuted, lijst: statusRegels },
     ...BLOKKEN.map(({ id, titel, vast = [] }) => ({
       id, titel,
-      lijst: [...vast, ...regels(c[id]), ...(id === 'afsluiten'
+      lijst: zonderCall ? regels(c[id]) : [...vast, ...regels(c[id]), ...(id === 'afsluiten'
         ? [heeft(c.volgende_call) ? `Volgende call: ${c.volgende_call}` : 'Volgende call: inplannen, gaat het goed over 2 weken, niet goed over 1 week']
         : [])],
     })),
   ].map(b => ({ ...b, regels: b.lijst.map((t, i) => ({ t, id: `${b.id}|${i}|${t}` })) }))
     .sort((a, b) => {
-      const ia = volgorde.indexOf(a.id), ib = volgorde.indexOf(b.id)
+      const ia = rang.indexOf(a.id), ib = rang.indexOf(b.id)
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
     })
   const precallRegels = regels(c.precall).length ? regels(c.precall)
@@ -129,7 +134,7 @@ export default function CallBlad({ call, status = null, sleutel = null, precall:
       )}
       {precall ? (
         <div>
-          <div style={LABEL}>Lees dit vóór de call</div>
+          <div style={LABEL}>{zonderCall ? 'Draaiboek' : 'Lees dit vóór de call'}</div>
           {precallRegels.length ? precallRegels.map((t, i) => <Regel key={i} tekst={t} />)
             : <div style={{ ...REGEL, color: colors.textSecondary }}>Nog geen voorbereiding van Gino.</div>}
         </div>
@@ -151,13 +156,13 @@ export default function CallBlad({ call, status = null, sleutel = null, precall:
         if (!open.length) return null
         return (
           <div key={b.id} onDragOver={(e) => { if (sleept) e.preventDefault() }}
-            onDrop={(e) => { e.preventDefault(); verplaats(sleept, b.id); setSleept(null) }}
+            onDrop={(e) => { e.preventDefault(); if (!zonderCall) verplaats(sleept, b.id); setSleept(null) }}
             style={{ opacity: sleept === b.id ? 0.4 : 1 }}>
-            <div draggable onDragStart={(e) => { setSleept(b.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', b.id) } catch { /* oude browser */ } }}
+            <div draggable={!zonderCall} onDragStart={(e) => { setSleept(b.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', b.id) } catch { /* oude browser */ } }}
               onDragEnd={() => setSleept(null)} onClick={() => klap(b.id)}
-              title="Tik om in of uit te klappen, sleep om te verplaatsen"
+              title={zonderCall ? 'Tik om in of uit te klappen' : 'Tik om in of uit te klappen, sleep om te verplaatsen'}
               style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
-              <GripVertical size={11} style={{ marginLeft: -3, opacity: 0.6, cursor: 'grab' }} />
+              {!zonderCall && <GripVertical size={11} style={{ marginLeft: -3, opacity: 0.6, cursor: 'grab' }} />}
               {dicht.has(b.id) ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
               {b.stip && <span style={{ width: 7, height: 7, borderRadius: '50%', background: b.stip }} />}{b.titel}
               {dicht.has(b.id) && <span style={{ fontWeight: 700, opacity: 0.7 }}>· {open.length}</span>}

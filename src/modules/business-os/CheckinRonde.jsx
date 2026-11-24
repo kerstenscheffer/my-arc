@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, Copy, Check, RefreshCw, Phone, X, Trophy } f
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import CallBlad from './CallBlad'
+import { isEchteCall } from './callBladData'
 import BerichtVak from './BerichtVak'
 
 export const RONDE_OPDRACHT = 'Zet de check-in ronde van vandaag klaar'
@@ -141,7 +142,7 @@ function CallPopup({ naam, call, sleutel, onSluit }) {
         border: `1px solid ${colors.borderSubtle}`, padding: 18, boxSizing: 'border-box',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Phone size={15} color={colors.success} strokeWidth={2.5} />
+          {isEchteCall(call) && <Phone size={15} color={colors.success} strokeWidth={2.5} />}
           <div style={{ flex: 1, fontSize: '1rem', fontWeight: 900, color: colors.textPrimary }}>
             {call.tijd ? `${call.tijd} · ` : ''}{naam}
           </div>
@@ -150,7 +151,7 @@ function CallPopup({ naam, call, sleutel, onSluit }) {
           </button>
         </div>
         {call.titel && <div style={{ ...REGEL, color: colors.textSecondary, marginBottom: 12 }}>{call.titel}</div>}
-        <CallBlad call={call} sleutel={sleutel} />
+        <CallBlad call={call} sleutel={sleutel} zonderCall={!isEchteCall(call)} />
       </div>
     </div>,
     document.body,
@@ -186,7 +187,9 @@ function KlantKaart({ k, item, status, kleur, ronde, onItem }) {
               ...KNOPJE, alignSelf: 'flex-start', minHeight: 28, background: 'transparent', color: colors.success,
               boxShadow: `inset 0 0 0 1.5px ${colors.success}`,
             }}>
-              <Phone size={13} strokeWidth={2.5} /> Call {status.suggesties.call.tijd || 'vandaag'}: voorbereiding
+              {isEchteCall(status.suggesties.call)
+                ? <><Phone size={13} strokeWidth={2.5} /> Call {status.suggesties.call.tijd}: voorbereiding</>
+                : 'Voorbereiding'}
             </button>
           )}
           <Uitklap titel="Data"><UitDeData k={k} /></Uitklap>
@@ -264,7 +267,8 @@ export default function CheckinRonde({ onVraagGino, bezig = false, challenge = n
   const telling = Object.fromEntries(GROEPEN.map(g => [g.id, lijst.filter(x => x.groep === g.id).length]))
   const metBericht = lijst.filter(x => x.groep !== 'gepauzeerd' && (heeftBericht(x.item) || x.item?.verstuurd_at))
   const verstuurd = metBericht.filter(x => x.item?.verstuurd_at).length
-  const calls = lijst.filter(x => x.status?.suggesties?.call)
+  // Alleen echte calls (met tijd); de maandag check-in heeft ook suggesties.call.
+  const calls = lijst.filter(x => isEchteCall(x.status?.suggesties?.call))
     .sort((a, b) => String(a.status.suggesties.call.tijd || '').localeCompare(String(b.status.suggesties.call.tijd || '')))
   const stip = (kleur, n) => n > 0 && (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary }}>

@@ -8,6 +8,7 @@ import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, Eye
 import KlantBord from './components/KlantBord'
 import BijsturingLabel from './components/BijsturingLabel'
 import { laadBijsturingen, EVENT_BIJSTURING } from './bijsturing'
+import { laadStatusRegels, EVENT_STATUSREGEL } from './statusRegel'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
@@ -59,6 +60,15 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
     const op = (e) => { const b = e?.detail; if (b?.clientId) setBijsturingen(m => new Map(m).set(b.clientId, b)) }
     window.addEventListener(EVENT_BIJSTURING, op)
     return () => { weg = true; window.removeEventListener(EVENT_BIJSTURING, op) }
+  }, [db.supabase])
+  // Statusregel per klant (logboek, category 'status'): de geldende stand, op de kaart in het bord.
+  const [statusRegels, setStatusRegels] = useState(() => new Map())
+  useEffect(() => {
+    let weg = false
+    laadStatusRegels(db.supabase).then(m => { if (!weg) setStatusRegels(m) })
+    const op = (e) => { const r = e?.detail; if (r?.clientId) setStatusRegels(m => new Map(m).set(r.clientId, r)) }
+    window.addEventListener(EVENT_STATUSREGEL, op)
+    return () => { weg = true; window.removeEventListener(EVENT_STATUSREGEL, op) }
   }, [db.supabase])
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
@@ -438,18 +448,20 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
     return aw - bw
   })
 
-  const kaartVoor = (client) => bijsturingen.get(client.id) ? (
+  // opBord: alleen de kaart op het Klantenbord toont de statusregel.
+  const kaartVoor = (client, opBord = false) => bijsturingen.get(client.id) ? (
     <div key={client.id} style={{ minWidth: 0 }}>
       <BijsturingLabel b={bijsturingen.get(client.id)} />
-      {kaartZelf(client)}
+      {kaartZelf(client, opBord)}
     </div>
-  ) : kaartZelf(client)
+  ) : kaartZelf(client, opBord)
 
-  const kaartZelf = (client) => (
+  const kaartZelf = (client, opBord = false) => (
     <ClientWeightCard
       key={client.id}
       client={client}
       isMobile={isMobile}
+      statusRegel={opBord ? (statusRegels.get(client.id) || null) : null}
       pakket={pakketVan ? pakketVanKlant(client) : null}
       maandagCheckin={pakketVan ? !maandagUit.has(client.id) : null}
       onToggleStatus={handleToggleStatus}
@@ -712,7 +724,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
           {/* CLIENT CARDS — als skelet tot de urgentie-sortering er is, dan
               één keer in met een korte fade. Zelfde hoogte als de echte kaart. */}
           {weergave === 'bord' && kaartFase === 'klaar' ? (
-            <KlantBord supabase={db.supabase} klanten={filteredClients} renderKaart={kaartVoor} isMobile={isMobile} />
+            <KlantBord supabase={db.supabase} klanten={filteredClients} renderKaart={c => kaartVoor(c, true)} isMobile={isMobile} />
           ) : (
           <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem', animation: kaartFase === 'klaar' ? 'ccKaartIn 0.28s ease' : 'none' }}>
             <style>{'@keyframes ccKaartIn { from { opacity: 0.35; } to { opacity: 1; } } @keyframes ccSkelet { 0% { opacity: 0.55; } 50% { opacity: 0.85; } 100% { opacity: 0.55; } }'}</style>
@@ -730,7 +742,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
                 </div>
               </div>
             ))}
-            {kaartFase === 'klaar' && filteredClients.map(kaartVoor)}
+            {kaartFase === 'klaar' && filteredClients.map(c => kaartVoor(c))}
           </div>
           )}
 

@@ -24,5 +24,14 @@ export const BLOKKEN = [
 
 export const heeft = (v) => (Array.isArray(v) ? v.length > 0 : typeof v === 'string' && v.trim() !== '')
 
-const DATA_BLOKKEN = BLOKKEN.map(b => b.id).concat('volgende_call')
+const DATA_BLOKKEN = BLOKKEN.map(b => b.id).concat('volgende_call', 'precall')
 export const callHeeftInhoud = (call) => !!call && DATA_BLOKKEN.some(id => heeft(call[id]))
+
+// Echte call of niet. Gino zet alleen bij een call een tijd ("HH:MM"). De
+// maandag check-in (24 nov 2026: video per klant, geen call) heeft dezelfde
+// blokken zonder tijd: dan is precall het draaiboek en vallen de vaste
+// call-vragen weg (CallBlad, zonderCall).
+export const isEchteCall = (call) => heeft(call?.tijd)
+
+// Volgorde zonder call. Blokken die hier niet staan komen erachter.
+export const VOLGORDE_ZONDER_CALL = ['precall', 'goed', 'gewicht', 'voeding', 'training', 'struggles', 'komende_week', 'randzaken']
