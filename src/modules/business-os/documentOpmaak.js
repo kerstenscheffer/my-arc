@@ -178,9 +178,10 @@ function domPositie(b, doel) {
         if (doel < pos + a.length) { uit = [el, i]; return true }
         pos += a.length
         if (loop(k)) return true
-        if (doel < pos + z.length) { uit = [k, k.childNodes.length]; return true }
+        if (doel === pos && z) { uit = [k, k.childNodes.length]; return true }
         pos += z.length
-        if (doel === pos) { uit = [el, i + 1]; buiten = !!a; return true }
+        // Op of in het sluitteken: de plek ligt buiten het element.
+        if (doel <= pos) { uit = [el, i + 1]; buiten = !!a; return true }
       }
     }
     return false
@@ -208,7 +209,53 @@ function runsVan(b) {
 }
 const zelfdeOpmaak = (x, y) => !x.b === !y.b && !x.i === !y.i && !x.c === !y.c && (x.h ?? null) === (y.h ?? null)
 
-function runsNaarMd(runs) {
+// Spaties aan de rand van vet of schuin horen erbuiten: '**een **twee' wordt '**een** twee'.
+function spatiesNaarBuiten(runs) {
+  const los = (x) => !x.c && x.h == null
+  const zonder = (x, sleutel, t) => { const n = { ...x, t }; delete n[sleutel]; return n }
+  const r = []
+  for (const x of runs) {
+    if (!x.t) continue
+    if (!x.i || !los(x)) { r.push({ ...x }); continue }
+    const m = x.t.match(/^(\s*)([\s\S]*?)(\s*)$/)
+    if (m[1]) r.push(zonder(x, 'i', m[1]))
+    if (m[2]) r.push({ ...x, t: m[2] })
+    if (m[3]) r.push(zonder(x, 'i', m[3]))
+  }
+  const uit = []
+  for (let i = 0; i < r.length; i++) {
+    if (!r[i].b) { uit.push(r[i]); continue }
+    let j = i
+    while (j + 1 < r.length && r[j + 1].b) j++
+    const groep = r.slice(i, j + 1)
+    const voor = []
+    const na = []
+    while (groep.length) {
+      const x = groep[0]
+      const m = los(x) && !x.i ? x.t.match(/^\s+/) : null
+      if (!m) break
+      voor.push(zonder(x, 'b', m[0]))
+      x.t = x.t.slice(m[0].length)
+      if (x.t) break
+      groep.shift()
+    }
+    while (groep.length) {
+      const x = groep[groep.length - 1]
+      const m = los(x) && !x.i ? x.t.match(/\s+$/) : null
+      if (!m) break
+      na.unshift(zonder(x, 'b', m[0]))
+      x.t = x.t.slice(0, -m[0].length)
+      if (x.t) break
+      groep.pop()
+    }
+    uit.push(...voor, ...groep, ...na)
+    i = j
+  }
+  return uit
+}
+
+function runsNaarMd(lijst) {
+  const runs = spatiesNaarBuiten(lijst)
   const r = []
   for (const x of runs) {
     if (!x.t) continue
@@ -663,6 +710,13 @@ export function maakBewerker(root, opties = {}) {
     const P = (x) => ({ b: x.b, pos: tekstVoor(x.b, x.node, x.off), vast: !bewerkbaar(x.b), heel: x.heel })
     const a = P(g.start)
     let z = P(g.eind)
+    // Alles geselecteerd: er blijft een leeg document over.
+    if (a.b !== z.b && a.b === root.firstElementChild && a.pos === 0 && z.b === root.lastElementChild && (z.vast || z.pos === z.b.textContent.length)) {
+      root.textContent = ''
+      borg()
+      zetCaret(root.firstElementChild, 0)
+      return
+    }
     // Selectie die eindigt vóór het eerste teken van een volgend blok (drie keer tikken): dat blok blijft heel.
     if (a.b !== z.b && !z.vast && z.pos === 0) {
       const v = z.b.previousElementSibling
@@ -692,6 +746,7 @@ export function maakBewerker(root, opties = {}) {
       knip(a.b, a.pos, z.pos)
       schoon(a.b)
       caretIn(a.b, a.pos)
+      controleerBlok(a.b)
       return
     }
     for (const b of tussen(a.b, z.b).slice(1, -1)) b.remove()
@@ -709,6 +764,7 @@ export function maakBewerker(root, opties = {}) {
       staart.remove()
       schoon(kop)
       caretIn(kop, a.pos)
+      controleerBlok(kop)
       return
     }
     if (kopOk) schoon(kop)
@@ -720,6 +776,8 @@ export function maakBewerker(root, opties = {}) {
       const doel = [...root.children].find(bewerkbaar)
       if (doel) caretIn(doel, 0, 'na')
     }
+    if (kopOk) controleerBlok(kop)
+    if (staartOk) controleerBlok(staart)
   }
 
   function enter(zacht) {
@@ -769,6 +827,8 @@ export function maakBewerker(root, opties = {}) {
     schoon(nieuw)
     if (nieuw.dataset.t === 'ol') hernummer(nieuw)
     caretIn(nieuw, 0, 'na')
+    controleerBlok(b)
+    controleerBlok(nieuw)
     inBeeld(nieuw)
   }
 
@@ -777,6 +837,7 @@ export function maakBewerker(root, opties = {}) {
     if (b.dataset.t !== 'p') {
       zetSoort(b, 'p', '')
       caretIn(b, 0, 'na')
+      controleerBlok(b)
       return
     }
     const v = b.previousElementSibling
@@ -789,6 +850,7 @@ export function maakBewerker(root, opties = {}) {
     b.remove()
     schoon(v)
     caretIn(v, pos)
+    controleerBlok(v)
   }
   // Delete achteraan in een blok.
   function wisVooruit(b) {
@@ -802,6 +864,7 @@ export function maakBewerker(root, opties = {}) {
     n.remove()
     schoon(b)
     caretIn(b, pos)
+    controleerBlok(b)
   }
 
   // Tekst invoegen op de cursor (zonder opmaak te veranderen).
@@ -891,9 +954,12 @@ export function maakBewerker(root, opties = {}) {
       }
     }
     spatiesUitSchuin(b)
+    // Staat er iets anders in beeld dan wat de markdown van dit blok zou tekenen, dan tekenen we het blok opnieuw.
     const md = inlineMd(b)
     const vers = inlineNaarDom(doc, md)
-    if (vers.textContent !== b.textContent || b.querySelector('span:not([data-href]), font, [style], b, i')) {
+    const proef = doc.createElement('div')
+    proef.append(vers.cloneNode(true))
+    if (proef.innerHTML !== b.innerHTML.replace(/<br>/g, '')) {
       const c = cursor()
       const mdPos = c ? mdPositie(b, c.node, c.off) : null
       b.textContent = ''
@@ -933,14 +999,10 @@ export function maakBewerker(root, opties = {}) {
     const alle = [regelVan(b) + regels[0], ...regels.slice(1, -1), regels[regels.length - 1] + staart]
     const { blokken, na } = ontleed(alle.join('\n'))
     const nieuw = blokken.map(maak)
-    if (nieuw.length) extra.get(nieuw[0]).voor = [...(extra.get(b)?.voor || []), ...extra.get(nieuw[0]).voor]
-    let laatste = nieuw[nieuw.length - 1] || null
-    if (na.length) {
-      // De geplakte tekst eindigt op een lege regel: daar staat de cursor.
-      const p = maak({ ...ontleedRegel(na[na.length - 1]), voor: na.slice(0, -1) })
-      nieuw.push(p)
-      laatste = p
-    }
+    // De geplakte tekst eindigt op een lege regel: daar staat de cursor.
+    if (na.length) nieuw.push(maak({ ...ontleedRegel(na[na.length - 1]), voor: na.slice(0, -1) }))
+    extra.get(nieuw[0]).voor = [...(extra.get(b)?.voor || []), ...extra.get(nieuw[0]).voor]
+    const laatste = nieuw[nieuw.length - 1]
     b.replaceWith(...nieuw)
     borg()
     if (bewerkbaar(laatste)) caretIn(laatste, Math.max(0, laatste.textContent.length - staartPlat))
@@ -1024,7 +1086,7 @@ export function maakBewerker(root, opties = {}) {
       if (v && v.dataset.t === 'ol' && !lijst.includes(v)) n = Number((v.dataset.pre.match(/\d+/) || ['0'])[0])
     }
     for (const b of lijst) {
-      if (weg) { zetSoort(b, 'p', ''); continue }
+      if (weg) { zetSoort(b, 'p', ''); controleerBlok(b); continue }
       const inspring = isLijst(b.dataset.t) && isLijst(doel) ? inspringVan(b.dataset.pre) : ''
       const pre = doel === 'li' ? `${inspring}- ` : doel === 'pijl' ? `${inspring}→ ` : doel === 'ol' ? `${inspring}${++n}. ` : `${'#'.repeat(Number(doel[1]))} `
       zetSoort(b, doel, pre)
@@ -1198,6 +1260,10 @@ export function maakBewerker(root, opties = {}) {
     if (type === 'historyRedo') { e.preventDefault(); opnieuw(); return }
     if (type === 'formatBold' || type === 'formatItalic') { e.preventDefault(); pas(type === 'formatBold' ? 'b' : 'i'); return }
     if (type.startsWith('format')) { e.preventDefault(); return }
+    // Opmaak via het menu van de browser of het toetsenbord: zelfde weg als de balk.
+    const viaMenu = { insertOrderedList: 'nummer', insertUnorderedList: 'lijst', insertHorizontalRule: 'lijn' }[type]
+    if (viaMenu) { e.preventDefault(); pas(viaMenu); return }
+    if (type === 'insertLink') { e.preventDefault(); return }
     const g = grenzen()
     if (!g) return
     if (type === 'insertFromPaste' || type === 'insertFromDrop' || type === 'insertFromPasteAsQuotation') {
@@ -1393,8 +1459,8 @@ export function maakBewerker(root, opties = {}) {
 
   // ── Start ──
   laad(huidig)
-  // Openen en direct opslaan moet teken voor teken hetzelfde geven, met én zonder het vangnet per blok.
-  const ok = naarMarkdown(root) === huidig && naarMarkdown(root, true) === huidig
+  // Openen en direct opslaan moet teken voor teken hetzelfde geven; anders opent het scherm de ruwe vorm.
+  const ok = naarMarkdown(root) === huidig
 
   const luister = [
     [root, 'beforeinput', opBeforeInput], [root, 'input', opInput], [root, 'keydown', opKeydown],

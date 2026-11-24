@@ -6,8 +6,15 @@
 // aanpassen (tabel staat op de veilige lijst); na elk antwoord laadt hij opnieuw.
 //
 // Opmaak is gewone markdown: '#'-kopjes, '- ' en '1. ' lijsten, **vet**,
-// [links](..) en |tabellen|. Lezen = opgemaakt; potlood = bewerken in een tekstvak.
+// [links](..) en |tabellen|. Lezen = opgemaakt; potlood = bewerken.
 // '+ Onderdeel' zet onderaan een nieuw kopje klaar.
+// Bewerken (24 nov 2026) gebeurt in de opgemaakte weergave zelf, zoals Google
+// Docs: DocumentBewerker.jsx + documentOpmaak.js. Opslag blijft dezelfde
+// markdown; wat een kop, punt of tabel is staat op één plek (documentOpmaak.js)
+// en geldt voor lezen én bewerken. Alle ###-onderdelen staan tijdens bewerken
+// open. Het kleine icoon rechts in de opmaakbalk wisselt naar de oude ruwe
+// tekst (textarea); daar opent een tabblad ook vanzelf als openen → opslaan
+// niet teken voor teken hetzelfde zou geven.
 //
 // Zweeft sinds 20 nov 2026 los over de pagina: sleep aan de kopbalk, de plek
 // blijft bewaard (localStorage bos_doc_pos) en wordt binnen het scherm gehouden.
@@ -19,14 +26,17 @@
 // in-/uitspringen via ⋮ (ook op telefoon) en vastzetten (sectie Vastgezet bovenaan).
 // Opmaakbalk tijdens bewerken: titel/kop/subkop, opsomming, genummerd, pijl, lijn,
 // vet en schuin (ook ⌘B / ⌘I; Tab = inspringen). Het blijft gewone markdown,
-// zodat Gino het kan lezen en schrijven.
+// zodat Gino het kan lezen en schrijven. Op telefoon staan er ook knoppen voor
+// inspringen en ongedaan maken, en schuift de balk opzij.
 // Lezen (24 nov 2026): elk ###-onderdeel is uitklapbaar en staat standaard dicht;
 // tekst onder # en ## blijft open. Welke open staan wordt per tab onthouden
 // (localStorage bos_doc_open, op koptekst). Knop in de kopbalk: alles open/dicht.
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus, Code2, IndentIncrease, IndentDecrease, Undo2 } from 'lucide-react'
 import { createPortal } from '../../client/paginaPortal'
+import DocumentBewerker from './DocumentBewerker'
+import { KOPREGEL, TABELREGEL, SCHEIDINGSRIJ, LIJNREGEL, PIJLREGEL, PUNTREGEL, PUNT_KAAL, NUMMERREGEL, inlineRe, cellen } from './documentOpmaak'
 
 const POS_SLEUTEL = 'bos_doc_pos'
 const TAB_SLEUTEL = 'bos_doc_tab_id'
@@ -43,7 +53,7 @@ const TEKST = { color: 'rgba(255,255,255,0.78)', fontSize: '0.88rem', lineHeight
 // **vet**, *schuin*, `code` en [tekst](url). Externe links klikbaar, interne bestandsverwijzingen als tekst.
 function Inline({ tekst }) {
   const delen = []
-  const re = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*([^*\s][^*]*?)\*/g
+  const re = inlineRe()
   let laatst = 0
   let m
   while ((m = re.exec(tekst))) {
@@ -62,12 +72,11 @@ function Inline({ tekst }) {
   return <>{delen.map((d, i) => <Fragment key={i}>{d}</Fragment>)}</>
 }
 
-const cellen = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())
-
-function Tabel({ rijen }) {
-  const [kop, ...rest] = rijen.filter(r => !/^\s*\|?\s*:?-{2,}/.test(r)).map(cellen)
+// regel = regelnummer in de markdown (data-regel): zo vindt bewerken de plek terug waar je las.
+function Tabel({ rijen, regel }) {
+  const [kop = [], ...rest] = rijen.filter(r => !SCHEIDINGSRIJ.test(r)).map(cellen)
   return (
-    <div style={{ overflowX: 'auto', margin: '4px 0' }}>
+    <div data-regel={regel} style={{ overflowX: 'auto', margin: '4px 0' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem' }}>
         <thead><tr>{kop.map((c, i) => <th key={i} style={{ textAlign: 'left', padding: '6px 8px', color: '#fff', fontWeight: 800, borderBottom: '1px solid rgba(255,255,255,0.12)' }}><Inline tekst={c} /></th>)}</tr></thead>
         <tbody>{rest.map((r, i) => (
@@ -77,8 +86,6 @@ function Tabel({ rijen }) {
     </div>
   )
 }
-
-const KOPREGEL = /^(#{1,4})\s+(.*)$/
 
 // Sleutel van een ###-onderdeel: het kopje erboven (# of ##) plus de eigen tekst,
 // zodat hetzelfde onderwerp onder twee calls los open kan. Een dubbele krijgt een volgnummer.
@@ -115,11 +122,11 @@ function Weergave({ tekst, open, wissel }) {
   let verborgen = false
   for (let i = 0; i < regels.length; i++) {
     const r = regels[i]
-    if (/^\s*\|/.test(r)) {
+    if (TABELREGEL.test(r)) {
       const blok = []
-      while (i < regels.length && /^\s*\|/.test(regels[i])) blok.push(regels[i++])
+      while (i < regels.length && TABELREGEL.test(regels[i])) blok.push(regels[i++])
       i--
-      if (!verborgen) uit.push(<Tabel key={i} rijen={blok} />)
+      if (!verborgen) uit.push(<Tabel key={i} regel={i} rijen={blok} />)
       continue
     }
     const kop = r.match(KOPREGEL)
@@ -136,7 +143,7 @@ function Weergave({ tekst, open, wissel }) {
           wissel(sleutel)
         }
         uit.push(
-          <div key={i} data-uitklap role="button" tabIndex={0} aria-expanded={isOpen} title={isOpen ? 'Inklappen' : 'Uitklappen'}
+          <div key={i} data-regel={i} data-uitklap role="button" tabIndex={0} aria-expanded={isOpen} title={isOpen ? 'Inklappen' : 'Uitklappen'}
             onClick={klap} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); klap(e) } }}
             style={{ ...KOP, fontSize: '0.8rem', marginTop: 20, paddingTop: 10, paddingBottom: 6, marginBottom: -4, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
             {/* Het onzichtbare teken geeft de chevron de hoogte van één tekstregel, ook als de kop afbreekt. */}
@@ -154,23 +161,23 @@ function Weergave({ tekst, open, wissel }) {
         ? { color: '#fff', fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', marginTop: i ? 18 : 0 }
         : n === 4 ? { color: '#fff', fontSize: '0.9rem', fontWeight: 800, marginTop: 12 }
         : { ...KOP, marginTop: i ? 14 : 0 }
-      uit.push(<div key={i} style={{ ...stijl, marginBottom: 2 }}><Inline tekst={kop[2]} /></div>)
+      uit.push(<div key={i} data-regel={i} style={{ ...stijl, marginBottom: 2 }}><Inline tekst={kop[2]} /></div>)
       continue
     }
     if (verborgen) continue
-    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(r)) {
-      uit.push(<div key={i} style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />)
+    if (LIJNREGEL.test(r)) {
+      uit.push(<div key={i} data-regel={i} style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />)
       continue
     }
-    const pijl = r.match(/^(\s*)(?:→|->)\s?(.*)$/)
-    const punt = r.match(/^(\s*)[-•*]\s(.*)$/) || r.match(/^(\s*)[-•]()$/)
-    const nummer = r.match(/^(\s*)(\d+)\.\s+(.*)$/)
+    const pijl = r.match(PIJLREGEL)
+    const punt = r.match(PUNTREGEL) || r.match(PUNT_KAAL)
+    const nummer = r.match(NUMMERREGEL)
     if (pijl || punt || nummer) {
       const m = pijl || punt || nummer
       const inhoud = nummer ? nummer[3] : m[2]
       const teken = pijl ? '→' : nummer ? `${nummer[2]}.` : m[1].length >= 2 ? '◦' : '•'
       uit.push(
-        <div key={i} style={{ ...TEKST, display: 'flex', gap: 8, marginLeft: Math.floor(m[1].replace(/\t/g, '  ').length / 2) * 18 }}>
+        <div key={i} data-regel={i} style={{ ...TEKST, display: 'flex', gap: 8, marginLeft: Math.floor(m[1].replace(/\t/g, '  ').length / 2) * 18 }}>
           <span style={{ color: pijl ? WIT : 'rgba(255,255,255,0.35)', fontWeight: pijl ? 800 : 400, flexShrink: 0 }}>{teken}</span>
           <span style={{ minWidth: 0 }}>{inhoud ? <Inline tekst={inhoud} /> : <span style={{ color: 'rgba(255,255,255,0.25)' }}>leeg</span>}</span>
         </div>
@@ -178,7 +185,7 @@ function Weergave({ tekst, open, wissel }) {
       continue
     }
     if (!r.trim()) continue
-    uit.push(<div key={i} style={TEKST}><Inline tekst={r} /></div>)
+    uit.push(<div key={i} data-regel={i} style={TEKST}><Inline tekst={r} /></div>)
   }
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{uit}</div>
 }
@@ -259,21 +266,25 @@ function springRegels(tekst, van, tot, uit) {
   return { tekst: tekst.slice(0, begin) + nieuw + tekst.slice(eind), van: begin, tot: begin + nieuw.length, cursor: van === tot }
 }
 
-function Opmaakbalk({ pas, isMobile }) {
+// ruw = de oude tekstvak-vorm staat open; wisselRuw schakelt tussen opgemaakt en ruw.
+function Opmaakbalk({ pas, isMobile, ruw, wisselRuw, alleenRuw }) {
   const groepen = [
     [['h1', Heading1, 'Titel'], ['h2', Heading2, 'Kop'], ['h3', Heading3, 'Subkop']],
     [['b', Bold, 'Vet (⌘B)'], ['i', Italic, 'Schuin (⌘I)']],
     [['lijst', List, 'Opsomming'], ['nummer', ListOrdered, 'Genummerd'], ['pijl', ArrowRight, 'Pijltje'], ['lijn', Minus, 'Scheidingslijn']],
+    // Op telefoon is er geen Tab en geen ⌘Z.
+    ...(isMobile ? [[['uit', IndentDecrease, 'Minder inspringen'], ['in', IndentIncrease, 'Inspringen'], ...(ruw ? [] : [['terug', Undo2, 'Ongedaan maken']])]] : []),
   ]
+  const ruwTitel = alleenRuw ? 'Dit tabblad opent alleen als ruwe tekst' : ruw ? 'Terug naar opgemaakt bewerken' : 'Ruwe tekst (markdown)'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', padding: isMobile ? '6px 10px' : '8px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: isMobile ? 'nowrap' : 'wrap', overflowX: isMobile ? 'auto' : 'visible', scrollbarWidth: 'none', padding: isMobile ? '6px 10px' : '8px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
       {groepen.map((g, gi) => (
         <Fragment key={gi}>
-          {gi > 0 && <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />}
+          {gi > 0 && <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)', margin: '0 4px', flexShrink: 0 }} />}
           {g.map(([k, icoon, titel]) => ({ k, icoon, titel })).map((b) => (
             <button key={b.k} type="button" title={b.titel} aria-label={b.titel}
               onMouseDown={e => e.preventDefault()} onClick={() => pas(b.k)}
-              style={{ width: 32, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: WIT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              style={{ width: 32, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: WIT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
               <b.icoon size={16} strokeWidth={2.4} />
@@ -281,6 +292,12 @@ function Opmaakbalk({ pas, isMobile }) {
           ))}
         </Fragment>
       ))}
+      <span style={{ flex: 1, minWidth: 4 }} />
+      <button type="button" title={ruwTitel} aria-label={ruwTitel} aria-pressed={ruw}
+        onMouseDown={e => e.preventDefault()} onClick={wisselRuw}
+        style={{ width: 28, height: 26, borderRadius: 7, border: 'none', background: ruw ? 'rgba(255,255,255,0.14)' : 'transparent', color: ruw ? WIT : 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+        <Code2 size={14} strokeWidth={2.4} />
+      </button>
     </div>
   )
 }
@@ -392,6 +409,14 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
   const [bewerk, setBewerk] = useState(false)
   const [concept, setConcept] = useState('')
   const [stand, setStand] = useState(null) // null | 'bezig' | 'ok' | 'fout'
+  // Bewerken is standaard opgemaakt; ruw = het oude tekstvak met markdown.
+  const [ruw, setRuw] = useState(false)
+  const [alleenRuw, setAlleenRuw] = useState(false)
+  const [sessie, setSessie] = useState(0)
+  const stuur = useRef(null) // de bewerker (documentOpmaak.js) zolang het opgemaakte vlak open is
+  const leesvlak = useRef(null)
+  const beginBij = useRef(null) // waar het bewerkvlak moet beginnen (regel + plek op het scherm)
+  const leesTerug = useRef(null) // waar je was toen je bewerken sloot
   const vak = useRef(null)
   const timer = useRef(null)
   const laatste = useRef('')
@@ -461,7 +486,37 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
     return () => clearTimeout(timer.current)
   }, [concept, bewerk, opslaan])
 
-  const klaar = () => { clearTimeout(timer.current); opslaan(concept); setBewerk(false) }
+  const klaar = () => {
+    clearTimeout(timer.current)
+    const b = ruw ? null : stuur.current
+    leesTerug.current = b ? b.bovenste() : null
+    opslaan(b ? b.markdown() : concept)
+    setBewerk(false)
+  }
+
+  // Na sluiten verder lezen waar je in het bewerkvlak was.
+  useLayoutEffect(() => {
+    const doel = leesTerug.current
+    const vlak = leesvlak.current
+    if (bewerk || !doel || !vlak) return
+    leesTerug.current = null
+    let el = null
+    for (const x of vlak.querySelectorAll('[data-regel]')) {
+      if (Number(x.dataset.regel) > doel.regel) break
+      el = x
+    }
+    if (el) vlak.scrollTop += el.getBoundingClientRect().top - doel.top
+  }, [bewerk])
+
+  // Ruwe vorm geopend (zelf gekozen of als terugval): cursor in het tekstvak.
+  useEffect(() => { if (bewerk && ruw) vak.current?.focus() }, [bewerk, ruw])
+
+  const wisselRuw = () => {
+    if (!ruw && stuur.current) setConcept(stuur.current.markdown())
+    beginBij.current = { focus: !isMobile }
+    setRuw(r => !r)
+    setSessie(n => n + 1)
+  }
 
   // Opmaak toepassen op de selectie in het tekstvak; selectie blijft daarna staan.
   const zetSelectie = (u) => {
@@ -480,6 +535,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
     const { selectionStart: van, selectionEnd: tot, value } = el
     if (soort === 'b') return zetSelectie(omhul(value, van, tot, '**'))
     if (soort === 'i') return zetSelectie(omhul(value, van, tot, '*'))
+    if (soort === 'in' || soort === 'uit') return zetSelectie(springRegels(value, van, tot, soort === 'uit'))
     if (soort === 'lijn') {
       const begin = value.lastIndexOf('\n', van - 1) + 1
       const ins = `${begin === van ? '' : '\n'}---\n`
@@ -517,20 +573,27 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
     }
   }
 
-  const start = (extra = '') => {
+  // klik = de tik in de leesweergave waarmee bewerken begon (of niets bij het potlood).
+  const start = (extra = '', klik = null) => {
     if (!actief) return
     const basis = (actief.inhoud || '') + extra
+    // Zelfde plek houden: het blok waarop getikt is, anders het bovenste dat in beeld staat.
+    let plekje = extra ? { einde: true, selecteer: true } : { focus: !!klik || !isMobile }
+    const vlak = leesvlak.current
+    if (!extra && vlak) {
+      const rand = vlak.getBoundingClientRect().top
+      const el = klik?.target?.closest?.('[data-regel]') || [...vlak.querySelectorAll('[data-regel]')].find(x => x.getBoundingClientRect().bottom > rand + 1)
+      if (el) plekje = { regel: Number(el.dataset.regel), top: el.getBoundingClientRect().top, ...(klik ? { x: klik.clientX, y: klik.clientY } : { focus: !isMobile }) }
+    }
+    beginBij.current = plekje
     setConcept(basis)
     laatste.current = actief.inhoud || ''
     bewerkId.current = actief.id
+    setRuw(false)
+    setAlleenRuw(false)
+    setSessie(n => n + 1)
     setBewerk(true)
     setDicht(false)
-    requestAnimationFrame(() => {
-      const el = vak.current
-      if (!el) return
-      el.focus()
-      if (extra) { el.selectionStart = el.selectionEnd = basis.length; el.scrollTop = el.scrollHeight }
-    })
   }
 
   const kies = (id) => {
@@ -627,7 +690,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
                 {allesOpen ? <ChevronsDownUp size={15} strokeWidth={2.4} /> : <ChevronsUpDown size={15} strokeWidth={2.4} />}
               </button>
             )}
-            <button type="button" onClick={() => (bewerk ? setConcept(c => `${c.replace(/\s*$/, '')}\n\n## Nieuw onderdeel\n`) : start(`${tekst && !tekst.endsWith('\n') ? '\n' : ''}${tekst ? '\n' : ''}## Nieuw onderdeel\n`))} title="Onderdeel toevoegen" aria-label="Onderdeel toevoegen" style={knop}>
+            <button type="button" onClick={() => (bewerk ? (!ruw && stuur.current ? stuur.current.voegOnderdeelToe() : setConcept(c => `${c.replace(/\s*$/, '')}\n\n## Nieuw onderdeel\n`)) : start(`${tekst && !tekst.endsWith('\n') ? '\n' : ''}${tekst ? '\n' : ''}## Nieuw onderdeel\n`))} title="Onderdeel toevoegen" aria-label="Onderdeel toevoegen" style={knop}>
               <Plus size={15} strokeWidth={2.6} />
             </button>
             {bewerk
@@ -674,7 +737,13 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
           {/* Het document zelf. */}
           {bewerk ? (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <Opmaakbalk pas={pasOpmaak} isMobile={isMobile} />
+            <Opmaakbalk pas={(soort) => (ruw ? pasOpmaak(soort) : stuur.current?.pas(soort))} isMobile={isMobile} ruw={ruw} wisselRuw={wisselRuw} alleenRuw={alleenRuw} />
+            {!ruw ? (
+              <DocumentBewerker key={`${bewerkId.current}:${sessie}`} tekst={concept} start={beginBij.current} stuur={stuur} isMobile={isMobile}
+                onWijzig={setConcept}
+                onBlur={() => { clearTimeout(timer.current); if (stuur.current) opslaan(stuur.current.markdown()) }}
+                onMislukt={() => { setRuw(true); setAlleenRuw(true) }} />
+            ) : (
             <textarea ref={vak} value={concept} onChange={e => setConcept(e.target.value)} onKeyDown={toets} onBlur={() => { clearTimeout(timer.current); opslaan(concept) }}
               spellCheck={false}
               style={{
@@ -682,9 +751,10 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
                 background: 'transparent', color: WIT, fontFamily: 'inherit', fontSize: '0.92rem', lineHeight: 1.55,
                 padding: isMobile ? '12px 14px' : '20px 28px',
               }} />
+            )}
             </div>
           ) : (
-            <div key={actief?.id || 'leeg'} onClick={tikBewerk && actief ? (e) => { if (!e.target.closest('[data-uitklap]')) start() } : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
+            <div key={actief?.id || 'leeg'} ref={leesvlak} onClick={tikBewerk && actief ? (e) => { if (!e.target.closest('[data-uitklap]')) start('', e) } : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
               style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 16px' : '20px 28px 24px' }}>
               {!docs.geladen ? <div style={{ ...TEKST, color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
                 : !actief ? (
