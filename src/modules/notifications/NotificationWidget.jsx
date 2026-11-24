@@ -41,7 +41,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       const d = betaling.dagen
       const wanneer = d <= 0 ? 'vanavond' : d === 1 ? 'morgen' : `over ${d} dagen`
       eigen.push({
-        id: `betaling-${betaling.id}`, _betaling: betaling, _knop: betaling.betaal_link ? 'Nu betalen' : null,
+        id: `betaling-${betaling.id}`, _betaling: betaling, _knop: 'Nu betalen', _vast: true,
         type: 'betaling', priority: d <= 3 ? 'urgent' : 'high', status: 'active',
         title: 'Je betaling staat nog open',
         message: `Heyy ${(betaling.voornaam || '').trim() || 'daar'}, je betaling voor ${betaling.aanbod} staat nog open. Rond hem af zodat je account niet ${wanneer} op slot gaat.`,
@@ -202,8 +202,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     e.stopPropagation();
     // Wegtikken verbergt de check-in tot je de app opnieuw opent; hij is pas echt weg na invullen.
     if (notificationId === 'checkin-week') { setCheckin(null); return }
-    // Betaling: weg tot de app opnieuw in beeld komt; pas echt weg na betalen.
-    if (String(notificationId).startsWith('betaling-')) { setBetaling(null); return }
+    // Betaling is niet weg te klikken (24 nov 2026, Kersten): pas weg na betalen.
+    if (String(notificationId).startsWith('betaling-')) return
     if (String(notificationId).startsWith('navraag-')) {
       if (navraag) navraagWeg(navraag.sessie.id)
       setNavraag(null)
@@ -551,6 +551,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                           </div>
                         )}
                       </div>
+                      {!notification._vast && (
                       <button
                         onClick={(e) => handleDismiss(e, notification.id)}
                         aria-label="Wegklikken"
@@ -561,7 +562,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                         }}
                       >
                         <X size={15} strokeWidth={2.4} />
-                      </button>
+                      </button>)}
                     </div>
                   </div>
                   );

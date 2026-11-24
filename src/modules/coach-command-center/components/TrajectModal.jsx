@@ -54,7 +54,6 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const [startDatum, setStartDatum] = useState('')
   const [isBetaald, setIsBetaald] = useState(true)
   const [betaalDatum, setBetaalDatum] = useState('')
-  const [betaalLink, setBetaalLink] = useState('')
   // Aanbod uit Business OS → Aanbod (producten + tiers met prijs). keuzeAanbod = gekozen optie of null (zelf invullen).
   const [opties, setOpties] = useState([])
   const [keuzeAanbod, setKeuzeAanbod] = useState(null)
@@ -212,7 +211,6 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         startOp: vervolgStart,
         betaald: isBetaald,
         betaalDatum: isBetaald ? null : (betaalDatum || null),
-        betaalLink: isBetaald ? null : betaalLink,
         vorige,
         borgId,
         aanbod: keuzeAanbod?.naam || null,
@@ -526,9 +524,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
                 <input type="date" value={betaalDatum} onChange={(e) => setBetaalDatum(e.target.value)}
                   aria-label="Verwachte betaaldatum" style={datumVeld} />
                 {onder('Verwacht op. Staat bij "wacht op betaling" tot je hem afvinkt.')}
-                <input type="url" value={betaalLink} onChange={(e) => setBetaalLink(e.target.value)} placeholder="Betaallink (https://…)"
-                  aria-label="Betaallink" style={{ ...datumVeld, marginTop: 8 }} />
-                {onder('De klant ziet deze link in de app, met een herinnering tot je de betaling afvinkt.')}
+                {onder('De klant krijgt een betaallink in de app. Betaalt hij, dan vinkt het zichzelf af.')}
               </>
             )}
           </>

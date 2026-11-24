@@ -21,7 +21,7 @@ import { colors } from '../../ui/tokens'
 import TrajectModal from '../coach-command-center/components/TrajectModal'
 import AfhandelModal from './AfhandelModal'
 import { borgAfronden } from './borgAfronden'
-import { computePeriod, hervatTraject } from '../coach-command-center/components/trajectPeriode'
+import { computePeriod, hervatTraject, betaalLinkVan } from '../coach-command-center/components/trajectPeriode'
 import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
 import { haalEisen, haalInstellingen, zetInstelling, borgOordeel } from '../challenge-monitor/challengeCoach'
@@ -86,7 +86,7 @@ function berichtVoorstel(r, soort) {
     const maanden = Math.max(1, Number(s.duration_months) || 1)
     const bedrag = s.payment_type === 'monthly' ? `${maanden} termijnen van ${geldKort(Number(s.order_value) / maanden)}` : geldKort(s.order_value)
     const wanneer = s.payment_due_date ? ` vóór ${dagKort(s.payment_due_date)}` : ''
-    const link = s.betaal_link ? `\n\nBetalen kan hier: ${s.betaal_link}` : ''
+    const link = betaalLinkVan(s) ? `\n\nBetalen kan hier: ${betaalLinkVan(s)}` : ''
     return `${hoi} Super dat je doorgaat!\n\nWil je ${s.payment_type === 'monthly' ? 'de eerste van de ' : ''}${bedrag}${wanneer} overmaken? Dan staat alles voor je klaar en gaan we gewoon door.${link}\n\nLaat even weten als je ergens vragen over hebt!`
   }
   if (soort === 'denkt_na') return `${hoi} Ik was benieuwd of je al hebt kunnen nadenken over doorgaan na je traject. Heb je nog vragen waar ik je mee kan helpen?`
@@ -969,14 +969,6 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           fout={rijFout[afhandelRij.client_id]}
           onClose={() => setAfhandel(null)}
           onBetaald={async () => { await betaald(afhandelRij); setAfhandel(null) }}
-          onBetaalLink={async (link) => {
-            const r = afhandelRij
-            const waarde = link.trim() || null
-            const { error } = await supabase.from('lead_movements').update({ betaal_link: waarde }).eq('id', r.sale.id).then(x => x, e => ({ error: e }))
-            if (error) { rijMislukt(r.client_id, error, 'Betaallink opslaan mislukt'); return false }
-            setRijen(l => l.map(x => (x.client_id === r.client_id && x.sale ? { ...x, sale: { ...x.sale, betaal_link: waarde } } : x)))
-            return true
-          }}
           onVerleng={() => { const r = afhandelRij; setAfhandel(null); openTraject(r) }}
           onBorgOmzetten={(borg) => { const r = afhandelRij; setAfhandel(null); openTraject(r, borg) }}
           onStatus={async (status, extra) => { if (await wijzig(afhandelRij.client_id, afhandelRij.coach_id, status, afhandelRij.pakket, extra)) setAfhandel(null) }}

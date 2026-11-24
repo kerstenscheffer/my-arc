@@ -10,6 +10,10 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/betaal/:id",
+      "destination": "/api/betaal-verlenging?id=:id"
+    },
+    {
       "source": "/online-coaching",
       "destination": "/online-coaching.html"
     },

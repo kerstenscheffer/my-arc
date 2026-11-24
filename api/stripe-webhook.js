@@ -112,6 +112,30 @@ const supabase = createClient(
   String(process.env.SUPABASE_SERVICE_KEY || '').trim() || 'ontbreekt'
 );
 
+// Verlenging betaald (24 nov 2026). Het event is al opnieuw bij Stripe opgehaald,
+// dus de inhoud is echt. Eenmalig: pas bij payment_status 'paid' (iDEAL kan
+// later binnenkomen, dan volgt checkout.session.async_payment_succeeded).
+// Abonnement: de eerste termijn is binnen als de sessie compleet is.
+// Op betaald zetten is genoeg: triggers zetten doorstap op betaald, borg op
+// behouden en halen het betaal-slot eraf; de app ziet de open betaling verdwijnen.
+async function verlengingBetaald(session) {
+  const id = session.metadata?.verlenging_id;
+  const binnen = session.mode === 'subscription' ? session.status === 'complete' : session.payment_status === 'paid';
+  if (!id || !binnen) { console.log('Verlenging: nog niet betaald', id, session.payment_status); return; }
+  const { data, error } = await supabase.from('lead_movements')
+    .update({ payment_received: true })
+    .eq('id', id).eq('to_section_title', 'Verlenging 🔁').is('reverted_at', null)
+    .select('id, client_id');
+  if (error) { console.error('Verlenging betaald opslaan mislukt:', id, error.message); throw error; }
+  const klant = data?.[0]?.client_id;
+  if (klant) {
+    // Push-meldingen van de herinnering opruimen.
+    await supabase.from('notifications').update({ status: 'dismissed', dismissed_at: new Date().toISOString() })
+      .eq('client_id', klant).eq('source', 'betaling').neq('status', 'dismissed');
+  }
+  console.log('Verlenging betaald via Stripe:', id, session.id);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -140,6 +164,8 @@ export default async function handler(req, res) {
         // zonder coach) staat uit: klanten komen via de intake (/myintake) en
         // omzet via het leadbord. Deze webhook stond tot 13 okt 2026 uit in
         // Stripe; aanzetten zou anders dubbele klanten opleveren.
+        // Open verlenging betaald via de app (api/betaal-verlenging.js, 24 nov 2026).
+        if (event.data.object?.metadata?.verlenging_id) await verlengingBetaald(event.data.object);
         if (event.data.object?.metadata?.plan === PLAN_2X) {
           await stopNaTweedeTermijn(event.data.object);
         } else if (event.data.object?.subscription) {
@@ -148,6 +174,10 @@ export default async function handler(req, res) {
         }
         break;
       
+      case 'checkout.session.async_payment_succeeded':
+        if (event.data.object?.metadata?.verlenging_id) await verlengingBetaald(event.data.object);
+        break;
+
       case 'payment_intent.succeeded':
         await handlePaymentSucceeded(event.data.object);
         break;

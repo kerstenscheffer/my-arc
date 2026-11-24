@@ -24,7 +24,9 @@ returns jsonb language sql stable security definer set search_path = public as $
     'aanbod', coalesce(nullif(trim(lm.aanbod), ''), 'je vervolgtraject'),
     'bedrag', lm.order_value,
     'per_maand', lm.payment_type = 'monthly',
-    'betaal_link', nullif(trim(lm.betaal_link), ''),
+    -- Eigen link (Tikkie e.d.) wint; anders de Stripe-link die zichzelf afvinkt
+    -- (api/betaal-verlenging.js via /betaal/<id>, webhook zet hem op betaald).
+    'betaal_link', coalesce(nullif(trim(lm.betaal_link), ''), 'https://www.myarcfitness.com/betaal/' || lm.id),
     'slot_op', s.slot_op,
     'dagen', s.slot_op - (now() at time zone 'Europe/Amsterdam')::date
   )

@@ -159,6 +159,10 @@ export async function vorigeSale(supabase, client) {
 // borgId: challenge-sale die bij deze doorstap hoort. Leeg = de open challenge-sale van deze
 // klant als die gekoppeld is. De trigger zet de borg op behouden zodra dit betaald is.
 // Geeft { clientPayload, pakket, doorstap }. Gooit een fout als stap 1 of 2 mislukt.
+// Betaallink van een open verlenging (24 nov 2026). Eigen link wint, anders de
+// Stripe-link die zichzelf afvinkt (api/betaal-verlenging.js, /betaal/<id>).
+export const betaalLinkVan = (sale) => (sale?.id ? (sale.betaal_link?.trim() || `https://www.myarcfitness.com/betaal/${sale.id}`) : null)
+
 export async function boekVerlenging(supabase, {
   client, coachId, maanden, betaling, prijs, startOp = null,
   betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null, borgOmzetten = null,
