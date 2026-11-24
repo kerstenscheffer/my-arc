@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check, LogOut, ArrowLeft, RotateCcw } from 'lucide-react'
-import { haalAanbod, koop, herstel, VOORWAARDEN_URL, PRIVACY_URL } from '../../lib/appAbonnement'
+import { haalAanbod, koop, herstel, abonnementMogelijk, VOORWAARDEN_URL, PRIVACY_URL } from '../../lib/appAbonnement'
 
 // Kersten (24 nov 2026): groot, vet, wit, korte zinnen.
 const VOORDELEN = [
@@ -74,6 +74,24 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
   }
 
   const open = (url) => window.open(url, '_blank', 'noopener')
+
+  // Op het web kan niemand een abonnement afsluiten: verwijs naar de app.
+  if (!abonnementMogelijk()) {
+    return (
+      <div style={{ minHeight: '100dvh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+        <div style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
+          <img src="/mascottes/kersten-duim.webp" alt="" style={{ width: 120, height: 180, objectFit: 'contain' }} />
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, marginTop: 10 }}>Open de MY ARC app</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 8, lineHeight: 1.4 }}>Daar start je je abonnement. Daarna werkt het ook hier.</div>
+          {onLogout && (
+            <button onClick={onLogout} style={{ marginTop: 24, width: '100%', minHeight: 50, borderRadius: 14, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+              Uitloggen
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{

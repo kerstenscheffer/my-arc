@@ -189,7 +189,9 @@ const ONDER = 18   // stuk dat achter de eerste knop valt
 const KIJK_FIGUUR = 250
 function KerstenKijkt({ sleutel, pose }) {
   return (
-    <div aria-hidden style={{ position: 'relative', zIndex: 0, height: KIJK + ONDER, width: Math.round(KIJK_FIGUUR * 2 / 3), overflow: 'hidden', flexShrink: 0 }}>
+    <div aria-hidden style={{ position: 'relative', zIndex: 0, height: KIJK + ONDER, width: Math.round(KIJK_FIGUUR * 2 / 3), flexShrink: 0,
+      // Alleen de onderkant afknippen; boven en opzij mag hij uitsteken (sprongetje, wijzende hand).
+      clipPath: 'inset(-80px -80px 0 -80px)', WebkitClipPath: 'inset(-80px -80px 0 -80px)' }}>
       <div style={{ height: KIJK_FIGUUR }}>
         <Kersten sleutel={sleutel} hoogte={KIJK_FIGUUR} pose={pose} />
       </div>

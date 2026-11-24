@@ -229,3 +229,65 @@ revoke all on function public.activeer_app_plannen() from public, anon;
 grant execute on function public.activeer_app_plannen() to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- 6. (24 nov 2026) Geen meldingen voor app-accounts.
+--    App-gebruikers hebben geen coach die concepten nakijkt, dus:
+--    a) geen "Concept-plan klaar" in de bel van de coach (workout-bouwer en
+--       maak_intake_voedingsconcept lopen allebei via create_intake_notification);
+--    b) geen "Je coach heeft ... voor je klaargezet" bij de klant.
+--    Zelfde handtekening als voorheen; voor coachingklanten verandert niets.
+create or replace function public.create_intake_notification(p_client_id uuid, p_type text, p_priority text, p_title text, p_message text, p_action_type text DEFAULT NULL::text, p_action_data jsonb DEFAULT NULL::jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_coach uuid; v_id uuid; v_app boolean;
+BEGIN
+  SELECT COALESCE(trainer_id, coach_id), coalesce(app_abonnee, false) INTO v_coach, v_app FROM clients WHERE id = p_client_id;
+  IF v_coach IS NULL THEN RETURN NULL; END IF;  -- onbekende klant of geen coach → niks doen
+  IF v_app THEN RETURN NULL; END IF;            -- app-account: geen coach die nakijkt
+  INSERT INTO coach_notifications
+    (coach_id, client_id, type, priority, title, message, action_type, action_data, read_status, created_at)
+  VALUES
+    (v_coach, p_client_id, COALESCE(p_type,'info'), COALESCE(p_priority,'normal'),
+     p_title, p_message, p_action_type, p_action_data, false, now())
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END $function$;
+
+CREATE OR REPLACE FUNCTION public.notify_client_new_workout_plan()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  plan_naam text;
+begin
+  if new.assigned_schema_id is null
+     or new.assigned_schema_id is not distinct from old.assigned_schema_id then
+    return new;
+  end if;
+  -- App-account: er is geen coach die iets klaarzet.
+  if coalesce(new.app_abonnee, false) then
+    return new;
+  end if;
+  -- Deload erin of eruit: de app toont "Deload week", geen losse melding.
+  if exists (select 1 from workout_schemas where id in (new.assigned_schema_id, old.assigned_schema_id) and deload_van is not null) then
+    return new;
+  end if;
+
+  select name into plan_naam from workout_schemas where id = new.assigned_schema_id;
+
+  insert into notifications (client_id, coach_id, type, title, message, page_context, priority, source)
+  values (
+    new.id, new.trainer_id, 'workout',
+    'Nieuw trainingsschema',
+    coalesce('Je coach heeft "' || plan_naam || '" voor je klaargezet.',
+             'Je coach heeft een nieuw trainingsschema voor je klaargezet.'),
+    'workout', 'normal', 'auto'
+  );
+  return new;
+end;
+$function$;

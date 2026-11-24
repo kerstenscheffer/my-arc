@@ -210,6 +210,20 @@ export default function LoginMain() {
           </div>
         )}
 
+        {/* Nieuw in de app (24 nov 2026): zelf een account en plan maken via de
+            onboarding. Alleen in de app; Apple eist dat je daar zelf een account
+            kunt maken. Op het web blijft dit weg (daar is geen betaalmuur). */}
+        {Capacitor.isNativePlatform() && (
+          <button type="button" onClick={() => { window.location.href = '/aanmelden' }} style={{
+            marginTop: '1.4rem', width: '100%', minHeight: 46, borderRadius: 12, cursor: 'pointer',
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff',
+            fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            Nog geen account? Maak je plan
+          </button>
+        )}
+
       </div>
 
       {showReset && (

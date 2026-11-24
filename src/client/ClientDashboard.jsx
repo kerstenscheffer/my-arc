@@ -317,7 +317,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         const betaald = t.reden === 'abonnement' || t.reden === 'abonnement_store'
         if (opSlotNu && betaald) opSlotNu = false
         if (!clientData.account_locked_at && clientData.app_abonnee) {
-          setBetaalmuur(!t.toegang && abonnementMogelijk() ? 'app' : null)
+          // Ook op het web: daar zegt de muur 'open de app' (betalen kan alleen in de app).
+          setBetaalmuur(!t.toegang ? 'app' : null)
         }
       }
       setOpSlot(opSlotNu)
