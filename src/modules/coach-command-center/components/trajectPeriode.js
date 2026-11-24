@@ -161,10 +161,12 @@ export async function vorigeSale(supabase, client) {
 // Geeft { clientPayload, pakket, doorstap }. Gooit een fout als stap 1 of 2 mislukt.
 export async function boekVerlenging(supabase, {
   client, coachId, maanden, betaling, prijs, startOp = null,
-  betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null,
+  betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null, borgOmzetten = null,
 }) {
   const plan = planVervolg(client, { maanden, startOp })
-  const totaal = betaling === 'monthly' ? prijs * maanden : prijs
+  // Borg omzetten (24 nov 2026, Joris → App 1 jaar): de borg ís de betaling. Geen nieuwe
+  // omzetregel (dan telde het geld dubbel); de borg gaat op behouden en hangt aan de klant.
+  const totaal = borgOmzetten ? 0 : (betaling === 'monthly' ? prijs * maanden : prijs)
   const vandaag = vandaagIso()
 
   const clientPayload = {
@@ -221,7 +223,19 @@ export async function boekVerlenging(supabase, {
     }
   }
 
-  const pakket = pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum, aanbod })
+  if (borgOmzetten?.id) {
+    const patch = { client_id: client.id, ...(borgOmzetten.challenge_status === 'open' ? { challenge_status: 'behouden' } : {}) }
+    const { error: borgFout } = await supabase.from('lead_movements').update(patch).eq('id', borgOmzetten.id)
+    if (borgFout) {
+      const e = new Error('Verlengd, maar de borg is niet bijgewerkt: ' + borgFout.message)
+      e.clientPayload = clientPayload
+      throw e
+    }
+  }
+
+  const pakket = borgOmzetten
+    ? `${aanbod ? `${aanbod}: ` : ''}${maanden} mnd vanaf ${kortDatum(plan.start)}, betaald met borg €${Math.round(Number(borgOmzetten.order_value) || 0)}`
+    : pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum, aanbod })
   const { data: doorstap } = await supabase.from('client_doorstap').insert({
     client_id: client.id, coach_id: client.coach_id || coach, status: betaald ? 'betaald' : 'ja_mondeling',
     pakket, gezet_door: coach,

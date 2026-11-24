@@ -40,7 +40,9 @@ const PRIJZEN_MAAND = Array.from({ length: 301 }, (_, i) => i * 5)      // €0�
 // in de laatste stap; nog niet betaald staat bij "wacht op betaling" tot het
 // geld binnen is. borgId: challenge-sale die bij deze doorstap hoort (leeg =
 // zelf zoeken). onGeboekt(pakket, doorstapRij) na het boeken.
-export default function TrajectModal({ open, modus = 'verleng', client, coachId, onClose, onClientUpdate, voorstel = null, betaald = true, borgId, onGeboekt = null }) {
+// borgOmzetten = challenge-sale { id, order_value, challenge_status }: de borg wordt de betaling
+// van het gekozen aanbod (alleen aanbod + start, geen prijsvragen, geen nieuwe omzet).
+export default function TrajectModal({ open, modus = 'verleng', client, coachId, onClose, onClientUpdate, voorstel = null, betaald = true, borgId, borgOmzetten = null, onGeboekt = null }) {
   const [stap, setStap] = useState(1)
   const [startOffset, setStartOffset] = useState(0)
   const [maanden, setMaanden] = useState(4)
@@ -105,7 +107,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
 
   const isStart = modus === 'start'
   // Volgorde van de stappen per modus. Verlengen begint met het aanbod (behalve met een voorstel).
-  const STAPPEN = isStart ? ['start', 'duur', 'betaling'] : (voorstel ? ['duur', 'betaling', 'prijs'] : ['aanbod', 'duur', 'betaling', 'prijs'])
+  const STAPPEN = isStart ? ['start', 'duur', 'betaling'] : borgOmzetten ? ['aanbod', 'duur'] : (voorstel ? ['duur', 'betaling', 'prijs'] : ['aanbod', 'duur', 'betaling', 'prijs'])
   const stappen = STAPPEN.length
   const prijsVan = (o, b) => (b === 'monthly' ? o.perMaand : o.vooruit)
   const kiesAanbod = (o) => {
@@ -157,6 +159,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         vorige,
         borgId,
         aanbod: keuzeAanbod?.naam || null,
+        borgOmzetten,
       })
       onClientUpdate?.(uit.clientPayload)
       onGeboekt?.(uit.pakket, uit.doorstap)
@@ -268,7 +271,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
             : <div style={{ width: 40 }} />}
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              {isStart ? 'Looptijd instellen' : 'Verlengen'} · stap {stap} van {stappen}
+              {isStart ? 'Looptijd instellen' : borgOmzetten ? 'Borg omzetten' : 'Verlengen'} · stap {stap} van {stappen}
             </div>
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
               {isStart ? <Clock size={15} strokeWidth={2.6} /> : <CalendarPlus size={15} strokeWidth={2.6} />}
@@ -440,7 +443,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           ? (
             <button onClick={bewaar} disabled={bezig || !startGeldig} style={{ ...primair, opacity: bezig || !startGeldig ? 0.5 : 1 }}>
               <Check size={16} strokeWidth={3} />
-              {bezig ? 'Opslaan…' : isStart ? 'Looptijd opslaan' : `${isBetaald ? 'Verlengen' : 'Boeken, nog niet betaald'} · ${euro(totaalBedrag)}`}
+              {bezig ? 'Opslaan…' : isStart ? 'Looptijd opslaan' : borgOmzetten ? `Omzetten · borg ${euro(Number(borgOmzetten.order_value) || 0)}` : `${isBetaald ? 'Verlengen' : 'Boeken, nog niet betaald'} · ${euro(totaalBedrag)}`}
             </button>
           )
           : huidig === 'aanbod' ? null : (() => {
