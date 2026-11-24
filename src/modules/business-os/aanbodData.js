@@ -4,9 +4,10 @@
 // Supabase-import, zodat de sommen ook met node te controleren zijn; laden en
 // bewaren zit in aanbodOpslag.js. Vorm van de opgeslagen gegevens:
 //   { partnerPct, vooruitPct, gratisMaanden: { 3, 6, 12 }, borgAan, borgBedrag,
-//     tiers: { premium|midden|basis: { prijs: { 3, 4, 6, 12 },
-//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst], zin } },
-//     producten: [...], vergelijking: [...] }
+//     tiers: { premium|midden|basis|app: { naam, prijs: { 3, 4, 6, 12 },
+//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst], zin,
+//     gratisMaandenUit } },
+//     volgorde: [sleutel], producten: [...], vergelijking: [...] }
 // Leeg veld = null. Een onbekende of oudere vorm wordt door normaliseer()
 // aangevuld met de beginwaarden, zodat het scherm altijd iets kan tonen.
 // vooruitPct, borgAan en borgBedrag kwamen er later op 23 nov bij: een rij
@@ -15,8 +16,8 @@
 //   [{ id, naam, maanden, vooruit, perMaand }]   vooruit = in één keer, perMaand = termijnbedrag.
 // Het verlengvenster (TrajectModal) kiest hieruit en uit de tiers met een prijs
 // (aanbodOpties). Een rij zonder producten leest als BEGIN.producten.
-// vergelijking (24 nov 2026): de drie tiers naast elkaar in één tabel, als lijst
-//   [{ onderdeel, basis, midden, premium }]   cel = true (zit erin), tekst (de vorm
+// vergelijking (24 nov 2026): de tiers naast elkaar in één tabel, als lijst
+//   [{ onderdeel, basis, midden, premium, app }]   cel = true (zit erin), tekst (de vorm
 //   in die tier) of null (zit er niet in).
 // Staat er minstens één gevulde rij, dan toont Aanbod.jsx de tabel in plaats van
 // de lijstjes uit tiers.*.onderdelen. Die lijstjes blijven in de data staan: een
@@ -33,11 +34,49 @@
 // Looptijden: de pagina toont 3, 6 en 12 (DUREN). 4 was de oude kortste looptijd: die
 // prijs blijft in de data staan (oudere app-versies tonen hem), net als elke andere
 // sleutel in prijs en gratisMaanden die hier niet bekend is.
+// Vier rangen met eigen namen (24 nov 2026, later): tiers is niet meer vast drie.
+//   tiers.<sleutel>.naam        eigen naam (All-in, Coaching, Op koers, Solo). Leeg of
+//                               weg = de oude naam (Premium, Midden, Basis).
+//   tiers.app                   vierde tier. Elke sleutel in tiers doet mee, ook een
+//                               die deze versie niet kent.
+//   volgorde                    [sleutel] = volgorde van de kolommen. Weg = premium,
+//                               midden, basis en daarna de rest (tierSleutels).
+//   tiers.<sleutel>.gratisMaandenUit   true = deze tier krijgt bij vooruitbetalen geen
+//                               gratis maanden (prijzen en gratisBij geven dan 0).
+//   vergelijking[].<sleutel>    één cel per tier, dus ook app.
+// normaliseer() laat velden die het niet kent staan (in een tier en bovenaan): de
+// kolom is één object, wat er niet in teruggaat is na één opslag weg.
 
 export const DUREN = [3, 6, 12]
 // Looptijden die altijd een plek in prijs hebben, ook als ze niet getoond worden.
 export const PRIJS_DUREN = [3, 4, 6, 12]
+// De drie vaste tiers met hun oude naam: de terugval als tier.naam ontbreekt, en
+// de tiers die altijd bestaan (ook in een lege rij).
 export const TIERS = [['premium', 'Premium'], ['midden', 'Midden'], ['basis', 'Basis']]
+const VASTE_SLEUTELS = TIERS.map(([k]) => k)
+const STANDAARD_NAAM = { ...Object.fromEntries(TIERS), app: 'App' }
+
+// Naam van een tier zonder eigen naam: de oude vaste naam, anders de sleutel.
+export const tierStandaardNaam = (k) => STANDAARD_NAAM[k] || (String(k).charAt(0).toUpperCase() + String(k).slice(1))
+// De naam die het scherm toont: tier.naam, anders de standaardnaam.
+export const tierNaam = (tier, k) => (typeof tier?.naam === 'string' && tier.naam.trim()) || tierStandaardNaam(k)
+
+const isObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v)
+
+// Alle tiers die in g.tiers staan, in de volgorde van g.volgorde. Wat daar niet in
+// staat komt erachter: eerst premium, midden, basis, dan de rest.
+export function tierSleutels(g) {
+  const tiers = isObject(g?.tiers) ? g.tiers : {}
+  const uit = []
+  const erbij = (k) => { if (typeof k === 'string' && isObject(tiers[k]) && !uit.includes(k)) uit.push(k) }
+  if (Array.isArray(g?.volgorde)) g.volgorde.forEach(erbij)
+  VASTE_SLEUTELS.forEach(erbij)
+  Object.keys(tiers).forEach(erbij)
+  return uit
+}
+
+// → [[sleutel, naam]] in de volgorde van het scherm.
+export const tierLijst = (g) => tierSleutels(g).map(k => [k, tierNaam(g.tiers[k], k)])
 
 // Wat Kersten nu verkoopt (23-24 nov 2026). Alleen wat hij zelf noemde; lege bedragen vult hij in Aanbod.
 // De challenge (6 weken €297 borg) staat er niet tussen: die verkoop je op het leadbord, niet bij verlengen.
@@ -54,8 +93,10 @@ const maakTier = (onderdelen, prijs, rest = {}) => ({
   urenMaand: null,
   urenEenmalig: null,
   ...rest,
+  naam: '',
   onderdelen,
   zin: '',
+  gratisMaandenUit: false,
 })
 
 // Beginwaarden: de drie tiers die Kersten op 23 nov 2026 koos. Kosten en uren
@@ -135,33 +176,52 @@ export function normaliseerGratis(ruw) {
   return uit
 }
 
-// Aantal gratis maanden bij vooruitbetalen voor één looptijd. Leeg = 0.
-export const gratisBij = (g, duur) => Math.max(0, Math.round(Number(g?.gratisMaanden?.[duur]) || 0))
+// Aantal gratis maanden bij vooruitbetalen voor één looptijd. Leeg = 0. Met een
+// tier erbij: 0 als die tier geen gratis maanden krijgt (gratisMaandenUit).
+export const gratisBij = (g, duur, tier = null) => (tier?.gratisMaandenUit === true
+  ? 0
+  : Math.max(0, Math.round(Number(g?.gratisMaanden?.[duur]) || 0)))
 
 // Het aanbod van één tier in één zin, zonder spaties eromheen. '' = geen zin.
 export const tierZin = (tier) => (typeof tier?.zin === 'string' ? tier.zin.trim() : '')
 
-// Maakt van wat er in de database staat altijd de volledige vorm.
+// Eén tier in de volledige vorm. begin = de beginwaarden van een vaste tier (voor
+// een tier die ontbreekt of geen lijst onderdelen heeft). Velden die deze versie
+// niet kent blijven staan.
+function normaliseerTier(t, begin = null) {
+  if (!isObject(t)) return begin ? { ...begin, prijs: { ...begin.prijs }, onderdelen: [...begin.onderdelen] } : null
+  return {
+    ...t,
+    naam: typeof t.naam === 'string' ? t.naam.trim() : '',
+    prijs: normaliseerPrijs(t.prijs),
+    kostenMaand: getalOfNull(t.kostenMaand),
+    kostenEenmalig: getalOfNull(t.kostenEenmalig),
+    urenMaand: getalOfNull(t.urenMaand),
+    urenEenmalig: getalOfNull(t.urenEenmalig),
+    onderdelen: Array.isArray(t.onderdelen)
+      ? t.onderdelen.filter(o => typeof o === 'string' && o.trim())
+      : begin ? [...begin.onderdelen] : [],
+    zin: tierZin(t),
+    gratisMaandenUit: t.gratisMaandenUit === true,
+  }
+}
+
+// Maakt van wat er in de database staat altijd de volledige vorm. De drie vaste
+// tiers bestaan altijd; elke andere tier in de rij (app) gaat mee.
 export function normaliseer(ruw) {
-  const r = ruw && typeof ruw === 'object' ? ruw : {}
+  const r = isObject(ruw) ? ruw : {}
   const tiers = {}
-  for (const [k] of TIERS) {
-    const t = r.tiers?.[k]
-    const begin = BEGIN.tiers[k]
-    if (!t || typeof t !== 'object') { tiers[k] = { ...begin, prijs: { ...begin.prijs }, onderdelen: [...begin.onderdelen] }; continue }
-    tiers[k] = {
-      prijs: normaliseerPrijs(t.prijs),
-      kostenMaand: getalOfNull(t.kostenMaand),
-      kostenEenmalig: getalOfNull(t.kostenEenmalig),
-      urenMaand: getalOfNull(t.urenMaand),
-      urenEenmalig: getalOfNull(t.urenEenmalig),
-      onderdelen: Array.isArray(t.onderdelen)
-        ? t.onderdelen.filter(o => typeof o === 'string' && o.trim())
-        : [...begin.onderdelen],
-      zin: tierZin(t),
+  for (const k of VASTE_SLEUTELS) tiers[k] = normaliseerTier(r.tiers?.[k], BEGIN.tiers[k])
+  if (isObject(r.tiers)) {
+    for (const [k, t] of Object.entries(r.tiers)) {
+      if (k in tiers) continue
+      const tier = normaliseerTier(t)
+      if (tier) tiers[k] = tier
     }
   }
+  const volgorde = tierSleutels({ tiers, volgorde: r.volgorde })
   return {
+    ...r,
     partnerPct: r.partnerPct === undefined ? BEGIN.partnerPct : getalOfNull(r.partnerPct),
     vooruitPct: r.vooruitPct === undefined ? BEGIN.vooruitPct : getalOfNull(r.vooruitPct),
     gratisMaanden: normaliseerGratis(r.gratisMaanden),
@@ -169,11 +229,12 @@ export function normaliseer(ruw) {
     borgBedrag: r.borgBedrag === undefined ? BEGIN.borgBedrag : getalOfNull(r.borgBedrag),
     producten: Array.isArray(r.producten) ? r.producten.filter(x => x && typeof x === 'object').map(normaliseerProduct) : BEGIN_PRODUCTEN.map(x => ({ ...x })),
     tiers,
-    vergelijking: normaliseerVergelijking(r.vergelijking),
+    volgorde,
+    vergelijking: normaliseerVergelijking(r.vergelijking, volgorde),
   }
 }
 
-// ── Vergelijking: één tabel voor de drie tiers ──
+// ── Vergelijking: één tabel voor alle tiers ──
 // Wat er in een cel staat: 'vink' (true), 'tekst' of 'leeg' (null, '', spaties).
 export const celSoort = (v) => (v === true ? 'vink' : typeof v === 'string' && v.trim() ? 'tekst' : 'leeg')
 
@@ -183,20 +244,26 @@ const leesCel = (v) => {
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
-export const nieuweVergelijkRij = () => ({ onderdeel: '', basis: null, midden: null, premium: null })
+// Lege rij met één cel per tier (sleutels = tierSleutels van de gegevens).
+export const nieuweVergelijkRij = (sleutels = VASTE_SLEUTELS) => ({ onderdeel: '', ...Object.fromEntries(sleutels.map(k => [k, null])) })
 
 // Rij die iets zegt: een naam of minstens één gevulde cel.
-export const rijGevuld = (r) => !!r && (!!String(r.onderdeel ?? '').trim() || TIERS.some(([k]) => celSoort(r[k]) !== 'leeg'))
+export const rijGevuld = (r) => !!r && (!!String(r.onderdeel ?? '').trim()
+  || Object.keys(r).some(k => k !== 'onderdeel' && celSoort(r[k]) !== 'leeg'))
 
 // Altijd een lijst. Helemaal lege rijen (net toegevoegd, niets getypt) vallen weg.
-export function normaliseerVergelijking(ruw) {
+// Elke rij krijgt een cel voor elke tier in sleutels; een cel van een tier die
+// daar niet in staat blijft bewaard.
+export function normaliseerVergelijking(ruw, sleutels = VASTE_SLEUTELS) {
   if (!Array.isArray(ruw)) return []
   return ruw
-    .filter(r => r && typeof r === 'object' && !Array.isArray(r))
-    .map(r => ({
-      onderdeel: typeof r.onderdeel === 'string' ? r.onderdeel.trim() : '',
-      basis: leesCel(r.basis), midden: leesCel(r.midden), premium: leesCel(r.premium),
-    }))
+    .filter(isObject)
+    .map(r => {
+      const rij = { onderdeel: typeof r.onderdeel === 'string' ? r.onderdeel.trim() : '' }
+      for (const k of sleutels) rij[k] = leesCel(r[k])
+      for (const k of Object.keys(r)) if (!(k in rij)) rij[k] = leesCel(r[k])
+      return rij
+    })
     .filter(rijGevuld)
 }
 
@@ -223,7 +290,7 @@ export function aanbodOpties(g) {
     if (!p.naam?.trim() || !p.maanden || (!(p.vooruit > 0) && !(p.perMaand > 0))) continue
     uit.push({ id: p.id, naam: p.naam.trim(), maanden: p.maanden, vooruit: p.vooruit > 0 ? p.vooruit : null, perMaand: p.perMaand > 0 ? p.perMaand : null, soort: 'product' })
   }
-  for (const [k, label] of TIERS) {
+  for (const [k, label] of tierLijst(g)) {
     for (const d of DUREN) {
       const pr = prijzen(g.tiers?.[k], d, g)
       if (!pr) continue
@@ -241,7 +308,8 @@ const n = (v) => Number(v) || 0
 //   teBetalen   totaal min borg: de gewone prijs in termijnen
 //   korting     korting bij vooruitbetalen, over teBetalen, op hele euro's (0 bij vooruitPct 0)
 //   vooruit     teBetalen min korting: de prijs in één keer
-//   gratis      gratis maanden bij vooruitbetalen voor deze duur (0 = geen)
+//   gratis      gratis maanden bij vooruitbetalen voor deze duur (0 = geen, ook
+//               als de tier ze niet krijgt: gratisMaandenUit)
 //   maandenVooruit   duur plus gratis: hoe lang hij bij vooruitbetalen coaching krijgt
 export function prijzen(tier, duur, g) {
   const totaal = n(tier?.prijs?.[duur])
@@ -250,7 +318,7 @@ export function prijzen(tier, duur, g) {
   const teBetalen = totaal - borg
   const pct = Math.min(100, Math.max(0, n(g?.vooruitPct)))
   const korting = Math.round(teBetalen * pct / 100)
-  const gratis = gratisBij(g, duur)
+  const gratis = gratisBij(g, duur, tier)
   return { totaal, perMaand: totaal / duur, borg, teBetalen, korting, vooruit: teBetalen - korting, gratis, maandenVooruit: duur + gratis }
 }
 
@@ -295,26 +363,29 @@ export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur 
   }
   if (!id) kop.rij = 'bestaat nog niet (Kersten heeft nog niets bewaard): insert met gegevens'
   if (!open) return { ...kop, inhoud: 'Pagina Aanbod staat dicht: lees de rij voor de waarden.' }
+  const sleutels = tierSleutels(gegevens)
   const tiers = {}
-  for (const [k] of TIERS) {
-    const t = gegevens.tiers?.[k] || {}
+  for (const k of sleutels) {
+    const { naam, prijs, onderdelen, zin, gratisMaandenUit, ...rest } = gegevens.tiers[k]
     tiers[k] = {
-      prijs: zonderLeeg(t.prijs),
-      ...zonderLeeg({ kostenMaand: t.kostenMaand, kostenEenmalig: t.kostenEenmalig, urenMaand: t.urenMaand, urenEenmalig: t.urenEenmalig }),
-      onderdelen: (t.onderdelen || []).filter(o => typeof o === 'string' && o.trim()),
-      ...zonderLeeg({ zin: tierZin(t) || null }),
+      ...zonderLeeg({ naam: typeof naam === 'string' && naam.trim() ? naam.trim() : null }),
+      prijs: zonderLeeg(prijs),
+      ...zonderLeeg(rest),
+      onderdelen: (onderdelen || []).filter(o => typeof o === 'string' && o.trim()),
+      ...zonderLeeg({ zin: tierZin({ zin }) || null, gratisMaandenUit: gratisMaandenUit === true ? true : null }),
     }
   }
   return {
     ...kop,
-    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, vergelijking, gratisMaanden, zin per tier en elke sleutel in prijs, anders verdwijnen ze). prijs = totaal per duur in maanden (scherm toont 3, 6, 12; 4 blijft staan), zin = het aanbod van die tier in één zin (achter het knopje bij de tiernaam), gratisMaanden = gratis maanden bovenop de duur bij vooruitbetalen, per duur, vooruitPct = % korting bij vooruitbetalen (0 = geen), borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, vergelijking, gratisMaanden, volgorde, elke tier met naam, zin en gratisMaandenUit, en elke sleutel in prijs, anders verdwijnen ze). tiers = de rangen per sleutel (premium, midden, basis, app); naam = de naam op het scherm (weg = Premium, Midden, Basis), volgorde = de sleutels in de volgorde van de kolommen. prijs = totaal per duur in maanden (scherm toont 3, 6, 12; 4 blijft staan), zin = het aanbod van die tier in één zin (achter het knopje bij de tiernaam), gratisMaanden = gratis maanden bovenop de duur bij vooruitbetalen, per duur; gratisMaandenUit: true op een tier = die tier krijgt ze niet. vooruitPct = % korting bij vooruitbetalen (0 = geen), borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier-sleutel true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
     in_beeld: { duur, stand },
     gegevens: {
-      partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,
+      ...gegevens,
       gratisMaanden: normaliseerGratis(gegevens.gratisMaanden),
-      borgAan: gegevens.borgAan, borgBedrag: gegevens.borgBedrag, tiers,
       producten: gegevens.producten || [],
-      vergelijking: normaliseerVergelijking(gegevens.vergelijking),
+      tiers,
+      volgorde: sleutels,
+      vergelijking: normaliseerVergelijking(gegevens.vergelijking, sleutels),
     },
   }
 }

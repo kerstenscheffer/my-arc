@@ -70,16 +70,34 @@
 //               kolom is een zin niet te lezen.
 //   Rekenen     tekstveld in de uitgeklapte tier, bewaard via wijzig zoals de rest.
 // Welke zinnen open staan onthoudt alleen dit scherm (openZin).
+//
+// Vier rangen met eigen namen (24 nov 2026, later): de pagina toont elke tier uit
+// gegevens.tiers, in de volgorde van gegevens.volgorde (tierLijst in aanbodData.js).
+// De naam komt uit tier.naam (All-in, Coaching, Op koers, Solo), zonder naam de oude
+// (Premium, Midden, Basis). De vierde tier (app) heeft het telefoon-icoon.
+//   Rekenen     uitgeklapt: naam bovenaan aan te passen, en per tier de schakelaar
+//               Gratis mnd (uit = gratisMaandenUit: bij vooruitbetalen alleen het
+//               bedrag, in beide standen). Vier tiers naast elkaar zolang elke ±230 px
+//               krijgt, anders twee per rij; smal onder elkaar. De vergelijking heeft
+//               een kolom per tier; smal met vier tiers staan de cellen twee aan twee
+//               met het tier-icoon ervoor.
+//   Laten zien  vier kolommen binnen dezelfde breedte (90% tot 1400 px): smallere
+//               tussenruimte, en naam en prijs schalen mee met het scherm. Onder
+//               1000 px de smalle weergave (label boven de cellen). Telefoon: de
+//               tabel schuift opzij (ruim twee kolommen in beeld); de onderdeelnaam
+//               en een opengeklapte zin blijven links staan tijdens het schuiven.
+// Drie tiers: alles zoals het was.
 
 import { Fragment, useState, useEffect, useLayoutEffect, useRef, useId } from 'react'
 import {
-  CalendarDays, Calculator, Eye, Settings, Info, Crown, Target, Layers, Wallet, Clock, List,
-  ChevronDown, Check, Plus, X, CloudOff, Trash2, Quote,
+  CalendarDays, Calculator, Eye, Settings, Info, Crown, Target, Layers, Smartphone, Box, Wallet, Clock, List,
+  ChevronDown, Check, Plus, X, CloudOff, Trash2, Quote, Pencil,
 } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 import {
-  DUREN, TIERS, prijzen, reken, euro, leesGetal, normaliseerProduct,
+  DUREN, prijzen, reken, euro, leesGetal, normaliseerProduct,
   celSoort, nieuweVergelijkRij, vergelijkRijen, tierZin, gratisBij,
+  tierLijst, tierStandaardNaam,
 } from './aanbodData'
 
 const C = {
@@ -97,7 +115,8 @@ const LABEL = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', te
 const KLEIN = { fontSize: '0.8rem', fontWeight: 700, color: C.zacht }
 const KAAL = { border: 'none', background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }
 
-const TIER_ICOON = { premium: Crown, midden: Target, basis: Layers }
+// Icoon per tier. Een tier die hier niet staat krijgt het blokje (TIER_ICOON[k] || Box).
+const TIER_ICOON = { premium: Crown, midden: Target, basis: Layers, app: Smartphone }
 const STANDEN = [['rekenen', 'Rekenen', Calculator], ['tonen', 'Laten zien', Eye]]
 
 const toonGetal = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','))
@@ -328,11 +347,12 @@ function VeldGroep({ icoon, naam, children }) {
 // ── Stand Rekenen: één tier ──
 // metLijst = false: er is een vergelijking, de onderdelen staan in de tabel eronder.
 function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onPrijs, onOnderdelen, metLijst = true }) {
-  const Icoon = TIER_ICOON[sleutel]
+  const Icoon = TIER_ICOON[sleutel] || Box
   const p = prijzen(tier, duur, g)
   const r = reken(tier, duur, g.partnerPct, p ? p.teBetalen : null)
   // Vooruit: de gratis maanden lever je ook, dus kosten en uren lopen daarover door.
-  const vu = reken(tier, duur, g.partnerPct, p ? p.vooruit : null, gratisBij(g, duur))
+  // Krijgt deze tier ze niet (gratisMaandenUit), dan is vooruit gelijk aan gewoon.
+  const vu = reken(tier, duur, g.partnerPct, p ? p.vooruit : null, gratisBij(g, duur, tier))
   const metGratis = vu.maanden !== r.maanden
   const roodOnderNul = (goed) => (w) => (w !== null && w < 0 ? C.rood : goed)
   const uurKleur = (w) => (w === null ? C.zacht : roodOnderNul(C.groen)(w))
@@ -375,6 +395,15 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
 
       {open && (
         <div id={id} style={{ marginTop: 20 }}>
+          {/* Naam van de tier. Leeg = de standaardnaam (staat er grijs in). */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
+            <span role="img" aria-label="Naam" title="Naam" style={{ display: 'flex', flexShrink: 0, paddingTop: 11, color: C.zacht }}>
+              <Pencil size={18} strokeWidth={2.4} />
+            </span>
+            <TekstVeld waarde={tier.naam || ''} onChange={v => onVeld('naam', v)} label={`Naam ${naam}`} placeholder={tierStandaardNaam(sleutel)}
+              stijl={{ fontWeight: 900 }} />
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: '1.5rem', fontWeight: 900, color: r.omzet === null ? C.zacht : C.wit }}>€</span>
             <GetalVeld groot waarde={tier.prijs[duur]} onChange={onPrijs} placeholder="Totaal" label={`Totaalprijs ${naam}, ${duur} maanden`} />
@@ -389,6 +418,9 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
               <KortVeld waarde={tier.urenMaand} onChange={v => onVeld('urenMaand', v)} label={`Uren per maand ${naam}`} naam="Uren per maand" eenheid="/mnd" />
               <KortVeld waarde={tier.urenEenmalig} onChange={v => onVeld('urenEenmalig', v)} label={`Eenmalige uren ${naam}`} naam="Uren eenmalig" eenheid="1x" />
             </VeldGroep>
+            {/* Uit = deze tier krijgt bij vooruitbetalen geen gratis maanden (gratisMaandenUit). */}
+            <Schakelaar aan={!tier.gratisMaandenUit} onChange={aan => onVeld('gratisMaandenUit', !aan)}
+              label="Gratis mnd" naam={`Gratis maanden bij vooruitbetalen, ${naam}`} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', alignItems: 'baseline', gap: '10px 16px', marginTop: 24 }}>
@@ -464,14 +496,17 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
 // de naam past en de prijzen op één lijn blijven.
 // De naamregel en de prijs zijn losse blokken: het zin-knopje mag niet in de knop
 // zitten die de onderdelen uitklapt. Een tik op de prijs klapt de lijst nog wel uit.
+// krap = vier of meer tiers naast elkaar (niet compact): naam en prijs schalen mee
+// met het scherm, zodat ze op een laptop in hun kolom passen en op een groot
+// scherm even groot zijn als bij drie.
 function TierTonen({
-  sleutel, naam, tier, duur, g, open, onWissel, metLijst = true, compact = false,
+  sleutel, naam, tier, duur, g, open, onWissel, metLijst = true, compact = false, krap = false,
   zinOpen = false, onZin = null, zinId = null, zinRegel = false, zinBinnen = true,
 }) {
-  const Icoon = TIER_ICOON[sleutel]
+  const Icoon = TIER_ICOON[sleutel] || Box
   const p = prijzen(tier, duur, g)
   const lijst = metLijst ? tier.onderdelen.filter(o => o.trim()) : []
-  const prijsMaat = compact ? 'clamp(1.3rem, 6.4vw, 2.2rem)' : 'clamp(2.6rem, 5vw, 3.6rem)'
+  const prijsMaat = compact ? 'clamp(1.3rem, 6.4vw, 2.2rem)' : krap ? 'clamp(2.2rem, 3.8vw, 3.6rem)' : 'clamp(2.6rem, 5vw, 3.6rem)'
   const kleinMaat = compact ? '0.72rem' : '0.85rem'
   // Zonder onderdelen valt er niets uit te klappen: dan is de naam geen knop.
   const kan = lijst.length > 0
@@ -479,9 +514,9 @@ function TierTonen({
   const eigenZinId = useId()
   const zin = onZin ? tierZin(tier) : ''
   const zId = zinId || eigenZinId
-  const rij = { display: 'flex', alignItems: 'center', flexWrap: compact ? 'wrap' : 'nowrap', gap: compact ? '4px 6px' : 12 }
-  const icoon = <Icoon size={compact ? 18 : 24} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />
-  const naamStijl = { minWidth: 0, fontSize: compact ? '0.78rem' : '1.25rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', overflowWrap: 'anywhere' }
+  const rij = { display: 'flex', alignItems: 'center', flexWrap: compact ? 'wrap' : 'nowrap', gap: compact ? '4px 6px' : krap ? 8 : 12 }
+  const icoon = <Icoon size={compact ? 18 : krap ? 22 : 24} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />
+  const naamStijl = { minWidth: 0, fontSize: compact ? '0.78rem' : krap ? 'clamp(1rem, 1.35vw, 1.25rem)' : '1.25rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', overflowWrap: 'anywhere' }
   const icoonBoven = compact && zinRegel
   return (
     <div style={{ minWidth: 0 }}>
@@ -550,7 +585,7 @@ function TierTonen({
   )
 }
 
-// ── Vergelijking: één tabel voor de drie tiers ──
+// ── Vergelijking: één tabel voor alle tiers ──
 // Eén cel: groen vinkje, de tekst in dik wit, of een grijs kruisje.
 function CelInhoud({ waarde, klein = false }) {
   const soort = celSoort(waarde)
@@ -575,67 +610,85 @@ function CelInhoud({ waarde, klein = false }) {
   )
 }
 
-// Raster van één rij. Breed: onderdeelnaam als eerste kolom. Smal: drie kolommen,
-// de naam staat er als label boven (gridColumn 1 / -1). staart = kolom voor de
-// prullenbak in de bewerkbare tabel.
-const vglRaster = (smal, ruim, staart = false) => ({
+// Raster van één rij voor n tiers. Breed: onderdeelnaam als eerste kolom. Smal: n
+// kolommen, de naam staat er als label boven (gridColumn 1 / -1). staart = kolom
+// voor de prullenbak in de bewerkbare tabel. Vier of meer tiers: minder
+// tussenruimte, zodat de kolommen zelf de breedte krijgen.
+const vglRaster = (n, smal, ruim, staart = false) => ({
   display: 'grid', alignItems: 'start',
-  gridTemplateColumns: smal ? 'repeat(3, minmax(0, 1fr))' : `minmax(0, 0.75fr) repeat(3, minmax(0, 1fr))${staart ? ' 40px' : ''}`,
-  columnGap: smal ? 12 : ruim ? 48 : 24,
+  gridTemplateColumns: smal ? `repeat(${n}, minmax(0, 1fr))` : `minmax(0, 0.75fr) repeat(${n}, minmax(0, 1fr))${staart ? ' 40px' : ''}`,
+  columnGap: smal ? 12 : n > 3 ? (ruim && !staart ? 32 : 24) : ruim ? 48 : 24,
 })
+
+// Smalste kolom waarin een cel met tekst nog leest (telefoon, vier of meer tiers).
+const SCHUIF_MIN = 132
 
 // Stand Laten zien: de tiers met prijs als kolomkop, daaronder de onderdelen.
 // Smal: elke rij is zijn eigen raster, de naam staat als label boven de cellen.
 // Breed: één raster voor de hele tabel (de rijen zelf doen niet mee: display
-// contents, de lijn ertussen is een eigen strook). Zo meet de browser de drie
+// contents, de lijn ertussen is een eigen strook). Zo meet de browser de
 // tier-kolommen op hun inhoud: een kolom met lange teksten wordt breder dan een
-// kolom met alleen vinkjes, en wat over is gaat gelijk over de drie. De naamkolom
+// kolom met alleen vinkjes, en wat over is gaat gelijk over de kolommen. De naamkolom
 // blijft een vijfde van de breedte zoals voorheen, met 196 px als plafond.
 // Zin per tier (openZin, onZin): breed klapt hij in zijn eigen kolom open, onder
 // de prijs. Smal staat hij tussen de koppen en de eerste rij, over de volle
 // breedte en met de tiernaam erboven.
-function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte, openZin, onZin }) {
-  const raster = vglRaster(smal, ruim)
+// Schuiven (telefoon, vier of meer tiers): passen de kolommen niet met minstens
+// SCHUIF_MIN px elk, dan krijgen ze een vaste breedte (ruim twee in beeld, de
+// afgesneden derde laat zien dat er meer is) en schuift de tabel opzij. De
+// onderdeelnaam en een open zin plakken links (sticky), zodat ze in beeld blijven.
+function VergelijkingTonen({ tiers, rijen, g, duur, smal, ruim, breedte, openZin, onZin }) {
+  const n = tiers.length
+  const raster = vglRaster(n, smal, ruim)
   const zinBasis = useId()
-  const zinRegel = smal && TIERS.some(([k]) => tierZin(g.tiers[k]))
-  const naamBreed = Math.max(0, Math.min(196, Math.round((breedte - 3 * raster.columnGap) * 0.2)))
-  const tabel = smal ? null : { ...raster, gridTemplateColumns: `${naamBreed}px repeat(3, minmax(0, auto))` }
+  const zinRegel = smal && tiers.some(([k]) => tierZin(g.tiers[k]))
+  const schuif = smal && n > 3 && (breedte - (n - 1) * raster.columnGap) / n < SCHUIF_MIN
+  const kolom = Math.round(Math.min(168, Math.max(SCHUIF_MIN, breedte * 0.42)))
+  const rijRaster = schuif ? { ...raster, gridTemplateColumns: `repeat(${n}, ${kolom}px)` } : raster
+  const plak = schuif ? { position: 'sticky', left: 0, boxSizing: 'border-box' } : null
+  const naamBreed = Math.max(0, Math.min(196, Math.round((breedte - n * raster.columnGap) * 0.2)))
+  const tabel = smal
+    ? (schuif ? { width: n * kolom + (n - 1) * raster.columnGap } : null)
+    : { ...raster, gridTemplateColumns: `${naamBreed}px repeat(${n}, minmax(0, auto))` }
   const lijn = `1px solid ${C.rand}`
-  return (
-    <div role="table" aria-label="Vergelijking" style={{ ...tabel, marginTop: smal ? 28 : 48 }}>
-      <div role="row" style={smal ? { ...raster, paddingBottom: 24 } : { display: 'contents' }}>
+  const marge = smal ? 28 : 48
+  const inhoud = (
+    <div role="table" aria-label="Vergelijking" style={{ ...tabel, marginTop: schuif ? 0 : marge }}>
+      <div role="row" style={smal ? { ...rijRaster, paddingBottom: 24 } : { display: 'contents' }}>
         {!smal && <span role="columnheader" style={{ gridColumn: 1 }} />}
-        {TIERS.map(([k, naam]) => (
+        {tiers.map(([k, naam]) => (
           <div key={k} role="columnheader" style={{ minWidth: 0, paddingBottom: smal ? 0 : 36 }}>
-            <TierTonen sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} metLijst={false} compact={smal}
+            <TierTonen sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} metLijst={false} compact={smal} krap={n > 3}
               zinOpen={!!openZin[k]} onZin={() => onZin(k)} zinId={`${zinBasis}-${k}`} zinRegel={zinRegel} zinBinnen={!smal} />
           </div>
         ))}
       </div>
-      {smal && TIERS.map(([k, naam]) => {
+      {smal && tiers.map(([k, naam]) => {
         const zin = tierZin(g.tiers[k])
         if (!zin) return null
-        const Icoon = TIER_ICOON[k]
+        const Icoon = TIER_ICOON[k] || Box
         const p = prijzen(g.tiers[k], duur, g)
         return (
-          <ZinVak key={k} id={`${zinBasis}-${k}`} open={!!openZin[k]} zin={zin} perMaand={p ? p.perMaand : null} klein ruimte={[0, 20]}
-            kop={(
-              <span style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: '0.68rem', color: C.zacht }}>
-                <Icoon size={14} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />{naam}
-              </span>
-            )} />
+          <div key={k} style={plak ? { ...plak, width: breedte } : null}>
+            <ZinVak id={`${zinBasis}-${k}`} open={!!openZin[k]} zin={zin} perMaand={p ? p.perMaand : null} klein ruimte={[0, 20]}
+              kop={(
+                <span style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: '0.68rem', color: C.zacht }}>
+                  <Icoon size={14} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />{naam}
+                </span>
+              )} />
+          </div>
         )
       })}
       {rijen.map((r, i) => (
         <Fragment key={i}>
           {!smal && <span role="presentation" aria-hidden="true" style={{ gridColumn: '1 / -1', borderTop: lijn }} />}
-          <div role="row" style={smal ? { ...raster, rowGap: 8, padding: '14px 0', borderTop: lijn } : { display: 'contents' }}>
+          <div role="row" style={smal ? { ...rijRaster, rowGap: 8, padding: '14px 0', borderTop: lijn } : { display: 'contents' }}>
             <span role="rowheader" style={smal
-              ? { ...LABEL, gridColumn: '1 / -1', fontSize: '0.68rem', color: C.zacht, overflowWrap: 'anywhere' }
+              ? { ...LABEL, gridColumn: '1 / -1', fontSize: '0.68rem', color: C.zacht, overflowWrap: 'anywhere', ...(plak ? { ...plak, justifySelf: 'start', maxWidth: breedte } : null) }
               : { gridColumn: 1, minWidth: 0, padding: '16px 0', fontSize: '1rem', fontWeight: 700, lineHeight: 1.3, color: C.zacht, overflowWrap: 'anywhere' }}>
               {r.onderdeel}
             </span>
-            {TIERS.map(([k]) => (
+            {tiers.map(([k]) => (
               <span key={k} role="cell" style={{ display: 'flex', minWidth: 0, padding: smal ? 0 : '16px 0' }}><CelInhoud waarde={r[k]} klein={smal} /></span>
             ))}
           </div>
@@ -643,12 +696,21 @@ function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte, openZin, onZin
       ))}
     </div>
   )
+  if (!schuif) return inhoud
+  return (
+    <div style={{ marginTop: marge, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}>
+      {inhoud}
+    </div>
+  )
 }
 
 // Stand Rekenen: dezelfde tabel, bewerkbaar. Tik op een cel om te typen (leeg =
 // kruisje); het vinkje ernaast zet de cel op vinkje of haalt het weer weg.
 // Zonder rijen staat er alleen de knop om te beginnen.
-function VergelijkingBewerk({ rijen, onChange, smal, ruim }) {
+// blok = smal met vier of meer tiers: de cellen staan twee aan twee onder de
+// onderdeelnaam, elk met het tier-icoon ervoor (vier naast elkaar is te smal om
+// in te typen). De kop erboven is dan de legenda in dezelfde twee kolommen.
+function VergelijkingBewerk({ tiers, rijen, onChange, smal, ruim }) {
   // Eén cel tegelijk open ('rij:tier'). Sluit met Enter, het vinkje, een andere
   // cel of een tik buiten de tabel. Binnen de tabel sluit alleen de knop of het
   // veld waar je op tikt: de open cel is op een smal scherm hoger, dus sluiten
@@ -664,7 +726,13 @@ function VergelijkingBewerk({ rijen, onChange, smal, ruim }) {
   }, [actief])
 
   const zet = (i, veld, v) => onChange(rijen.map((r, j) => (j === i ? { ...r, [veld]: v } : r)))
-  const raster = vglRaster(smal, ruim, true)
+  const n = tiers.length
+  const blok = smal && n > 3
+  const raster = blok
+    ? { display: 'grid', alignItems: 'start', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: 12 }
+    : vglRaster(n, smal, ruim, true)
+  // Typveld boven het vinkje: alleen in de smalle cellen van drie naast elkaar.
+  const gestapeld = smal && !blok
   const kopStijl = { ...LABEL, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, color: C.zacht }
   const prullenbak = (i, r) => (
     <button type="button" title="Rij weghalen" aria-label={`Rij ${r.onderdeel.trim() || i + 1} weghalen`}
@@ -681,10 +749,10 @@ function VergelijkingBewerk({ rijen, onChange, smal, ruim }) {
   return (
     <div data-vgl-tabel style={{ marginTop: 40 }}>
       {rijen.length > 0 && (
-        <div style={{ ...raster, paddingBottom: 10 }}>
+        <div style={{ ...raster, rowGap: 6, paddingBottom: 10 }}>
           {!smal && <span />}
-          {TIERS.map(([k, naam]) => {
-            const Icoon = TIER_ICOON[k]
+          {tiers.map(([k, naam]) => {
+            const Icoon = TIER_ICOON[k] || Box
             return (
               <span key={k} style={kopStijl}>
                 <Icoon size={16} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -700,24 +768,31 @@ function VergelijkingBewerk({ rijen, onChange, smal, ruim }) {
           {smal
             ? <div onFocus={() => setActief(null)} style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'flex-start', gap: 4 }}>{naamVeld(i, r)}{prullenbak(i, r)}</div>
             : <div onFocus={() => setActief(null)} style={{ display: 'flex', minWidth: 0 }}>{naamVeld(i, r)}</div>}
-          {TIERS.map(([k, naam]) => {
+          {tiers.map(([k, naam]) => {
             const w = r[k]
             const sleutel = `${i}:${k}`
             const label = `${naam}, ${r.onderdeel.trim() || `rij ${i + 1}`}`
+            const Icoon = TIER_ICOON[k] || Box
+            // Alleen in blok: welk tier deze cel is.
+            const merk = blok
+              ? <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, paddingTop: 2, color: C.zacht }}><Icoon size={14} strokeWidth={2.4} /></span>
+              : null
             if (actief !== sleutel) {
               return (
                 <button key={k} type="button" title={naam} aria-label={`${label}: ${celSoort(w) === 'tekst' ? w.trim() : celSoort(w) === 'vink' ? 'zit erin' : 'zit er niet in'}. Bewerken`}
                   onClick={() => { setNieuw(-1); setActief(sleutel) }}
-                  style={{ ...KAAL, display: 'flex', alignItems: 'flex-start', minWidth: 0, minHeight: 40, padding: '10px 0', textAlign: 'left', color: C.wit }}>
+                  style={{ ...KAAL, display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0, minHeight: 40, padding: '10px 0', textAlign: 'left', color: C.wit }}>
+                  {merk}
                   <CelInhoud waarde={w} klein />
                 </button>
               )
             }
             return (
-              <div key={k} data-vgl-actief style={{ display: 'flex', flexDirection: smal ? 'column' : 'row', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
+              <div key={k} data-vgl-actief style={{ display: 'flex', flexDirection: gestapeld ? 'column' : 'row', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
+                {merk && <span style={{ display: 'flex', paddingTop: 10, marginRight: 4 }}>{merk}</span>}
                 <TekstVeld waarde={typeof w === 'string' ? w : ''} autoFocus label={label} onKlaar={() => setActief(null)}
                   onChange={v => zet(i, k, v === '' ? null : v)}
-                  stijl={{ fontWeight: 800, ...(smal ? { flex: 'none', width: '100%' } : null) }} />
+                  stijl={{ fontWeight: 800, ...(gestapeld ? { flex: 'none', width: '100%' } : null) }} />
                 <button type="button" aria-pressed={w === true} title="Vinkje" aria-label={`Vinkje ${label}`}
                   onClick={() => { zet(i, k, w === true ? null : true); setActief(null) }}
                   style={{ ...KAAL, width: 36, height: 40, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, color: w === true ? C.groen : C.zacht }}>
@@ -729,7 +804,7 @@ function VergelijkingBewerk({ rijen, onChange, smal, ruim }) {
           {!smal && prullenbak(i, r)}
         </div>
       ))}
-      <button type="button" onClick={() => { setActief(null); setNieuw(rijen.length); onChange([...rijen, nieuweVergelijkRij()]) }} style={{
+      <button type="button" onClick={() => { setActief(null); setNieuw(rijen.length); onChange([...rijen, nieuweVergelijkRij(tiers.map(([k]) => k))]) }} style={{
         ...KAAL, display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, marginTop: rijen.length ? 4 : 0, padding: 0,
         color: C.groen, fontSize: '0.85rem', fontWeight: 800,
       }}>
@@ -790,6 +865,20 @@ export default function Aanbod({ a, onSluit = null }) {
   const smal = breedte < 760
   // Rekenen heeft per tier twee bedragen naast elkaar en dus meer breedte nodig.
   const smalRekenen = breedte < 900
+  // De tiers in de volgorde van het scherm: [[sleutel, naam]].
+  const tiers = g ? tierLijst(g) : []
+  const n = tiers.length
+  const veel = n > 3
+  // Vier of meer tiers: de tabellen gaan eerder naar de smalle weergave (label
+  // boven de cellen), anders worden de kolommen te smal voor naam en prijs.
+  const smalTonen = breedte < (veel ? 1000 : 760)
+  const smalBewerk = breedte < (veel ? 900 : 760)
+  // Rekenen: alle tiers naast elkaar zolang elke ±230 px krijgt. Passen vier of
+  // meer niet, dan twee per rij.
+  const gatRekenen = veel ? 32 : 48
+  const kolRekenen = smalRekenen ? 1 : !veel || (breedte - (n - 1) * gatRekenen) / n >= 232 ? n : 2
+  // Laten zien zonder vergelijking (lijstjes per tier): zelfde gedachte.
+  const kolTonen = smal ? 1 : veel && breedte < 1000 ? 2 : n
   const tonen = stand === 'tonen'
   const rekenen = !!g && !tonen
   const popOpen = rekenen ? pop : null
@@ -912,10 +1001,10 @@ export default function Aanbod({ a, onSluit = null }) {
             </div>
           )}
           <div style={{
-            display: 'grid', gridTemplateColumns: smalRekenen ? '1fr' : 'repeat(3, minmax(0, 1fr))', alignItems: 'start',
-            gap: smalRekenen ? 40 : 48, marginTop: onSluit ? 16 : 28,
+            display: 'grid', gridTemplateColumns: `repeat(${kolRekenen}, minmax(0, 1fr))`, alignItems: 'start',
+            gap: smalRekenen ? 40 : kolRekenen > 3 ? `48px ${gatRekenen}px` : 48, marginTop: onSluit ? 16 : 28,
           }}>
-            {TIERS.map(([k, naam]) => (
+            {tiers.map(([k, naam]) => (
               <TierRekenen key={k} sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g}
                 open={!!openTiers[k]} onWissel={() => wisselTier(k)}
                 onPrijs={v => zetTier(k, t => ({ ...t, prijs: { ...t.prijs, [duur]: v } }))}
@@ -924,23 +1013,23 @@ export default function Aanbod({ a, onSluit = null }) {
                 metLijst={vglRijen.length === 0} />
             ))}
           </div>
-          <VergelijkingBewerk rijen={vglRijen} smal={smal} ruim={ruim}
+          <VergelijkingBewerk tiers={tiers} rijen={vglRijen} smal={smalBewerk} ruim={ruim}
             onChange={lijst => wijzig(oud => ({ ...oud, vergelijking: lijst }))} />
         </>
       )}
 
       {g && tonen && vglTonen.length > 0 && (
-        <VergelijkingTonen rijen={vglTonen} g={g} duur={duur} smal={smal} ruim={ruim} breedte={breedte}
+        <VergelijkingTonen tiers={tiers} rijen={vglTonen} g={g} duur={duur} smal={smalTonen} ruim={ruim} breedte={breedte}
           openZin={openZin} onZin={wisselZin} />
       )}
 
       {g && tonen && vglTonen.length === 0 && (
         <div style={{
-          display: 'grid', gridTemplateColumns: smal ? '1fr' : 'repeat(3, minmax(0, 1fr))', alignItems: 'start',
-          gap: smal ? 48 : 56, marginTop: smal ? 32 : 48,
+          display: 'grid', gridTemplateColumns: `repeat(${kolTonen}, minmax(0, 1fr))`, alignItems: 'start',
+          gap: smal ? 48 : kolTonen > 3 ? '56px 40px' : 56, marginTop: smal ? 32 : 48,
         }}>
-          {TIERS.map(([k, naam]) => (
-            <TierTonen key={k} sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g}
+          {tiers.map(([k, naam]) => (
+            <TierTonen key={k} sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} krap={kolTonen > 3}
               open={!!openTiers[k]} onWissel={() => wisselTier(k)}
               zinOpen={!!openZin[k]} onZin={() => wisselZin(k)} />
           ))}
