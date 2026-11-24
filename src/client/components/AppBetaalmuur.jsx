@@ -13,11 +13,12 @@ import { useEffect, useState } from 'react'
 import { Check, LogOut, ArrowLeft, RotateCcw } from 'lucide-react'
 import { haalAanbod, koop, herstel, VOORWAARDEN_URL, PRIVACY_URL } from '../../lib/appAbonnement'
 
+// Kersten (24 nov 2026): groot, vet, wit, korte zinnen.
 const VOORDELEN = [
-  'Je eigen voedingsplan met calorieën en macro\'s',
-  'Trainingsschema dat meegroeit met je progressie',
-  'Eten loggen, uit eten en boodschappen',
-  'Gewicht, foto\'s en voortgang bijhouden',
+  'Jouw eigen eetplan',
+  'Jouw eigen training',
+  'Eten loggen in een tik',
+  'Zie hoe je vooruitgaat',
 ]
 
 const knopWit = {
@@ -27,8 +28,8 @@ const knopWit = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 const linkKnop = {
-  background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.75)', fontFamily: 'inherit',
-  fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', padding: '0.6rem 0.4rem',
+  background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit',
+  fontSize: '1rem', fontWeight: 900, cursor: 'pointer', padding: '0.6rem 0.4rem',
   display: 'inline-flex', alignItems: 'center', gap: 6, touchAction: 'manipulation',
 }
 
@@ -88,7 +89,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
         )}
 
         <div style={{ textAlign: 'center', marginTop: onTerug ? 4 : 16 }}>
-          <img src="/mascottes/coach.png" alt="" style={{ width: 110, height: 110, objectFit: 'contain' }} />
+          <img src="/mascottes/kersten-duim.webp" alt="" style={{ width: 110, height: 165, objectFit: 'contain' }} />
           <div style={{ fontSize: '1.55rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.15, marginTop: 8 }}>
             {titel || (voornaam ? `${voornaam}, ga door met MY ARC` : 'Ga door met MY ARC')}
           </div>
@@ -96,7 +97,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
 
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {VOORDELEN.map(v => (
-            <div key={v} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: '0.95rem', fontWeight: 700 }}>
+            <div key={v} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: '1.1rem', fontWeight: 900 }}>
               <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: '#10b981', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Check size={14} strokeWidth={3.2} />
               </span>
@@ -106,10 +107,10 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
         </div>
 
         <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {aanbod === null && <div style={{ textAlign: 'center', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Prijzen laden…</div>}
+          {aanbod === null && <div style={{ textAlign: 'center', fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>Even laden…</div>}
           {aanbod?.length === 0 && (
             <div style={{ textAlign: 'center', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-              De abonnementen zijn nu niet te laden. Controleer je internet en probeer het zo opnieuw.
+              Dat lukte niet. Check je internet.
             </div>
           )}
           {aanbod?.map(a => {
@@ -133,13 +134,13 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', fontWeight: 900 }}>
                     {a.maanden === 12 ? 'Jaar' : a.maanden === 1 ? 'Maand' : `${a.maanden} maanden`}
-                    {extra && <span style={{ fontSize: '0.72rem', fontWeight: 900, background: '#10b981', color: '#0a0a0a', borderRadius: 6, padding: '2px 6px' }}>{extra}</span>}
+                    {extra && <span style={{ fontSize: '0.9rem', fontWeight: 900, background: '#10b981', color: '#0a0a0a', borderRadius: 6, padding: '2px 6px' }}>{extra}</span>}
                   </span>
-                  {a.proef && <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>Eerste {a.proefDuur} gratis</span>}
+                  {a.proef && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, color: '#fff', marginTop: 2 }}>Eerste {a.proefDuur} gratis</span>}
                 </span>
                 <span style={{ textAlign: 'right' }}>
                   <span style={{ display: 'block', fontSize: '1.05rem', fontWeight: 900 }}>{a.prijs}</span>
-                  <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}>
+                  <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>
                     {a.maanden === 12 ? (a.perMaand ? `${a.perMaand} /mnd` : 'per jaar') : a.maanden === 1 ? 'per maand' : 'per periode'}
                   </span>
                 </span>
@@ -151,19 +152,19 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
         {keuze && (
           <>
             <button onClick={start} disabled={bezig} style={{ ...knopWit, marginTop: 18, opacity: bezig ? 0.6 : 1 }}>
-              {bezig ? 'Even geduld…' : keuze.proef ? `Start je gratis ${keuze.proefDuur}` : 'Abonnement starten'}
+              {bezig ? 'Even wachten…' : keuze.proef ? `Start gratis` : 'Start'}
             </button>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginTop: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.45, marginTop: 12, textAlign: 'center' }}>
               {keuze.proef
-                ? `Na je gratis ${keuze.proefDuur} betaal je ${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `
-                : `Je betaalt ${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `}
-              Het abonnement verlengt automatisch, tenzij je het minstens 24 uur voor het einde van de periode opzegt in je Apple ID-instellingen.
+                ? `Eerst ${keuze.proefDuur} gratis. Daarna ${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `
+                : `${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `}
+              Het loopt vanzelf door. Stoppen? Zeg het 24 uur voor het einde op in je Apple ID.
             </div>
           </>
         )}
 
         {melding && (
-          <div style={{ marginTop: 12, padding: '0.7rem 0.9rem', borderRadius: 12, background: 'rgba(245,158,11,0.12)', color: '#fbbf24', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.45 }}>
+          <div style={{ marginTop: 12, padding: '0.7rem 0.9rem', borderRadius: 12, background: 'rgba(245,158,11,0.12)', color: '#fbbf24', fontSize: '1rem', fontWeight: 900, lineHeight: 1.4 }}>
             {melding}
           </div>
         )}
@@ -180,7 +181,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
           <button onClick={onLogout} style={{
             marginTop: 18, width: '100%', minHeight: 48, borderRadius: 14,
             background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', color: '#fff',
-            fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}>
             <LogOut size={16} strokeWidth={2.6} /> Uitloggen

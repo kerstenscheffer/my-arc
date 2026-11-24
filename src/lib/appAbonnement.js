@@ -112,10 +112,10 @@ export async function koop(authUserId, pkg) {
   if (!Purchases) return { ok: false, fout: 'Kopen lukt niet op dit apparaat.' }
   try {
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
-    return heeftToegang(customerInfo) ? { ok: true } : { ok: false, fout: 'De aankoop is niet bevestigd. Probeer Herstel aankopen.' }
+    return heeftToegang(customerInfo) ? { ok: true } : { ok: false, fout: 'Dat lukte niet. Tik op Herstel aankopen.' }
   } catch (e) {
     if (e?.userCancelled || e?.code === '1' || e?.code === 1) return { ok: false, geannuleerd: true }
-    return { ok: false, fout: e?.message || 'Er ging iets mis bij de aankoop.' }
+    return { ok: false, fout: e?.message || 'Dat lukte niet. Probeer het nog eens.' }
   }
 }
 
@@ -125,7 +125,7 @@ export async function herstel(authUserId) {
   if (!Purchases) return { ok: false, fout: 'Herstellen lukt niet op dit apparaat.' }
   try {
     const { customerInfo } = await Purchases.restorePurchases()
-    return heeftToegang(customerInfo) ? { ok: true } : { ok: false, fout: 'Geen lopend abonnement gevonden op dit Apple ID.' }
+    return heeftToegang(customerInfo) ? { ok: true } : { ok: false, fout: 'Geen abonnement gevonden.' }
   } catch (e) {
     return { ok: false, fout: e?.message || 'Herstellen mislukt.' }
   }

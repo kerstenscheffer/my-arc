@@ -31,47 +31,40 @@ const SLIDES = [
 // ── De vragen ─────────────────────────────────────────────────────────────────
 // soort: keuze (tikken = door), meer (meerdere, met Verder), getal, tekst.
 const VRAGEN = [
-  { k: 'voornaam', soort: 'tekst', vraag: 'Hoe heet je?', sub: 'Dan weten we hoe we je aanspreken.', placeholder: 'Voornaam' },
-  { k: 'doel', soort: 'keuze', vraag: 'Wat is je doel?', opties: [
-    ['fat_loss', 'Vet verliezen', 'Strakker en lichter worden'],
-    ['muscle_gain', 'Spieren opbouwen', 'Sterker en groter worden'],
-    ['recomp', 'Strakker worden', 'Vet eraf, spieren erbij'],
-    ['maintain', 'Fit blijven', 'Je gewicht houden'],
+  { k: 'voornaam', soort: 'tekst', vraag: 'Hoe heet je?', placeholder: 'Je naam' },
+  { k: 'doel', soort: 'keuze', vraag: 'Wat wil je?', opties: [
+    ['fat_loss', 'Vet kwijt'], ['muscle_gain', 'Meer spieren'], ['recomp', 'Strakker worden'], ['maintain', 'Fit blijven'],
   ] },
-  { k: 'geslacht', soort: 'keuze', vraag: 'Ben je een man of een vrouw?', sub: 'Dat telt mee in je verbruik.', opties: [['male', 'Man'], ['female', 'Vrouw']] },
+  { k: 'geslacht', soort: 'keuze', vraag: 'Ben je een man of een vrouw?', opties: [['male', 'Man'], ['female', 'Vrouw']] },
   { k: 'leeftijd', soort: 'getal', vraag: 'Hoe oud ben je?', eenheid: 'jaar', min: 16, max: 90, placeholder: '30' },
   { k: 'lengte', soort: 'getal', vraag: 'Hoe lang ben je?', eenheid: 'cm', min: 130, max: 230, placeholder: '180' },
-  { k: 'gewicht', soort: 'getal', vraag: 'Wat weeg je nu?', eenheid: 'kg', min: 35, max: 250, decimaal: true, placeholder: '85' },
-  { k: 'streefgewicht', soort: 'getal', vraag: 'Wat is je streefgewicht?', eenheid: 'kg', min: 35, max: 250, decimaal: true, placeholder: '78',
+  { k: 'gewicht', soort: 'getal', vraag: 'Hoe zwaar ben je nu?', eenheid: 'kg', min: 35, max: 250, decimaal: true, placeholder: '85' },
+  { k: 'streefgewicht', soort: 'getal', vraag: 'Wat wil je wegen?', eenheid: 'kg', min: 35, max: 250, decimaal: true, placeholder: '78',
     tonen: a => a.doel !== 'maintain' },
-  { k: 'activiteit', soort: 'keuze', vraag: 'Hoe actief ben je overdag?', sub: 'Buiten je trainingen om.', opties: [
-    ['sedentary', 'Vooral zittend', 'Kantoor, auto, weinig lopen'],
-    ['lightly_active', 'Licht actief', 'Af en toe lopen of fietsen'],
-    ['moderately_active', 'Actief', 'Veel op de been'],
-    ['very_active', 'Heel actief', 'Lichamelijk werk'],
+  { k: 'activiteit', soort: 'keuze', vraag: 'Hoeveel beweeg je op een dag?', opties: [
+    ['sedentary', 'Ik zit veel'], ['lightly_active', 'Ik loop soms'], ['moderately_active', 'Ik loop veel'], ['very_active', 'Ik werk met mijn lijf'],
   ] },
-  { k: 'trainingen', soort: 'keuze', vraag: 'Hoe vaak per week kun je trainen?', opties: [['2', '2 keer'], ['3', '3 keer'], ['4', '4 keer'], ['5', '5 keer of meer']] },
-  { k: 'ervaring', soort: 'keuze', vraag: 'Hoeveel ervaring heb je met krachttraining?', opties: [
-    ['beginner', 'Beginner', 'Minder dan een jaar'],
-    ['intermediate', 'Gemiddeld', '1 tot 3 jaar'],
-    ['advanced', 'Gevorderd', 'Langer dan 3 jaar'],
+  { k: 'trainingen', soort: 'keuze', vraag: 'Hoe vaak wil je trainen?', opties: [['2', '2 keer per week'], ['3', '3 keer per week'], ['4', '4 keer per week'], ['5', '5 keer per week']] },
+  { k: 'ervaring', soort: 'keuze', vraag: 'Hoe lang train je al?', opties: [
+    ['beginner', 'Net begonnen'], ['intermediate', '1 tot 3 jaar'], ['advanced', 'Langer dan 3 jaar'],
   ] },
-  { k: 'minuten', soort: 'keuze', vraag: 'Hoeveel tijd heb je per training?', opties: [['45', '45 minuten'], ['60', '1 uur'], ['75', '1 uur en een kwartier'], ['90', '1,5 uur']] },
-  { k: 'locatie', soort: 'keuze', vraag: 'Waar train je?', opties: [['gym', 'In de sportschool'], ['home', 'Thuis'], ['both', 'Allebei']] },
-  { k: 'focus', soort: 'meer', vraag: 'Welke spieren wil je extra aandacht geven?', sub: 'Kies er maximaal drie, of sla over.', max: 3, opties: [
+  { k: 'minuten', soort: 'keuze', vraag: 'Hoe lang mag een training duren?', opties: [['45', '45 minuten'], ['60', '1 uur'], ['75', '1 uur en 15 minuten'], ['90', '1,5 uur']] },
+  { k: 'locatie', soort: 'keuze', vraag: 'Waar train je?', opties: [['gym', 'In de gym'], ['home', 'Thuis'], ['both', 'Allebei']] },
+  { k: 'focus', soort: 'meer', vraag: 'Welke spieren wil je extra trainen?', sub: 'Kies er max 3.', max: 3, opties: [
     ['chest', 'Borst'], ['shoulders', 'Schouders'], ['arms', 'Armen'], ['back', 'Rug'], ['abs', 'Buik'],
-    ['glutes', 'Billen'], ['quads', 'Bovenbenen'], ['hamstrings', 'Achterkant benen'], ['calves', 'Kuiten'],
+    ['glutes', 'Billen'], ['quads', 'Benen voor'], ['hamstrings', 'Benen achter'], ['calves', 'Kuiten'],
   ] },
-  { k: 'maaltijden', soort: 'keuze', vraag: 'Hoeveel keer per dag eet je het liefst?', opties: [['3', '3 keer'], ['4', '4 keer'], ['5', '5 keer']] },
-  { k: 'allergieen', soort: 'meer', vraag: 'Is er iets dat je niet eet?', sub: 'Laat leeg als je alles eet.', opties: [
+  { k: 'maaltijden', soort: 'keuze', vraag: 'Hoe vaak eet je per dag?', opties: [['3', '3 keer'], ['4', '4 keer'], ['5', '5 keer']] },
+  { k: 'allergieen', soort: 'meer', vraag: 'Wat eet je niet?', sub: 'Eet je alles? Tik dan op Verder.', opties: [
     ['lactose', 'Lactose'], ['gluten', 'Gluten'], ['noten', 'Noten'], ['vis', 'Vis'], ['varkensvlees', 'Varkensvlees'],
-    ['vegetarisch', 'Vegetarisch'], ['vegan', 'Vegan'],
+    ['vegetarisch', 'Geen vlees'], ['vegan', 'Vegan'],
   ] },
 ]
 
 // ── Kleine bouwstenen in de stijl van het inlogscherm ────────────────────────
 const kop = { fontSize: '1.55rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.15 }
-const subTekst = { fontSize: '0.92rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', margin: '0.55rem 0 0', lineHeight: 1.45 }
+// Kersten (24 nov 2026): geen kleine of grijze letters. Alles groot, vet en wit. Korte zinnen.
+const subTekst = { fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: '0.6rem 0 0', lineHeight: 1.4 }
 
 function WitteKnop({ children, disabled, style, ...props }) {
   return (
@@ -111,8 +104,8 @@ function Optie({ actief, titel, sub, onClick, vinkje }) {
       transition: 'background 0.15s, border-color 0.15s',
     }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900 }}>{titel}</span>
-        {sub && <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, opacity: 0.7, marginTop: 2 }}>{sub}</span>}
+        <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900 }}>{titel}</span>
+        {sub && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 800, marginTop: 2 }}>{sub}</span>}
       </span>
       {vinkje && (
         <span style={{
@@ -156,7 +149,11 @@ function Achtergrond({ children }) {
 // ── De gids: Kersten-figuur, bovenlijf, licht geanimeerd ─────────────────────
 // Ademt rustig; bij elke nieuwe stap (sleutel) een sprongetje met een knik.
 // 'blij' = juichen bij het resultaat. Onderkant loopt weg in het zwart.
-function CoachGids({ sleutel, hoogte = 150, blij = false }) {
+// Houdingen (24 nov 2026, door Kersten gemaakt): per stap een andere pose.
+const POSES = ['wijzen', 'denken', 'duim', 'juichen', 'spierballen']
+const poseUrl = (pose) => `/mascottes/kersten-${POSES.includes(pose) ? pose : 'spierballen'}.webp`
+
+function CoachGids({ sleutel, hoogte = 150, blij = false, pose = 'spierballen' }) {
   const breed = Math.round(hoogte * 1.35)
   return (
     <div aria-hidden style={{ position: 'relative', height: hoogte, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -169,11 +166,65 @@ function CoachGids({ sleutel, hoogte = 150, blij = false }) {
       <div style={{ position: 'absolute', bottom: 0, width: breed * 0.9, height: hoogte * 0.9, borderRadius: '50%', background: 'radial-gradient(ellipse at 50% 60%, rgba(255,140,60,0.28) 0%, transparent 65%)', animation: 'gidsGloed 3.6s ease-in-out infinite' }} />
       <div key={sleutel} style={{ position: 'relative', width: breed, height: hoogte, overflow: 'hidden', animation: 'gidsHop 0.6s cubic-bezier(.3,1.4,.5,1) both', transformOrigin: '50% 100%' }}>
         <div style={{ animation: `${blij ? 'gidsJuich 1.4s ease-in-out 0.6s 2,' : ''} gidsAdem 3.6s ease-in-out infinite`, transformOrigin: '50% 100%' }}>
-          <img src="/mascottes/coach.png" alt="" draggable={false} style={{
+          <img src={poseUrl(pose)} alt="" draggable={false} style={{
             display: 'block', width: breed, height: 'auto', marginTop: 6,
-            WebkitMaskImage: 'linear-gradient(to bottom, #000 62%, transparent 96%)',
-            maskImage: 'linear-gradient(to bottom, #000 62%, transparent 96%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, #000 85%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, #000 85%, transparent 100%)',
           }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Typt een tekst letter voor letter. Begint opnieuw als de tekst verandert.
+function useTypen(tekst, snelheid = 26) {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    setN(0)
+    if (!tekst) return
+    let i = 0
+    const t = setInterval(() => { i += 1; setN(i); if (i >= tekst.length) clearInterval(t) }, snelheid)
+    return () => clearInterval(t)
+  }, [tekst, snelheid])
+  return { getypt: tekst.slice(0, n), klaar: n >= tekst.length }
+}
+
+// Kersten in beeld met een tekstwolk eronder die over de onderkant van zijn
+// lijf valt (24 nov 2026). De tekst wordt getypt, alsof hij praat. De wolk
+// heeft vast de hoogte van de hele tekst, zodat niets verspringt.
+function Gids({ sleutel, hoogte = 150, blij = false, pose, titel, zin, overlap = 22 }) {
+  const heel = zin ? `${titel}\n${zin}` : titel
+  const { getypt, klaar } = useTypen(heel)
+  const [t1, t2 = ''] = getypt.split('\n')
+  const opRegel2 = getypt.includes('\n')
+  const cursor = !klaar && <span style={{ display: 'inline-block', width: 3, height: '1em', background: '#fff', marginLeft: 3, verticalAlign: '-0.12em', animation: 'cursorKnipper 0.8s steps(1) infinite' }} />
+  const tekst = (eerste, tweede, zichtbaar) => (
+    <div style={{ visibility: zichtbaar ? 'visible' : 'hidden', gridArea: '1 / 1' }}>
+      <div style={kop}>{eerste}{zichtbaar && !opRegel2 ? cursor : null}</div>
+      {zin && <div style={subTekst}>{tweede}{zichtbaar && opRegel2 ? cursor : null}</div>}
+    </div>
+  )
+  return (
+    <div>
+      <style>{'@keyframes cursorKnipper { 50% { opacity: 0 } } @keyframes wolkIn { from { opacity: 0; transform: translateY(8px) scale(.98) } to { opacity: 1; transform: none } }'}</style>
+      <CoachGids sleutel={sleutel} hoogte={hoogte} blij={blij} pose={pose} />
+      <div key={sleutel} style={{
+        position: 'relative', zIndex: 2, marginTop: -overlap,
+        background: 'rgba(16,16,16,0.95)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 20,
+        padding: '1rem 1.15rem', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+        animation: 'wolkIn 0.35s ease both',
+      }}>
+        {/* Puntje van de wolk naar Kersten */}
+        <span style={{
+          position: 'absolute', top: -9, left: '50%', width: 16, height: 16, marginLeft: -8,
+          background: 'rgba(16,16,16,0.95)', borderTop: '1px solid rgba(255,255,255,0.16)', borderLeft: '1px solid rgba(255,255,255,0.16)',
+          transform: 'rotate(45deg)', borderTopLeftRadius: 4,
+        }} />
+        <div style={{ display: 'grid', textAlign: 'left' }}>
+          {tekst(titel, zin, false)}
+          {tekst(t1, t2, true)}
         </div>
       </div>
     </div>
@@ -191,6 +242,7 @@ export default function AppOnboarding() {
   const [fout, setFout] = useState(null)
 
   useEffect(() => { try { localStorage.setItem(OPSLAG, JSON.stringify(antw)) } catch { /* privé-venster */ } }, [antw])
+  useEffect(() => { POSES.forEach(p => { const i = new Image(); i.src = poseUrl(p) }) }, [])
 
   const zichtbaar = useMemo(() => VRAGEN.filter(v => !v.tonen || v.tonen(antw)), [antw])
   const totaal = zichtbaar.length + 2 // + resultaat + account
@@ -217,71 +269,74 @@ export default function AppOnboarding() {
       supabase.rpc('app_macro_voorbeeld', { p }).then(x => x, e => ({ error: e })),
       new Promise(res => setTimeout(res, 1800)), // even het rekenmoment laten zien
     ])
-    if (r?.error || !r?.data || r.data.fout) { setFout('Rekenen lukte niet. Controleer je gegevens of je internet.'); setStap(zichtbaar.length - 1); return }
+    if (r?.error || !r?.data || r.data.fout) { setFout('Dat lukte niet. Check je internet en probeer het nog eens.'); setStap(zichtbaar.length - 1); return }
     setMacros(r.data); setStap('resultaat')
   }
 
+  const naam = antw.voornaam ? `${antw.voornaam}, ` : ''
+  const Naam = antw.voornaam || ''
+  const vraag = typeof stap === 'number' ? zichtbaar[stap] : null
+  const zegt = stap === 'intro' ? { titel: 'Hoi! Ik ben Kersten', zin: 'Ik stel je een paar vragen. Dan maak ik jouw plan.' }
+    : vraag ? { titel: vraag.vraag, zin: vraag.sub }
+    : stap === 'rekenen' ? { titel: 'Even rekenen…', zin: Naam ? `${Naam}, ik maak jouw plan.` : 'Ik maak jouw plan.' }
+    : stap === 'resultaat' ? { titel: `${naam}dit is jouw plan!`.replace(/^./, c => c.toUpperCase()), zin: 'Op een trainingsdag eet je:' }
+    : stap === 'account' ? { titel: 'Maak je account', zin: 'Zo bewaar je jouw plan.' }
+    : { titel: Naam ? `Even wachten, ${Naam}` : 'Even wachten', zin: 'Ik zet alles voor je klaar.' }
+  const groot = stap === 'intro' || stap === 'rekenen' || stap === 'bouwen'
+  // Welke houding bij welke stap: wijzen bij keuzes, denken bij getallen en rekenen.
+  const pose = stap === 'intro' ? 'spierballen'
+    : vraag ? (vraag.soort === 'getal' ? 'denken' : 'wijzen')
+    : stap === 'rekenen' ? 'denken'
+    : stap === 'resultaat' ? 'juichen'
+    : 'duim'
+
   return (
     <Achtergrond>
-      {/* De gids boven de voortgang */}
-      {stap !== 'intro' && (
-        <div style={{ marginBottom: 4 }}>
-          <CoachGids sleutel={String(stap)} hoogte={stap === 'rekenen' || stap === 'bouwen' ? 190 : 140} blij={stap === 'resultaat'} />
-        </div>
-      )}
-
-      {/* Bovenbalk: terug + voortgang */}
-      {stap !== 'intro' && stap !== 'bouwen' && stap !== 'rekenen' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.75rem' }}>
+      {/* Kop: terug, voortgang, inloggen */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, marginBottom: '0.75rem' }}>
+        {stap !== 'intro' && stap !== 'rekenen' && stap !== 'bouwen' && (
           <button onClick={terug} aria-label="Terug" style={{
             width: 40, height: 40, borderRadius: 12, flexShrink: 0, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff',
+            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}><ArrowLeft size={18} strokeWidth={2.6} /></button>
-          <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-            <div style={{ width: `${Math.round((positie / totaal) * 100)}%`, height: '100%', background: '#fff', borderRadius: 2, transition: 'width 0.35s ease' }} />
+        )}
+        {stap === 'intro' ? (
+          <>
+            <div style={{ flex: 1, display: 'flex', transform: 'scale(0.7)', transformOrigin: 'left center' }}><LaadLogo boog={false} /></div>
+            <button onClick={() => { window.location.href = '/client-login' }} style={{
+              minHeight: 40, padding: '0 1rem', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff',
+              fontSize: '1rem', fontWeight: 900,
+            }}>Inloggen</button>
+          </>
+        ) : (
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.round((positie / totaal) * 100)}%`, height: '100%', background: '#fff', borderRadius: 3, transition: 'width 0.35s ease' }} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {stap === 'intro' && <Intro onStart={() => setStap(0)} />}
-      {typeof stap === 'number' && zichtbaar[stap] && (
-        <Vraag key={zichtbaar[stap].k} v={zichtbaar[stap]} waarde={antw[zichtbaar[stap].k]} onZet={zet} onVolgende={volgende} fout={fout} />
-      )}
-      {stap === 'rekenen' && <Rekenen voornaam={antw.voornaam} />}
-      {stap === 'resultaat' && macros && <Resultaat macros={macros} antw={antw} onVerder={() => setStap('account')} />}
-      {stap === 'account' && <Account antw={antw} onKlaar={() => setStap('bouwen')} />}
-      {stap === 'bouwen' && <Bouwen antw={antw} />}
+      <div style={groot ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: '2rem' } : null}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <Gids sleutel={String(stap)} hoogte={groot ? 230 : 150} blij={stap === 'resultaat'} pose={pose} titel={zegt.titel} zin={zegt.zin} overlap={groot ? 26 : 18} />
+        </div>
+
+        {stap === 'intro' && <Intro onStart={() => setStap(0)} />}
+        {vraag && <Vraag key={vraag.k} v={vraag} waarde={antw[vraag.k]} onZet={zet} onVolgende={volgende} fout={fout} />}
+        {stap === 'resultaat' && macros && <Resultaat macros={macros} antw={antw} onVerder={() => setStap('account')} />}
+        {stap === 'account' && <Account antw={antw} onKlaar={() => setStap('bouwen')} />}
+        {stap === 'bouwen' && <Bouwen antw={antw} />}
+      </div>
     </Achtergrond>
   )
 }
 
 function Intro({ onStart }) {
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', paddingBottom: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem', opacity: 0.9, transform: 'scale(0.8)' }}><LaadLogo boog={false} /></div>
-      <CoachGids sleutel="intro" hoogte={230} />
-      {/* Naamkaartje onder de figuur: wie je helpt */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: -6 }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999,
-          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
-          fontSize: '0.82rem', fontWeight: 800, color: '#fff',
-        }}>
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-          Kersten · je coach
-        </span>
-      </div>
-      <h1 style={{ ...kop, fontSize: '1.8rem', marginTop: '1.1rem' }}>Hoi! Ik help je op weg</h1>
-      <p style={{ ...subTekst, marginTop: '0.75rem' }}>
-        Ik stel je een paar korte vragen. Daarna reken ik je calorieën uit en zet ik je trainingsschema en voedingsplan voor je klaar. Duurt 2 minuten.
-      </p>
-      <WitteKnop onClick={onStart} style={{ marginTop: '1.6rem' }}>Laten we beginnen</WitteKnop>
-      <button onClick={() => { window.location.href = '/client-login' }} style={{
-        marginTop: '0.9rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)',
-        fontSize: '0.9rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', padding: '0.5rem',
-      }}>Ik heb al een account</button>
-      {VOORBEELD && <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', fontWeight: 800, color: '#10b981' }}>Voorbeeldmodus: er wordt niets aangemaakt</div>}
+    <div style={{ textAlign: 'center' }}>
+      <WitteKnop onClick={onStart}>Start</WitteKnop>
+      {VOORBEELD && <div style={{ marginTop: '0.9rem', fontSize: '1rem', fontWeight: 900, color: '#10b981' }}>Voorbeeld: er wordt niets opgeslagen</div>}
     </div>
   )
 }
@@ -305,11 +360,9 @@ function Vraag({ v, waarde, onZet, onVolgende, fout }) {
 
   return (
     <div>
-      <h1 style={kop}>{v.vraag}</h1>
-      {v.sub && <p style={subTekst}>{v.sub}</p>}
-      {fout && <div style={{ marginTop: 14, padding: '0.7rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '0.85rem', fontWeight: 800 }}>{fout}</div>}
+      {fout && <div style={{ marginBottom: 14, padding: '0.7rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '1rem', fontWeight: 900 }}>{fout}</div>}
 
-      <div style={{ marginTop: '1.4rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {v.soort === 'keuze' && v.opties.map(([w, t, s]) => (
           <Optie key={w} titel={t} sub={s} actief={String(waarde) === w} onClick={() => kies(w)} />
         ))}
@@ -332,26 +385,15 @@ function Vraag({ v, waarde, onZet, onVolgende, fout }) {
                 autoCapitalize={v.soort === 'tekst' ? 'words' : 'off'} autoComplete={v.k === 'voornaam' ? 'given-name' : 'off'}
                 style={v.soort === 'getal' ? { fontSize: '1.6rem', fontWeight: 900, minHeight: 64, paddingRight: '4rem' } : null}
               />
-              {v.eenheid && <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{v.eenheid}</span>}
+              {v.eenheid && <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{v.eenheid}</span>}
             </div>
             {v.soort === 'getal' && tekst !== '' && !getalOk && (
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fbbf24' }}>Vul een getal in tussen {v.min} en {v.max}.</div>
+              <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fbbf24' }}>Kies een getal van {v.min} tot {v.max}.</div>
             )}
             <WitteKnop type="submit" disabled={!(getalOk || tekstOk)}>Verder</WitteKnop>
           </form>
         )}
       </div>
-    </div>
-  )
-}
-
-function Rekenen({ voornaam }) {
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', paddingBottom: '4rem' }}>
-      <Loader2 size={36} strokeWidth={2.4} style={{ animation: 'draai 1s linear infinite' }} />
-      <style>{'@keyframes draai { to { transform: rotate(360deg) } }'}</style>
-      <h1 style={{ ...kop, marginTop: '1.25rem' }}>{voornaam ? `${voornaam}, we rekenen het uit` : 'We rekenen het uit'}</h1>
-      <p style={subTekst}>Je verbruik, je doel en wat je per dag nodig hebt.</p>
     </div>
   )
 }
@@ -378,17 +420,15 @@ function Resultaat({ macros, antw, onVerder }) {
   const blok = (label, waarde) => (
     <div style={{ flex: 1, padding: '0.85rem 0.5rem', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
       <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{waarde} g</div>
-      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginTop: 2 }}>{label}</div>
     </div>
   )
 
   return (
     <div>
-      <h1 style={kop}>{antw.voornaam ? `${antw.voornaam}, dit is je plan` : 'Dit is je plan'}</h1>
-      <p style={subTekst}>Op een trainingsdag eet je:</p>
-      <div style={{ marginTop: '1.4rem', textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '3.4rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1 }}>{kcal.toLocaleString('nl-NL')}</div>
-        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>calorieën per dag</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', marginTop: 4 }}>calorieën per dag</div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: '1.4rem' }}>
         {blok('eiwit', macros.target_protein)}
@@ -397,18 +437,18 @@ function Resultaat({ macros, antw, onVerder }) {
       </div>
       <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          `Trainingsschema van ${antw.trainingen || 3} dagen per week`,
-          `Voedingsplan met ${antw.maaltijden || 3} maaltijden per dag`,
-          tempo ? `Je streefgewicht in ongeveer ${tempo} weken` : null,
+          `Training: ${antw.trainingen || 3} keer per week`,
+          `Eten: ${antw.maaltijden || 3} keer per dag`,
+          tempo ? `Je doel in ongeveer ${tempo} weken` : null,
         ].filter(Boolean).map(t => (
-          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.95rem', fontWeight: 700 }}>
+          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.1rem', fontWeight: 900 }}>
             <span style={{ width: 22, height: 22, borderRadius: 7, background: '#10b981', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Check size={14} strokeWidth={3.2} />
             </span>{t}
           </div>
         ))}
       </div>
-      <WitteKnop onClick={onVerder} style={{ marginTop: '1.6rem' }}>Zet mijn plan klaar</WitteKnop>
+      <WitteKnop onClick={onVerder} style={{ marginTop: '1.6rem' }}>Maak mijn plan</WitteKnop>
     </div>
   )
 }
@@ -423,8 +463,8 @@ function Account({ antw, onKlaar }) {
   const maak = async (e) => {
     e?.preventDefault()
     setFout(null)
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setFout('Vul een geldig e-mailadres in.'); return }
-    if (ww.length < 8) { setFout('Kies een wachtwoord van minstens 8 tekens.'); return }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setFout('Check je e-mailadres.'); return }
+    if (ww.length < 8) { setFout('Je wachtwoord moet 8 tekens of meer zijn.'); return }
     if (VOORBEELD) { onKlaar(); return }
     setBezig(true)
     const { data, error } = await supabase.auth.signUp({
@@ -433,7 +473,7 @@ function Account({ antw, onKlaar }) {
     })
     setBezig(false)
     if (error) {
-      setFout(/registered|already/i.test(error.message) ? 'Dit e-mailadres heeft al een account. Log in via "Ik heb al een account".' : 'Account maken lukte niet. Probeer het opnieuw.')
+      setFout(/registered|already/i.test(error.message) ? 'Dit e-mailadres heeft al een account. Log in.' : 'Dat lukte niet. Probeer het nog eens.')
       return
     }
     if (!data?.session) { setBevestigen(true); return } // e-mailbevestiging staat aan
@@ -443,8 +483,8 @@ function Account({ antw, onKlaar }) {
   if (bevestigen) {
     return (
       <div>
-        <h1 style={kop}>Bevestig je e-mailadres</h1>
-        <p style={subTekst}>We hebben een mail gestuurd naar {email}. Tik op de link in die mail en log daarna in; je plan wordt dan klaargezet.</p>
+        <h1 style={kop}>Kijk in je mail</h1>
+        <p style={subTekst}>Tik op de link in de mail. Log daarna in.</p>
         <WitteKnop onClick={() => { window.location.href = '/client-login' }} style={{ marginTop: '1.5rem' }}>Naar inloggen</WitteKnop>
       </div>
     )
@@ -452,22 +492,20 @@ function Account({ antw, onKlaar }) {
 
   return (
     <div>
-      <h1 style={kop}>Maak je account</h1>
-      <p style={subTekst}>Daarmee bewaren we je plan en je voortgang.</p>
       {fout && <div style={{ marginTop: 14, padding: '0.7rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '0.85rem', fontWeight: 800 }}>{fout}</div>}
-      <form onSubmit={maak} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: '1.4rem' }}>
+      <form onSubmit={maak} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: fout ? 14 : 0 }}>
         <Veld type="email" placeholder="E-mailadres" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" />
-        <Veld type="password" placeholder="Wachtwoord (minstens 8 tekens)" value={ww} onChange={e => setWw(e.target.value)} autoComplete="new-password" />
+        <Veld type="password" placeholder="Wachtwoord (8 tekens of meer)" value={ww} onChange={e => setWw(e.target.value)} autoComplete="new-password" />
         <WitteKnop type="submit" disabled={bezig} style={{ marginTop: 6 }}>{bezig ? 'Even geduld…' : 'Account maken'}</WitteKnop>
       </form>
-      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginTop: '1rem', textAlign: 'center' }}>
-        Door verder te gaan ga je akkoord met onze <a href="/privacy" style={{ color: '#fff' }}>privacyverklaring</a>.
+      <p style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.4, marginTop: '1rem', textAlign: 'center' }}>
+        <a href="/privacy" style={{ color: '#fff' }}>Lees hier hoe wij met je gegevens omgaan</a>
       </p>
     </div>
   )
 }
 
-const STAPPEN = ['Account aanmaken', 'Trainingsschema bouwen', 'Voedingsplan samenstellen', 'Alles klaarzetten']
+const STAPPEN = ['Account maken', 'Training maken', 'Eten maken', 'Alles klaarzetten']
 
 function Bouwen({ antw }) {
   const [klaar, setKlaar] = useState(0)
@@ -489,7 +527,7 @@ function Bouwen({ antw }) {
       }
       const r = await supabase.rpc('start_app_account', { p }).then(x => x, e => ({ error: e }))
       const clientId = r?.data?.client_id
-      if (r?.error || !clientId) { if (leeft) setFout('Je account kon niet worden afgemaakt. Probeer het opnieuw.'); return }
+      if (r?.error || !clientId) { if (leeft) setFout('Dat lukte niet. Probeer het nog eens.'); return }
       if (r.data.bestond_al && !r.data.app_abonnee) { window.location.href = '/'; return } // bestaande coachingklant
       stap(1)
       await supabase.functions.invoke('workout-bouwer', { body: { client_id: clientId } }).then(x => x, () => null)
@@ -507,14 +545,12 @@ function Bouwen({ antw }) {
   }, [antw])
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: '4rem' }}>
-      <h1 style={kop}>{antw.voornaam ? `Even geduld, ${antw.voornaam}` : 'Even geduld'}</h1>
-      <p style={subTekst}>We zetten alles voor je klaar.</p>
-      <div style={{ marginTop: '1.6rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {STAPPEN.map((t, i) => {
           const af = klaar > i, bezig = klaar === i && !fout
           return (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '1rem', fontWeight: 800, color: af || bezig ? '#fff' : 'rgba(255,255,255,0.45)' }}>
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '1.1rem', fontWeight: 900, color: '#fff', opacity: af || bezig ? 1 : 0.5 }}>
               <span style={{
                 width: 26, height: 26, borderRadius: 13, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: af ? '#10b981' : 'transparent', border: af ? 'none' : '2px solid rgba(255,255,255,0.25)',
@@ -527,9 +563,9 @@ function Bouwen({ antw }) {
         })}
       </div>
       <style>{'@keyframes draai { to { transform: rotate(360deg) } }'}</style>
-      {fout && <div style={{ marginTop: 18, padding: '0.7rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '0.85rem', fontWeight: 800 }}>{fout}</div>}
+      {fout && <div style={{ marginTop: 18, padding: '0.7rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '1rem', fontWeight: 900 }}>{fout}</div>}
       {VOORBEELD && klaar >= STAPPEN.length && (
-        <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>Voorbeeld klaar. In het echt ga je nu naar de app en zie je de proefmaand.</div>
+        <div style={{ marginTop: '1.5rem', fontSize: '1.05rem', fontWeight: 900, color: '#10b981' }}>Klaar. Nu ga je naar de app.</div>
       )}
     </div>
   )
