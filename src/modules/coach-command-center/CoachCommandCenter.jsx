@@ -45,7 +45,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   // Pakket per klant (clients.pakket, 24 nov 2026): filter voor een data- + feedbackdag.
   // Apart geladen: ontbreekt de kolom nog, dan valt alleen dit filter weg en niet de hele lijst.
   const [pakketVan, setPakketVan] = useState(null) // Map client_id → 'app' | 'basis' | 'midden' | 'premium'
-  const [pakketFilter, setPakketFilter] = useState('all')
+  const [pakketFilter, setPakketFilter] = useState('midden') // standaard Coaching (Kersten, 24 nov)
   // Maandag check-in: wie er los van staat (maandag_checkin = false) en wie niet betaalt.
   const [maandagUit, setMaandagUit] = useState(() => new Set())
   const [nietBetalend, setNietBetalend] = useState(() => new Set())
@@ -514,11 +514,6 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
         <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: isMobile ? '1 1 100%' : '0 0 auto', padding: '0 0.3rem', height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <Keuze vast waarde={statusFilter} zet={(v) => { setStatusFilter(v); setUrgencyFilter('all') }} isMobile={isMobile}
             opties={[{ id: 'active', label: `Actief · ${stats.active}` }, { id: 'inactive', label: `Inactief · ${stats.inactive}` }, { id: 'all', label: `Alle · ${stats.total}` }]} />
-          {statusFilter === 'active' && (<>
-            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-            <Keuze vast waarde={urgencyFilter} zet={setUrgencyFilter} isMobile={isMobile}
-              opties={[{ id: 'all', label: `Alle urgenties · ${stats.active}` }, { id: 'urgent', label: `Urgent · ${stats.urgent}` }, { id: 'warning', label: `Aandacht · ${stats.warning}` }, { id: 'ok', label: `Op schema · ${stats.ok}` }]} />
-          </>)}
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
           <Keuze vast waarde={vinkFilter} zet={setVinkFilter} isMobile={isMobile}
             opties={[{ id: 'all', label: 'Vinkjes' }, { id: 'open', label: `Nog langs · ${vinkOpen}` }, { id: 'gedaan', label: `Afgevinkt · ${vinkGedaan}` }]} />
@@ -532,11 +527,6 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
                 ...PAKKETTEN.map(p => ({ id: p.id, label: `${p.naam} · ${binnenStatus.filter(c => pakketVanKlant(c) === p.id).length}` })),
               ]} />
           </>)}
-          {challengeIds.size > 0 && (<>
-            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-            <Keuze vast waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
-              opties={[{ id: 'all', label: 'Iedereen' }, { id: 'challenge', label: `Challenge · ${challengeIds.size}` }]} />
-          </>)}
         </div>
 
         {!isMobile && <div style={{ flex: 1, minWidth: 8 }} />}
@@ -546,7 +536,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
         {/* Maandag check-in: hoeveel klanten er deze maandag een video krijgen.
             Tik = alleen die klanten tonen (nog een tik = weer iedereen). */}
         {pakketVan && (
-          <button onClick={() => { const aan = pakketFilter !== 'maandag'; setPakketFilter(aan ? 'maandag' : 'all'); if (aan) setStatusFilter('active') }}
+          <button onClick={() => { const aan = pakketFilter !== 'maandag'; setPakketFilter(aan ? 'maandag' : 'midden'); if (aan) setStatusFilter('active') }}
             title="Klanten die maandag een check-in-video krijgen"
             style={{
               flexShrink: 0, height: 36, padding: '0 0.8rem', borderRadius: 10, cursor: 'pointer',
@@ -695,7 +685,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
             </div>
           )}
 
-          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || pakketFilter !== 'all' || vinkFilter !== 'all' || searchQuery) && (
+          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || pakketFilter !== 'midden' || vinkFilter !== 'all' || searchQuery) && (
             <div style={{ padding: isMobile ? '0.375rem 1rem' : '0.375rem 2rem', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               {filteredClients.length} van {stats.total}{searchQuery && ` · "${searchQuery}"`}
             </div>

@@ -33,3 +33,53 @@ create policy eigen_plek on public.command_bord_plek for all to authenticated
 
 revoke all on public.command_bord_secties, public.command_bord_plek from anon;
 revoke truncate, references, trigger on public.command_bord_secties, public.command_bord_plek from authenticated;
+
+-- ── Weekritme (24 nov 2026, Kersten) ─────────────────────────────────────
+-- Maandag: iedereen in de startkolom (rol 'maandag'), langs en verplaatsen.
+-- Donderdag: alleen de kolom met rol 'donderdag' nog eens langs.
+-- Zondagnacht zet command_bord_week_reset() iedereen terug in de startkolom
+-- en onthoudt waar hij vorige week eindigde (label op de kaart).
+alter table public.command_bord_secties add column if not exists rol text;
+do $$ begin
+  alter table public.command_bord_secties add constraint command_bord_secties_rol_check check (rol in ('maandag', 'donderdag'));
+exception when duplicate_object then null; end $$;
+alter table public.command_bord_plek add column if not exists vorige_naam text;
+alter table public.command_bord_plek add column if not exists vorige_kleur text;
+alter table public.command_bord_plek add column if not exists vorige_rol text;
+
+create or replace function public.command_bord_week_reset()
+returns integer language plpgsql security definer set search_path = public as $$
+declare n integer := 0; r record;
+begin
+  for r in
+    select distinct on (coach_id) coach_id, id as start_id
+      from command_bord_secties
+     order by coach_id, (rol = 'maandag') desc nulls last, volgorde
+  loop
+    update command_bord_plek p
+       set vorige_naam = s.naam, vorige_kleur = s.kleur, vorige_rol = s.rol,
+           sectie_id = r.start_id, updated_at = now()
+      from command_bord_secties s
+     where s.id = p.sectie_id and p.coach_id = r.coach_id;
+    -- Nieuwe maandag-klanten erbij (alleen voor de eigenaar van de klanten).
+    insert into command_bord_plek (coach_id, client_id, sectie_id)
+    select r.coach_id, c.id, r.start_id
+      from clients c
+     where c.coach_id = r.coach_id and c.status = 'active'
+       and (c.coaching_status = 'paused'  -- pauze-accounts houdt Kersten ook in het oog
+            or (coalesce(c.coaching_status, 'active') = 'active'
+                and c.pakket <> 'app' and c.maandag_checkin and not coalesce(c.niet_betalend, false)))
+    on conflict (coach_id, client_id) do nothing;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.command_bord_week_reset() from public, anon, authenticated;
+
+-- Zondag 23:00 UTC = maandag 00:00 (winter) / 01:00 (zomer) in Nederland.
+select cron.unschedule('command-bord-week-reset') where exists (select 1 from cron.job where jobname = 'command-bord-week-reset');
+select cron.schedule('command-bord-week-reset', '0 23 * * 0', 'select public.command_bord_week_reset()');
+
+-- Kerstens kolommen: Checken en monitoren = start, Motivatie en coherence = donderdag.
+update public.command_bord_secties set rol = 'maandag' where id = 'ab0911ec-c7f2-4fd2-aa8d-c6b299c18a77';
+update public.command_bord_secties set rol = 'donderdag' where id = '9d0ab932-c1b5-4808-9c90-956faeade7c9';

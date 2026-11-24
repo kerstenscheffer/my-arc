@@ -27,6 +27,7 @@ const lokaalLezen = () => {
   return {
     secties: STANDAARD.map((s, i) => ({ id: `lokaal-${i}`, ...s, volgorde: i })),
     plek: {},
+    vorige: {},
   }
 }
 const lokaalSchrijven = (bord) => {
@@ -35,22 +36,25 @@ const lokaalSchrijven = (bord) => {
 
 export async function laadBord(supabase) {
   const [s, p] = await Promise.all([
-    supabase.from('command_bord_secties').select('id, naam, kleur, volgorde').order('volgorde').then(r => r, e => ({ error: e })),
-    supabase.from('command_bord_plek').select('client_id, sectie_id').then(r => r, e => ({ error: e })),
+    supabase.from('command_bord_secties').select('id, naam, kleur, volgorde, rol').order('volgorde').then(r => r, e => ({ error: e })),
+    supabase.from('command_bord_plek').select('client_id, sectie_id, vorige_naam, vorige_kleur, vorige_rol').then(r => r, e => ({ error: e })),
   ])
   if (s.error || p.error) return { bron: 'lokaal', ...lokaalLezen() }
   let secties = s.data || []
   if (!secties.length) {
     const ins = await supabase.from('command_bord_secties')
       .insert(STANDAARD.map((x, i) => ({ ...x, volgorde: i })))
-      .select('id, naam, kleur, volgorde')
+      .select('id, naam, kleur, volgorde, rol')
       .then(r => r, e => ({ error: e }))
     if (ins.error) return { bron: 'lokaal', ...lokaalLezen() }
     secties = ins.data || []
   }
-  const plek = {}
-  for (const r of p.data || []) plek[r.client_id] = r.sectie_id
-  return { bron: 'db', secties, plek }
+  const plek = {}, vorige = {}
+  for (const r of p.data || []) {
+    plek[r.client_id] = r.sectie_id
+    if (r.vorige_naam) vorige[r.client_id] = { naam: r.vorige_naam, kleur: r.vorige_kleur, rol: r.vorige_rol }
+  }
+  return { bron: 'db', secties, plek, vorige }
 }
 
 // Alle schrijfacties krijgen het nieuwe bord mee (al optimistisch bijgewerkt)
@@ -68,7 +72,7 @@ export async function nieuweSectie(supabase, bord, naam) {
   const volgorde = bord.secties.length ? Math.max(...bord.secties.map(s => s.volgorde)) + 1 : 0
   if (bord.bron !== 'db') return { id: `lokaal-${Date.now()}`, naam, kleur: 'wit', volgorde }
   const r = await supabase.from('command_bord_secties').insert({ naam, kleur: 'wit', volgorde })
-    .select('id, naam, kleur, volgorde').single().then(x => x, e => ({ error: e }))
+    .select('id, naam, kleur, volgorde, rol').single().then(x => x, e => ({ error: e }))
   if (r.error) { console.warn('[klantbord] sectie niet gemaakt', r.error); return null }
   return r.data
 }
