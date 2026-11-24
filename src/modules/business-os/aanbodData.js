@@ -5,7 +5,8 @@
 // bewaren zit in aanbodOpslag.js. Vorm van de opgeslagen gegevens:
 //   { partnerPct, vooruitPct, borgAan, borgBedrag,
 //     tiers: { premium|midden|basis: { prijs: { 4, 6, 12 },
-//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst] } } }
+//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst] } },
+//     producten: [...], vergelijking: [...] }
 // Leeg veld = null. Een onbekende of oudere vorm wordt door normaliseer()
 // aangevuld met de beginwaarden, zodat het scherm altijd iets kan tonen.
 // vooruitPct, borgAan en borgBedrag kwamen er later op 23 nov bij: een rij
@@ -14,6 +15,12 @@
 //   [{ id, naam, maanden, vooruit, perMaand }]   vooruit = in één keer, perMaand = termijnbedrag.
 // Het verlengvenster (TrajectModal) kiest hieruit en uit de tiers met een prijs
 // (aanbodOpties). Een rij zonder producten leest als BEGIN.producten.
+// vergelijking (24 nov 2026): de drie tiers naast elkaar in één tabel, als lijst
+//   [{ onderdeel, basis, midden, premium }]   cel = true (zit erin), tekst (de vorm
+//   in die tier) of null (zit er niet in).
+// Staat er minstens één gevulde rij, dan toont Aanbod.jsx de tabel in plaats van
+// de lijstjes uit tiers.*.onderdelen. Die lijstjes blijven in de data staan: een
+// oudere app-versie leest ze nog, en zonder vergelijking tonen we ze zoals altijd.
 
 export const DUREN = [4, 6, 12]
 export const TIERS = [['premium', 'Premium'], ['midden', 'Midden'], ['basis', 'Basis']]
@@ -113,8 +120,39 @@ export function normaliseer(ruw) {
     borgBedrag: r.borgBedrag === undefined ? BEGIN.borgBedrag : getalOfNull(r.borgBedrag),
     producten: Array.isArray(r.producten) ? r.producten.filter(x => x && typeof x === 'object').map(normaliseerProduct) : BEGIN_PRODUCTEN.map(x => ({ ...x })),
     tiers,
+    vergelijking: normaliseerVergelijking(r.vergelijking),
   }
 }
+
+// ── Vergelijking: één tabel voor de drie tiers ──
+// Wat er in een cel staat: 'vink' (true), 'tekst' of 'leeg' (null, '', spaties).
+export const celSoort = (v) => (v === true ? 'vink' : typeof v === 'string' && v.trim() ? 'tekst' : 'leeg')
+
+const leesCel = (v) => {
+  if (v === true) return true
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
+export const nieuweVergelijkRij = () => ({ onderdeel: '', basis: null, midden: null, premium: null })
+
+// Rij die iets zegt: een naam of minstens één gevulde cel.
+export const rijGevuld = (r) => !!r && (!!String(r.onderdeel ?? '').trim() || TIERS.some(([k]) => celSoort(r[k]) !== 'leeg'))
+
+// Altijd een lijst. Helemaal lege rijen (net toegevoegd, niets getypt) vallen weg.
+export function normaliseerVergelijking(ruw) {
+  if (!Array.isArray(ruw)) return []
+  return ruw
+    .filter(r => r && typeof r === 'object' && !Array.isArray(r))
+    .map(r => ({
+      onderdeel: typeof r.onderdeel === 'string' ? r.onderdeel.trim() : '',
+      basis: leesCel(r.basis), midden: leesCel(r.midden), premium: leesCel(r.premium),
+    }))
+    .filter(rijGevuld)
+}
+
+// De rijen die Laten zien toont. Leeg = geen vergelijking: dan de lijstjes per tier.
+export const vergelijkRijen = (g) => (Array.isArray(g?.vergelijking) ? g.vergelijking.filter(rijGevuld) : [])
 
 export function normaliseerProduct(x, i = 0) {
   const maanden = getalOfNull(x?.maanden)
@@ -212,12 +250,13 @@ export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur 
   }
   return {
     ...kop,
-    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, anders verdwijnen ze). prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn).',
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten en vergelijking, anders verdwijnen ze). prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
     in_beeld: { duur, stand },
     gegevens: {
       partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,
       borgAan: gegevens.borgAan, borgBedrag: gegevens.borgBedrag, tiers,
       producten: gegevens.producten || [],
+      vergelijking: normaliseerVergelijking(gegevens.vergelijking),
     },
   }
 }
