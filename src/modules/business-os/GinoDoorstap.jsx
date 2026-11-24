@@ -13,12 +13,13 @@
 // De borg telt pas als winst zodra de verlenging betaald is: de trigger uit
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Check, Loader2, FileDown, Search, X, ChevronsUpDown, Euro, ListChecks, CalendarDays } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Loader2, FileDown, Search, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
 import TrajectModal from '../coach-command-center/components/TrajectModal'
+import AfhandelModal from './AfhandelModal'
 import { computePeriod, hervatTraject } from '../coach-command-center/components/trajectPeriode'
 import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
@@ -119,11 +120,8 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [rijen, setRijen] = useState(null)
   const [fout, setFout] = useState(null)
   const [bezig, setBezig] = useState(null)
-  const [bevestig, setBevestig] = useState(null) // client_id die 'Zeker?' toont (4 s)
-  const bevestigKlok = useRef(null)
   const [rijFout, setRijFout] = useState({}) // client_id → fout, rood onder de naam
-  const [traject, setTraject] = useState(null) // { client, rij, betaald, borgId, jaZonderBoeking }
-  const geboektRef = useRef(false)
+  const [traject, setTraject] = useState(null) // { client, rij, betaald, borgId }
   const [borgen, setBorgen] = useState([]) // open challenge-sales die al betaald zijn
   const [borgKeuze, setBorgKeuze] = useState({}) // client_id → gekozen borg
   const [coachId, setCoachId] = useState(null)
@@ -139,8 +137,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
   const [pdfBezig, setPdfBezig] = useState(false)
   const [zoek, setZoek] = useState('')
-  const [openBorg, setOpenBorg] = useState(null) // client_id van wie de borg-regel open staat
-  const [borgVraag, setBorgVraag] = useState(null) // { id, status } terwijl 'Zeker?' staat (4 s)
+  const [afhandel, setAfhandel] = useState(null) // client_id waar het Afhandelen-venster voor open staat
 
   // De borg die al aan de klant hangt (challenge-sale, open en betaald). Dan hoef je hem niet te kiezen.
   const bekendeBorg = (clientId) => { const id = instellingen.get(clientId)?.sale_id; return id && borgen.some(b => b.id === id) ? id : null }
@@ -149,7 +146,7 @@ export default function GinoDoorstap({ isMobile = false }) {
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
-      supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at')
+      supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at, call_datum')
         .order('gezet_at', { ascending: false }).order('id', { ascending: false })
         .then(r => r, e => ({ error: e })),
       supabase.from('clients').select('id, first_name, last_name, email, coach_id, coaching_onbeperkt, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status, coaching_paused_at').eq('status', 'active').order('first_name')
@@ -208,7 +205,7 @@ export default function GinoDoorstap({ isMobile = false }) {
         return {
           // Geen vlag op de klant: challenge = traject van 6 weken, of al een doorstap-stand.
           challenge: c.coaching_total_weeks === CHALLENGE_WEKEN || !!stand?.status, onbeperkt: !!c.coaching_onbeperkt,
-          client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null,
+          client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: stand?.call_datum || null,
           klant: c, sale: eigen.find(x => !x.payment_received) || null, betaaldeSale: eigen.find(x => x.payment_received) || null,
           week: periode ? Math.min(periode.weeksDone + 1, periode.weeksTotal) : null, weken: periode?.weeksTotal || null,
           ...(() => {
@@ -284,26 +281,12 @@ export default function GinoDoorstap({ isMobile = false }) {
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
       .then(x => x, e => ({ error: e }))
     if (error) { setFout(error.message || 'Klant laden mislukt'); return }
-    geboektRef.current = false
     setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
   }
 
-  // Ja gekozen: meteen de afspraak vastleggen in hetzelfde venster als Einde traject en
-  // Coach Inzicht (startdatum, prijs, nog niet betaald). Sluit je het zonder te boeken,
-  // dan staat hij alsnog op Ja.
-  const kiesJa = async (r) => {
-    setBezig(r.client_id); rijFoutWeg(r.client_id)
-    const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
-      .then(x => x, e => ({ error: e }))
-    setBezig(null)
-    if (error) { rijMislukt(r.client_id, error, 'Klant laden mislukt'); return }
-    geboektRef.current = false
-    setTraject({ client, rij: r, betaald: false, borgId: borgVoor(r.client_id), jaZonderBoeking: true })
-  }
-
-  const zetStatus = async (clientId, klantCoach, status, pakket = null) => {
+  const zetStatus = async (clientId, klantCoach, status, pakket = null, extra = {}) => {
     const { error } = await supabase.from('client_doorstap').insert({
-      client_id: clientId, coach_id: klantCoach || coachId, status: status || null, pakket, gezet_door: coachId,
+      client_id: clientId, coach_id: klantCoach || coachId, status: status || null, pakket, gezet_door: coachId, ...extra,
     }).then(r => r, e => ({ error: e }))
     if (error) throw error
   }
@@ -356,33 +339,27 @@ export default function GinoDoorstap({ isMobile = false }) {
   }
   const rijFoutWeg = (clientId) => setRijFout(o => { if (!o[clientId]) return o; const n = { ...o }; delete n[clientId]; return n })
 
-  const wijzig = async (clientId, klantCoach, status, pakket) => {
+  const wijzig = async (clientId, klantCoach, status, pakket, extra = {}) => {
     setBezig(clientId); setFout(null); rijFoutWeg(clientId)
+    let ok = false
     try {
-      await zetStatus(clientId, klantCoach, status, pakket)
+      await zetStatus(clientId, klantCoach, status, pakket, extra)
       await laad()
+      ok = true
     } catch (e) { rijMislukt(clientId, e, 'Stand opslaan mislukt') }
     setBezig(null)
+    return ok
   }
 
-  useEffect(() => () => clearTimeout(bevestigKlok.current), [])
-
   // De borg afronden bij wie stopt (16 nov 2026): terugbetaald of behouden. Dezelfde ene
-  // kolom als het lead-systeem (setChallengeStatus). Klik 1 = 'Zeker?', klik 2 = opslaan.
+  // kolom als het lead-systeem (setChallengeStatus). Gekozen in het Afhandelen-venster.
   // Terugbetaald valt uit omzet en uitbetaling; behouden telt vanaf nu mee (trigger).
   // Omzetten kan ook achteraf, in beide richtingen (18 nov 2026). Niets zet een gekozen
   // terugbetaald terug: de automatische stap hierboven en de trigger borg-na-doorstap
-  // pakken alleen een borg die nog open staat.
-  const rondBorgAf = async (r, sale, status) => {
-    if (bezig || sale.challenge_status === status) return
-    if (borgVraag?.id !== r.client_id || borgVraag?.status !== status) {
-      clearTimeout(bevestigKlok.current)
-      setBorgVraag({ id: r.client_id, status })
-      bevestigKlok.current = setTimeout(() => setBorgVraag(null), 4000)
-      return
-    }
-    clearTimeout(bevestigKlok.current)
-    setBorgVraag(null); setBezig(r.client_id); rijFoutWeg(r.client_id)
+  // pakken alleen een borg die nog open staat. Geeft true als het gelukt is.
+  const zetBorg = async (r, sale, status) => {
+    if (sale.challenge_status === status) return true
+    rijFoutWeg(r.client_id)
     // Was hij behouden en al aan Marcel uitbetaald, dan blijft die maand vast staan: melden.
     const { data: alBetaald } = sale.challenge_status === 'behouden' && status === 'terugbetaald'
       ? await supabase.from('partner_payout_items').select('id').eq('movement_id', sale.id).limit(1).then(x => x, () => ({ data: [] }))
@@ -392,27 +369,15 @@ export default function GinoDoorstap({ isMobile = false }) {
     const patch = status === 'terugbetaald' ? { challenge_status: status, telt_mee_vanaf: null } : { challenge_status: status }
     const { data, error } = await supabase.from('lead_movements').update(patch)
       .eq('id', sale.id).in('challenge_status', ['open', 'behouden', 'terugbetaald']).select('id').then(x => x, e => ({ error: e }))
-    if (error || !data?.length) rijMislukt(r.client_id, error, 'Borg afronden mislukt')
-    else {
-      setOpenBorg(null)
-      await laad()
-      if (alBetaald?.length) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
-    }
-    setBezig(null)
+    if (error || !data?.length) { rijMislukt(r.client_id, error, 'Borg afronden mislukt'); return false }
+    if (alBetaald?.length) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
+    return true
   }
 
-  // Klik 1 = 'Zeker?' (4 seconden), klik 2 binnen die tijd = opslaan. Bewust een klok en
-  // geen onBlur: Safari geeft een knop bij klikken geen focus, dus daar klopte dat niet.
+  // Betaling binnen (keuze in het Afhandelen-venster).
   const betaald = async (r) => {
     if (bezig === r.client_id) return
-    if (bevestig !== r.client_id) {
-      clearTimeout(bevestigKlok.current)
-      setBevestig(r.client_id)
-      bevestigKlok.current = setTimeout(() => setBevestig(b => (b === r.client_id ? null : b)), 4000)
-      return
-    }
-    clearTimeout(bevestigKlok.current)
-    setBevestig(null); setFout(null); rijFoutWeg(r.client_id)
+    setFout(null); rijFoutWeg(r.client_id)
     if (!r.sale) {
       // Verlenging staat al op betaald, alleen de stand niet (vorige keer halverwege mislukt):
       // dan alleen de stand. Anders zou TrajectModal de omzet een tweede keer boeken.
@@ -422,8 +387,7 @@ export default function GinoDoorstap({ isMobile = false }) {
         .then(x => x, e => ({ error: e }))
       setBezig(null)
       if (error) { rijMislukt(r.client_id, error, 'Klant laden mislukt'); return }
-      geboektRef.current = false
-      setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
+        setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
       return
     }
     setBezig(r.client_id)
@@ -443,11 +407,9 @@ export default function GinoDoorstap({ isMobile = false }) {
   }
 
   // TrajectModal dicht. Stand, omzetregel en borg zet boekVerlenging zelf (zelfde route als
-  // Einde traject en Coach Inzicht). Alleen Ja zonder boeking moet hier nog opgeslagen.
+  // Einde traject en Coach Inzicht).
   const trajectDicht = async () => {
-    const t = traject
     setTraject(null)
-    if (t?.jaZonderBoeking && !geboektRef.current) { await wijzig(t.rij.client_id, t.rij.coach_id, 'ja_mondeling', t.rij.pakket); return }
     await laad()
   }
 
@@ -539,8 +501,25 @@ export default function GinoDoorstap({ isMobile = false }) {
     },
   })
   // Klein label achter een cijfer op de kaart, zoals KCAL / E / K / V op een maaltijdkaart.
+  // Afhandelen-venster: de rij, de borg van die klant en "stopt" (stand nee + borg).
+  const afhandelRij = afhandel ? (rijen || []).find(x => x.client_id === afhandel) || null : null
+  const borgVan = (r) => {
+    const id = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id || borgKeuze[r.client_id]
+    return id ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === id) || null : null
+  }
+  // Stopt: stand op nee (de nachtregel zet de app na het einde op slot) en de borg afronden.
+  const stopt = async (r, borg, borgStatus) => {
+    setBezig(r.client_id); setFout(null); rijFoutWeg(r.client_id)
+    try {
+      if (r.status !== 'nee') await zetStatus(r.client_id, r.coach_id, 'nee', r.pakket)
+      const ok = borg && borgStatus ? await zetBorg(r, borg, borgStatus) : true
+      await laad()
+      if (ok) setAfhandel(null)
+    } catch (e) { rijMislukt(r.client_id, e, 'Stopt opslaan mislukt') }
+    setBezig(null)
+  }
+
   const klein = { fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textSecondary }
-  const dun = { background: 'transparent', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', outline: 'none', maxWidth: '100%' }
 
   // Pdf om te delen: dezelfde cijfers en klanten als op het scherm, in dezelfde groepen.
   const exporteer = async () => {
@@ -689,14 +668,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
             const borgId = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id
             const borgSale = borgId ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === borgId) : null
-            // Is de borg al verrekend, dan zegt het witte label het. De keuze blijft te wijzigen
-            // via de borg-knop; alleen bij een open borg van wie stopt staat hij vanzelf open.
-            const borgKlaar = ['behouden', 'terugbetaald'].includes(borgSale?.challenge_status)
-            const borgOpen = openBorg === r.client_id || (r.status === 'nee' && !borgKlaar)
-            // Stand wijzigen kan ook in Afgerond. Alleen niet bij betaald met een geboekte
-            // verlenging: die boeking zou dan als wees blijven staan en in de omzet blijven tellen.
-            const standKiesbaar = r.status !== 'betaald' || !r.betaaldeSale
-            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || (r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && !bekendeBorg(r.client_id)) || borgOpen
+            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id]
             return (
               <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
@@ -766,54 +738,12 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       )}
                     </div>
                   </div>
-                  {/* Knoppenbalk zoals onder een maaltijdkaart: alleen iconen, dunne lijntjes ertussen. */}
-                  {(() => {
-                    const zeker = bevestig === r.client_id
-                    const laadt = bezig === r.client_id
-                    const cel = { position: 'relative', flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: 0, background: 'none', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.06)', color: colors.textSecondary, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
-                    const aan = { color: colors.textPrimary }
-                    return (
-                      <div className="gd-balk" style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)', opacity: laadt ? 0.5 : 1 }}>
-                        {standKiesbaar && (
-                          <span title="Stand kiezen" style={{ ...cel, borderLeft: 'none' }}>
-                            <ChevronsUpDown size={15} strokeWidth={2.4} />
-                            <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={laadt}
-                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : ev.target.value === 'ja_mondeling' && !r.sale && !r.betaaldeSale ? kiesJa(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
-                              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
-                              <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
-                              {r.status === 'betaald' && <option value="betaald">Betaald</option>}
-                              {STATUS_KEUZE.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
-                              {r.gepauzeerd && <option value="hervat">Pauze eraf</option>}
-                            </select>
-                          </span>
-                        )}
-                        {r.status === 'ja_mondeling' && (
-                          <button type="button" disabled={laadt} onClick={() => betaald(r)} title={zeker ? 'Nog een keer klikken: betaald' : 'Betaald'} aria-label={zeker ? 'Zeker? Klik nog een keer: betaald' : 'Betaald'}
-                            style={{ ...cel, ...(zeker ? { color: G } : aan) }}>
-                            {laadt ? <Loader2 size={15} strokeWidth={2.6} className="gd-draai" /> : <Check size={16} strokeWidth={2.8} />}
-                            {zeker && <span aria-live="polite">Zeker?</span>}
-                          </button>
-                        )}
-                        {borgSale && (
-                          <button type="button" onClick={() => setOpenBorg(o => (o === r.client_id ? null : r.client_id))} aria-label="Borg" aria-expanded={borgOpen}
-                            title={borgKlaar ? `Borg ${euro(borgSale.order_value)} ${borgSale.challenge_status}. Klik: wijzigen` : `Borg ${euro(borgSale.order_value)}: terugbetaald of behouden`}
-                            style={{ ...cel, ...(borgSale.challenge_status === 'behouden' ? { color: G } : borgOpen ? aan : {}) }}>
-                            <Euro size={15} strokeWidth={2.4} />
-                          </button>
-                        )}
-                        {metEisen && r.challenge && (
-                          <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen" aria-label="Eisen"
-                            style={{ ...cel, ...(openEisen === r.client_id ? aan : {}) }}>
-                            <ListChecks size={15} strokeWidth={2.4} />
-                          </button>
-                        )}
-                        <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Looptijd of verlenging aanpassen`} aria-label="Looptijd"
-                          style={cel}>
-                          <CalendarDays size={15} strokeWidth={2.4} />
-                        </button>
-                      </div>
-                    )
-                  })()}
+                  {/* Eén knop (24 nov 2026, Kersten): wat doet hij? Alles staat in het venster. */}
+                  <button type="button" disabled={bezig === r.client_id} onClick={() => { rijFoutWeg(r.client_id); setAfhandel(r.client_id) }}
+                    style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', color: nu.groep === 'actie' ? colors.textPrimary : colors.textSecondary, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', opacity: bezig === r.client_id ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    {bezig === r.client_id ? <Loader2 size={14} strokeWidth={2.6} className="gd-draai" /> : null}
+                    Afhandelen
+                  </button>
                   </div>
                 </div>
 
@@ -842,35 +772,6 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                       )
                     })()}
                     {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={e} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
-                    {borgOpen && (() => {
-                      if (!borgSale) return <span style={{ color: colors.textSecondary }}>Geen borg gekoppeld. Refund zet je in het lead-systeem op de sale.</span>
-                      const bedragBorg = euro(borgSale.order_value)
-                      if (!['open', 'behouden', 'terugbetaald'].includes(borgSale.challenge_status) || !borgSale.payment_received) return <span style={{ color: colors.textSecondary }}>Borg {bedragBorg} niet betaald</span>
-                      // Al gekozen: de huidige keuze wit gevuld, de andere omlijnd. Open borg: beide gevuld.
-                      const knopStijl = (status) => {
-                        const zeker = borgVraag?.id === r.client_id && borgVraag.status === status
-                        const huidig = borgSale.challenge_status === status
-                        const omlijnd = borgKlaar && !huidig && !zeker
-                        return { height: 24, padding: '0 10px', borderRadius: 7, border: omlijnd ? '1px solid rgba(255,255,255,0.3)' : 'none', cursor: huidig ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900, background: zeker ? G : omlijnd ? 'transparent' : colors.textPrimary, color: omlijnd ? colors.textPrimary : colors.bg }
-                      }
-                      const tekst = (status, gewoon) => (borgVraag?.id === r.client_id && borgVraag.status === status ? 'Zeker?' : gewoon)
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span>Borg {bedragBorg}</span>
-                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'terugbetaald')} aria-pressed={borgSale.challenge_status === 'terugbetaald'} title="Het geld is teruggestort: valt uit omzet en uitbetaling" style={knopStijl('terugbetaald')}>{tekst('terugbetaald', 'Terugbetaald')}</button>
-                          <button type="button" disabled={bezig === r.client_id} onClick={() => rondBorgAf(r, borgSale, 'behouden')} aria-pressed={borgSale.challenge_status === 'behouden'} title="Geen geld terug: de borg telt vanaf nu mee in omzet en uitbetaling" style={knopStijl('behouden')}>{tekst('behouden', 'Behouden')}</button>
-                        </div>
-                      )
-                    })()}
-                    {r.status === 'ja_mondeling' && !r.sale?.borg_movement_id && !bekendeBorg(r.client_id) && (
-                      <select className="gd-stand" aria-label={`Borg van ${naamVan(r.klant)}`} value={borgKeuze[r.client_id] || ''} style={{ ...dun, fontSize: '0.75rem', color: colors.textSecondary }}
-                        onChange={ev => setBorgKeuze(k => ({ ...k, [r.client_id]: ev.target.value }))}>
-                        <option value="" style={{ background: '#0a0a0a', color: '#fff' }}>Geen borg gekoppeld</option>
-                        {borgen.filter(b => b.id === borgKeuze[r.client_id] || !bezet.has(b.id)).map(b => (
-                          <option key={b.id} value={b.id} style={{ background: '#0a0a0a', color: '#fff' }}>Borg {b.lead_name} {euro(b.order_value)}</option>
-                        ))}
-                      </select>
-                    )}
                   </div>
                 )}
               </div>
@@ -884,10 +785,31 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
         </div>
       )}
 
+      {afhandelRij && (
+        <AfhandelModal
+          r={afhandelRij}
+          // Betaald mét geboekte verlenging: stand niet meer wijzigen, anders blijft die boeking als wees in de omzet.
+          vast={afhandelRij.status === 'betaald' && !!afhandelRij.betaaldeSale}
+          naam={naamVan(afhandelRij.klant)}
+          borgSale={borgVan(afhandelRij)}
+          borgKandidaten={borgen.filter(b => b.id === borgKeuze[afhandelRij.client_id] || !bezet.has(b.id))}
+          gekozenBorg={borgKeuze[afhandelRij.client_id] || ''}
+          onKiesBorg={(id) => setBorgKeuze(k => ({ ...k, [afhandelRij.client_id]: id }))}
+          bezig={bezig === afhandelRij.client_id}
+          fout={rijFout[afhandelRij.client_id]}
+          onClose={() => setAfhandel(null)}
+          onBetaald={async () => { await betaald(afhandelRij); setAfhandel(null) }}
+          onVerleng={() => { const r = afhandelRij; setAfhandel(null); openTraject(r) }}
+          onStatus={async (status, extra) => { if (await wijzig(afhandelRij.client_id, afhandelRij.coach_id, status, afhandelRij.pakket, extra)) setAfhandel(null) }}
+          onStopt={(borg, borgStatus) => stopt(afhandelRij, borg, borgStatus)}
+          onHervat={async () => { const r = afhandelRij; setAfhandel(null); await hervat(r) }}
+        />
+      )}
+
       {traject && (
         <TrajectModal open modus="verleng" client={traject.client} coachId={coachId}
           betaald={traject.betaald !== false} borgId={traject.borgId}
-          onGeboekt={() => { geboektRef.current = true }} onClose={trajectDicht} />
+          onClose={trajectDicht} />
       )}
     </div>
   )

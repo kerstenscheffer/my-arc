@@ -107,10 +107,13 @@ export function planVervolg(client, { maanden, startOp }) {
   const start = startOp || directeStart(client)
   const eind = plusMaandenIso(start, maanden)
   const klantStart = client.coaching_start_date || start
-  const totaalWeken = Math.max(1, Math.round((dagenTussen(klantStart, eind) - (client.coaching_paused_days_total || 0)) / 7))
+  // Naar boven afgerond: de klant verliest nooit dagen door de weekindeling.
+  const totaalWeken = Math.max(1, Math.ceil((dagenTussen(klantStart, eind) - (client.coaching_paused_days_total || 0)) / 7))
   const huidigEind = computePeriod(client)?.endDate || null
-  // Tussen het huidige einde en de start van het vervolg: toegang loopt door.
-  const gatDagen = huidigEind && start > huidigEind ? dagenTussen(huidigEind, start) : 0
+  // Tussen het huidige einde (of vandaag, als dat al voorbij is) en de start van het
+  // vervolg: toegang loopt door.
+  const vanaf = huidigEind && huidigEind > vandaagIso() ? huidigEind : vandaagIso()
+  const gatDagen = start > vanaf ? dagenTussen(vanaf, start) : 0
   return { start, eind, totaalWeken, huidigEind, gatDagen }
 }
 
