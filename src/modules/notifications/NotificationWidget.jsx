@@ -76,7 +76,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     })
     // Meldingen met een pagina krijgen een knop erheen (23 nov 2026, Kersten).
     // De push-rijen van de betaalherinnering niet dubbel tonen: de eigen melding hierboven is de bron.
-    const dbZicht = dbMeldingen.filter(n => n.source !== 'betaling')
+    // Zelfde voor de geplande check-in-herinnering: de eigen check-in-melding hierboven is de bron
+    // (weet of hij al ingevuld is en hoe laat het is), anders staan er twee (24 nov 2026, Ronald).
+    const dbZicht = dbMeldingen.filter(n => n.source !== 'betaling' && n.trigger_data?.check_type !== 'checkin_not_done')
     const metKnop = onNavigate ? dbZicht.map(n => {
       const doel = paginaVan(n)
       return doel ? { ...n, _knop: doel.knop, _doel: doel } : n

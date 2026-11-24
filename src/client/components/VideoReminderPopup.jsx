@@ -143,10 +143,9 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
   // Alleen hiermee gaat een video weg, en alleen na de bevestiging hieronder.
   const echtGezien = async (item) => {
     setBevestig(null)
-    // Coach kijkt mee: niet namens de klant afvinken.
-    if (alleenKijken) return
     setBezig(item.video_id)
-    await videoService.markeerVideoGezien(client.id, item.video_id, 'knop', item.assignment_id)
+    // Coach kijkt mee en vinkt af (24 nov 2026, Kersten): mag, maar vastgelegd als 'coach'.
+    await videoService.markeerVideoGezien(client.id, item.video_id, alleenKijken ? 'coach' : 'knop', item.assignment_id)
     const over = items.filter(i => i.video_id !== item.video_id)
     setItems(over)
     setBezig(null)
