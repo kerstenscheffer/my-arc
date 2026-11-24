@@ -12,7 +12,7 @@
 //     bij de coach (mijn_slot_keuze) en opent WhatsApp met een klaar bericht.
 
 import { useEffect, useState } from 'react'
-import { Lock, LogOut, CreditCard, Smartphone, Dumbbell, MessageCircle, Check } from 'lucide-react'
+import { Lock, LogOut, CreditCard, Smartphone, Dumbbell, MessageCircle, Check, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 const WHATSAPP = '31631388756'
@@ -33,7 +33,7 @@ const keuzeKnop = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-export default function AccountOpSlot({ client, onLogout }) {
+export default function AccountOpSlot({ client, onLogout, onAbonnement }) {
   const [betaling, setBetaling] = useState(null)
   const [borg, setBorg] = useState(null)
   const [geladen, setGeladen] = useState(false)
@@ -61,6 +61,12 @@ export default function AccountOpSlot({ client, onLogout }) {
   }
 
   const keuzes = [
+    // 24 nov 2026: in de native app zelf verder met het app-abonnement (betaalmuur).
+    onAbonnement && {
+      id: 'app_abonnement', Icon: Sparkles, titel: 'Zelf verder met de app',
+      sub: 'Houd je plannen, tracking en logs met het MY ARC-abonnement. Zonder coach.',
+      actie: onAbonnement,
+    },
     borg && {
       id: 'borg_app', Icon: Smartphone, titel: 'Borg omzetten naar de app',
       sub: `Je borg van ${euro(borg.bedrag)} gaat naar de app: je houdt je plannen, tracking en logs.`,
@@ -151,7 +157,7 @@ export default function AccountOpSlot({ client, onLogout }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
               {keuzes.map(k => (
-                <button key={k.id} onClick={() => kies(k.id, k.bericht)} style={{ ...keuzeKnop, ...(gekozen === k.id ? { borderColor: '#10b981' } : {}) }}>
+                <button key={k.id} onClick={() => (k.actie ? k.actie() : kies(k.id, k.bericht))} style={{ ...keuzeKnop, ...(gekozen === k.id ? { borderColor: '#10b981' } : {}) }}>
                   <span style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: gekozen === k.id ? '#10b981' : '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {gekozen === k.id ? <Check size={18} strokeWidth={3} /> : <k.Icon size={18} strokeWidth={2.5} />}
                   </span>

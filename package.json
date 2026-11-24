@@ -29,6 +29,7 @@
     "@capawesome/capacitor-app-review": "^8.1.0",
     "@capgo/capacitor-health": "^8.12.1",
     "@capgo/capacitor-updater": "^8.53.0",
+    "@revenuecat/purchases-capacitor": "14.1.0",
     "@stripe/stripe-js": "^7.9.0",
     "@supabase/supabase-js": "^2.100.0",
     "@zxing/browser": "^0.1.5",

@@ -33,6 +33,8 @@ import { supabase } from '../lib/supabase'
 import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
+import AppBetaalmuur from './components/AppBetaalmuur'
+import { bepaalAppToegang, abonnementMogelijk } from '../lib/appAbonnement'
 
 // Lucide Icons
 import {
@@ -151,6 +153,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   foutContext.clientId = client?.id || null
   // Account op slot (coaching gestopt): de klant ziet alleen het slotscherm.
   const [opSlot, setOpSlot] = useState(false)
+  // App-abonnement (24 nov 2026): 'app' = eigen app-account zonder abonnement,
+  // 'slot' = klant op slot koos in het slotscherm voor het abonnement.
+  const [betaalmuur, setBetaalmuur] = useState(null)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   // Alleen lokaal (npm run dev): ?checkin=1 opent de check-in buiten het
@@ -300,7 +305,22 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       }
       // Op slot geldt alleen voor de klant zelf; de coach die meekijkt ziet
       // gewoon zijn app.
-      setOpSlot(!!clientData.account_locked_at && !previewClientId && !uitSleutel)
+      const eigenAccount = !previewClientId && !uitSleutel
+      let opSlotNu = !!clientData.account_locked_at && eigenAccount
+      // App-abonnement (24 nov 2026). Alleen voor accounts die op slot staan of
+      // zelf in de app zijn aangemaakt; alle andere klanten slaan dit over.
+      //   - Op slot + lopend abonnement: gewoon de app in.
+      //   - Eigen app-account zonder abonnement: betaalmuur (alleen native).
+      // Bij een fout blijft een slot een slot en komt een app-account binnen.
+      if (eigenAccount && (clientData.account_locked_at || clientData.app_abonnee)) {
+        const t = await bepaalAppToegang(supabase, authUser.id).catch(() => ({ toegang: true, reden: 'onbekend' }))
+        const betaald = t.reden === 'abonnement' || t.reden === 'abonnement_store'
+        if (opSlotNu && betaald) opSlotNu = false
+        if (!clientData.account_locked_at && clientData.app_abonnee) {
+          setBetaalmuur(!t.toegang && abonnementMogelijk() ? 'app' : null)
+        }
+      }
+      setOpSlot(opSlotNu)
       // Zelfde gegevens als we al hebben (bv. na de token-verversing elk uur):
       // het oude object houden, anders draaien alle effecten op [client]
       // opnieuw en haalt elk scherm alles nog eens op.
@@ -388,7 +408,26 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   }, [])
 
   if (loading) return <LaadScherm />
-  if (opSlot && client) return <AccountOpSlot client={client} onLogout={handleLogout} />
+  if (betaalmuur && client && user) {
+    return (
+      <AppBetaalmuur
+        authUserId={user.id}
+        voornaam={(client.first_name || '').trim()}
+        onGelukt={() => { setBetaalmuur(null); setOpSlot(false); loadClientData() }}
+        onTerug={betaalmuur === 'slot' ? () => setBetaalmuur(null) : undefined}
+        onLogout={handleLogout}
+      />
+    )
+  }
+  if (opSlot && client) {
+    return (
+      <AccountOpSlot
+        client={client}
+        onLogout={handleLogout}
+        onAbonnement={abonnementMogelijk() && user ? () => setBetaalmuur('slot') : undefined}
+      />
+    )
+  }
 
   if (error) {
     return (
