@@ -20,6 +20,12 @@
 //   ruwe tekst.
 // - Klopt openen → opslaan niet teken voor teken, dan is ok false en opent het
 //   scherm het document in de oude ruwe vorm.
+//
+// Testen (lokale headless Chrome, geen netwerk): ~/Gino/doc-editor-test/
+//   haal.mjs        haalt alle rijen van business_os_documenten op (md5-controle)
+//   test.mjs        heen-en-terug per rij, toetsgedrag, willekeurige bewerkingen
+//   scherm-test.mjs het hele documentscherm met nep-opslag, desktop en telefoonmaat
+// Draai ze na elke wijziging hier of aan de regels hieronder.
 
 // ── Regels van de markdown-vorm (ook gebruikt door de leesweergave) ──
 export const KOPREGEL = /^(#{1,4})\s+(.*)$/
@@ -515,6 +521,16 @@ export function maakBewerker(root, opties = {}) {
       const p = leegBlok('p', '')
       extra.get(p).virtueel = true
       root.append(p)
+    }
+    // Twee tabellen direct onder elkaar zijn in de markdown één tabel: dan ook één blok.
+    for (const tweede of root.querySelectorAll(':scope > [data-t="ruw"] + [data-t="ruw"]')) {
+      const eerste = tweede.previousElementSibling
+      const x = extra.get(eerste)
+      const y = extra.get(tweede)
+      if (!x || !y || y.voor?.length || eerste.querySelector('textarea') || tweede.querySelector('textarea')) continue
+      x.regels = `${x.regels}\n${y.regels}`
+      tweede.remove()
+      tekenTabel(doc, eerste)
     }
   }
 
@@ -1479,8 +1495,9 @@ export function maakBewerker(root, opties = {}) {
     voegOnderdeelToe,
     focusEind,
     markdown: () => { meld(); return huidig },
-    // Alleen voor de test: opslaan zonder het vangnet van de oorspronkelijke regels.
+    // Alleen voor de test: opslaan zonder het vangnet van de oorspronkelijke regels, en de regel per blok.
     markdownZonderVangnet: () => naarMarkdown(root, true),
+    regelsPerBlok: () => [...root.children].map(regelVan),
     sluit: () => {
       for (const [el, soort, f] of luister) el.removeEventListener(soort, f)
       if (meter) meter.remove()

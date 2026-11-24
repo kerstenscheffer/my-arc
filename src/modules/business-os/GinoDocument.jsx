@@ -496,10 +496,11 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
   // Na sluiten verder lezen waar je in het bewerkvlak was.
   useLayoutEffect(() => {
+    if (bewerk) return
     const doel = leesTerug.current
     const vlak = leesvlak.current
-    if (bewerk || !doel || !vlak) return
     leesTerug.current = null
+    if (!doel || !vlak) return
     let el = null
     for (const x of vlak.querySelectorAll('[data-regel]')) {
       if (Number(x.dataset.regel) > doel.regel) break
@@ -598,7 +599,8 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
   const kies = (id) => {
     if (id !== actief?.id) {
-      if (bewerk) klaar()
+      // Ander tabblad: daar geldt de leesplek van dit tabblad niet.
+      if (bewerk) { klaar(); leesTerug.current = null }
       setStand(null)
       setMenuVoor(null)
     }
