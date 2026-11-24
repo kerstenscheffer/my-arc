@@ -34,7 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Minus, Maximize2, Minimize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus, Zap, Bot, Trash2 } from 'lucide-react'
+import { X, Minus, Maximize2, Minimize2, Grid2x2, Check, CalendarDays, ChevronDown, Plus, Zap, Bot, Trash2, ArrowLeftRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useZwevendVenster from '../../components/useZwevendVenster'
@@ -60,7 +60,7 @@ const DAGDELEN = [
   { id: 'avond', titel: 'Avond', tijd: '18–24', van: 18, tot: 24 },
 ]
 const dagdeelNu = () => { const u = new Date().getHours(); return DAGDELEN.find(d => u >= d.van && u < d.tot)?.id || null }
-const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, gino_opdracht, gino_status, gino_resultaat, gino_klaar_at, gino_gesprek, created_at'
+const VELDEN = 'id, title, description, priority, deadline, scheduled_date, scheduled_start_time, recurrence_active, section_id, kwadrant, dagdeel, gino_opdracht, gino_status, gino_resultaat, gino_klaar_at, gino_gesprek, prio_rol, created_at'
 
 const dagIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dagIso(d) }
@@ -78,6 +78,13 @@ function voorlopig(t) {
   return spoed ? 'gino' : 'weg'
 }
 const kwadrantVan = (t) => t.kwadrant || voorlopig(t)
+
+// Business / Manager (24 nov 2026), kolom productivity_tasks.prio_rol.
+// Business = trekt de business vooruit, Manager = klanten goed helpen.
+// Leeg: beloftes en coaching-secties zijn Manager, de rest Business.
+const ROLLEN = [{ id: 'business', titel: 'Business' }, { id: 'manager', titel: 'Manager' }]
+const rolVan = (t, secties) => t.prio_rol
+  || (isBelofte(t) || /coach|belofte|klant/i.test((t.section_id && secties[t.section_id]) || '') ? 'manager' : 'business')
 
 const kortDatum = (iso) => {
   if (iso === plusDagen(0)) return 'vandaag'
@@ -123,6 +130,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const [nieuwOpen, setNieuwOpen] = useState(false)
   const [nieuwTitel, setNieuwTitel] = useState('')
   const [nieuwVak, setNieuwVak] = useState('doen')
+  const [rol, setRolState] = useState(() => {
+    try { return localStorage.getItem('prio_rol') === 'manager' ? 'manager' : 'business' } catch { return 'business' }
+  })
+  const setRol = (r) => { setRolState(r); try { localStorage.setItem('prio_rol', r) } catch { /* privé-venster */ } }
   const sleepteNet = useRef(false)
   const ongedaanTimer = useRef(null)
   const uidRef = useRef(coachId || null)
@@ -142,7 +153,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         .then(r => r, e => ({ data: null, error: e })),
       supabase.from('productivity_sections').select('id, title').eq('coach_id', uid)
         .then(r => r, e => ({ data: null, error: e })),
-      supabase.from('productivity_tasks').select('id, title, updated_at').eq('coach_id', uid)
+      supabase.from('productivity_tasks').select('id, title, updated_at, prio_rol, section_id').eq('coach_id', uid)
         .eq('status', 'archived').eq('kwadrant', 'weg').gte('updated_at', week)
         .order('updated_at', { ascending: false }).limit(50)
         .then(r => r, e => ({ data: null, error: e })),
@@ -162,7 +173,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
     if (!titel || !uidRef.current) return
     const rij = {
       coach_id: uidRef.current, title: titel, status: 'active', kwadrant: nieuwVak,
-      dagdeel: nieuwVak === 'doen' ? dagdeelNu() : null,
+      dagdeel: nieuwVak === 'doen' ? dagdeelNu() : null, prio_rol: rol,
     }
     setNieuwTitel('')
     const { data, error } = await supabase.from('productivity_tasks').insert(rij).select(VELDEN).single()
@@ -194,6 +205,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   // naar = 'doen' | 'doen:ochtend' | 'plannen' | …
   const verplaats = async (t, doelId) => {
     const [naar, deel] = String(doelId).split(':')
+    if (naar === 'rol') {
+      if (rolVan(t, secties) !== deel) await schrijf(t.id, { prio_rol: deel })
+      return
+    }
     if (naar === 'doen') {
       if (t.kwadrant === 'doen' && (!deel || deel === t.dagdeel)) return
       await schrijf(t.id, { kwadrant: 'doen', dagdeel: deel || (t.kwadrant === 'doen' ? t.dagdeel : null) || null })
@@ -208,7 +223,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         .update({ kwadrant: 'weg', status: 'archived', updated_at: new Date().toISOString() }).eq('id', t.id)
         .then(r => r, e => ({ error: e }))
       if (error) { console.error('Matrix archiveren:', error); setFout('Opslaan mislukt'); laad(); return }
-      setWegLijst(l => [{ id: t.id, title: t.title, updated_at: new Date().toISOString() }, ...l.filter(x => x.id !== t.id)])
+      setWegLijst(l => [{ id: t.id, title: t.title, updated_at: new Date().toISOString(), prio_rol: t.prio_rol, section_id: t.section_id }, ...l.filter(x => x.id !== t.id)])
       clearTimeout(ongedaanTimer.current)
       setOngedaan({ taak: t, vorig })
       ongedaanTimer.current = setTimeout(() => setOngedaan(null), 5000)
@@ -343,10 +358,11 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   }
 
   const perVak = (id) => (taken || [])
-    .filter(t => kwadrantVan(t) === id)
+    .filter(t => kwadrantVan(t) === id && rolVan(t, secties) === rol)
     .sort((a, b) => (datumVan(a) || '9').localeCompare(datumVan(b) || '9') || String(a.created_at).localeCompare(String(b.created_at)))
 
   const vandaag = plusDagen(0)
+  const wegZicht = wegLijst.filter(w => rolVan(w, secties) === rol)
 
   // Laatste "Gino (dd-mm-jjjj): …"-regel uit description.
   const ginoStand = (t) => {
@@ -361,7 +377,8 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const kaart = (t) => {
     const isOpen = open === t.id
     // Gino wacht op antwoord: kaart gloeit amber, zodat je hem ziet staan.
-    const gloed = kwadrantVan(t) === 'gino' && t.gino_status === 'vraag' ? '#f59e0b' : VAKKEN.find(v => v.id === kwadrantVan(t))?.rand || '#ffffff'
+    const vraagt = kwadrantVan(t) === 'gino' && t.gino_status === 'vraag'
+    const andereRol = rol === 'business' ? 'manager' : 'business'
     const label = labelVan(t)
     const d = datumVan(t)
     const dKleur = d && d < vandaag ? colors.danger : d === vandaag ? GROEN : ZACHT
@@ -376,8 +393,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         style={{
           display: 'flex', gap: 8, alignItems: 'flex-start',
           padding: '8px 8px 8px 10px', marginBottom: 6,
-          // Strak (20 nov 2026, Kersten): kaart in de kleur van zijn vak, geen gloed.
-          background: `${gloed}24`, border: `1px solid ${gloed}59`, borderRadius: 12,
+          // 24 nov 2026 (Kersten): geen vakkleur meer op de kaart, alleen
+          // amber als Gino op antwoord wacht.
+          background: vraagt ? '#f59e0b24' : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${vraagt ? '#f59e0b59' : 'rgba(255,255,255,0.12)'}`, borderRadius: 12,
           WebkitTouchCallout: 'none',
           opacity: sleep?.taak.id === t.id ? 0.3 : afgevinkt === t.id ? 0.5 : 1,
           cursor: isOpen ? 'default' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
@@ -441,6 +460,9 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
               <button type="button" onClick={() => vinkAf(t)} style={{ ...KNOP, gap: 5, height: 30, padding: '0 12px', borderRadius: 999, background: GROEN, color: '#000', fontSize: '0.76rem', fontWeight: 900 }}>
                 <Check size={14} strokeWidth={3} /> Afvinken
               </button>
+              <button type="button" onClick={() => { setOpen(null); verplaats(t, `rol:${rol === 'business' ? 'manager' : 'business'}`) }} style={{ ...KNOP, height: 30, padding: '0 10px', fontSize: '0.76rem', fontWeight: 900 }}>
+                Naar {rol === 'business' ? 'Manager' : 'Business'}
+              </button>
               {t.kwadrant !== 'uit' && (
                 <button type="button" onClick={() => { setOpen(null); verplaats(t, 'uit') }} style={{ ...KNOP, height: 30, padding: '0 10px', fontSize: '0.76rem', fontWeight: 900 }}>
                   Uitplannen
@@ -490,6 +512,13 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           </button>
         )}
         {!isOpen && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); verplaats(t, `rol:${andereRol}`) }}
+            title={`Naar ${andereRol === 'manager' ? 'Manager' : 'Business'}`} aria-label={`Naar ${andereRol === 'manager' ? 'Manager' : 'Business'}`}
+            style={{ ...KNOP, width: 22, height: 22, borderRadius: 999, color: 'rgba(255,255,255,0.55)' }}>
+            <ArrowLeftRight size={13} strokeWidth={2.6} />
+          </button>
+        )}
+        {!isOpen && (
           <button type="button" onClick={(e) => { e.stopPropagation(); setDatumVoor(t.id) }} title="Datum kiezen" aria-label="Datum kiezen" style={{
             ...KNOP, gap: 4, height: 22, padding: d ? '0 7px' : 0, width: d ? 'auto' : 22, borderRadius: 999,
             background: d ? 'rgba(255,255,255,0.08)' : 'transparent', color: d ? dKleur : 'rgba(255,255,255,0.55)',
@@ -507,7 +536,10 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
   const kiesDatum = async (iso) => {
     const id = datumVoor
     setDatumVoor(null)
-    if (id && iso) await schrijf(id, { scheduled_date: iso })
+    if (!id) return
+    // 'geen' (24 nov 2026): datum en deadline eraf, taak gaat naar Zonder datum.
+    if (iso === 'geen') await schrijf(id, { scheduled_date: null, deadline: null })
+    else if (iso) await schrijf(id, { scheduled_date: iso })
   }
   const datumKnop = { ...KNOP, height: 40, borderRadius: 999, border: '1.5px solid rgba(255,255,255,0.35)', fontSize: '0.85rem', fontWeight: 900, padding: '0 16px' }
 
@@ -528,7 +560,26 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
         ...(sleepHandvat.style || {}),
       }}>
         <Grid2x2 size={15} color={WIT} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
+        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, letterSpacing: '-0.02em' }}>Prioriteiten</span>
+        {/* Business / Manager. Een kaart op de andere knop slepen = verhuizen. */}
+        <div style={{ display: 'flex', gap: 2, padding: 2, marginLeft: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          {ROLLEN.map(r => {
+            const aan = rol === r.id
+            const over = sleep?.over === `rol:${r.id}`
+            return (
+              <button key={r.id} type="button" data-kwadrant={`rol:${r.id}`} onClick={() => setRol(r.id)}
+                style={{
+                  ...KNOP, height: 24, padding: '0 12px', borderRadius: 999,
+                  background: aan ? WIT : over ? 'rgba(255,255,255,0.22)' : 'transparent',
+                  color: aan ? '#000' : 'rgba(255,255,255,0.6)',
+                  fontSize: '0.74rem', fontWeight: 900, transition: 'background 0.15s, color 0.15s',
+                }}>
+                {r.titel}
+              </button>
+            )
+          })}
+        </div>
+        <span style={{ flex: 1 }} />
         <button type="button" onClick={() => setNieuwOpen(v => !v)} aria-label="Nieuwe taak" title="Nieuwe taak"
           style={{ ...KOPKNOP, background: 'transparent', color: nieuwOpen ? '#22c55e' : WIT }}>
           <Plus size={18} strokeWidth={3} />
@@ -580,7 +631,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
       )}
 
       {!ingeklapt && (() => {
-        const onderLeeg = !sleep && perVak('gino').length === 0 && perVak('weg').length === 0 && wegLijst.length === 0
+        const onderLeeg = !sleep && perVak('gino').length === 0 && perVak('weg').length === 0 && wegZicht.length === 0
         const groepKop = (tekst, n, kleur) => (
           <div key={`kop-${tekst}`} style={{ display: 'flex', gap: 6, padding: '8px 4px 5px', fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: kleur || ZACHT }}>
             <span>{tekst}</span><span style={{ opacity: 0.7 }}>{n}</span>
@@ -624,7 +675,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           ]
         }
         // Voorlopig in Weg (nog actief) bovenaan, daarna wat al gearchiveerd is.
-        const wegInhoud = () => [...perVak('weg').map(kaart), ...(wegLijst.length ? [groepKop('Gearchiveerd, 7 dagen', wegLijst.length)] : []), ...wegLijst.map(w => (
+        const wegInhoud = () => [...perVak('weg').map(kaart), ...(wegZicht.length ? [groepKop('Gearchiveerd, 7 dagen', wegZicht.length)] : []), ...wegZicht.map(w => (
           <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 4px 6px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.title}</span>
             <button type="button" onClick={() => haalTerug(w)} style={{ ...KNOP, height: 22, padding: '0 6px', fontSize: '0.7rem', fontWeight: 900 }}>Terug</button>
@@ -637,7 +688,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             gap: 0, padding: 0, overflow: 'hidden', borderRadius: isMobile ? 0 : '0 0 16px 16px',
           }}>
             {VAKKEN.map(v => {
-              const lijst = v.id === 'weg' ? [...perVak('weg'), ...wegLijst] : perVak(v.id)
+              const lijst = v.id === 'weg' ? [...perVak('weg'), ...wegZicht] : perVak(v.id)
               const doel = sleep && String(sleep.over || '').split(':')[0] === v.id
               return (
                 <div key={v.id} data-kwadrant={v.id} style={{
@@ -750,6 +801,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
                   onChange={e => { if (e.target.value) kiesDatum(e.target.value) }}
                   style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
               </label>
+              <button type="button" onClick={() => kiesDatum('geen')} style={{ ...datumKnop, width: '100%', border: 'none', color: ZACHT }}>Geen datum</button>
             </div>
           </div>
         </div>
