@@ -3009,7 +3009,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // maand van de sale. (De "Omzet"-stat in de weekstats blijft wél op de
         // sale-datum tellen; dat is bewust, zie SaleValueModal.)
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
-        restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
+        // Betaaldatum telt ook buiten een reservering (24 nov 2026, verlenging die later ingaat):
+        // termijnen starten op payment_due_date, net als get_payment_schedule; een toegezegd bedrag
+        // staat in de maand waarin het verwacht wordt. Betaald in één keer blijft op de boekdatum.
+        restDatum: (r.payment_due_date && (r.is_reservation || r.payment_type === 'monthly' || r.payment_received !== true)) ? new Date(r.payment_due_date) : null,
+        isReservering: !!r.is_reservation,
         pauzes: pauzesVan[r.id] || null,
       })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
 
@@ -3050,7 +3054,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           }
         } else {
           const nd = pauzeSchuif(restStart, s.pauzes)
-          if (nd) boek(monthKey(nd), restBedrag, heeftRest ? 'Restbetaling' : 'In één keer', nd)
+          if (nd) boek(monthKey(nd), restBedrag, heeftRest && s.isReservering ? 'Restbetaling' : 'In één keer', nd)
         }
       }
 
@@ -3399,7 +3403,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         date: new Date(r.moved_at),
         naam: naamVanBorg[r.id] || r.lead_name || null,
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
-        restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
+        // Betaaldatum telt ook buiten een reservering (24 nov 2026, verlenging die later ingaat):
+        // termijnen starten op payment_due_date, net als get_payment_schedule; een toegezegd bedrag
+        // staat in de maand waarin het verwacht wordt. Betaald in één keer blijft op de boekdatum.
+        restDatum: (r.payment_due_date && (r.is_reservation || r.payment_type === 'monthly' || r.payment_received !== true)) ? new Date(r.payment_due_date) : null,
+        isReservering: !!r.is_reservation,
         // Net als bij de omzet: over een ja waarvan het geld nog moet komen
         // reken je geen commissie af. Komt de betaling binnen, dan verschijnt
         // hij vanzelf in de maand waarin dat gebeurde.
@@ -3538,7 +3546,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               portie: `termijn-${i + 1}`,
               los: false,
             }))
-          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: s.borg ? 'Challenge-borg' : heeftRest ? 'Restbetaling' : 'Vooruitbetaald', portie: 'rest', los: true }]
+          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: s.borg ? 'Challenge-borg' : heeftRest && s.isReservering ? 'Restbetaling' : 'Vooruitbetaald', portie: 'rest', los: true }]
 
         // Betaalpauze: termijnen die stilstaan vallen weg, na hervatten
         // landen ze in de periode van hun nieuwe datum.

@@ -13,10 +13,11 @@ import { X, ChevronLeft, Check } from 'lucide-react'
 
 const euro = (n) => `€${Math.round(Number(n) || 0).toLocaleString('nl-NL')}`
 const vandaagIso = () => new Date().toLocaleDateString('sv-SE')
+const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE') }
 
 // r = de rij uit GinoDoorstap. borgSale = gekoppelde challenge-sale (of null).
 // borgKandidaten = betaalde open borgen om te koppelen als er nog geen is.
-export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onVerleng, onBorgOmzetten, onStatus, onStopt, onHervat }) {
+export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onVerleng, onBorgOmzetten, onStatus, onStopt, onHervat, onSluimer }) {
   const [stap, setStap] = useState('kies')
   const [callDatum, setCallDatum] = useState(r.call_datum && r.call_datum >= vandaagIso() ? r.call_datum : '')
 
@@ -85,6 +86,9 @@ export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKan
             {optie('denkt_na', 'Denkt na', 'Komt bovenaan terug om op te volgen', () => onStatus('denkt_na'), r.status === 'denkt_na')}
             {optie('call', 'Call ingepland', r.status === 'call' && r.call_datum ? `Nu: ${r.call_datum}` : 'Kies de datum', () => setStap('call'), r.status === 'call')}
             </>}
+            {onSluimer && (r.sluimer_tot && r.sluimer_tot >= vandaagIso()
+              ? optie('wakker', 'Weer oppakken', `Sluimert tot ${r.sluimer_tot}. Terug naar Actie nodig`, () => onSluimer(null))
+              : optie('sluimer', 'Even laten rusten', 'Appje gestuurd of wacht op antwoord: uit Actie nodig tot een datum', () => setStap('sluimer')))}
             {r.gepauzeerd && optie('hervat', 'Pauze eraf', 'Traject loopt weer, einddatum schuift mee', onHervat)}
             {!borgSale && r.challenge && borgKandidaten.length > 0 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
@@ -115,6 +119,15 @@ export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKan
                 {primair('Ja, hij stopt', () => onStopt(null, null))}
               </>
             )}
+          </>
+        )}
+
+        {stap === 'sluimer' && (
+          <>
+            {vraag('Tot wanneer laten rusten?')}
+            {[[2, 'Twee dagen'], [3, 'Drie dagen'], [7, 'Een week']].map(([n, l]) => optie(`s${n}`, l, null, () => onSluimer(plusDagen(n))))}
+            <input type="date" min={vandaagIso()} onChange={(e) => e.target.value && onSluimer(e.target.value)} aria-label="Eigen datum"
+              style={{ width: '100%', minHeight: 48, boxSizing: 'border-box', padding: '0 0.75rem', marginTop: 4, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: '1rem', fontWeight: 800, fontFamily: 'inherit', colorScheme: 'dark', outline: 'none' }} />
           </>
         )}
 

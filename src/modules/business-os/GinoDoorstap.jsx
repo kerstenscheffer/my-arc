@@ -51,13 +51,21 @@ const volgorde = (r) => (r.eindcallNodig ? 0 : r.status === 'ja_mondeling' ? 1 :
 // Wat moet de coach nu doen bij deze klant, en in welke groep hoort de kaart
 // (16 nov 2026)? 'actie' = jij bent aan zet, 'loopt' = niets te doen, 'klaar'
 // = afgerond. De volgorde van de regels is de volgorde van belang.
+const vandaagIsoNL = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+const plusDagenIso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' }) }
 const watNu = (r) => {
   // Door en betaald = gewoon een lopend traject (24 nov 2026, Kersten). Afgerond is alleen wie stopt.
   if (r.status === 'nee') return { groep: 'klaar', tekst: 'Gestopt' }
   if (r.status === 'betaald') return { groep: 'loopt', tekst: '' }
   // Kanban (24 nov 2026): door maar nog niet betaald is een eigen kolom.
-  if (r.status === 'ja_mondeling' && r.sale) return { groep: 'betaling', tekst: 'Betaling ophalen', bericht: 'betaling' }
+  // Sluimer (24 nov 2026, Kersten): actie gedaan (appje gestuurd, even laten rusten) = uit Actie nodig
+  // tot de datum. Een geplande call in de agenda telt ook als gedaan: dan wacht je op die call.
+  const slaapt = r.sluimer_tot && r.sluimer_tot >= vandaagIsoNL()
+  const wacht = slaapt ? `Wacht tot ${dagKort(r.sluimer_tot)}` : null
+  if (r.status === 'ja_mondeling' && r.sale) return { groep: 'betaling', tekst: slaapt ? `Herinnerd · ${wacht.toLowerCase()}` : 'Betaling ophalen', bericht: 'betaling', slaapt }
+  if (slaapt) return { groep: 'loopt', tekst: wacht, slaapt }
   if (r.status === 'ja_mondeling') return { groep: 'actie', tekst: 'Traject boeken' }
+  if (r.volgendeCall && !r.gepauzeerd) return { groep: 'loopt', tekst: `Call ${dagKort(r.volgendeCall.start)}` }
   if (r.eindcallNodig) return { groep: 'actie', tekst: 'Eindcall plannen', bericht: 'eindcall' }
   if (r.status === 'denkt_na') return { groep: 'actie', tekst: 'Opvolgen: denkt na', bericht: 'denkt_na' }
   if (gesprekNodig(r)) return { groep: 'actie', tekst: 'Doorstapgesprek voeren', bericht: 'eindcall' }
@@ -169,6 +177,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [eindOplopend, setEindOplopend] = useState(() => { try { return localStorage.getItem('myarc.doorstap.sorteer') !== 'af' } catch { return true } })
   const [instellingen, setInstellingen] = useState(() => new Map())
   const [gestopt, setGestopt] = useState([]) // challenge-klanten van wie het traject is beëindigd
+  const [gestoptRijen, setGestoptRijen] = useState([]) // dezelfden als kaart, voor de kolom Gestopt
   const [soortFilter, setSoortFilter] = useState(leesFilter)
   const [looptijd, setLooptijd] = useState(null) // { id, start, weken } terwijl je hem aanpast
   const [klaarOpen, setKlaarOpen] = useState(false) // de groep Afgerond staat standaard dicht
@@ -205,7 +214,7 @@ export default function GinoDoorstap({ isMobile = false }) {
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
-      supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at, call_datum')
+      supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at, call_datum, sluimer_tot')
         .order('gezet_at', { ascending: false }).order('id', { ascending: false })
         .then(r => r, e => ({ error: e })),
       supabase.from('clients').select('id, first_name, last_name, email, coach_id, coaching_onbeperkt, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status, coaching_paused_at, phone').eq('status', 'active').order('first_name')
@@ -244,10 +253,25 @@ export default function GinoDoorstap({ isMobile = false }) {
     // Gestopt telt ook wie niet meer actief is, dus los van de klantenlijst hierboven.
     // Traject beëindigd, of het account staat niet meer op actief terwijl coaching_status
     // nog op active bleef hangen (18 nov 2026: zo vielen twee refunds uit beide lijsten).
-    const { data: geeindigd } = await supabase.from('clients').select('id, first_name, last_name, email')
+    const { data: geeindigd } = await supabase.from('clients').select('id, first_name, last_name, email, coach_id, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status, phone, niet_betalend')
       .eq('coaching_total_weeks', CHALLENGE_WEKEN).or('coaching_status.eq.ended,status.neq.active,status.is.null')
       .then(x => x, () => ({ data: [] }))
-    setGestopt((geeindigd || []).filter(c => !isTest(c) && !['ja_mondeling', 'betaald'].includes(laatste.get(c.id)?.status)))
+    // Nooit betaald (clients.niet_betalend, vinkje in Coach Inzicht) hoort hier niet: Tygo, Thom, Romeo (24 nov 2026).
+    const gestoptLijst = (geeindigd || []).filter(c => !isTest(c) && !c.niet_betalend && !['ja_mondeling', 'betaald'].includes(laatste.get(c.id)?.status))
+    setGestopt(gestoptLijst)
+    // Kaarten voor de kolom Gestopt (24 nov 2026: Oscar, Erwin e.a. stonden er niet in, want hun account
+    // staat niet meer op actief). Alleen tonen; stats rekenen ze al mee via gestopt.
+    setGestoptRijen(gestoptLijst.map(c => {
+      const stand = laatste.get(c.id) || null
+      const p = computePeriod(c)
+      return {
+        gestopt: true, vanChallenge: true, challenge: false, onbeperkt: false, // challenge false: geen eisen meer laden
+        client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: 'nee', pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: null,
+        klant: c, sale: null, betaaldeSale: null,
+        week: p ? Math.min(p.weeksDone + 1, p.weeksTotal) : null, weken: p?.weeksTotal || null,
+        start: c.coaching_start_date || null, eind: p?.endDate || null, dagen: null, gepauzeerd: false, eindcallNodig: false,
+      }
+    }))
 
     // Verlengingen van deze klanten: het bedrag dat nog moet komen, of al betaald is.
     const ids = alle.map(c => c.id)
@@ -273,7 +297,7 @@ export default function GinoDoorstap({ isMobile = false }) {
           vanChallenge: c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id),
           challenge: (c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id)) && stand?.status !== 'betaald',
           onbeperkt: !!c.coaching_onbeperkt,
-          client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: stand?.call_datum || null,
+          client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: stand?.call_datum || null, sluimer_tot: stand?.sluimer_tot || null,
           klant: c, sale: eigen.find(x => !x.payment_received) || null, betaaldeSale: eigen.find(x => x.payment_received) || null,
           week: periode ? Math.min(periode.weeksDone + 1, periode.weeksTotal) : null, weken: periode?.weeksTotal || null,
           ...(() => {
@@ -562,6 +586,19 @@ export default function GinoDoorstap({ isMobile = false }) {
     },
   })
   // Klein label achter een cijfer op de kaart, zoals KCAL / E / K / V op een maaltijdkaart.
+  // Sluimer: zelfde stand, pakket en calldatum, plus sluimer_tot. tot = null maakt hem weer wakker.
+  const sluimer = async (r, tot, notitie = null) => {
+    setBezig(r.client_id); setFout(null); rijFoutWeg(r.client_id)
+    const { error } = await supabase.from('client_doorstap').insert({
+      client_id: r.client_id, coach_id: r.coach_id || coachId, status: r.status || null, pakket: r.pakket || null,
+      call_datum: r.call_datum || null, sluimer_tot: tot, notitie, gezet_door: coachId,
+    }).then(x => x, e => ({ error: e }))
+    if (error) rijMislukt(r.client_id, error, 'Sluimer opslaan mislukt')
+    else await laad()
+    setBezig(null)
+    return !error
+  }
+
   // Bericht naar het klembord en WhatsApp open bij de klant, met de tekst al ingevuld. Het venster
   // gaat meteen open (anders blokkeert de browser het). Versturen doet Kersten zelf.
   const naarWhatsApp = async (r, tekst) => {
@@ -572,10 +609,13 @@ export default function GinoDoorstap({ isMobile = false }) {
     const url = `https://wa.me/${nr}?text=${encodeURIComponent(tekst)}`
     if (venster) venster.location.href = url; else window.location.href = url
     setBericht(null)
+    // Appje gestuurd = actie gedaan: drie dagen uit Actie nodig, dan komt hij terug als er niets veranderde.
+    if (r.gestopt) return
+    await sluimer(r, plusDagenIso(3), `Appje gestuurd: ${watNu(r).tekst || 'bericht'}`)
   }
 
   // Afhandelen-venster: de rij, de borg van die klant en "stopt" (stand nee + borg).
-  const afhandelRij = afhandel ? (rijen || []).find(x => x.client_id === afhandel) || null : null
+  const afhandelRij = afhandel ? [...(rijen || []), ...gestoptRijen].find(x => x.client_id === afhandel) || null : null
   const borgVan = (r) => {
     const id = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id || borgKeuze[r.client_id]
     return id ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === id) || null : null
@@ -732,7 +772,10 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             height: kanbanHoogte || undefined, boxSizing: 'border-box',
           }} ref={kanbanRef}>
           {GROEPEN.map(([groep, groepLabel]) => {
-            const inGroep = getoond.filter(x => watNu(x).groep === groep)
+            const extra = groep === 'klaar' && soortFilter !== 'coaching'
+              ? gestoptRijen.filter(g => !rijen.some(x => x.client_id === g.client_id) && (!zoekTerm || naamVan(g.klant).toLowerCase().includes(zoekTerm)))
+              : []
+            const inGroep = [...getoond.filter(x => watNu(x).groep === groep), ...extra]
             const dag = (x) => (x.dagen ?? 9999)
             const betaalDag = (x) => String(x.sale?.payment_due_date || x.sale?.start_op || '9999')
             const lijst = groep === 'actie' ? [...inGroep].sort((a, b) => dag(a) - dag(b) || volgorde(a) - volgorde(b))
@@ -930,6 +973,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           onStatus={async (status, extra) => { if (await wijzig(afhandelRij.client_id, afhandelRij.coach_id, status, afhandelRij.pakket, extra)) setAfhandel(null) }}
           onStopt={(borg, borgStatus) => stopt(afhandelRij, borg, borgStatus)}
           onHervat={async () => { const r = afhandelRij; setAfhandel(null); await hervat(r) }}
+          onSluimer={async (tot) => { const r = afhandelRij; if (await sluimer(r, tot, tot ? 'Even laten rusten' : 'Weer wakker')) setAfhandel(null) }}
         />
       )}
 

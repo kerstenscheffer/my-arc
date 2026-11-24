@@ -38,6 +38,8 @@ const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`)
 export function vraagtNuActie(r) {
   // Op pauze: het einde schuift nog op, dus nu niets te beslissen (Dirk Jan, 24 nov 2026).
   if (r.gepauzeerd) return false
+  // Sluimer (appje gestuurd, even laten rusten): zelfde regel als Business OS → Klanten.
+  if (r.sluimer_tot && r.sluimer_tot >= vandaagIso()) return false
   if (r.status === 'call' && r.call_datum && r.call_datum >= vandaagIso()) return false
   if (r.status === 'denkt_na' && r.gezet_at && Date.now() - new Date(r.gezet_at).getTime() < DENKT_NA_DAGEN * 864e5) return false
   // Nog niet afgelopen en al een keuze: wacht tot het einde.
@@ -49,12 +51,22 @@ export function vraagtNuActie(r) {
 export async function haalEindeTraject() {
   const { data, error } = await supabase.rpc('einde_traject_open')
   if (error) { console.warn('Einde traject laden mislukt:', error.message); return [] }
-  return data || []
+  const rijen = data || []
+  // sluimer_tot zit (nog) niet in de RPC; los erbij uit de laatste doorstap-rij per klant.
+  const ids = rijen.map(r => r.client_id)
+  if (!ids.length) return rijen
+  const { data: ds } = await supabase.from('client_doorstap').select('client_id, sluimer_tot, gezet_at')
+    .in('client_id', ids).order('gezet_at', { ascending: false })
+    .then(x => x, () => ({ data: [] }))
+  const laatste = new Map()
+  for (const d of ds || []) if (!laatste.has(d.client_id)) laatste.set(d.client_id, d.sluimer_tot)
+  return rijen.map(r => ({ ...r, sluimer_tot: laatste.get(r.client_id) || null }))
 }
 
 // Kort: "17 nov · nog 1 d" of "10 nov · 6 d geleden".
 const eindTekst = (r) => `${dagKort(r.einde)} · ${r.dagen > 0 ? `nog ${r.dagen} d` : r.dagen === 0 ? 'vandaag' : `${-r.dagen} d geleden`}`
-const standTekst = (r) => (r.status === 'call' ? `call ${dagKort(r.call_datum)}`
+const standTekst = (r) => (r.sluimer_tot && r.sluimer_tot >= vandaagIso() ? `rust tot ${dagKort(r.sluimer_tot)}`
+  : r.status === 'call' ? `call ${dagKort(r.call_datum)}`
   : r.status === 'denkt_na' ? 'denkt na'
     : r.status === 'ja_mondeling' ? 'ja, nog niet geboekt'
       : null)
@@ -147,6 +159,11 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
     await kiesNee(r)
     sluitAfhandel()
   }
+  const afhandelSluimer = async (tot) => {
+    const r = afhandel.r
+    await doe(r, async () => [await bewaarKeuze(r, r.status || null, { pakket: r.pakket || null, call_datum: r.call_datum || null, sluimer_tot: tot, notitie: tot ? 'Even laten rusten' : 'Weer wakker' })])
+    sluitAfhandel()
+  }
   const afhandelStatus = async (status, extra = {}) => {
     const r = afhandel.r
     await doe(r, async () => [await bewaarKeuze(r, status, extra), await slotEraf(r)])
@@ -217,6 +234,7 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
           onVerleng={() => { const a = afhandel; sluitAfhandel(); kiesJa(a.r, null, true, { borgId: afhandelBorg(a)?.id }) }}
           onBorgOmzetten={(borg) => { const a = afhandel; sluitAfhandel(); kiesJa(a.r, null, true, { borgOmzetten: borg }) }}
           onStatus={afhandelStatus}
+          onSluimer={afhandelSluimer}
           onStopt={afhandelStopt}
           onHervat={async () => {
             const r = afhandel.r

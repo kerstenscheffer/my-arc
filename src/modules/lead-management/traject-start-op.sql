@@ -111,3 +111,7 @@ revoke all on function public.verlenging_betaald_doorstap() from public, anon, a
 alter table public.lead_movements add column if not exists aanbod text;
 comment on column public.lead_movements.aanbod is 'Gekozen aanbod bij verlengen (Business OS → Aanbod), bv. App 1 jaar. 24 nov 2026.';
 -- Kerstens rij gevuld met 12 weken €450, 6 maanden €125/mnd, App 1 jaar €300 of €30/mnd.
+
+-- 5) Sluimer (24 nov 2026). Live gedraaid. Actie gedaan (appje gestuurd, handmatig "even laten rusten"):
+--    kaart uit Actie nodig tot sluimer_tot. Nieuwe rij in client_doorstap met dezelfde stand.
+alter table public.client_doorstap add column if not exists sluimer_tot date;
