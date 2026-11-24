@@ -32,8 +32,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   // onderin (CheckinReminderPopup); nu een melding zoals de rest (18 nov 2026).
   const [checkin, setCheckin] = useState(null); // { dagenLaat }
   // Betaling open (24 nov 2026): doorgezet maar nog niet betaald. Bron is de RPC
-  // mijn_open_betaling (alleen klanten met clients.betaal_herinnering). Zichtbaar
-  // vanaf 14 dagen voor de slotdatum, tot de coach de betaling afvinkt.
+  // mijn_open_betaling. Zichtbaar vanaf het boeken tot de betaling binnen is
+  // (Stripe vinkt hem af, of de coach). Slot = einde traject + 3 dagen.
   const [betaling, setBetaling] = useState(null);
   const notifications = useMemo(() => {
     const eigen = []
@@ -44,7 +44,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
         id: `betaling-${betaling.id}`, _betaling: betaling, _knop: 'Nu betalen', _vast: true,
         type: 'betaling', priority: d <= 3 ? 'urgent' : 'high', status: 'active',
         title: 'Je betaling staat nog open',
-        message: `Heyy ${(betaling.voornaam || '').trim() || 'daar'}, je betaling voor ${betaling.aanbod} staat nog open. Rond hem af zodat je account niet ${wanneer} op slot gaat.`,
+        message: `Heyy ${(betaling.voornaam || '').trim() || 'daar'}, je betaling voor ${betaling.aanbod} staat nog open.${betaling.te_laat ? ' Eigenlijk zit je al over je termijn heen.' : ''} Rond hem af zodat je account niet ${wanneer} op slot gaat.`,
       })
     }
     if (checkin) {
@@ -121,7 +121,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     let leeft = true
     const kijk = () => db.supabase.rpc('mijn_open_betaling').then(({ data, error }) => {
       if (!leeft) return
-      const b = !error && data && typeof data === 'object' && data.dagen <= 14 ? data : null
+      const b = !error && data && typeof data === 'object' ? data : null
       setBetaling(b)
       if (b && !autoGeopend.has(`betaling-${b.id}`)) { autoGeopend.add(`betaling-${b.id}`); setTimeout(() => setIsExpanded(true), 800) }
     }, () => null)
