@@ -621,10 +621,6 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           })}
         </div>
         <span style={{ flex: 1 }} />
-        <button type="button" onClick={() => setNieuwOpen(v => !v)} aria-label="Nieuwe taak" title="Nieuwe taak"
-          style={{ ...KOPKNOP, background: 'transparent', color: nieuwOpen ? '#22c55e' : WIT }}>
-          <Plus size={18} strokeWidth={3} />
-        </button>
         <button type="button" data-kwadrant="uit" onClick={() => setUitOpen(v => !v)} title="Uitgeplande taken"
           style={{
             ...KNOP, gap: 5, height: 24, padding: '0 4px', border: 'none', background: 'transparent',
@@ -651,25 +647,6 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
           <X size={18} strokeWidth={2.8} />
         </button>
       </div>
-
-      {nieuwOpen && !ingeklapt && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <input autoFocus value={nieuwTitel} onChange={e => setNieuwTitel(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') maakTaak(); if (e.key === 'Escape') setNieuwOpen(false) }}
-            placeholder="Nieuwe taak…"
-            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: WIT, fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit', padding: '4px 0' }} />
-          {VAKKEN.map(v => (
-            <button key={v.id} type="button" onClick={() => setNieuwVak(v.id)} title={v.titel}
-              style={{ ...KNOP, height: 22, padding: '0 6px', border: 'none', background: 'transparent', fontSize: '0.7rem', fontWeight: 900, color: nieuwVak === v.id ? v.rand : 'rgba(255,255,255,0.35)', textShadow: nieuwVak === v.id ? `0 0 8px ${v.rand}` : 'none' }}>
-              {({ doen: 'Nu', plannen: 'Plannen', gino: 'Gino', weg: 'Weg' })[v.id]}
-            </button>
-          ))}
-          <button type="button" onClick={maakTaak} disabled={!nieuwTitel.trim()} aria-label="Toevoegen" title="Toevoegen (Enter)"
-            style={{ ...KOPKNOP, background: 'transparent', color: nieuwTitel.trim() ? '#22c55e' : 'rgba(255,255,255,0.3)' }}>
-            <Check size={17} strokeWidth={3} />
-          </button>
-        </div>
-      )}
 
       {!ingeklapt && (() => {
         const onderLeeg = !sleep && perVak('gino').length === 0 && perVak('weg').length === 0 && wegZicht.length === 0
@@ -741,11 +718,31 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: onderLeeg && (v.id === 'gino' || v.id === 'weg') ? '8px 12px' : '8px 12px 4px', flexShrink: 0 }}>
                     <v.icoon size={15} color={v.rand} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                    <span style={{ minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
                       {v.titel}
                     </span>
+                    {/* Nieuwe taak in dít vak: plus achter de titel (24 nov 2026, Kersten). */}
+                    <button type="button" aria-label={`Nieuwe taak in ${v.titel}`} title={`Nieuwe taak in ${v.titel}`}
+                      onClick={() => { const zelfde = nieuwOpen && nieuwVak === v.id; setNieuwVak(v.id); setNieuwOpen(!zelfde) }}
+                      style={{ ...KNOP, width: 22, height: 22, padding: 0, border: 'none', background: 'transparent', flexShrink: 0,
+                        color: nieuwOpen && nieuwVak === v.id ? v.rand : 'rgba(255,255,255,0.55)' }}>
+                      <Plus size={15} strokeWidth={3} />
+                    </button>
+                    <span style={{ flex: 1 }} />
                     <span style={{ fontSize: '0.9rem', fontWeight: 900, color: WIT, opacity: lijst.length ? 1 : 0.5, fontVariantNumeric: 'tabular-nums' }}>{taken ? lijst.length : ''}</span>
                   </div>
+                  {nieuwOpen && nieuwVak === v.id && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, margin: '2px 10px 6px', padding: '4px 4px 4px 10px', borderRadius: 10, border: `1px solid ${v.rand}`, background: 'rgba(255,255,255,0.04)' }}>
+                      <input autoFocus value={nieuwTitel} onChange={e => setNieuwTitel(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') maakTaak(); if (e.key === 'Escape') setNieuwOpen(false) }}
+                        placeholder="Nieuwe taak…"
+                        style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: WIT, fontSize: '0.84rem', fontWeight: 800, fontFamily: 'inherit', padding: '4px 0' }} />
+                      <button type="button" onClick={maakTaak} disabled={!nieuwTitel.trim()} aria-label="Toevoegen" title="Toevoegen (Enter)"
+                        style={{ ...KNOP, width: 26, height: 26, padding: 0, border: 'none', background: 'transparent', color: nieuwTitel.trim() ? '#22c55e' : 'rgba(255,255,255,0.3)' }}>
+                        <Check size={16} strokeWidth={3} />
+                      </button>
+                    </div>
+                  )}
                   {!(onderLeeg && (v.id === 'gino' || v.id === 'weg')) && (
                     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block', padding: '2px 10px 12px' }}>
                       {v.id === 'plannen' ? plannenInhoud(lijst) : v.id === 'weg' ? wegInhoud() : v.id === 'doen' ? doenInhoud(lijst) : lijst.map(kaart)}

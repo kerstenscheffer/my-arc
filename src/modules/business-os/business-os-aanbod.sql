@@ -22,6 +22,10 @@
 -- vervangt de korting; vooruitPct blijft bestaan en staat op 0) en prijs krijgt sleutel "3".
 -- Het scherm toont 3, 6 en 12; prijs "4" blijft staan voor oudere app-versies. Geen
 -- schemawijziging; een rij zonder gratisMaanden leest als 1, 3 en 6.
+-- 24 nov (nog later): vier rangen met eigen namen. In gegevens erbij: tiers.<sleutel>.naam,
+-- een vierde tier tiers.app, volgorde [sleutel], tiers.<sleutel>.gratisMaandenUit en per
+-- rij in vergelijking de cel app. Geen schemawijziging; een rij zonder leest als de drie
+-- oude tiers met hun oude naam. normaliseer() laat onbekende velden sindsdien staan.
 
 create table if not exists public.business_os_aanbod (
   coach_id uuid primary key default auth.uid(),

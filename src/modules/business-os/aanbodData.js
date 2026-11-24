@@ -43,7 +43,8 @@
 //                               midden, basis en daarna de rest (tierSleutels).
 //   tiers.<sleutel>.gratisMaandenUit   true = deze tier krijgt bij vooruitbetalen geen
 //                               gratis maanden (prijzen en gratisBij geven dan 0).
-//   vergelijking[].<sleutel>    één cel per tier, dus ook app.
+//   vergelijking[].<sleutel>    één cel per tier, dus ook app. Andere velden in een
+//                               rij (icoon) blijven staan.
 // normaliseer() laat velden die het niet kent staan (in een tier en bovenaan): de
 // kolom is één object, wat er niet in teruggaat is na één opslag weg.
 
@@ -247,28 +248,31 @@ const leesCel = (v) => {
 // Lege rij met één cel per tier (sleutels = tierSleutels van de gegevens).
 export const nieuweVergelijkRij = (sleutels = VASTE_SLEUTELS) => ({ onderdeel: '', ...Object.fromEntries(sleutels.map(k => [k, null])) })
 
-// Rij die iets zegt: een naam of minstens één gevulde cel.
-export const rijGevuld = (r) => !!r && (!!String(r.onderdeel ?? '').trim()
-  || Object.keys(r).some(k => k !== 'onderdeel' && celSoort(r[k]) !== 'leeg'))
+// Rij die iets zegt: een naam of minstens één gevulde cel van een tier in sleutels.
+export const rijGevuld = (r, sleutels = VASTE_SLEUTELS) => !!r && (!!String(r.onderdeel ?? '').trim()
+  || sleutels.some(k => celSoort(r[k]) !== 'leeg'))
 
 // Altijd een lijst. Helemaal lege rijen (net toegevoegd, niets getypt) vallen weg.
-// Elke rij krijgt een cel voor elke tier in sleutels; een cel van een tier die
-// daar niet in staat blijft bewaard.
+// Elke rij krijgt een cel voor elke tier in sleutels. Wat er verder in een rij
+// staat (icoon, een cel van een tier die deze versie niet kent) blijft zoals het is.
 export function normaliseerVergelijking(ruw, sleutels = VASTE_SLEUTELS) {
   if (!Array.isArray(ruw)) return []
   return ruw
     .filter(isObject)
     .map(r => {
-      const rij = { onderdeel: typeof r.onderdeel === 'string' ? r.onderdeel.trim() : '' }
+      const rij = { ...r, onderdeel: typeof r.onderdeel === 'string' ? r.onderdeel.trim() : '' }
       for (const k of sleutels) rij[k] = leesCel(r[k])
-      for (const k of Object.keys(r)) if (!(k in rij)) rij[k] = leesCel(r[k])
       return rij
     })
-    .filter(rijGevuld)
+    .filter(r => rijGevuld(r, sleutels))
 }
 
 // De rijen die Laten zien toont. Leeg = geen vergelijking: dan de lijstjes per tier.
-export const vergelijkRijen = (g) => (Array.isArray(g?.vergelijking) ? g.vergelijking.filter(rijGevuld) : [])
+export function vergelijkRijen(g) {
+  if (!Array.isArray(g?.vergelijking)) return []
+  const sleutels = tierSleutels(g)
+  return g.vergelijking.filter(r => rijGevuld(r, sleutels))
+}
 
 export function normaliseerProduct(x, i = 0) {
   const maanden = getalOfNull(x?.maanden)
