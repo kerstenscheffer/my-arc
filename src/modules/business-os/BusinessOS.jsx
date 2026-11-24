@@ -1236,7 +1236,9 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
       { key: 'prijs', label: '€ / sale', nu: ratio(n, 'omzet', 'sales'), voor: ratio(v, 'omzet', 'sales'), toon: euro(ratio(n, 'omzet', 'sales')) },
     ].map(s => ({ ...s, verschil: s.voor > 0 ? s.nu / s.voor - 1 : 0 }))
     const zwakste = [...schakels].sort((x, y) => x.verschil - y.verschil)
-    const omzet = Number(n.omzet) || 0
+    // Omzet = binnen t/m vandaag (get_payment_schedule), overal hetzelfde getal als bovenaan
+    // het scherm en in het omzetscherm (24 nov 2026). n.omzet (orderwaarde) alleen nog voor € / sale.
+    const omzet = Number(n.binnen ?? n.omzet) || 0
     const prognose = omzet / dagenVoorbij * dagenInMaand
     // Terugrekensom op de omzetting van de afgelopen 3 maanden.
     const p = prijs || Math.round(ratio(v, 'omzet', 'sales')) || 297
@@ -1501,7 +1503,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             }}>
               {/* Rechts: binnengekomen van de 1e t/m vandaag (get_business_os.nu.binnen, 19 nov 2026);
                   een oudere RPC zonder dat veld valt terug op de nieuwe sales. */}
-              {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(data?.nu?.binnen ?? a.omzet)}
+              {doel >= 1000 ? `${String(Math.round(doel / 100) / 10).replace('.', ',')}K` : euro(doel)} / {euro(a.omzet)}
             </div>
             {/* Leus met de stand van deze maand eronder, even breed en even vaag (19 nov 2026).
                 Stand komt uit get_business_os.nu; een oudere RPC zonder deze velden toont een streepje. */}

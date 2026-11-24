@@ -35,6 +35,7 @@ import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
 import AppBetaalmuur from './components/AppBetaalmuur'
 import AppRondleiding from './components/AppRondleiding'
+import KerstenAI from './components/KerstenAI'
 import { bepaalAppToegang, abonnementMogelijk } from '../lib/appAbonnement'
 
 // Lucide Icons
@@ -899,6 +900,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           // maakte deze balk onnodig lang.
         ] : []}
       />
+
+      {/* Kersten AI: vragen stellen en naar een pagina gaan. Alleen app-gebruikers. */}
+      {appGebruiker && !ingebed && !focusMode && (
+        <KerstenAI onNavigeer={setCurrentView} isMobile={isMobile} />
+      )}
 
       {rondleiding && !ingebed && client?.id && (
         <AppRondleiding clientId={client.id} onKiesPagina={setCurrentView} onKlaar={() => setRondleiding(false)} />

@@ -94,7 +94,9 @@ export default function OmzetScherm({
       if (!p) { p = { key: k, maanden: [], amount: 0, binnen: 0, pendingAmount: 0, challengeAmount: 0, perBron: {}, isPast: true, isCurrent: false }; per.set(k, p) }
       p.maanden.push(m.key)
       p.amount += m.amount || 0
-      if (m.isPast || m.isCurrent) p.binnen += m.amount || 0
+      // Lopende maand: alleen wat t/m vandaag binnen is (zelfde getal als Business OS).
+      if (m.isPast) p.binnen += m.amount || 0
+      else if (m.isCurrent) p.binnen += m.binnenTotNu ?? m.amount ?? 0
       p.pendingAmount += m.pendingAmount || 0
       p.challengeAmount += m.challengeAmount || 0
       for (const [b, v] of Object.entries(m.perBron || {})) p.perBron[b] = (p.perBron[b] || 0) + v
@@ -182,11 +184,12 @@ export default function OmzetScherm({
             fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff',
             letterSpacing: '-0.04em', lineHeight: 1.05, marginTop: 10, fontVariantNumeric: 'tabular-nums',
           }}>
-            {eur(maand.amount)}
+            {/* Lopende periode: binnen t/m vandaag, zelfde getal als Business OS (24 nov 2026). */}
+            {eur(isHuidig ? maand.binnen : maand.amount)}
           </div>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
             {maand.isPast ? 'binnengekomen'
-              : isHuidig && maand.binnen < maand.amount ? `${eur(maand.binnen)} binnen, ${eur(maand.amount - maand.binnen)} verwacht`
+              : isHuidig && maand.binnen < maand.amount ? `binnen t/m vandaag · nog ${eur(maand.amount - maand.binnen)} verwacht deze ${modus}`
               : isHuidig ? `binnengekomen deze ${modus}` : 'verwacht op basis van termijnen'}
             {maand.pendingAmount > 0 && <> · <span style={{ color: '#fff' }}>+{eur(maand.pendingAmount)}</span> toegezegd</>}
           </div>
@@ -200,10 +203,10 @@ export default function OmzetScherm({
             {doel ? (
               <>
                 <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, Math.round((maand.amount / doel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  <div style={{ width: `${Math.min(100, Math.round(((isHuidig ? maand.binnen : maand.amount) / doel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                  <span>{Math.round((maand.amount / doel) * 100)}% van je doel</span>
+                  <span>{Math.round(((isHuidig ? maand.binnen : maand.amount) / doel) * 100)}% van je doel</span>
                   <button onClick={onDoel} style={{ ...tik, background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: '0.78rem' }}>
                     Doel {eur(doel)}
                   </button>

@@ -30,6 +30,7 @@ const STAPPEN = [
   { pagina: 'tracking', wijs: 'tracking', pose: 'wijzen', titel: 'Dit is Tracking', zin: 'Hier hou je je voortgang bij.' },
   { pagina: 'tracking', wijs: 'tracking-gewicht', pose: 'wijzen', titel: 'Je gewicht', zin: 'Weeg jezelf en sla het op.' },
   { pagina: 'tracking', wijs: 'tracking-fotos', pose: 'wijzen', titel: 'Je foto\'s', zin: 'Maak elke week een foto. Dan zie je het verschil.' },
+  { pagina: 'home', wijs: 'kersten-ai', pose: 'wijzen', titel: 'Vraag het mij', zin: 'Heb je een vraag? Tik op mij. Ik help je en breng je naar de juiste plek.' },
   { pose: 'spierballen', titel: 'Je bent klaar!', zin: 'Succes. Je kunt het!' },
 ]
 

@@ -3012,7 +3012,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Betaaldatum telt ook buiten een reservering (24 nov 2026, verlenging die later ingaat):
         // termijnen starten op payment_due_date, net als get_payment_schedule; een toegezegd bedrag
         // staat in de maand waarin het verwacht wordt. Betaald in één keer blijft op de boekdatum.
-        restDatum: (r.payment_due_date && (r.is_reservation || r.payment_type === 'monthly' || r.payment_received !== true)) ? new Date(r.payment_due_date) : null,
+        // Altijd de betaaldatum als die er is, ook bij in één keer betaald: zo telt get_payment_schedule
+        // (Business OS "binnen") het ook. Anders viel bv. een verlenging geboekt op 30 okt en betaald op
+        // 27 nov hier in oktober en daar in november (24 nov 2026, Kersten: overal hetzelfde bedrag).
+        restDatum: r.payment_due_date ? new Date(r.payment_due_date) : null,
         isReservering: !!r.is_reservation,
         pauzes: pauzesVan[r.id] || null,
       })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
@@ -3062,8 +3065,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // omzetscherm (waar komt het vandaan + alle transacties).
       const perBron = {}
       const boekingen = []
+      // Binnen t/m vandaag (24 nov 2026): zelfde getal als "binnen" op Business OS
+      // (get_payment_schedule zonder wat later deze maand nog komt).
+      const eindVandaag = new Date(); eindVandaag.setHours(23, 59, 59, 999)
+      const cashTotNu = {}
       sales.forEach(s => verdeel(s, (k, bedrag, termijn, datum) => {
         cash[k] = (cash[k] || 0) + bedrag
+        if ((datum || s.date) <= eindVandaag) cashTotNu[k] = (cashTotNu[k] || 0) + bedrag
         if (s.challenge) cashChallenge[k] = (cashChallenge[k] || 0) + bedrag
         perBron[k] = perBron[k] || {}
         perBron[k][s.bron] = (perBron[k][s.bron] || 0) + bedrag
@@ -3099,6 +3107,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
           amount: Math.round(cash[k] || 0),
+          binnenTotNu: Math.round(cashTotNu[k] || 0),
           challengeAmount: Math.round(cashChallenge[k] || 0),
           pendingAmount: Math.round(cashPending[k] || 0),
           perBron: Object.fromEntries(Object.entries(perBron[k] || {}).map(([b, v]) => [b, Math.round(v)])),
@@ -3406,7 +3415,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Betaaldatum telt ook buiten een reservering (24 nov 2026, verlenging die later ingaat):
         // termijnen starten op payment_due_date, net als get_payment_schedule; een toegezegd bedrag
         // staat in de maand waarin het verwacht wordt. Betaald in één keer blijft op de boekdatum.
-        restDatum: (r.payment_due_date && (r.is_reservation || r.payment_type === 'monthly' || r.payment_received !== true)) ? new Date(r.payment_due_date) : null,
+        // Altijd de betaaldatum als die er is, ook bij in één keer betaald: zo telt get_payment_schedule
+        // (Business OS "binnen") het ook. Anders viel bv. een verlenging geboekt op 30 okt en betaald op
+        // 27 nov hier in oktober en daar in november (24 nov 2026, Kersten: overal hetzelfde bedrag).
+        restDatum: r.payment_due_date ? new Date(r.payment_due_date) : null,
         isReservering: !!r.is_reservation,
         // Net als bij de omzet: over een ja waarvan het geld nog moet komen
         // reken je geen commissie af. Komt de betaling binnen, dan verschijnt

@@ -358,7 +358,7 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
         display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)',
         gap: isMobile ? 20 : 40, alignItems: 'start', flexShrink: 0,
       }}>
-        <div style={{ opacity: dim(focus, 'doel'), transition: 'opacity .4s' }}><Doelwijzer bedrag={maand?.amount || 0} doel={doel} isHuidig={!!maand?.isCurrent} /></div>
+        <div style={{ opacity: dim(focus, 'doel'), transition: 'opacity .4s' }}><Doelwijzer bedrag={(maand?.isCurrent ? (maand?.binnenTotNu ?? maand?.amount) : maand?.amount) || 0} doel={doel} isHuidig={!!maand?.isCurrent} /></div>
         <div style={{ opacity: focus && !BRONNEN.some(([k]) => focus.has(k)) ? 0.25 : 1, transition: 'opacity .4s' }}>
           <Bronnen maand={maand} focus={focus} toegezegd={maand?.isCurrent ? { totaal: data.revenue?.toegezegdTotaal, aantal: data.revenue?.toegezegdAantal } : null} />
         </div>

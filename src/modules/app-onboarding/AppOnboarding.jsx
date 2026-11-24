@@ -24,6 +24,7 @@ import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react'
 import { LaadLogo } from '../../components/LaadScherm'
 import { supabase } from '../../lib/supabase'
 import { THEMAS } from './onboardingThemas'
+import KerstenZwaait from './KerstenZwaait'
 
 const VOORBEELD_URL = (() => { try { return new URLSearchParams(window.location.search).has('voorbeeld') } catch { return false } })()
 const OPSLAG = 'myarc_app_onboarding'
@@ -357,7 +358,10 @@ function Onboarding() {
               </>
             ) : (
               <>
-                <Kersten sleutel={String(stap)} hoogte={groot ? 300 : 190} pose={pose} blij={stap === 'resultaat'} />
+                {/* Op de start zwaait Kersten (animatie uit zijn zwaaiproef, 24 nov 2026). */}
+                {stap === 'intro'
+                  ? <KerstenZwaait hoogte={320} />
+                  : <Kersten sleutel={String(stap)} hoogte={groot ? 300 : 190} pose={pose} blij={stap === 'resultaat'} />}
                 <div style={{ marginTop: '1.4rem' }}>
                   <Praat key={String(stap)} titel={zegt.titel} zin={zegt.zin} />
                 </div>
