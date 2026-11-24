@@ -16,6 +16,7 @@ const KOLOM = 340
 
 export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) {
   const [bord, setBord] = useState(null)
+  const bordGeladen = !!bord
   const [dropKolom, setDropKolom] = useState(null)
   const [verplaats, setVerplaats] = useState(null) // klant voor het keuzevenster
   const [menu, setMenu] = useState(null) // sectie-id met open menu
@@ -24,6 +25,22 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   const [zeker, setZeker] = useState(null) // sectie-id die nog een tik nodig heeft
   const gesleept = useRef(null)
   const lang = useRef({ t: null, vuurde: false })
+  // Bovenkant blijft staan: het bord vult de rest van het scherm en elke
+  // kolom scrolt zelf (Kersten, 24 nov).
+  const vak = useRef(null)
+  const [hoogte, setHoogte] = useState(null)
+  useEffect(() => {
+    if (!bordGeladen) return
+    const meet = () => {
+      const el = vak.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      setHoogte(Math.max(320, window.innerHeight - top - (isMobile ? 90 : 8)))
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [bordGeladen, isMobile])
 
   useEffect(() => {
     let weg = false
@@ -118,7 +135,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   return (
     <>
     <style>{'@media (hover: hover) { .kb-kaart:hover { opacity: 1 !important; filter: none !important; } }'}</style>
-    <div style={{ display: 'flex', gap: space[4], overflowX: 'auto', padding: isMobile ? `${space[3]}px` : `${space[4]}px ${space[8]}px`, alignItems: 'flex-start', scrollSnapType: isMobile ? 'x mandatory' : 'none', WebkitOverflowScrolling: 'touch', minHeight: '60vh' }}
+    <div ref={vak} style={{ display: 'flex', gap: space[4], overflowX: 'auto', overflowY: 'hidden', padding: isMobile ? `${space[3]}px ${space[3]}px 0` : `${space[4]}px ${space[8]}px 0`, alignItems: 'stretch', scrollSnapType: isMobile ? 'x mandatory' : 'none', WebkitOverflowScrolling: 'touch', height: hoogte || '70vh', boxSizing: 'border-box' }}
       onClick={() => { if (menu) { setMenu(null); setZeker(null) } }}>
       {kolommen.map(k => {
         const lijst = perKolom[k.id] || []
@@ -130,7 +147,8 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
             onDrop={e => { e.preventDefault(); const id = gesleept.current; gesleept.current = null; setDropKolom(null); if (id) zet(id, k.id) }}
             style={{
               flex: isMobile ? '0 0 auto' : `1 1 ${KOLOM}px`, width: isMobile ? '86vw' : undefined, minWidth: isMobile ? undefined : KOLOM, scrollSnapAlign: 'start',
-              borderRadius: radius.card, padding: space[2], boxSizing: 'border-box', minHeight: 160,
+              borderRadius: radius.card, padding: space[2], boxSizing: 'border-box', minHeight: 0,
+              display: 'flex', flexDirection: 'column',
               background: dropKolom === k.id ? colors.surfaceHover : 'transparent', transition: 'background .15s',
             }}>
             {/* Kop: kleurbalk (tik = andere kleur), naam (tik = hernoemen), aantal, menu. */}
@@ -172,7 +190,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: space[3], marginTop: space[2] }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', gap: space[3], marginTop: space[2], paddingBottom: space[6] }}>
               {lijst.map(c => (
                 <div key={c.id}
                   draggable={!isMobile}
@@ -185,7 +203,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
                   style={(() => {
                     const vol = volheid(c)
                     return {
-                      cursor: isMobile ? 'auto' : 'grab', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
+                      flexShrink: 0, cursor: isMobile ? 'auto' : 'grab', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
                       '--kb-vol': vol, opacity: vol, filter: vol < 1 ? 'grayscale(0.6)' : 'none',
                       transition: 'opacity .2s, filter .2s',
                     }
@@ -200,7 +218,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
                 </div>
               ))}
               {!lijst.length && (
-                <div style={{ padding: `${space[6]}px ${space[3]}px`, borderRadius: radius.btn, border: `1px dashed ${colors.borderSubtle}`, color: colors.textSecondary, fontSize: 15, fontWeight: 800, textAlign: 'center' }}>
+                <div style={{ flexShrink: 0, padding: `${space[6]}px ${space[3]}px`, borderRadius: radius.btn, border: `1px dashed ${colors.borderSubtle}`, color: colors.textSecondary, fontSize: 15, fontWeight: 800, textAlign: 'center' }}>
                   {isMobile ? 'Druk lang op een klant om hem hierheen te zetten' : 'Sleep een klant hierheen'}
                 </div>
               )}

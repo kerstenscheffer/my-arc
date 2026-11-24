@@ -14,6 +14,7 @@ import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
 import LooptijdKort from './LooptijdKort'
+import BijsturingBalk from './BijsturingBalk'
 import { isOnbeperkt } from './trajectPeriode'
 import { KolomKop } from './insight/KolomKop'
 import TrajectModal from './TrajectModal'
@@ -422,7 +423,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     })}
                   </div>
 
-                  <div style={{ flex: 1 }} />
+                  {/* Bijsturing deze week: punt → bijsturing, wordt het label op de klantkaart. */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center', padding: '0 12px' }}>
+                    <BijsturingBalk client={effectiveClient} db={db} coachId={coachId} />
+                  </div>
 
                   {/* Looptijd: lijn altijd zichtbaar, knoppen in een dropdown. */}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
