@@ -8,7 +8,7 @@ import { Plus, MoreHorizontal, Check, X } from 'lucide-react'
 import { colors, radius, space } from '../../../ui/tokens'
 import {
   KLEUREN, KLEUR_VOLGORDE, laadBord, bewaarPlek, nieuweSectie,
-  wijzigSectie, verwijderSectie, bewaarVolgorde,
+  wijzigSectie, verwijderSectie, bewaarVolgorde, weekMoment, kaartVolheid,
 } from '../klantBord'
 
 const NOG = '__nog__'
@@ -22,7 +22,6 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   const [hernoem, setHernoem] = useState(null) // { id, naam }
   const [nieuw, setNieuw] = useState(null) // naam in het invoerveld, null = dicht
   const [zeker, setZeker] = useState(null) // sectie-id die nog een tik nodig heeft
-  const [alleenDonderdag, setAlleenDonderdag] = useState(false)
   const gesleept = useRef(null)
   const lang = useRef({ t: null, vuurde: false })
 
@@ -35,16 +34,13 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   if (!bord) return <div style={{ padding: space[6], color: colors.textSecondary, fontWeight: 800 }}>Bord laden…</div>
 
   const bestaand = new Set(bord.secties.map(s => s.id))
-  // Weekritme: startkolom (maandag iedereen langs) en donderdag-kolom (dubbelcheck).
-  const start = bord.secties.find(s => s.rol === 'maandag') || bord.secties[0]
-  const donderdag = bord.secties.find(s => s.rol === 'donderdag')
+  const startId = (bord.secties.find(s => s.rol === 'maandag') || bord.secties[0])?.id
+  const moment = weekMoment()
+  const sectieById = Object.fromEntries(bord.secties.map(s => [s.id, s]))
   const sectieVan = (c) => (bestaand.has(bord.plek[c.id]) ? bord.plek[c.id] : NOG)
   const perKolom = {}
   for (const c of klanten) (perKolom[sectieVan(c)] ||= []).push(c)
-  const ingedeeld = klanten.filter(c => sectieVan(c) !== NOG)
-  const maandagGedaan = ingedeeld.filter(c => sectieVan(c) !== start?.id).length
-  const aantalDonderdag = donderdag ? (perKolom[donderdag.id]?.length || 0) : 0
-  const kolommen = alleenDonderdag && donderdag ? [donderdag] : [
+  const kolommen = [
     ...(perKolom[NOG]?.length ? [{ id: NOG, naam: 'Nog indelen', kleur: 'wit', virtueel: true }] : []),
     ...bord.secties,
   ]
@@ -53,7 +49,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
     const doel = sectieId === NOG ? null : sectieId
     const plek = { ...bord.plek }
     if (doel) plek[clientId] = doel; else delete plek[clientId]
-    const nieuwBord = { ...bord, plek }
+    const nieuwBord = { ...bord, plek, tijd: { ...(bord.tijd || {}), [clientId]: new Date().toISOString() } }
     setBord(nieuwBord)
     bewaarPlek(supabase, nieuwBord, clientId, doel)
   }
@@ -115,28 +111,9 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   const knop = { minWidth: 44, minHeight: 44, padding: 0, border: 'none', background: 'none', color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }
   const menuRegel = { ...knop, justifyContent: 'flex-start', width: '100%', padding: `0 ${space[3]}px`, fontSize: 15, fontWeight: 800, minHeight: 44 }
 
-  const balkKnop = (actief) => ({
-    minHeight: 44, padding: `0 ${space[3]}px`, borderRadius: radius.btn, cursor: 'pointer', fontFamily: 'inherit',
-    display: 'flex', alignItems: 'center', gap: space[2], fontSize: 15, fontWeight: 900,
-    background: actief ? colors.textPrimary : 'transparent', color: actief ? colors.onAccent : colors.textPrimary,
-    border: actief ? 'none' : `1px solid ${colors.borderSubtle}`,
-  })
-
   return (
     <>
-    {/* Weekritme: maandag hoeveel er al langs zijn geweest, donderdag wie nog een keer moet. */}
-    {start && (
-      <div style={{ display: 'flex', alignItems: 'center', gap: space[2], flexWrap: 'wrap', padding: isMobile ? `${space[3]}px ${space[3]}px 0` : `${space[4]}px ${space[8]}px 0` }}>
-        <button onClick={() => setAlleenDonderdag(false)} title={`Klanten die al uit "${start.naam}" zijn`} style={balkKnop(!alleenDonderdag)}>
-          Maandag <span style={{ color: !alleenDonderdag ? colors.onAccent : (maandagGedaan === ingedeeld.length && ingedeeld.length ? colors.success : colors.textPrimary) }}>{maandagGedaan}/{ingedeeld.length}</span>
-        </button>
-        {donderdag && (
-          <button onClick={() => setAlleenDonderdag(a => !a)} title={`Alleen "${donderdag.naam}"`} style={balkKnop(alleenDonderdag)}>
-            Donderdag {aantalDonderdag}
-          </button>
-        )}
-      </div>
-    )}
+    <style>{'@media (hover: hover) { .kb-kaart:hover { opacity: 1 !important; filter: none !important; } }'}</style>
     <div style={{ display: 'flex', gap: space[4], overflowX: 'auto', padding: isMobile ? `${space[3]}px` : `${space[4]}px ${space[8]}px`, alignItems: 'flex-start', scrollSnapType: isMobile ? 'x mandatory' : 'none', WebkitOverflowScrolling: 'touch', minHeight: '60vh' }}
       onClick={() => { if (menu) { setMenu(null); setZeker(null) } }}>
       {kolommen.map(k => {
@@ -200,7 +177,15 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
                   onContextMenu={e => { e.preventDefault(); setVerplaats(c) }}
                   onTouchStart={() => drukStart(c)} onTouchMove={drukStop} onTouchEnd={drukStop} onTouchCancel={drukStop}
                   onClickCapture={e => { if (lang.current.vuurde) { e.stopPropagation(); e.preventDefault(); lang.current.vuurde = false } }}
-                  style={{ cursor: isMobile ? 'auto' : 'grab', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}>
+                  className="kb-kaart"
+                  style={(() => {
+                    const vol = kaartVolheid({ sectie: sectieById[sectieVan(c)], startId, tijd: bord.tijd?.[c.id], dagen: c.dagCheck?.dagen, moment })
+                    return {
+                      cursor: isMobile ? 'auto' : 'grab', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
+                      '--kb-vol': vol, opacity: vol, filter: vol < 1 ? 'grayscale(0.6)' : 'none',
+                      transition: 'opacity .2s, filter .2s',
+                    }
+                  })()}>
                   {bord.vorige?.[c.id]?.rol === 'donderdag' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: space[2], padding: `0 ${space[1]}px ${space[1]}px`, fontSize: 13, fontWeight: 800, color: colors.textPrimary }}>
                       <span style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: KLEUREN[bord.vorige[c.id].kleur] || KLEUREN.wit }} />
