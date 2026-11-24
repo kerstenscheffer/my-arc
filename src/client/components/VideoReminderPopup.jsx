@@ -77,7 +77,7 @@ const toonVoor = (dagen) => {
   return 'rustig'
 }
 
-export default function VideoReminderPopup({ client, isMobile: propMobile, version = 0 }) {
+export default function VideoReminderPopup({ client, isMobile: propMobile, version = 0, alleenKijken = false }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
   const [items, setItems] = useState([])
@@ -143,6 +143,8 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
   // Alleen hiermee gaat een video weg, en alleen na de bevestiging hieronder.
   const echtGezien = async (item) => {
     setBevestig(null)
+    // Coach kijkt mee: niet namens de klant afvinken.
+    if (alleenKijken) return
     setBezig(item.video_id)
     await videoService.markeerVideoGezien(client.id, item.video_id, 'knop', item.assignment_id)
     const over = items.filter(i => i.video_id !== item.video_id)

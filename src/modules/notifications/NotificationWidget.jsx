@@ -20,7 +20,7 @@ function paginaVan(n) {
 }
 import { Bell, X, CheckCircle } from 'lucide-react';
 
-export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange, client = null, onCheckin = null, checkinVersie = 0, onNavigate = null }) {
+export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange, client = null, onCheckin = null, checkinVersie = 0, onNavigate = null, meekijk = false }) {
   const isMobile = window.innerWidth <= 768;
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [dbMeldingen, setNotifications] = useState([]);
@@ -40,17 +40,32 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     if (betaling) {
       const d = betaling.dagen
       const wanneer = d <= 0 ? 'vanavond' : d === 1 ? 'morgen' : `over ${d} dagen`
+      // Naam van het vervolg: "6 maanden verlenging"; zonder aanbod "je verlenging" (24 nov 2026, Kersten).
+      const aanbod = String(betaling.aanbod || '').trim()
+      const naam = !aanbod || aanbod === 'je vervolgtraject' ? 'je verlenging' : /verleng/i.test(aanbod) ? aanbod : `${aanbod} verlenging`
+      const betaal = (e) => { e.stopPropagation(); if (betaling.betaal_link) window.open(betaling.betaal_link, '_blank', 'noopener') }
       eigen.push({
-        id: `betaling-${betaling.id}`, _betaling: betaling, _knop: 'Nu betalen', _vast: true,
-        type: 'betaling', priority: d <= 3 ? 'urgent' : 'high', status: 'active',
+        id: `betaling-${betaling.id}`, _betaling: betaling, _vast: true,
+        type: 'betaling', priority: 'urgent', status: 'active', // altijd Urgent (24 nov 2026)
         title: 'Je betaling staat nog open',
-        message: `Heyy ${(betaling.voornaam || '').trim() || 'daar'}, je betaling voor ${betaling.aanbod} staat nog open.${betaling.te_laat ? ' Eigenlijk zit je al over je termijn heen.' : ''} Rond hem af zodat je account niet ${wanneer} op slot gaat.`,
+        message: `Er staat een betaling open voor ${naam}, rond hem hier af zodat je account niet ${wanneer} op slot gaat.`,
+        _bericht: (
+          <>
+            Er staat een betaling open voor <b style={{ color: '#fff', fontWeight: 800 }}>{naam}</b>, rond hem{' '}
+            <button onClick={betaal} style={{
+              padding: 0, border: 'none', background: 'none', font: 'inherit', fontWeight: 900, color: '#10b981',
+              textDecoration: 'underline', textUnderlineOffset: 3, cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>hier</button>{' '}
+            af zodat je account niet <b style={{ color: '#ef4444', fontWeight: 900 }}>{wanneer}</b> op slot gaat.
+          </>
+        ),
       })
     }
     if (checkin) {
       const d = checkin.dagenLaat
       eigen.push({
-        id: 'checkin-week', _checkin: true, _knop: 'Vul in', type: 'checkin', priority: d >= 2 ? 'urgent' : 'high', status: 'active',
+        id: 'checkin-week', _checkin: true, _knop: 'Vul in', type: 'checkin', priority: 'high', status: 'active', // altijd Belangrijk
         title: d === 0 ? 'Je wekelijkse check-in staat klaar' : 'Je check-in staat nog open',
         message: d === 0 ? 'Dit weekend invullen: hoe ging je week en wat pak je komende week aan.' : `Die was van afgelopen weekend, nu ${d} ${d === 1 ? 'dag' : 'dagen'} te laat. Een paar minuten werk.`,
       })
@@ -70,6 +85,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     return eigen.length ? [...eigen, ...metKnop] : metKnop
   }, [navraag, checkin, betaling, dbMeldingen, onNavigate]);
   const [isExpandedInternal, setIsExpandedInternal] = useState(false);
+  const [alleMeldingen, setAlleMeldingen] = useState(false);
   const isExpanded = controlled ? openProp : isExpandedInternal;
   const setIsExpanded = (val) => {
     const next = typeof val === 'function' ? val(isExpanded) : val
@@ -119,7 +135,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   useEffect(() => {
     if (!clientId || !db?.supabase) return
     let leeft = true
-    const kijk = () => db.supabase.rpc('mijn_open_betaling').then(({ data, error }) => {
+    const kijk = () => (meekijk ? db.supabase.rpc('betaling_van_klant', { p_client: clientId }) : db.supabase.rpc('mijn_open_betaling')).then(({ data, error }) => {
       if (!leeft) return
       const b = !error && data && typeof data === 'object' ? data : null
       setBetaling(b)
@@ -135,7 +151,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   useEffect(() => {
     // checkinVersie > 0 = er is zojuist een check-in opgeslagen: melding weg.
     if (checkinVersie > 0) { setCheckin(null); return }
-    if (!client?.id || !db?.supabase || !onCheckin || !trajectLoopt(client)) { setCheckin(null); return }
+    if (!client?.id || !db?.supabase || (!onCheckin && !meekijk) || !trajectLoopt(client)) { setCheckin(null); return }
     let leeft = true
     new CheckinService(db).hasCheckinSinceLastFriday(client.id).then(al => {
       if (!leeft || al) return
@@ -200,6 +216,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
 
   const handleDismiss = async (e, notificationId) => {
     e.stopPropagation();
+    // Meekijken = alleen kijken: niets wegklikken namens de klant.
+    if (meekijk) return
     // Wegtikken verbergt de check-in tot je de app opnieuw opent; hij is pas echt weg na invullen.
     if (notificationId === 'checkin-week') { setCheckin(null); return }
     // Betaling is niet weg te klikken (24 nov 2026, Kersten): pas weg na betalen.
@@ -222,6 +240,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   };
 
   const handleMarkAsRead = async (notificationId) => {
+    if (meekijk) return
     await db.notifications.markAsRead(notificationId);
     setNotifications(prev => 
       prev.map(n => n.id === notificationId ? {...n, status: 'read'} : n)
@@ -472,16 +491,15 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
               </p>
             ) : (
               <div>
-                {notifications.map((notification, index) => {
+                {(notifications.length > 2 && !alleMeldingen ? notifications.slice(0, 2) : notifications).map((notification, index) => {
                   const pc = getPriorityColor(notification.priority);
                   const isActive = notification.status === 'active';
                   const belangrijk = notification.priority === 'urgent' || notification.priority === 'high';
                   const open = () => {
+                    // Meekijken: niets invullen namens de klant; alleen naar de pagina mag.
+                    if (meekijk && (notification._checkin || notification._navraag)) return
                     if (notification._checkin) { setIsExpanded(false); onCheckin?.(); return }
-                    if (notification._betaling) {
-                      if (notification._betaling.betaal_link) window.open(notification._betaling.betaal_link, '_blank', 'noopener')
-                      return
-                    }
+                    if (notification._betaling) return // betalen gaat via "hier" in de tekst
                     if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
                     if (notification._doel) {
                       setIsExpanded(false)
@@ -524,7 +542,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                           {notification.title}
                         </h4>
                         <p style={{ margin: 0, fontSize: isMobile ? '0.82rem' : '0.88rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: 500, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                          {notification.message}
+                          {notification._bericht || notification.message}
                         </p>
                         {(notification._knop || notification.source === 'smart' || notification.status === 'read') && (
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.7rem' }}>
@@ -567,6 +585,17 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                   </div>
                   );
                 })}
+                {/* Meer dan twee: de rest achter een +N-knop onderaan (24 nov 2026, Kersten). */}
+                {notifications.length > 2 && (
+                  <button onClick={() => setAlleMeldingen(a => !a)} style={{
+                    display: 'block', margin: '0.4rem auto 0.9rem', height: 32, padding: '0 0.95rem', borderRadius: 999,
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff',
+                    fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    {alleMeldingen ? 'Minder' : `+${notifications.length - 2}`}
+                  </button>
+                )}
               </div>
             )}
           </div>

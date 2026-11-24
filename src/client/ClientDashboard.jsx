@@ -490,10 +490,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           uitleg-video's is het de bedoeling dat niemand eronderuit komt.
           Schuift rechts in, valt daarna terug op een tabje aan de rechterrand
           zodat hij niet met de check-in-pill onderaan vecht. */}
-      {!ingebed && <VideoReminderPopup
+      {/* Ook bij meekijken (24 nov 2026): de coach ziet wat de klant ziet, maar vinkt niets af. */}
+      <VideoReminderPopup
         client={client}
         isMobile={isMobile}
-      />}
+        alleenKijken={ingebed}
+      />
 
       {/* ── Main Content ── */}
       {/* Geen header en geen side-nav meer: enige navigatie is de floating
@@ -790,6 +792,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         // Niet in een meekijk-paneel: de knop zou een check-in indienen op naam
         // van de klant terwijl de coach erachter zit.
         client={client} onCheckin={ingebed ? null : () => setShowCheckinModal(true)} checkinVersie={checkinVersion}
+        meekijk={ingebed}
         onNavigate={(view) => setCurrentView(view)}
       />
 
@@ -822,7 +825,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           je wegkijken — en dan mis je de keer dat er wél iets staat. Staat het
           venster open terwijl je de laatste wegtikt, dan blijft de bel staan
           tot je hem sluit; anders verdwijnt de knop onder je vinger. */}
-      {!ingebed && <WidgetSidebar
+      {/* Ook bij meekijken: de bel met de open meldingen van de klant (24 nov 2026). */}
+      <WidgetSidebar
         isMobile={isMobile}
         plek="rechtsboven"
         buttons={(widgetCounts.notifications > 0 || widgetOpen === 'notifications') ? [
@@ -836,9 +840,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           // de video-balk daarboven; twee ingangen naar hetzelfde venster
           // maakte deze balk onnodig lang.
         ] : []}
-      />}
+      />
 
-      {/* Om dezelfde reden ook het formulier zelf niet. */}
+      {/* Het check-in-formulier niet bij meekijken: dat zou namens de klant indienen. */}
       {!ingebed && <CheckinModal
         isOpen={showCheckinModal}
         altijdFormulier={checkinVoorbeeld === 'nieuw'}

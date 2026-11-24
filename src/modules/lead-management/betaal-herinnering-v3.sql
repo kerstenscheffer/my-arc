@@ -75,3 +75,12 @@ begin
 end $$;
 revoke all on function public.mijn_slot_keuze(text) from public, anon;
 grant execute on function public.mijn_slot_keuze(text) to authenticated;
+
+-- Meekijken vanuit CoachHub (24 nov 2026): de coach ziet de openstaande
+-- betaling van de klant in diens meldingen. Alleen voor coaches.
+create or replace function public.betaling_van_klant(p_client uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select case when public.rls_is_coach() then public.open_betaling_van(p_client) end
+$$;
+revoke all on function public.betaling_van_klant(uuid) from public, anon;
+grant execute on function public.betaling_van_klant(uuid) to authenticated;
