@@ -83,8 +83,31 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
       if (existing) {
         console.log('✅ Found in internal DB:', existing.name)
         if (isNameSuspicious(existing.name)) {
+          // Naam klopt niet — probeer OFF om een echte naam op te halen.
+          let betterName = existing.brand || ''
+          try {
+            const ctrl = new AbortController()
+            const tid = setTimeout(() => ctrl.abort(), 5000)
+            const r = await fetch(
+              `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_nl,brands,generic_name_nl`,
+              { headers: { 'User-Agent': 'MyArc - Nutrition App - Version 1.0' }, signal: ctrl.signal }
+            )
+            clearTimeout(tid)
+            if (r.ok) {
+              const d = await r.json()
+              if (d.status === 1 && d.product) {
+                const p = d.product
+                const kandidaten = [p.product_name_nl, p.product_name, p.generic_name_nl].filter(Boolean)
+                for (const n of kandidaten) {
+                  const clean = n.replace(/^\d{4,}\s*/, '').replace(/[:\-,;]\s*$/, '').trim()
+                  if (clean.length >= 3 && !isNameSuspicious(clean)) { betterName = clean; break }
+                }
+                if (!betterName && p.brands) betterName = p.brands.split(',')[0].trim()
+              }
+            }
+          } catch { /* OFF timeout/fail: valt terug op merk of leeg */ }
           setPendingProduct({ ...existing, _isExisting: true, _existingId: existing.id })
-          setEditedName(existing.brand || `Product ${barcode.slice(-4)}`)
+          setEditedName(betterName)
           setLookupLoading(false)
           return
         }
@@ -205,7 +228,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
 
       if (isNameSuspicious(product.name)) {
         setPendingProduct(product)
-        setEditedName(product.brands || `Product ${barcode.slice(-4)}`)
+        setEditedName(product.brands ? product.brands.split(',')[0].trim() : '')
         return
       }
 

@@ -547,7 +547,9 @@ export default function WeekSchedule({
   const alGedaan = (day) => gedaneDagen.some(u => u.workout_day === day)
 
   // Verschuif workout van `day` één positie in `direction` (-1 = vorige dag,
-  // +1 = volgende dag). Bezet → swap; leeg of al gedaan → move.
+  // +1 = volgende dag). Altijd naast elkaar zetten (voegTrainingToe), nooit
+  // wisselen: een gemiste training op een andere dag doen mag niet de geplande
+  // training van die dag weghalen (meld. Mark Aaldenberg 22 nov 2026).
   // `rosterKey`: een tweede of derde training van de dag ('Thursday#2'). Die
   // wisselt niet met de buurdag maar schuift er los naartoe (13 nov 2026).
   const handleShift = (day, direction, rosterKey = null) => {
@@ -564,15 +566,10 @@ export default function WeekSchedule({
     const sourceWorkout = tempSchedule[day]
     if (!sourceWorkout) return
     const targetDay = weekDays[targetIdx]
-    const targetWorkout = tempSchedule[targetDay]
-    if (targetWorkout && !alGedaan(targetDay)) {
-      handleAutoSave({ ...tempSchedule, [targetDay]: sourceWorkout, [day]: targetWorkout })
-      return
-    }
-    // Doeldag is al getraind of leeg: niet wisselen, maar erbij zetten. Dit
-    // overschreef de geplande training van die dag (9 nov 2026: Legs weg, omdat
-    // op die dag Push al gedaan was en Pull ernaartoe schoof).
+    // Doeldag al gedaan of training staat er al: niet plaatsen.
+    if (alGedaan(targetDay)) return
     if (trainingenVanDag(tempSchedule, targetDay).includes(sourceWorkout)) return
+    // Altijd naast bestaande training plaatsen (niet wisselen).
     // Eerst weghalen: een extra training op de brondag schuift dan door.
     handleAutoSave(voegTrainingToe(verwijderTrainingVanDag(tempSchedule, day), targetDay, sourceWorkout))
   }
