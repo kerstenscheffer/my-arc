@@ -17,7 +17,7 @@ const plusDagen = (n) => { const d = new Date(); d.setDate(d.getDate() + n); ret
 
 // r = de rij uit GinoDoorstap. borgSale = gekoppelde challenge-sale (of null).
 // borgKandidaten = betaalde open borgen om te koppelen als er nog geen is.
-export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onVerleng, onBorgOmzetten, onStatus, onStopt, onHervat, onSluimer }) {
+export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onBetaalLink, onVerleng, onBorgOmzetten, onStatus, onStopt, onHervat, onSluimer }) {
   const [stap, setStap] = useState('kies')
   const [callDatum, setCallDatum] = useState(r.call_datum && r.call_datum >= vandaagIso() ? r.call_datum : '')
 
@@ -52,6 +52,15 @@ export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKan
   )
 
   const open = r.sale // onbetaalde verlenging die al geboekt is
+  // Betaallink (24 nov 2026): de klant ziet hem in de app met een herinnering.
+  const [link, setLink] = useState(open?.betaal_link || '')
+  const [linkStand, setLinkStand] = useState(null) // null | 'bezig' | 'ok'
+  const linkGewijzigd = (link || '').trim() !== (open?.betaal_link || '')
+  const bewaarLink = async () => {
+    if (!onBetaalLink) return
+    setLinkStand('bezig')
+    setLinkStand((await onBetaalLink(link)) ? 'ok' : null)
+  }
   const openTekst = open ? `${euro(open.order_value)}${r.pakket ? ` · ${r.pakket}` : ''}` : null
 
   return createPortal(
@@ -77,6 +86,17 @@ export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKan
               </div>
             )}
             {open && optie('betaald', 'Betaling is binnen', openTekst, onBetaald)}
+            {open && onBetaalLink && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '-2px 0 10px' }}>
+                <input type="url" value={link} onChange={(e) => { setLink(e.target.value); setLinkStand(null) }} placeholder="Betaallink voor in de app (https://…)"
+                  aria-label="Betaallink" style={{ flex: 1, minWidth: 0, minHeight: 40, padding: '0 0.7rem', borderRadius: 10, background: '#111', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, outline: 'none', colorScheme: 'dark' }} />
+                <button type="button" onClick={bewaarLink} disabled={!linkGewijzigd || linkStand === 'bezig'}
+                  style={{ minHeight: 40, padding: '0 0.9rem', borderRadius: 10, border: 'none', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: linkGewijzigd ? 'pointer' : 'default',
+                    background: linkGewijzigd ? '#fff' : 'rgba(255,255,255,0.08)', color: linkGewijzigd ? '#000' : 'rgba(255,255,255,0.5)' }}>
+                  {linkStand === 'ok' && !linkGewijzigd ? 'Opgeslagen' : 'Opslaan'}
+                </button>
+              </div>
+            )}
             {!open && optie('verleng', vast ? 'Nog een keer verlengen' : 'Verlengt', 'Maanden, startdatum, prijs, betaald of nog niet', onVerleng)}
             {!vast && <>
             {/* Borg omzetten (24 nov 2026, Joris): geen geld terug, wel een aanbod ervoor in de plaats. */}

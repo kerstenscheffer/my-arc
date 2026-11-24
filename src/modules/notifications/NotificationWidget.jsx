@@ -31,8 +31,22 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   // De wekelijkse check-in: open op zaterdag en zondag, daarna te laat tot en met donderdag. Stond als balk
   // onderin (CheckinReminderPopup); nu een melding zoals de rest (18 nov 2026).
   const [checkin, setCheckin] = useState(null); // { dagenLaat }
+  // Betaling open (24 nov 2026): doorgezet maar nog niet betaald. Bron is de RPC
+  // mijn_open_betaling (alleen klanten met clients.betaal_herinnering). Zichtbaar
+  // vanaf 14 dagen voor de slotdatum, tot de coach de betaling afvinkt.
+  const [betaling, setBetaling] = useState(null);
   const notifications = useMemo(() => {
     const eigen = []
+    if (betaling) {
+      const d = betaling.dagen
+      const wanneer = d <= 0 ? 'vanavond' : d === 1 ? 'morgen' : `over ${d} dagen`
+      eigen.push({
+        id: `betaling-${betaling.id}`, _betaling: betaling, _knop: betaling.betaal_link ? 'Nu betalen' : null,
+        type: 'betaling', priority: d <= 3 ? 'urgent' : 'high', status: 'active',
+        title: 'Je betaling staat nog open',
+        message: `Heyy ${(betaling.voornaam || '').trim() || 'daar'}, je betaling voor ${betaling.aanbod} staat nog open. Rond hem af zodat je account niet ${wanneer} op slot gaat.`,
+      })
+    }
     if (checkin) {
       const d = checkin.dagenLaat
       eigen.push({
@@ -47,12 +61,14 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       message: 'Twee tikken: een cijfer en of de lengte goed was. Dan weet je coach het.',
     })
     // Meldingen met een pagina krijgen een knop erheen (23 nov 2026, Kersten).
-    const metKnop = onNavigate ? dbMeldingen.map(n => {
+    // De push-rijen van de betaalherinnering niet dubbel tonen: de eigen melding hierboven is de bron.
+    const dbZicht = dbMeldingen.filter(n => n.source !== 'betaling')
+    const metKnop = onNavigate ? dbZicht.map(n => {
       const doel = paginaVan(n)
       return doel ? { ...n, _knop: doel.knop, _doel: doel } : n
-    }) : dbMeldingen
+    }) : dbZicht
     return eigen.length ? [...eigen, ...metKnop] : metKnop
-  }, [navraag, checkin, dbMeldingen, onNavigate]);
+  }, [navraag, checkin, betaling, dbMeldingen, onNavigate]);
   const [isExpandedInternal, setIsExpandedInternal] = useState(false);
   const isExpanded = controlled ? openProp : isExpandedInternal;
   const setIsExpanded = (val) => {
@@ -60,7 +76,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     if (controlled) onOpenChange(next); else setIsExpandedInternal(next)
   };
   const [hasUnreadDb, setHasUnread] = useState(false);
-  const hasUnread = hasUnreadDb || !!navraag || !!checkin;
+  const hasUnread = hasUnreadDb || !!navraag || !!checkin || !!betaling;
   const [isLoading, setIsLoading] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState(null);
 
@@ -97,6 +113,22 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
       window.removeEventListener('myarc:training-feedback', kijk)
       document.removeEventListener('visibilitychange', opZicht)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let leeft = true
+    const kijk = () => db.supabase.rpc('mijn_open_betaling').then(({ data, error }) => {
+      if (!leeft) return
+      const b = !error && data && typeof data === 'object' && data.dagen <= 14 ? data : null
+      setBetaling(b)
+      if (b && !autoGeopend.has(`betaling-${b.id}`)) { autoGeopend.add(`betaling-${b.id}`); setTimeout(() => setIsExpanded(true), 800) }
+    }, () => null)
+    kijk()
+    const opZicht = () => { if (document.visibilityState === 'visible') kijk() }
+    document.addEventListener('visibilitychange', opZicht)
+    return () => { leeft = false; document.removeEventListener('visibilitychange', opZicht) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -170,6 +202,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     e.stopPropagation();
     // Wegtikken verbergt de check-in tot je de app opnieuw opent; hij is pas echt weg na invullen.
     if (notificationId === 'checkin-week') { setCheckin(null); return }
+    // Betaling: weg tot de app opnieuw in beeld komt; pas echt weg na betalen.
+    if (String(notificationId).startsWith('betaling-')) { setBetaling(null); return }
     if (String(notificationId).startsWith('navraag-')) {
       if (navraag) navraagWeg(navraag.sessie.id)
       setNavraag(null)
@@ -444,6 +478,10 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                   const belangrijk = notification.priority === 'urgent' || notification.priority === 'high';
                   const open = () => {
                     if (notification._checkin) { setIsExpanded(false); onCheckin?.(); return }
+                    if (notification._betaling) {
+                      if (notification._betaling.betaal_link) window.open(notification._betaling.betaal_link, '_blank', 'noopener')
+                      return
+                    }
                     if (notification._navraag) { setNavraagOpen(true); setIsExpanded(false); return }
                     if (notification._doel) {
                       setIsExpanded(false)

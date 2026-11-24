@@ -162,7 +162,7 @@ export async function vorigeSale(supabase, client) {
 export async function boekVerlenging(supabase, {
   client, coachId, maanden, betaling, prijs, startOp = null,
   betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null, borgOmzetten = null,
-  totaal: totaalGegeven = null, prijsTekst = null, borgVerrekend = null,
+  totaal: totaalGegeven = null, prijsTekst = null, borgVerrekend = null, betaalLink = null,
 }) {
   const plan = planVervolg(client, { maanden, startOp })
   // Borg omzetten (24 nov 2026, Joris → App 1 jaar): de borg ís de betaling. Geen nieuwe
@@ -216,6 +216,8 @@ export async function boekVerlenging(supabase, {
       payment_due_date: betaalVanaf,
       start_op: plan.start,
       aanbod: aanbod || null,
+      // Betaallink (24 nov 2026): de klant ziet hem in de app zolang dit niet betaald is.
+      ...(!betaald && betaalLink?.trim() ? { betaal_link: betaalLink.trim() } : {}),
       borg_movement_id: borg || null,
       sale_kind: 'coaching',
     })

@@ -92,6 +92,47 @@ const kortDatum = (iso) => {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
 
+// Kalender in het Wanneer-venster (24 nov 2026). Het verborgen native
+// datumveld opende op desktop niet of onder het venster.
+const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+function MiniKalender({ gekozen, onKies }) {
+  const [maand, setMaand] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const vandaag = plusDagen(0)
+  const eerste = (maand.getDay() + 6) % 7 // maandag = 0
+  const dagen = new Date(maand.getFullYear(), maand.getMonth() + 1, 0).getDate()
+  const cellen = [...Array(eerste).fill(null), ...Array.from({ length: dagen }, (_, i) => i + 1)]
+  const schuif = (n) => setMaand(m => new Date(m.getFullYear(), m.getMonth() + n, 1))
+  const pijl = { ...KNOP, width: 28, height: 28, borderRadius: 8, fontSize: '1rem', fontWeight: 900 }
+  return (
+    <div style={{ width: '100%', padding: '4px 2px 2px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+        <button type="button" onClick={() => schuif(-1)} aria-label="Vorige maand" style={pijl}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: '0.82rem', fontWeight: 900, color: WIT }}>{MAANDEN[maand.getMonth()]} {maand.getFullYear()}</div>
+        <button type="button" onClick={() => schuif(1)} aria-label="Volgende maand" style={pijl}>›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: '0.62rem', fontWeight: 900, color: ZACHT, padding: '2px 0' }}>{d}</div>
+        ))}
+        {cellen.map((n, i) => {
+          if (!n) return <div key={`l${i}`} />
+          const iso = dagIso(new Date(maand.getFullYear(), maand.getMonth(), n))
+          const voorbij = iso < vandaag
+          const aan = iso === gekozen
+          return (
+            <button key={iso} type="button" disabled={voorbij} onClick={() => onKies(iso)} style={{
+              ...KNOP, height: 32, borderRadius: 8, fontSize: '0.8rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+              background: aan ? WIT : 'transparent', color: aan ? '#000' : voorbij ? 'rgba(255,255,255,0.2)' : WIT,
+              border: iso === vandaag && !aan ? '1px solid rgba(255,255,255,0.35)' : '1px solid transparent',
+              cursor: voorbij ? 'default' : 'pointer',
+            }}>{n}</button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const KNOP = {
   border: 'none', background: 'transparent', color: WIT, cursor: 'pointer', padding: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
@@ -795,12 +836,7 @@ export default function PrioriteitenMatrix({ coachId, isMobile, onClose }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" onClick={() => kiesDatum(plusDagen(0))} style={{ ...datumKnop, flex: 1 }}>Vandaag</button>
               <button type="button" onClick={() => kiesDatum(plusDagen(1))} style={{ ...datumKnop, flex: 1 }}>Morgen</button>
-              <label style={{ ...datumKnop, width: '100%', position: 'relative', cursor: 'pointer', boxSizing: 'border-box', color: WIT }}>
-                Kies dag
-                <input type="date" min={plusDagen(0)} aria-label="Kies dag"
-                  onChange={e => { if (e.target.value) kiesDatum(e.target.value) }}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
-              </label>
+              <MiniKalender gekozen={datumVan(datumTaak)} onKies={kiesDatum} />
               <button type="button" onClick={() => kiesDatum('geen')} style={{ ...datumKnop, width: '100%', border: 'none', color: ZACHT }}>Geen datum</button>
             </div>
           </div>
