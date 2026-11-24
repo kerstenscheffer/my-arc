@@ -20,6 +20,7 @@ const UiDemo = lazy(() => import('./ui/UiDemo'))
 const LaadTest = lazy(() => import('./pages/LaadTest'))
 const OnboardingTest = lazy(() => import('./pages/OnboardingTest'))
 const OnboardingStijlen = lazy(() => import('./pages/OnboardingStijlen'))
+const BetaalmuurVoorbeeld = lazy(() => import('./pages/BetaalmuurVoorbeeld'))
 const AppOnboarding = lazy(() => import('./modules/app-onboarding/AppOnboarding'))
 const InfoPage = lazy(() => import('./pages/InfoPage'))
 const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
@@ -219,6 +220,10 @@ function App() {
   // van 21 nov staan nu op /test-mascottes.
   if (currentPath === '/test') {
     return <OnboardingStijlen />
+  }
+  // Betaalmuur met voorbeeldprijzen, voor de review-screenshot (24 nov 2026).
+  if (currentPath === '/test-betaalmuur') {
+    return <BetaalmuurVoorbeeld />
   }
   if (currentPath === '/test-mascottes') {
     return <OnboardingTest />

@@ -109,7 +109,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropKolom(d => (d === k.id ? null : d)) }}
             onDrop={e => { e.preventDefault(); const id = gesleept.current; gesleept.current = null; setDropKolom(null); if (id) zet(id, k.id) }}
             style={{
-              flex: '0 0 auto', width: isMobile ? '86vw' : KOLOM, scrollSnapAlign: 'start',
+              flex: isMobile ? '0 0 auto' : `1 1 ${KOLOM}px`, width: isMobile ? '86vw' : undefined, minWidth: isMobile ? undefined : KOLOM, scrollSnapAlign: 'start',
               borderRadius: radius.card, padding: space[2], boxSizing: 'border-box', minHeight: 160,
               background: dropKolom === k.id ? colors.surfaceHover : 'transparent', transition: 'background .15s',
             }}>
@@ -174,10 +174,11 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
       })}
 
       {/* Nieuwe sectie */}
-      <div style={{ flex: '0 0 auto', width: isMobile ? '86vw' : KOLOM, paddingTop: 12 + space[2], scrollSnapAlign: 'start' }}>
+      {/* Smal: alleen een + tot je er een naam in typt. */}
+      <div style={{ flex: '0 0 auto', width: nieuw === null ? 44 : (isMobile ? '86vw' : 280), paddingTop: 12 + space[2], scrollSnapAlign: 'start' }}>
         {nieuw === null ? (
-          <button onClick={() => setNieuw('')} style={{ ...knop, gap: space[2], fontSize: 17, fontWeight: 900, padding: `0 ${space[2]}px` }}>
-            <Plus size={20} strokeWidth={2.8} /> Sectie
+          <button onClick={() => setNieuw('')} title="Sectie toevoegen" aria-label="Sectie toevoegen" style={knop}>
+            <Plus size={20} strokeWidth={2.8} />
           </button>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: space[1] }}>

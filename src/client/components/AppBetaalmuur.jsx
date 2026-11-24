@@ -39,7 +39,9 @@ const linkKnop = {
   display: 'inline-flex', alignItems: 'center', gap: 6, touchAction: 'manipulation',
 }
 
-export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, onTerug, onLogout }) {
+// voorbeeldAanbod: alleen voor /test-betaalmuur (screenshot voor App Store Connect);
+// toont de muur met vaste prijzen zonder winkel en zonder kopen.
+export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, onTerug, onLogout, voorbeeldAanbod = null }) {
   const [aanbod, setAanbod] = useState(null) // null = laden, [] = niets
   const [gekozen, setGekozen] = useState(null)
   const [bezig, setBezig] = useState(false)
@@ -47,11 +49,12 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
 
   useEffect(() => {
     let leeft = true
+    if (voorbeeldAanbod) { setAanbod(voorbeeldAanbod); setGekozen(voorbeeldAanbod[0]?.id || null); return }
     haalAanbod(authUserId)
       .then(a => { if (!leeft) return; setAanbod(a); setGekozen(a[0]?.id || null) })
       .catch(() => { if (leeft) setAanbod([]) })
     return () => { leeft = false }
-  }, [authUserId])
+  }, [authUserId, voorbeeldAanbod])
 
   const keuze = aanbod?.find(a => a.id === gekozen) || null
   const maand = aanbod?.find(a => a.maanden === 1)
@@ -82,7 +85,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
   const open = (url) => window.open(url, '_blank', 'noopener')
 
   // Op het web kan niemand een abonnement afsluiten: verwijs naar de app.
-  if (!abonnementMogelijk()) {
+  if (!abonnementMogelijk() && !voorbeeldAanbod) {
     return (
       <div style={{ minHeight: '100dvh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
         <div style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
@@ -160,7 +163,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
                     {a.maanden === 12 ? 'Jaar' : a.maanden === 1 ? 'Maand' : `${a.maanden} maanden`}
                     {extra && <span style={{ fontSize: '0.85rem', fontWeight: 900, background: actief ? '#000' : GOUD, color: actief ? GOUD : '#000', borderRadius: 6, padding: '2px 6px' }}>{extra}</span>}
                   </span>
-                  {a.proef && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, marginTop: 2 }}>Eerste {a.proefDuur} gratis</span>}
+                  {a.proef && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, marginTop: 2 }}>{a.proefDuur === '1 maand' ? 'Eerste maand gratis' : `Eerste ${a.proefDuur} gratis`}</span>}
                 </span>
                 <span style={{ textAlign: 'right' }}>
                   <span style={{ display: 'block', fontSize: '1.05rem', fontWeight: 900 }}>{a.prijs}</span>
