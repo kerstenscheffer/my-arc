@@ -9,6 +9,7 @@ import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
 import AccountWisselKnop from '../../components/AccountWisselKnop'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
+import AppMijnPlan from '../components/AppMijnPlan'
 const db = DatabaseService
 
 // MY ARC modal-stijl: zwart met wit accent. Het goud dat hier overal in de
@@ -80,9 +81,12 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
       })
   }, [client?.id])
 
+  // App-gebruikers (geen coaching, 24 nov 2026) krijgen 'Mijn plan' in plaats
+  // van 'Coach': daar passen ze zelf hun doel, schema en abonnement aan.
+  const appGebruiker = !!client?.app_abonnee
   const sections = [
     { id: 'persoonlijk', label: 'Persoonlijk', icon: User },
-    { id: 'coach', label: 'Coach', icon: Target },
+    appGebruiker ? { id: 'plan', label: 'Mijn plan', icon: Target } : { id: 'coach', label: 'Coach', icon: Target },
     { id: 'instellingen', label: 'Instellingen', icon: Settings }
   ]
 
@@ -344,7 +348,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         )}
 
         {/* Coach */}
-        {activeSection === 'coach' && (
+        {activeSection === 'plan' && appGebruiker && (
+          <AppMijnPlan client={client} user={user} onClientUpdate={onClientUpdate} />
+        )}
+
+        {activeSection === 'coach' && !appGebruiker && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: '0.85rem',
@@ -517,6 +525,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
               Je account, je plannen en al je voortgang worden direct en permanent
               verwijderd. Je kunt daarna niet meer inloggen.
             </p>
+            {appGebruiker && (
+              <p style={{ margin: '0.75rem 0 0', fontSize: '0.95rem', fontWeight: 900, color: '#fbbf24', lineHeight: 1.45 }}>
+                Let op: je abonnement stopt niet vanzelf. Zeg het op in je Apple ID of Google Play.
+              </p>
+            )}
 
             <div style={{ marginTop: '1rem' }}>
               <Kopje Icon={Trash2} tekst="Typ VERWIJDER om te bevestigen" />

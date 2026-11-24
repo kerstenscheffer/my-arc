@@ -325,6 +325,9 @@ async getAIMealService() {
         .select(CLIENT_KOLOMMEN_LIJST)
         .eq('trainer_id', tid)
         .eq('status', 'active')
+        // App-gebruikers (zelf aangemeld, geen coaching, 24 nov 2026) horen
+        // niet in de klantenlijst van de coach.
+        .eq('app_abonnee', false)
         .order('created_at', { ascending: false })
       
       if (error) throw error

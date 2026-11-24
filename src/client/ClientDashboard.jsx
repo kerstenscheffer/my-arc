@@ -219,7 +219,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     // Boodschappen is verhuisd naar de maaltijdpagina (knop op de foto): daar
     // hoort hij, want hij komt uit je plan. De weergave hieronder blijft
     // bestaan zodat een oude link niet doodloopt.
-    { id: 'calls',        label: 'Calls',   Icon: Phone,        actie: () => setCurrentView('calls') },
+    // Calls zijn coaching; app-gebruikers (zonder coach) hebben ze niet.
+    ...(appGebruiker ? [] : [{ id: 'calls', label: 'Calls', Icon: Phone, actie: () => setCurrentView('calls') }]),
     { id: 'profile',      label: 'Profile', Icon: User,         actie: () => setCurrentView('profile') },
     { id: 'vragen',       label: 'Vragen',  Icon: HelpCircle,   actie: () => setWidgetOpen('vragen') },
   ]
@@ -850,7 +851,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         onCountChange={setCount('notifications')}
         // Niet in een meekijk-paneel: de knop zou een check-in indienen op naam
         // van de klant terwijl de coach erachter zit.
-        client={client} onCheckin={ingebed ? null : () => setShowCheckinModal(true)} checkinVersie={checkinVersion}
+        client={client} onCheckin={ingebed || appGebruiker ? null : () => setShowCheckinModal(true)} checkinVersie={checkinVersion}
         meekijk={ingebed}
         onNavigate={(view) => setCurrentView(view)}
       />
@@ -911,7 +912,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       )}
 
       {/* Het check-in-formulier niet bij meekijken: dat zou namens de klant indienen. */}
-      {!ingebed && <CheckinModal
+      {!ingebed && !appGebruiker && <CheckinModal
         isOpen={showCheckinModal}
         altijdFormulier={checkinVoorbeeld === 'nieuw'}
         onClose={() => setShowCheckinModal(false)}
