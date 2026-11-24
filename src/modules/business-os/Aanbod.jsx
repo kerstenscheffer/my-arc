@@ -8,7 +8,16 @@
 //               gewoon en bij vooruitbetalen naast elkaar.
 //   Laten zien  alleen de drie tiers met onderdelen en prijs. Kosten, uren en
 //               partner staan dan niet in de pagina, ook niet verborgen.
-// Vooruitbetalen geeft korting (procent in de stand Rekenen, standaard 20).
+// Vooruitbetalen geeft gratis maanden (24 nov 2026, vervangt de korting): per
+// looptijd in gegevens.gratisMaanden, aan te passen achter het tandwiel. De
+// maandprijs blijft gelijk, de gratis maanden komen bovenop de looptijd.
+//   Laten zien  Vooruit €1.200, in groen +3 maanden gratis, klein 9 maanden.
+//               Geen gratis maanden bij die looptijd: alleen het bedrag.
+//   Rekenen     kolom Vooruit rekent kosten en uren over betaalde plus gratis
+//               maanden, de omzet blijft het vooruitbetaalde bedrag. De rijen
+//               Maanden en Uren staan er alleen als er gratis maanden zijn.
+// De korting in procent (vooruitPct) bestaat nog en staat op 0: boven 0 werkt de
+// oude korting ernaast, bij 0 is er nergens een korting te zien.
 // Borg verrekenen is een losse schakelaar (standaard uit): het bedrag gaat dan
 // van het totaal af, de korting rekent over wat er daarna overblijft.
 // Sommen in aanbodData.js (reken), opslag in aanbodOpslag.js (één rij per coach
@@ -24,9 +33,9 @@
 // zijn eigen kruisje.
 //
 // Rustige weergave (23 nov 2026, later op de dag): zelfde inhoud, minder tekst.
-//   Kop         duur als '4 · 6 · 12' naast een kalender, de stand als twee
+//   Kop         duur als '3 · 6 · 12' naast een kalender, de stand als twee
 //               iconen (rekenmachine, oog). Alleen in Rekenen: info-icoon (de
-//               huidige prijzen) en tandwiel (partner %, korting %, borg) als
+//               huidige prijzen) en tandwiel (partner %, gratis maanden, korting %, borg) als
 //               dropdown. Het groene stipje op het tandwiel = borg staat aan.
 //   Tiers       dicht: icoon, naam, prijs per maand, totaal en (Rekenen) per uur
 //               met klein ernaast per uur bij vooruitbetalen. Tik klapt uit; er
@@ -70,7 +79,7 @@ import {
 import { colors } from '../../ui/tokens'
 import {
   DUREN, TIERS, prijzen, reken, euro, leesGetal, normaliseerProduct,
-  celSoort, nieuweVergelijkRij, vergelijkRijen, tierZin,
+  celSoort, nieuweVergelijkRij, vergelijkRijen, tierZin, gratisBij,
 } from './aanbodData'
 
 const C = {
@@ -92,6 +101,9 @@ const TIER_ICOON = { premium: Crown, midden: Target, basis: Layers }
 const STANDEN = [['rekenen', 'Rekenen', Calculator], ['tonen', 'Laten zien', Eye]]
 
 const toonGetal = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','))
+// Kaal getal in een uitkomstregel (maanden, uren): hoogstens één cijfer achter de komma.
+const kaalGetal = (v) => Number(v).toLocaleString('nl-NL', { maximumFractionDigits: 1 })
+const maandWoord = (aantal) => (aantal === 1 ? 'maand' : 'maanden')
 
 // Getalveld: zolang je typt blijft je eigen tekst staan (ook "12,"), de
 // waarde gaat als getal of null naar boven.
@@ -174,22 +186,23 @@ function TekstVeld({ waarde, onChange, label, autoFocus, onBlur, onKlaar, placeh
   )
 }
 
-function Bedrag({ waarde, kleur = C.wit, groot = false }) {
+// toon = hoe het getal eruitziet: euro's, of kaalGetal voor maanden en uren.
+function Bedrag({ waarde, kleur = C.wit, groot = false, toon = euro }) {
   return (
     <span style={{ ...NUM, textAlign: 'right', whiteSpace: 'nowrap', fontSize: groot ? '1.2rem' : '1rem', fontWeight: 900, color: waarde === null ? C.zacht : kleur }}>
-      {waarde === null ? '–' : euro(waarde)}
+      {waarde === null ? '–' : toon(waarde)}
     </span>
   )
 }
 
 // Eén regel in de uitkomsten (drie cellen in het raster): gewoon en
 // vooruitbetalen naast elkaar. kleur krijgt het bedrag en geeft de kleur.
-function Uitkomst({ label, gewoon, vooruit, kleur, groot = false }) {
+function Uitkomst({ label, gewoon, vooruit, kleur, groot = false, toon = euro }) {
   return (
     <>
       <span style={{ minWidth: 0, fontSize: '0.85rem', fontWeight: 700, color: C.zacht }}>{label}</span>
-      <Bedrag waarde={gewoon} kleur={kleur?.(gewoon)} groot={groot} />
-      <Bedrag waarde={vooruit} kleur={kleur?.(vooruit)} groot={groot} />
+      <Bedrag waarde={gewoon} kleur={kleur?.(gewoon)} groot={groot} toon={toon} />
+      <Bedrag waarde={vooruit} kleur={kleur?.(vooruit)} groot={groot} toon={toon} />
     </>
   )
 }
@@ -318,7 +331,9 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
   const Icoon = TIER_ICOON[sleutel]
   const p = prijzen(tier, duur, g)
   const r = reken(tier, duur, g.partnerPct, p ? p.teBetalen : null)
-  const vu = reken(tier, duur, g.partnerPct, p ? p.vooruit : null)
+  // Vooruit: de gratis maanden lever je ook, dus kosten en uren lopen daarover door.
+  const vu = reken(tier, duur, g.partnerPct, p ? p.vooruit : null, gratisBij(g, duur))
+  const metGratis = vu.maanden !== r.maanden
   const roodOnderNul = (goed) => (w) => (w !== null && w < 0 ? C.rood : goed)
   const uurKleur = (w) => (w === null ? C.zacht : roodOnderNul(C.groen)(w))
   // Alleen een net toegevoegde regel krijgt de cursor.
@@ -380,11 +395,13 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
             <span />
             <span style={{ ...LABEL, color: C.zacht, textAlign: 'right' }}>Gewoon</span>
             <span style={{ ...LABEL, color: C.zacht, textAlign: 'right' }}>Vooruit</span>
+            {metGratis && <Uitkomst label="Maanden" gewoon={r.maanden} vooruit={vu.maanden} toon={kaalGetal} />}
             {p && p.borg > 0 && <Uitkomst label="Borg verrekend" gewoon={-p.borg} vooruit={-p.borg} />}
             <Uitkomst label="Omzet" gewoon={r.omzet} vooruit={vu.omzet} />
             <Uitkomst label="Partner" gewoon={r.partner === null ? null : -r.partner} vooruit={vu.partner === null ? null : -vu.partner} />
             <Uitkomst label="Kosten" gewoon={r.omzet === null ? null : -r.kosten} vooruit={vu.omzet === null ? null : -vu.kosten} />
             <Uitkomst label="Jij houdt over" gewoon={r.over} vooruit={vu.over} groot kleur={roodOnderNul(C.wit)} />
+            {metGratis && <Uitkomst label="Uren" gewoon={r.uren} vooruit={vu.uren} toon={kaalGetal} />}
             <Uitkomst label="Per uur" gewoon={r.perUur} vooruit={vu.perUur} groot kleur={roodOnderNul(C.groen)} />
           </div>
 
@@ -498,11 +515,23 @@ function TierTonen({
                 {euro(-p.borg)} borg · blijft {euro(p.teBetalen)}
               </span>
             )}
-            {p.korting > 0 && (
-              <span title="Vooruitbetalen" style={{ ...NUM, display: 'block', fontSize: compact ? '0.78rem' : '1rem', fontWeight: 800, lineHeight: 1.35, marginTop: compact ? 8 : 12 }}>
-                In één keer {euro(p.vooruit)} · <span title="Je bespaart" style={{ color: C.groen, whiteSpace: 'nowrap' }}>{euro(-p.korting)}</span>
-              </span>
-            )}
+            {/* Vooruitbetalen: het bedrag, in groen de gratis maanden, klein de looptijd die hij
+                dan krijgt. Geen gratis maanden bij deze duur = alleen het bedrag. De korting
+                staat er alleen bij een vooruitPct boven 0. width 0 + minWidth 100%: de regel
+                telt niet mee in de breedte van zijn kolom (zie ZinVak), anders trekt hij de
+                vergelijkingstabel scheef; hij breekt af binnen wat de kolom krijgt. */}
+            <span title="Vooruitbetalen" style={{ ...NUM, display: 'block', width: 0, minWidth: '100%', fontSize: compact ? '0.78rem' : '1rem', fontWeight: 800, lineHeight: 1.35, marginTop: compact ? 8 : 12 }}>
+              Vooruit {euro(p.vooruit)}
+              {p.korting > 0 && <> · <span title="Je bespaart" style={{ color: C.groen, whiteSpace: 'nowrap' }}>{euro(-p.korting)}</span></>}
+              {p.gratis > 0 && (
+                <>
+                  {' '}
+                  <span style={{ color: C.groen, whiteSpace: compact ? 'normal' : 'nowrap' }}>+{p.gratis} {maandWoord(p.gratis)} gratis</span>
+                  {' '}
+                  <span title="Looptijd bij vooruitbetalen" style={{ fontSize: kleinMaat, fontWeight: 700, color: C.zacht, whiteSpace: 'nowrap' }}>{p.maandenVooruit} {maandWoord(p.maandenVooruit)}</span>
+                </>
+              )}
+            </span>
           </>
         )}
       </div>
@@ -802,7 +831,7 @@ export default function Aanbod({ a, onSluit = null }) {
             <>
               <IcoonKnop icoon={Info} naam="Wat je nu verkoopt" smal={smal} aan={popOpen === 'info'} data-aanbod-pop aria-haspopup="dialog" aria-expanded={popOpen === 'info'}
                 onClick={() => setPop(v => (v === 'info' ? null : 'info'))} />
-              <IcoonKnop icoon={Settings} naam={`Partner, korting en borg${g.borgAan ? ' (borg aan)' : ''}`} smal={smal} aan={popOpen === 'instel'} stip={g.borgAan}
+              <IcoonKnop icoon={Settings} naam={`Partner, vooruitbetalen en borg${g.borgAan ? ' (borg aan)' : ''}`} smal={smal} aan={popOpen === 'instel'} stip={g.borgAan}
                 data-aanbod-pop aria-haspopup="dialog" aria-expanded={popOpen === 'instel'}
                 onClick={() => setPop(v => (v === 'instel' ? null : 'instel'))} />
             </>
@@ -823,7 +852,7 @@ export default function Aanbod({ a, onSluit = null }) {
         </div>
 
         {popOpen && (
-          <div ref={paneel} role="dialog" aria-label={popOpen === 'info' ? 'Wat je nu verkoopt' : 'Partner, korting en borg'} style={{
+          <div ref={paneel} role="dialog" aria-label={popOpen === 'info' ? 'Wat je nu verkoopt' : 'Partner, vooruitbetalen en borg'} style={{
             position: 'absolute', top: onSluit ? 'calc(100% - 6px)' : 'calc(100% + 6px)', right: 0, zIndex: 3, boxSizing: 'border-box',
             minWidth: popOpen === 'info' ? Math.min(440, breedte) : 248, maxWidth: '100%', padding: '10px 18px', borderRadius: 16, background: C.vlak, boxShadow: '0 18px 44px rgba(0,0,0,0.7)',
           }}>
@@ -834,6 +863,19 @@ export default function Aanbod({ a, onSluit = null }) {
               <>
                 <InstelRij label="Partner %" naam="Aandeel partner in procent">
                   <GetalVeld waarde={g.partnerPct} onChange={v => wijzig(oud => ({ ...oud, partnerPct: v === null ? null : Math.min(100, v) }))} label="Aandeel partner in procent" placeholder="0" breedte={64} />
+                </InstelRij>
+                {/* Gratis maanden bij vooruitbetalen, per looptijd: '6 +3' = 6 vooruit, 3 gratis. */}
+                <InstelRij label="Gratis mnd" naam="Gratis maanden bij vooruitbetalen, per looptijd">
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                    {DUREN.map(d => (
+                      <span key={d} title={`${d} maanden vooruit`} style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                        <span aria-hidden="true" style={{ ...NUM, ...KLEIN }}>{d}</span>
+                        <span aria-hidden="true" style={{ ...KLEIN, fontWeight: 900, color: C.groen }}>+</span>
+                        <GetalVeld waarde={g.gratisMaanden?.[d]} label={`Gratis maanden bij ${d} maanden vooruit`} placeholder="0" breedte={26}
+                          onChange={v => wijzig(oud => ({ ...oud, gratisMaanden: { ...oud.gratisMaanden, [d]: v === null ? null : Math.max(0, Math.round(v)) } }))} />
+                      </span>
+                    ))}
+                  </span>
                 </InstelRij>
                 <InstelRij label="Korting %" naam="Korting bij vooruitbetalen in procent">
                   <GetalVeld waarde={g.vooruitPct} onChange={v => wijzig(oud => ({ ...oud, vooruitPct: v === null ? null : Math.min(100, v) }))} label="Korting bij vooruitbetalen in procent" placeholder="0" breedte={64} />

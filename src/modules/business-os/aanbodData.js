@@ -3,14 +3,14 @@
 // Rekenkern van de aanbod-rekenaar (Aanbod.jsx, 23 nov 2026). Bewust zonder
 // Supabase-import, zodat de sommen ook met node te controleren zijn; laden en
 // bewaren zit in aanbodOpslag.js. Vorm van de opgeslagen gegevens:
-//   { partnerPct, vooruitPct, borgAan, borgBedrag,
-//     tiers: { premium|midden|basis: { prijs: { 4, 6, 12 },
+//   { partnerPct, vooruitPct, gratisMaanden: { 3, 6, 12 }, borgAan, borgBedrag,
+//     tiers: { premium|midden|basis: { prijs: { 3, 4, 6, 12 },
 //     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst], zin } },
 //     producten: [...], vergelijking: [...] }
 // Leeg veld = null. Een onbekende of oudere vorm wordt door normaliseer()
 // aangevuld met de beginwaarden, zodat het scherm altijd iets kan tonen.
 // vooruitPct, borgAan en borgBedrag kwamen er later op 23 nov bij: een rij
-// zonder die velden leest als 20 procent, borg uit, 300.
+// zonder die velden leest als 0 procent (was 20 tot de gratis maanden kwamen), borg uit, 300.
 // producten (24 nov 2026): wat Kersten nu echt verkoopt, als lijst
 //   [{ id, naam, maanden, vooruit, perMaand }]   vooruit = in één keer, perMaand = termijnbedrag.
 // Het verlengvenster (TrajectModal) kiest hieruit en uit de tiers met een prijs
@@ -25,8 +25,18 @@
 // toont hem achter een knopje bij de tiernaam, Rekenen bewerkt hem. Hij moet bij
 // laden, normaliseren, opslaan en in Gino's context blijven staan: de kolom is één
 // object, wat er niet in teruggaat is weg.
+// gratisMaanden (24 nov 2026, besluit Kersten): vooruitbetalen geeft geen korting
+// meer maar gratis maanden bovenop de looptijd: { 3: 1, 6: 3, 12: 6 } = 3 vooruit is
+// 1 gratis, 6 is 3, 12 is 6. De maandprijs blijft gelijk; wie per maand betaalt krijgt
+// niets gratis. Leeg of 0 bij een looptijd = geen gratis maanden. vooruitPct blijft
+// als veld bestaan (nu 0); staat het boven 0, dan werkt de oude korting er nog naast.
+// Looptijden: de pagina toont 3, 6 en 12 (DUREN). 4 was de oude kortste looptijd: die
+// prijs blijft in de data staan (oudere app-versies tonen hem), net als elke andere
+// sleutel in prijs en gratisMaanden die hier niet bekend is.
 
-export const DUREN = [4, 6, 12]
+export const DUREN = [3, 6, 12]
+// Looptijden die altijd een plek in prijs hebben, ook als ze niet getoond worden.
+export const PRIJS_DUREN = [3, 4, 6, 12]
 export const TIERS = [['premium', 'Premium'], ['midden', 'Midden'], ['basis', 'Basis']]
 
 // Wat Kersten nu verkoopt (23-24 nov 2026). Alleen wat hij zelf noemde; lege bedragen vult hij in Aanbod.
@@ -38,7 +48,7 @@ export const BEGIN_PRODUCTEN = [
 ]
 
 const maakTier = (onderdelen, prijs, rest = {}) => ({
-  prijs: { 4: null, 6: null, 12: null, ...prijs },
+  prijs: { 3: null, 4: null, 6: null, 12: null, ...prijs },
   kostenMaand: null,
   kostenEenmalig: null,
   urenMaand: null,
@@ -52,7 +62,8 @@ const maakTier = (onderdelen, prijs, rest = {}) => ({
 // zijn een schatting. Alles is aanpasbaar.
 export const BEGIN = {
   partnerPct: 50,
-  vooruitPct: 20,     // korting bij vooruitbetalen
+  vooruitPct: 0,      // korting bij vooruitbetalen: vervangen door gratis maanden (24 nov 2026)
+  gratisMaanden: { 3: 1, 6: 3, 12: 6 },  // gratis maanden bij vooruitbetalen, per looptijd
   borgAan: false,     // borg verrekenen: nog geen besluit, dus standaard uit
   borgBedrag: 300,
   producten: BEGIN_PRODUCTEN,
@@ -64,20 +75,20 @@ export const BEGIN = {
       "Feedback op workout-video's",
       '3 trainingen in persoon op een plek halverwege',
       'Plus alles uit Midden',
-    ], { 6: 4000 }, { kostenMaand: 45, kostenEenmalig: 160, urenMaand: 2.8, urenEenmalig: 9 }),
+    ], { 3: 2250, 6: 4000 }, { kostenMaand: 45, kostenEenmalig: 160, urenMaand: 2.8, urenEenmalig: 9 }),
     midden: maakTier([
       'Wekelijkse check op je data met bijsturing',
       'Check-in calls wanneer nodig',
       "Feedback op workout-video's die je opstuurt",
       'Onbeperkt WhatsApp-support',
       'Plus alles uit Basis',
-    ], { 4: 800, 6: 1200, 12: 2400 }, { urenMaand: 1.5 }),
+    ], { 3: 600, 4: 800, 6: 1200, 12: 2400 }, { urenMaand: 1.5 }),
     basis: maakTier([
       'Volledige toegang tot de app',
       'Trainingsplan',
       'Voedingsplan',
       'Eén aanpassing per maand',
-    ], { 4: 400, 6: 600, 12: 1200 }, { urenMaand: 0.3 }),
+    ], { 3: 300, 4: 400, 6: 600, 12: 1200 }, { urenMaand: 0.3 }),
   },
 }
 
@@ -97,6 +108,36 @@ const getalOfNull = (v) => {
   return Number.isFinite(n) ? n : null
 }
 
+const heelOfNull = (v) => {
+  const g = getalOfNull(v)
+  return g === null ? null : Math.max(0, Math.round(g))
+}
+const isLooptijd = (k) => /^\d+$/.test(k)
+
+// Prijs per looptijd. Alle sleutels blijven staan (ook 4 en looptijden die deze
+// versie niet kent): de kolom is één object, wat hier wegvalt is na één opslag weg.
+function normaliseerPrijs(ruw) {
+  const prijs = {}
+  for (const d of PRIJS_DUREN) prijs[d] = getalOfNull(ruw?.[d])
+  if (ruw && typeof ruw === 'object') {
+    for (const [k, v] of Object.entries(ruw)) if (!(k in prijs) && isLooptijd(k)) prijs[k] = getalOfNull(v)
+  }
+  return prijs
+}
+
+// Gratis maanden bij vooruitbetalen, per looptijd: heel getal vanaf 0, of null (leeg).
+// Een rij zonder het veld leest als de beginwaarden (1, 3, 6).
+export function normaliseerGratis(ruw) {
+  if (!ruw || typeof ruw !== 'object' || Array.isArray(ruw)) return { ...BEGIN.gratisMaanden }
+  const uit = {}
+  for (const d of DUREN) uit[d] = heelOfNull(ruw[d])
+  for (const [k, v] of Object.entries(ruw)) if (!(k in uit) && isLooptijd(k)) uit[k] = heelOfNull(v)
+  return uit
+}
+
+// Aantal gratis maanden bij vooruitbetalen voor één looptijd. Leeg = 0.
+export const gratisBij = (g, duur) => Math.max(0, Math.round(Number(g?.gratisMaanden?.[duur]) || 0))
+
 // Het aanbod van één tier in één zin, zonder spaties eromheen. '' = geen zin.
 export const tierZin = (tier) => (typeof tier?.zin === 'string' ? tier.zin.trim() : '')
 
@@ -108,10 +149,8 @@ export function normaliseer(ruw) {
     const t = r.tiers?.[k]
     const begin = BEGIN.tiers[k]
     if (!t || typeof t !== 'object') { tiers[k] = { ...begin, prijs: { ...begin.prijs }, onderdelen: [...begin.onderdelen] }; continue }
-    const prijs = {}
-    for (const d of DUREN) prijs[d] = getalOfNull(t.prijs?.[d])
     tiers[k] = {
-      prijs,
+      prijs: normaliseerPrijs(t.prijs),
       kostenMaand: getalOfNull(t.kostenMaand),
       kostenEenmalig: getalOfNull(t.kostenEenmalig),
       urenMaand: getalOfNull(t.urenMaand),
@@ -125,6 +164,7 @@ export function normaliseer(ruw) {
   return {
     partnerPct: r.partnerPct === undefined ? BEGIN.partnerPct : getalOfNull(r.partnerPct),
     vooruitPct: r.vooruitPct === undefined ? BEGIN.vooruitPct : getalOfNull(r.vooruitPct),
+    gratisMaanden: normaliseerGratis(r.gratisMaanden),
     borgAan: r.borgAan === true,
     borgBedrag: r.borgBedrag === undefined ? BEGIN.borgBedrag : getalOfNull(r.borgBedrag),
     producten: Array.isArray(r.producten) ? r.producten.filter(x => x && typeof x === 'object').map(normaliseerProduct) : BEGIN_PRODUCTEN.map(x => ({ ...x })),
@@ -199,8 +239,10 @@ const n = (v) => Number(v) || 0
 //   totaal      de ingevulde totaalprijs
 //   borg        wat er door 'borg verrekenen' afgaat (0 als de schakelaar uit staat)
 //   teBetalen   totaal min borg: de gewone prijs in termijnen
-//   korting     korting bij vooruitbetalen, over teBetalen, op hele euro's
+//   korting     korting bij vooruitbetalen, over teBetalen, op hele euro's (0 bij vooruitPct 0)
 //   vooruit     teBetalen min korting: de prijs in één keer
+//   gratis      gratis maanden bij vooruitbetalen voor deze duur (0 = geen)
+//   maandenVooruit   duur plus gratis: hoe lang hij bij vooruitbetalen coaching krijgt
 export function prijzen(tier, duur, g) {
   const totaal = n(tier?.prijs?.[duur])
   if (totaal <= 0) return null
@@ -208,7 +250,8 @@ export function prijzen(tier, duur, g) {
   const teBetalen = totaal - borg
   const pct = Math.min(100, Math.max(0, n(g?.vooruitPct)))
   const korting = Math.round(teBetalen * pct / 100)
-  return { totaal, perMaand: totaal / duur, borg, teBetalen, korting, vooruit: teBetalen - korting }
+  const gratis = gratisBij(g, duur)
+  return { totaal, perMaand: totaal / duur, borg, teBetalen, korting, vooruit: teBetalen - korting, gratis, maandenVooruit: duur + gratis }
 }
 
 // Alle sommen voor één tier bij één duur (maanden). Zonder prijs: omzet,
@@ -216,15 +259,19 @@ export function prijzen(tier, duur, g) {
 // Partner-aandeel gaat over de omzet, niet over wat er na kosten overblijft.
 // omzet: wat er echt binnenkomt als dat afwijkt van de totaalprijs (borg
 // verrekend, vooruitbetalen); weggelaten = de totaalprijs.
-export function reken(tier, duur, partnerPct, omzet = null) {
-  const kosten = n(tier?.kostenMaand) * duur + n(tier?.kostenEenmalig)
-  const uren = n(tier?.urenMaand) * duur + n(tier?.urenEenmalig)
+// gratis: gratis maanden bij vooruitbetalen. Die maanden lever je wel: kosten en
+// uren per maand lopen door over duur plus gratis (maanden), de omzet blijft wat
+// er vooruit betaald is. perMaand blijft de prijs per betaalde maand.
+export function reken(tier, duur, partnerPct, omzet = null, gratis = 0) {
+  const maanden = duur + Math.max(0, n(gratis))
+  const kosten = n(tier?.kostenMaand) * maanden + n(tier?.kostenEenmalig)
+  const uren = n(tier?.urenMaand) * maanden + n(tier?.urenEenmalig)
   const prijs = n(tier?.prijs?.[duur])
-  if (prijs <= 0) return { omzet: null, perMaand: null, partner: null, kosten, uren, over: null, perUur: null }
+  if (prijs <= 0) return { omzet: null, perMaand: null, partner: null, kosten, uren, maanden, over: null, perUur: null }
   const binnen = omzet === null ? prijs : n(omzet)
   const partner = binnen * n(partnerPct) / 100
   const over = binnen - partner - kosten
-  return { omzet: binnen, perMaand: prijs / duur, partner, kosten, uren, over, perUur: uren > 0 ? over / uren : null }
+  return { omzet: binnen, perMaand: prijs / duur, partner, kosten, uren, maanden, over, perUur: uren > 0 ? over / uren : null }
 }
 
 export const euro = (v) => (Number(v) < 0 ? '−€' : '€') + Math.abs(Math.round(Number(v) || 0)).toLocaleString('nl-NL')
@@ -260,10 +307,11 @@ export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur 
   }
   return {
     ...kop,
-    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, vergelijking en zin per tier, anders verdwijnen ze). prijs = totaal per duur in maanden, zin = het aanbod van die tier in één zin (achter het knopje bij de tiernaam), vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, vergelijking, gratisMaanden, zin per tier en elke sleutel in prijs, anders verdwijnen ze). prijs = totaal per duur in maanden (scherm toont 3, 6, 12; 4 blijft staan), zin = het aanbod van die tier in één zin (achter het knopje bij de tiernaam), gratisMaanden = gratis maanden bovenop de duur bij vooruitbetalen, per duur, vooruitPct = % korting bij vooruitbetalen (0 = geen), borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
     in_beeld: { duur, stand },
     gegevens: {
       partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,
+      gratisMaanden: normaliseerGratis(gegevens.gratisMaanden),
       borgAan: gegevens.borgAan, borgBedrag: gegevens.borgBedrag, tiers,
       producten: gegevens.producten || [],
       vergelijking: normaliseerVergelijking(gegevens.vergelijking),

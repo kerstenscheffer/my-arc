@@ -18,6 +18,10 @@
 -- in gegevens. Geen schemawijziging; een rij zonder leest als leeg. De vorm staat
 -- in aanbodData.js. Nieuw veld = ook in normaliseer en aanbodVoorGino zetten: de
 -- pagina schrijft het hele object terug, wat daar niet in zit is na één opslag weg.
+-- 24 nov (later): gratisMaanden { "3","6","12" } erbij (gratis maanden bij vooruitbetalen,
+-- vervangt de korting; vooruitPct blijft bestaan en staat op 0) en prijs krijgt sleutel "3".
+-- Het scherm toont 3, 6 en 12; prijs "4" blijft staan voor oudere app-versies. Geen
+-- schemawijziging; een rij zonder gratisMaanden leest als 1, 3 en 6.
 
 create table if not exists public.business_os_aanbod (
   coach_id uuid primary key default auth.uid(),

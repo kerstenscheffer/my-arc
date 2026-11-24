@@ -35,6 +35,11 @@ h1{font-size:1.4rem;margin:0 0 10px}p{color:rgba(255,255,255,.65);line-height:1.
 }
 
 export default async function handler(req, res) {
+  // Terug van Stripe (24 nov 2026): eigen bedankpagina. /success is voor nieuwe
+  // klanten (intake invullen) en blijft voor hen zoals hij is.
+  if (req.query?.klaar) {
+    return pagina(res, 200, 'Betaling gelukt', 'Dank je! Je betaling is binnen en je traject loopt gewoon door.<br><br>Ga terug naar de app via <b>MY ARC</b> linksboven, of sluit dit venster. De melding verdwijnt vanzelf.');
+  }
   const id = String(req.query?.id || '').trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return pagina(res, 400, 'Link klopt niet', 'Open de betaling opnieuw vanuit de app.');
 
@@ -70,7 +75,7 @@ export default async function handler(req, res) {
       subscription_data: { metadata: { ...metadata, duration: `${maanden}-months` } },
       metadata,
       ...(klant?.email ? { customer_email: klant.email } : {}),
-      success_url: `${BASIS}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${BASIS}/api/betaal-verlenging?klaar=1`,
       cancel_url: `${BASIS}/`,
     } : {
       mode: 'payment',
@@ -86,7 +91,7 @@ export default async function handler(req, res) {
       payment_intent_data: { metadata },
       metadata,
       ...(klant?.email ? { customer_email: klant.email } : {}),
-      success_url: `${BASIS}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${BASIS}/api/betaal-verlenging?klaar=1`,
       cancel_url: `${BASIS}/`,
     });
 
