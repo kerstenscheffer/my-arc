@@ -2,6 +2,7 @@
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
 // (naam, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
+import { PAKKETTEN, zetPakket } from '../klantPakket'
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
@@ -64,7 +65,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus, pakket = null }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
   const [lokaal, setLokaal] = useState(null)
@@ -571,6 +572,20 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
                   <button onClick={handleToggle} disabled={toggling} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderTop: hasPhone && !isInactive ? '1px solid rgba(255,255,255,0.06)' : 'none', color: isInactive ? '#10b981' : '#ef4444', fontSize: '0.78rem', fontWeight: 700, cursor: toggling ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', opacity: toggling ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <Power size={15} /> {isInactive ? 'Activeer' : 'Deactiveer'}
                   </button>
+                )}
+                {/* Pakket (24 nov 2026): alleen als de kolom er is (pakket !== null). */}
+                {pakket && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '0.45rem 0.6rem 0.5rem' }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', padding: '0 0.25rem 0.3rem' }}>Pakket</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                      {PAKKETTEN.map(p => (
+                        <button key={p.id} onClick={() => { setShowMenu(false); if (p.id !== pakket) zetPakket(db.supabase, client.id, p.id).catch(e => console.error('Pakket opslaan mislukt:', e)) }}
+                          style={{ height: 28, borderRadius: 7, border: `1px solid ${p.id === pakket ? '#fff' : 'rgba(255,255,255,0.14)'}`, background: p.id === pakket ? '#fff' : 'transparent', color: p.id === pakket ? '#0a0a0a' : '#fff', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                          {p.naam}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {/* Onomkeerbaar — de bevestiging zit in DeleteClientModal. */}
                 <button onClick={() => { setShowDelete(true); setShowMenu(false) }} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>

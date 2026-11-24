@@ -1,6 +1,7 @@
 // src/modules/coach-command-center/CoachCommandCenter.jsx
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
+import { PAKKETTEN } from './klantPakket'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Keuze from '../meal-plan/components/Keuze'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff } from 'lucide-react'
@@ -40,6 +41,10 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const [challengeFilter, setChallengeFilter] = useState('all')
   // Afgevinkt vandaag (het rondje op de kaart): 'open' = nog langs, 'gedaan' = al gehad.
   const [vinkFilter, setVinkFilter] = useState('all')
+  // Pakket per klant (clients.pakket, 24 nov 2026): filter voor een data- + feedbackdag.
+  // Apart geladen: ontbreekt de kolom nog, dan valt alleen dit filter weg en niet de hele lijst.
+  const [pakketVan, setPakketVan] = useState(null) // Map client_id → 'app' | 'basis' | 'midden' | 'premium'
+  const [pakketFilter, setPakketFilter] = useState('all')
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   const [showAddClient, setShowAddClient] = useState(false)
@@ -82,6 +87,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
       setSearchQuery('')
       setUrgencyFilter('all')
       setChallengeFilter('all')
+      setPakketFilter('all')
       setVinkFilter('all')
       setKaartKlantId(id)
     }
@@ -126,6 +132,18 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
       )
     return () => { afgebroken = true }
   }, [])
+
+  useEffect(() => {
+    let afgebroken = false
+    db.supabase.from('clients').select('id, pakket').then(
+      r => { if (!afgebroken && !r.error) setPakketVan(new Map((r.data || []).map(c => [c.id, c.pakket || 'midden']))) },
+      () => null
+    )
+    const op = (e) => { const d = e?.detail; if (d?.id && d?.pakket) setPakketVan(m => new Map(m || []).set(d.id, d.pakket)) }
+    window.addEventListener('myarc:pakket', op)
+    return () => { afgebroken = true; window.removeEventListener('myarc:pakket', op) }
+  }, [])
+  const pakketVanKlant = (c) => pakketVan?.get(c.id) || 'midden'
 
   const computeStats = (sorted) => {
     const activeClients = sorted.filter(c => c.status === 'active')
@@ -360,6 +378,8 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
     if (challengeFilter === 'challenge' && !challengeIds.has(client.id)) return false
+    if (pakketFilter === 'monitoring' && pakketVanKlant(client) === 'app') return false
+    if (!['all', 'monitoring'].includes(pakketFilter) && pakketVanKlant(client) !== pakketFilter) return false
     // Vóór de urgentie-switch: die returnt zelf.
     if (vinkFilter === 'open' && isGehad(client)) return false
     if (vinkFilter === 'gedaan' && !isGehad(client)) return false
@@ -451,6 +471,15 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
           <Keuze vast waarde={vinkFilter} zet={setVinkFilter} isMobile={isMobile}
             opties={[{ id: 'all', label: 'Vinkjes' }, { id: 'open', label: `Nog langs · ${vinkOpen}` }, { id: 'gedaan', label: `Afgevinkt · ${vinkGedaan}` }]} />
+          {pakketVan && (<>
+            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+            <Keuze vast waarde={pakketFilter} zet={setPakketFilter} isMobile={isMobile}
+              opties={[
+                { id: 'all', label: 'Alle pakketten' },
+                { id: 'monitoring', label: `Met feedback · ${binnenStatus.filter(c => pakketVanKlant(c) !== 'app').length}` },
+                ...PAKKETTEN.map(p => ({ id: p.id, label: `${p.naam} · ${binnenStatus.filter(c => pakketVanKlant(c) === p.id).length}` })),
+              ]} />
+          </>)}
           {challengeIds.size > 0 && (<>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze vast waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
@@ -583,7 +612,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
             </div>
           )}
 
-          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || vinkFilter !== 'all' || searchQuery) && (
+          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || pakketFilter !== 'all' || vinkFilter !== 'all' || searchQuery) && (
             <div style={{ padding: isMobile ? '0.375rem 1rem' : '0.375rem 2rem', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               {filteredClients.length} van {stats.total}{searchQuery && ` · "${searchQuery}"`}
             </div>
@@ -612,6 +641,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
                 key={client.id}
                 client={client}
                 isMobile={isMobile}
+                pakket={pakketVan ? pakketVanKlant(client) : null}
                 onToggleStatus={handleToggleStatus}
                 onDeleted={handleClientDeleted}
                 showStatusToggle={true}

@@ -19,6 +19,7 @@ import pushNotificationService from './services/PushNotificationService'
 const UiDemo = lazy(() => import('./ui/UiDemo'))
 const LaadTest = lazy(() => import('./pages/LaadTest'))
 const OnboardingTest = lazy(() => import('./pages/OnboardingTest'))
+const OnboardingStijlen = lazy(() => import('./pages/OnboardingStijlen'))
 const AppOnboarding = lazy(() => import('./modules/app-onboarding/AppOnboarding'))
 const InfoPage = lazy(() => import('./pages/InfoPage'))
 const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
@@ -214,7 +215,12 @@ function App() {
   }
 
   // Keuzepagina voor de onboarding-mascottes (21 nov 2026) — niet gelinkt in menu's.
+  // /test = stijlen van de app-onboarding (24 nov 2026); de mascotte-concepten
+  // van 21 nov staan nu op /test-mascottes.
   if (currentPath === '/test') {
+    return <OnboardingStijlen />
+  }
+  if (currentPath === '/test-mascottes') {
     return <OnboardingTest />
   }
 
