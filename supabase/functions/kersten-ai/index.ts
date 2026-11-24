@@ -30,11 +30,11 @@ const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
 
 const MODEL = 'claude-opus-5-5'
 const LIMIET_PER_DAG = 20
-const PAGINAS = ['home', 'workout', 'meal', 'tracking', 'boodschappen', 'agenda', 'profile'] as const
+const PAGINAS = ['home', 'workout', 'meal', 'tracking', 'boodschappen', 'agenda', 'profile', 'mijnplan'] as const
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [{
   name: 'navigeer',
-  description: 'Open een pagina in de MY ARC app voor de gebruiker. Gebruik dit als de gebruiker iets wil doen of zien dat op een pagina staat, of als je uitlegt waar iets staat. home = dagoverzicht en agenda; workout = trainingsschema en sets loggen; meal = voedingsplan, maaltijden loggen en wisselen; tracking = gewicht, omtrek en voortgangsfoto\'s; boodschappen = boodschappenlijst; agenda = weekagenda; profile = profiel en instellingen.',
+  description: 'Open een pagina in de MY ARC app voor de gebruiker. Gebruik dit als de gebruiker iets wil doen of zien dat op een pagina staat, of als je uitlegt waar iets staat. home = dagoverzicht en agenda; workout = trainingsschema en sets loggen; meal = voedingsplan, maaltijden loggen en wisselen; tracking = gewicht, omtrek en voortgangsfoto\'s; boodschappen = boodschappenlijst; agenda = weekagenda; profile = profiel en instellingen; mijnplan = zelf je doel, gewicht en streefgewicht aanpassen (macro\'s worden opnieuw berekend), een nieuw trainingsschema laten maken, je abonnement beheren of coaching aanvragen.',
   input_schema: {
     type: 'object',
     properties: { pagina: { type: 'string', enum: [...PAGINAS] } },
@@ -61,7 +61,7 @@ Grenzen:
 - Geen medisch advies. Bij pijn, blessures, ziekte, zwangerschap, medicijnen of eetproblemen: zeg dat hij dat met een arts of fysiotherapeut moet bespreken.
 - Verzin geen functies die de app niet heeft. Weet je iets niet zeker, zeg dat eerlijk.
 - Deze gebruiker heeft geen persoonlijke coaching: beloof geen calls, check-ins of persoonlijke berichten van Kersten. Wil hij persoonlijke begeleiding, zeg dan dat dat kan via coaching van MY ARC.
-- Pas zelf geen plannen aan; je kunt alleen uitleggen en de juiste pagina openen.
+- Pas zelf geen plannen aan; je kunt alleen uitleggen en de juiste pagina openen. Wil iemand een ander doel, andere calorieën, een ander schema (bijvoorbeeld minder dagen of thuis trainen) of zijn abonnement wijzigen: stuur hem naar mijnplan.
 - Blijf bij fitness, voeding en de app. Vragen over iets anders beantwoord je kort niet.`
 
 // Vragenboom → leesbare tekst (label > sublabel: antwoord [pagina]).

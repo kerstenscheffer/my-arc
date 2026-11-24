@@ -51,7 +51,7 @@ import {
   LogOut,
   Bell,
   HelpCircle,
-  MoreHorizontal, Video } from 'lucide-react'
+  MoreHorizontal, Video, Target } from 'lucide-react'
 
 // De zeven schermen als losse stukken: alleen het open scherm wordt opgehaald.
 const ClientHome = lazy(() => import('./pages/ClientHome'))
@@ -60,9 +60,10 @@ const ClientWorkoutPlan = lazy(() => import('./pages/ClientWorkoutPlan'))
 const ClientCalls = lazy(() => import('../modules/call-planning/ClientCalls'))
 const ProgressMain = lazy(() => import('../modules/progress/ProgressMain'))
 const ClientProfile = lazy(() => import('./pages/ClientProfile'))
+const MijnPlanPagina = lazy(() => import('./pages/MijnPlanPagina'))
 const ShoppingHub = lazy(() => import('../modules/shopping/ShoppingHub'))
 const ClientAgendaView = lazy(() => import('../modules/client-agenda/ClientAgendaView'))
-const PAGINAS = ['home', 'workout', 'meal', 'agenda', 'boodschappen', 'tracking', 'calls', 'profile']
+const PAGINAS = ['home', 'workout', 'meal', 'agenda', 'boodschappen', 'tracking', 'calls', 'profile', 'mijnplan']
 
 // Initialize database
 const db = DatabaseService
@@ -598,6 +599,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                   {id === 'tracking' && <ProgressMain db={db} client={client} />}
                   {id === 'calls' && <ClientCalls db={db} clientInfo={client} />}
                   {id === 'profile' && <ClientProfile client={client} user={user} db={db} onClientUpdate={handleClientUpdate} />}
+                  {id === 'mijnplan' && appGebruiker && <MijnPlanPagina client={client} user={user} onClientUpdate={handleClientUpdate} isMobile={isMobile} />}
                 </Suspense>
                 </PaginaVangnet>
                 </PaginaZichtbaar.Provider>
@@ -719,7 +721,31 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             )
           })}
 
-          {/* App-gebruikers (geen coaching): geen video-knop. */}
+          {/* App-gebruikers (geen coaching): op de plek van Video staat 'Plan'
+              (pagina Mijn plan: doel, schema, abonnement). */}
+          {appGebruiker && (() => {
+            const isActive = currentView === 'mijnplan'
+            return (
+              <button
+                data-rondleiding="mijnplan"
+                onClick={() => setCurrentView('mijnplan')}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                  padding: isMobile ? '0.25rem 0.05rem' : '0.3rem 0.15rem',
+                  background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  border: 'none', borderRadius: 12, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  minHeight: 38, minWidth: 36, transition: 'background 0.15s ease',
+                }}
+              >
+                <Target size={isMobile ? 21 : 23} color={isActive ? '#FFD700' : 'rgba(255, 255, 255, 0.4)'} strokeWidth={isActive ? 2.8 : 2} />
+                <span style={{
+                  fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: isActive ? 900 : 700,
+                  color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.35)', letterSpacing: '-0.01em', lineHeight: 1,
+                }}>Mijn plan</span>
+              </button>
+            )
+          })()}
           {!appGebruiker && (<>
           {/* Video — opent de video-balk van de coach omhoog; staat er niets
               klaar, dan de bibliotheek. Stond eerder als los rond knopje
@@ -759,6 +785,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
 
           {/* Meer — klapt boven de balk open. */}
           <button
+            data-rondleiding="meer"
             onClick={() => setMeerOpen(v => !v)}
             aria-expanded={meerOpen}
             style={{

@@ -18,7 +18,7 @@ import { supabase } from '../../lib/supabase'
 
 const GOUD = '#FFD700'
 const KOP = { fontFamily: '"Archivo Black", "Arial Black", sans-serif', fontStyle: 'italic', textTransform: 'uppercase' }
-const PAGINA_NAAM = { home: 'Home', workout: 'Workout', meal: 'Meal', tracking: 'Tracking', boodschappen: 'Boodschappen', agenda: 'Agenda', profile: 'Profiel' }
+const PAGINA_NAAM = { home: 'Home', workout: 'Workout', meal: 'Meal', tracking: 'Tracking', boodschappen: 'Boodschappen', agenda: 'Agenda', profile: 'Profiel', mijnplan: 'Mijn plan' }
 const SUGGESTIES = ['Hoe log ik mijn eten?', 'Hoeveel eiwit moet ik eten?', 'Waar zie ik mijn training?', 'Ik heb geen zin vandaag. Tips?']
 const BALK_ONDER = 92 // boven de zwevende balk onderin
 

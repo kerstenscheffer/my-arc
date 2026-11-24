@@ -9,7 +9,6 @@ import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
 import AccountWisselKnop from '../../components/AccountWisselKnop'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
-import AppMijnPlan from '../components/AppMijnPlan'
 const db = DatabaseService
 
 // MY ARC modal-stijl: zwart met wit accent. Het goud dat hier overal in de
@@ -28,7 +27,7 @@ const VELD = {
   outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
 }
 
-export default function ClientProfile({ client, user, onClientUpdate }) {
+export default function ClientProfile({ client, onClientUpdate }) {
   const isMobile = window.innerWidth <= 768
   const [activeSection, setActiveSection] = useState('persoonlijk')
   const [isEditing, setIsEditing] = useState(false)
@@ -81,12 +80,12 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
       })
   }, [client?.id])
 
-  // App-gebruikers (geen coaching, 24 nov 2026) krijgen 'Mijn plan' in plaats
-  // van 'Coach': daar passen ze zelf hun doel, schema en abonnement aan.
+  // App-gebruikers (geen coaching, 24 nov 2026): geen tabblad 'Coach'. Hun doel,
+  // schema en abonnement staan op de eigen pagina Mijn plan (balk onderin).
   const appGebruiker = !!client?.app_abonnee
   const sections = [
     { id: 'persoonlijk', label: 'Persoonlijk', icon: User },
-    appGebruiker ? { id: 'plan', label: 'Mijn plan', icon: Target } : { id: 'coach', label: 'Coach', icon: Target },
+    ...(appGebruiker ? [] : [{ id: 'coach', label: 'Coach', icon: Target }]),
     { id: 'instellingen', label: 'Instellingen', icon: Settings }
   ]
 
@@ -348,10 +347,6 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         )}
 
         {/* Coach */}
-        {activeSection === 'plan' && appGebruiker && (
-          <AppMijnPlan client={client} user={user} onClientUpdate={onClientUpdate} />
-        )}
-
         {activeSection === 'coach' && !appGebruiker && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div style={{
