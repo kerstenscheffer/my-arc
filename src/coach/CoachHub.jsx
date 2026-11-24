@@ -213,6 +213,24 @@ const getHashTab = () => {
   return ALL_TAB_IDS.includes(base) ? base : 'command'
 }
 
+// Elke keer dat de hub opnieuw opent (nieuwe tab, app opnieuw gestart) start je
+// op Business OS, ook als er nog een oude #tab in het adres staat (Kersten,
+// 24 nov 2026). Een herlaadactie binnen dezelfde sessie houdt de tab vast
+// (sessionStorage), en een deep link met extra (#ai-meals:<id>) gaat altijd voor.
+const startTabBijOpenen = () => {
+  const hash = window.location.hash.replace('#', '')
+  if (/[:?]/.test(hash)) return getHashTab()
+  let eerste = false
+  try {
+    eerste = !sessionStorage.getItem('coachhub_geopend')
+    sessionStorage.setItem('coachhub_geopend', '1')
+  } catch { eerste = false }
+  if (eerste && hash !== START_TAB) {
+    try { window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${START_TAB}`) } catch { /* adres laten staan */ }
+  }
+  return getHashTab()
+}
+
 const setHashTab = (id) => {
   window.location.hash = id
 }
@@ -221,7 +239,7 @@ const setHashTab = (id) => {
 // MAIN COMPONENT
 // ============================================
 export default function CoachHub() {
-  const [activeTab, setActiveTab] = useState(getHashTab)
+  const [activeTab, setActiveTab] = useState(startTabBijOpenen)
   // Android-terugknop: vanaf elk tabblad terug naar Command.
   useEffect(() => {
     const terug = (ev) => { if (activeTab !== 'command') { ev.preventDefault(); setHashTab('command') } }
