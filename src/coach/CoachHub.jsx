@@ -46,6 +46,7 @@ import {
 // opgehaald. Command blijft in de hoofdbundel (standaardtab).
 const ClientInfoTab = lazy(() => import('./tabs/ClientInfoTab'))
 const ClientViewTab = lazy(() => import('./tabs/ClientViewTab'))
+const AppGebruikersTab = lazy(() => import('./tabs/AppGebruikersTab'))
 const CoachChallengeHub = lazy(() => import('./pages/CoachChallengeHub'))
 const MealPlanGenerator = lazy(() => import('../modules/ai-meal-generator/MealPlanGenerator'))
 const CallPlanningTab = lazy(() => import('../modules/call-planning/CallPlanningComponents').then(m => ({ default: m.CallPlanningTab })))
@@ -132,7 +133,9 @@ const MORE_CATEGORIES = [
       // De challenge-hub stond wél in de switch maar niet in dit menu, dus je
       // kon er alleen komen door het hash zelf in te typen.
       { id: 'challenge-hub', label: 'Challenge', icon: Trophy },
-      { id: 'results', label: 'Resultaten', icon: BarChart3 } // eigen icoon: zonder tekst was hij niet te onderscheiden van Challenge
+      { id: 'results', label: 'Resultaten', icon: BarChart3 }, // eigen icoon: zonder tekst was hij niet te onderscheiden van Challenge
+      // Zelf aangemelde app-gebruikers zonder coaching (24 nov 2026)
+      { id: 'app-gebruikers', label: 'App-gebruikers', icon: Smartphone }
     ]
   },
   {
@@ -746,6 +749,8 @@ export default function CoachHub() {
         return <SpotsManager db={db} compact={false} />
       case 'app-versies':
         return <AppVersiesPaneel db={db} />
+      case 'app-gebruikers':
+        return <AppGebruikersTab isMobile={isMobile} />
       case 'lab':
         return <LabHub isMobile={isMobile} />
       default:

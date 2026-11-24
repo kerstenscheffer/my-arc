@@ -34,6 +34,7 @@ import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
 import AppBetaalmuur from './components/AppBetaalmuur'
+import { Capacitor } from '@capacitor/core'
 import AppRondleiding from './components/AppRondleiding'
 import KerstenAI from './components/KerstenAI'
 import { bepaalAppToegang, abonnementMogelijk } from '../lib/appAbonnement'
@@ -342,8 +343,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         const betaald = t.reden === 'abonnement' || t.reden === 'abonnement_store'
         if (opSlotNu && betaald) opSlotNu = false
         if (!clientData.account_locked_at && clientData.app_abonnee) {
-          // Ook op het web: daar zegt de muur 'open de app' (betalen kan alleen in de app).
-          setBetaalmuur(!t.toegang ? 'app' : null)
+          // Op het web zegt de muur 'open de app' (betalen kan alleen in de app).
+          // In een native app zonder winkelkoppeling (Android zolang RevenueCat
+          // daar nog niet staat) geen muur: daar zou iemand anders vastlopen.
+          const winkelOntbreekt = Capacitor.isNativePlatform() && !abonnementMogelijk()
+          setBetaalmuur(!t.toegang && !winkelOntbreekt ? 'app' : null)
         }
       }
       setOpSlot(opSlotNu)

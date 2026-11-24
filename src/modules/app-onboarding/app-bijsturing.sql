@@ -6,6 +6,8 @@
 --
 --   - Alleen app-accounts met doel vet kwijt (fat_loss / cut) en een lopend
 --     abonnement of proefmaand.
+--   - Gewicht komt uit weight_challenge_logs (daar schrijft de app het weegmoment;
+--     weight_tracking wordt niet meer gevuld).
 --   - Elke maandag: gemiddeld gewicht van de laatste 7 dagen vergeleken met het
 --     gemiddelde van 14-20 dagen geleden (minstens 2 wegingen in elk venster).
 --   - Gaat er minder dan 0,25 % per week af: 100 kcal minder per dag
@@ -63,9 +65,9 @@ begin
       continue;
     end if;
 
-    select avg(weight), count(*) into v_nu, n_nu from weight_tracking
+    select avg(weight), count(*) into v_nu, n_nu from weight_challenge_logs
       where client_id = c.id and date > current_date - 7 and weight > 0;
-    select avg(weight), count(*) into v_toen, n_toen from weight_tracking
+    select avg(weight), count(*) into v_toen, n_toen from weight_challenge_logs
       where client_id = c.id and date between current_date - 20 and current_date - 14 and weight > 0;
     if coalesce(n_nu, 0) < 2 or coalesce(n_toen, 0) < 2 then
       insert into app_bijsturing_log (client_id, besluit, oud_kcal, gem_nu, gem_toen) values (c.id, 'te_weinig_data', c.target_calories, v_nu, v_toen);

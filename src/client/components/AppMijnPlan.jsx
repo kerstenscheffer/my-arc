@@ -111,6 +111,17 @@ export default function AppMijnPlan({ client, user, onClientUpdate }) {
     setAboMelding(r.ok ? { tekst: 'Je abonnement is hersteld.', goed: true } : { tekst: r.fout })
   }
 
+  // ── Coaching aanvragen: lead in het lead-systeem + WhatsApp naar Kersten ──
+  const [coachBezig, setCoachBezig] = useState(false)
+  const [coachMelding, setCoachMelding] = useState(null)
+  const vraagCoaching = async () => {
+    setCoachBezig(true); setCoachMelding(null)
+    await supabase.rpc('app_coaching_aanvraag').then(r => r, () => null) // lead + melding bij Kersten; mislukt dit, dan nog steeds WhatsApp
+    setCoachBezig(false)
+    setCoachMelding({ tekst: 'Top! Kersten neemt contact met je op.', goed: true })
+    window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hoi Kersten, ik gebruik de MY ARC app en wil graag meer weten over coaching.${client?.first_name ? ` Groet, ${client.first_name}` : ''}`)}`, '_blank', 'noopener')
+  }
+
   return (
     <div>
       {/* Doel */}
@@ -199,8 +210,9 @@ export default function AppMijnPlan({ client, user, onClientUpdate }) {
       <div style={{ ...blok, borderBottom: 'none' }}>
         <div style={kop}>Wil je een coach?</div>
         <div style={{ fontSize: '1.02rem', fontWeight: 800, lineHeight: 1.4 }}>Met coaching kijk ik zelf mee. Je krijgt een plan op maat, check-ins en calls.</div>
-        <button onClick={() => window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hoi Kersten, ik gebruik de MY ARC app en wil graag meer weten over coaching.${client?.first_name ? ` Groet, ${client.first_name}` : ''}`)}`, '_blank', 'noopener')}
-          style={{ ...knopWit, background: GOUD, boxShadow: '0 4px 0 #9c8200' }}>Vraag coaching aan</button>
+        <button onClick={vraagCoaching} disabled={coachBezig}
+          style={{ ...knopWit, background: GOUD, boxShadow: '0 4px 0 #9c8200', opacity: coachBezig ? 0.6 : 1 }}>{coachBezig ? 'Even wachten…' : 'Vraag coaching aan'}</button>
+        <Melding {...(coachMelding || {})} />
       </div>
     </div>
   )

@@ -20,6 +20,7 @@ import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
 import PasswordResetService from '../../services/PasswordResetService'
 import AppleSignInButton from './AppleSignInButton'
+import { abonnementMogelijk } from '../../lib/appAbonnement'
 
 const db = DatabaseService
 const passwordReset = PasswordResetService
@@ -212,8 +213,9 @@ export default function LoginMain() {
 
         {/* Nieuw in de app (24 nov 2026): zelf een account en plan maken via de
             onboarding. Alleen in de app; Apple eist dat je daar zelf een account
-            kunt maken. Op het web blijft dit weg (daar is geen betaalmuur). */}
-        {Capacitor.isNativePlatform() && (
+            kunt maken. Op het web blijft dit weg (daar is geen betaalmuur), en op
+            Android ook zolang RevenueCat daar nog niet is ingesteld. */}
+        {abonnementMogelijk() && (
           <button type="button" onClick={() => { window.location.href = '/aanmelden' }} style={{
             marginTop: '1.4rem', width: '100%', minHeight: 46, borderRadius: 12, cursor: 'pointer',
             background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff',
