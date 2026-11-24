@@ -1,7 +1,7 @@
 // src/modules/coach-command-center/CoachCommandCenter.jsx
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
-import { PAKKETTEN } from './klantPakket'
+import { PAKKETTEN, krijgtMaandag } from './klantPakket'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Keuze from '../meal-plan/components/Keuze'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff, Columns3, LayoutGrid } from 'lucide-react'
@@ -46,6 +46,9 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   // Apart geladen: ontbreekt de kolom nog, dan valt alleen dit filter weg en niet de hele lijst.
   const [pakketVan, setPakketVan] = useState(null) // Map client_id → 'app' | 'basis' | 'midden' | 'premium'
   const [pakketFilter, setPakketFilter] = useState('all')
+  // Maandag check-in: wie er los van staat (maandag_checkin = false) en wie niet betaalt.
+  const [maandagUit, setMaandagUit] = useState(() => new Set())
+  const [nietBetalend, setNietBetalend] = useState(() => new Set())
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   // Lijst of bord (kanban met eigen secties). Onthouden per apparaat.
@@ -139,15 +142,28 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
 
   useEffect(() => {
     let afgebroken = false
-    db.supabase.from('clients').select('id, pakket').then(
-      r => { if (!afgebroken && !r.error) setPakketVan(new Map((r.data || []).map(c => [c.id, c.pakket || 'midden']))) },
+    db.supabase.from('clients').select('id, pakket, maandag_checkin, niet_betalend').then(
+      r => {
+        if (afgebroken || r.error) return
+        const rijen = r.data || []
+        setPakketVan(new Map(rijen.map(c => [c.id, c.pakket || 'midden'])))
+        setMaandagUit(new Set(rijen.filter(c => c.maandag_checkin === false).map(c => c.id)))
+        setNietBetalend(new Set(rijen.filter(c => c.niet_betalend).map(c => c.id)))
+      },
       () => null
     )
     const op = (e) => { const d = e?.detail; if (d?.id && d?.pakket) setPakketVan(m => new Map(m || []).set(d.id, d.pakket)) }
+    const opMaandag = (e) => {
+      const d = e?.detail
+      if (!d?.id) return
+      setMaandagUit(s => { const n = new Set(s); if (d.aan) n.delete(d.id); else n.add(d.id); return n })
+    }
     window.addEventListener('myarc:pakket', op)
-    return () => { afgebroken = true; window.removeEventListener('myarc:pakket', op) }
+    window.addEventListener('myarc:maandag', opMaandag)
+    return () => { afgebroken = true; window.removeEventListener('myarc:pakket', op); window.removeEventListener('myarc:maandag', opMaandag) }
   }, [])
   const pakketVanKlant = (c) => pakketVan?.get(c.id) || 'midden'
+  const krijgtMaandagVideo = (c) => krijgtMaandag(c, { pakket: pakketVanKlant(c), maandagUit, nietBetalend })
 
   const computeStats = (sorted) => {
     const activeClients = sorted.filter(c => c.status === 'active')
@@ -373,6 +389,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const gehadVandaag = actieveKlanten.filter(c => c.dagCheck?.dagen?.includes(vandaagStr)).length
   const nogTeGaan = actieveKlanten.length - gehadVandaag
 
+  const aantalMaandag = pakketVan ? clientsWithData.filter(krijgtMaandagVideo).length : 0
   const isGehad = (c) => !!c.dagCheck?.dagen?.includes(vandaagStr)
   // Tellers in het menu binnen de gekozen status, zodat ze kloppen met de lijst.
   const binnenStatus = clientsWithData.filter(c => statusFilter === 'all' || c.status === statusFilter)
@@ -382,8 +399,9 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
     if (challengeFilter === 'challenge' && !challengeIds.has(client.id)) return false
+    if (pakketFilter === 'maandag' && !krijgtMaandagVideo(client)) return false
     if (pakketFilter === 'monitoring' && pakketVanKlant(client) === 'app') return false
-    if (!['all', 'monitoring'].includes(pakketFilter) && pakketVanKlant(client) !== pakketFilter) return false
+    if (!['all', 'monitoring', 'maandag'].includes(pakketFilter) && pakketVanKlant(client) !== pakketFilter) return false
     // Vóór de urgentie-switch: die returnt zelf.
     if (vinkFilter === 'open' && isGehad(client)) return false
     if (vinkFilter === 'gedaan' && !isGehad(client)) return false
@@ -415,6 +433,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
       client={client}
       isMobile={isMobile}
       pakket={pakketVan ? pakketVanKlant(client) : null}
+      maandagCheckin={pakketVan ? !maandagUit.has(client.id) : null}
       onToggleStatus={handleToggleStatus}
       onDeleted={handleClientDeleted}
       showStatusToggle={true}
@@ -508,6 +527,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
             <Keuze vast waarde={pakketFilter} zet={setPakketFilter} isMobile={isMobile}
               opties={[
                 { id: 'all', label: 'Alle pakketten' },
+                { id: 'maandag', label: `Maandag check-in · ${aantalMaandag}` },
                 { id: 'monitoring', label: `Met feedback · ${binnenStatus.filter(c => pakketVanKlant(c) !== 'app').length}` },
                 ...PAKKETTEN.map(p => ({ id: p.id, label: `${p.naam} · ${binnenStatus.filter(c => pakketVanKlant(c) === p.id).length}` })),
               ]} />
@@ -522,6 +542,24 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
         {!isMobile && <div style={{ flex: 1, minWidth: 8 }} />}
         {/* Regelafbreking op telefoon: zoeken + knoppen op een eigen rij. */}
         {isMobile && <div style={{ flexBasis: '100%', height: 0 }} />}
+
+        {/* Maandag check-in: hoeveel klanten er deze maandag een video krijgen.
+            Tik = alleen die klanten tonen (nog een tik = weer iedereen). */}
+        {pakketVan && (
+          <button onClick={() => { const aan = pakketFilter !== 'maandag'; setPakketFilter(aan ? 'maandag' : 'all'); if (aan) setStatusFilter('active') }}
+            title="Klanten die maandag een check-in-video krijgen"
+            style={{
+              flexShrink: 0, height: 36, padding: '0 0.8rem', borderRadius: 10, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+              background: pakketFilter === 'maandag' ? '#fff' : 'rgba(255,255,255,0.05)',
+              border: pakketFilter === 'maandag' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              color: pakketFilter === 'maandag' ? '#000' : '#fff',
+              fontSize: '0.85rem', fontWeight: 900,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            <Video size={15} strokeWidth={2.6} /> Maandag {aantalMaandag}
+          </button>
+        )}
 
         {/* Zoeken staat nu inline; dat scheelt een klik en een aparte rij. */}
         <div style={{

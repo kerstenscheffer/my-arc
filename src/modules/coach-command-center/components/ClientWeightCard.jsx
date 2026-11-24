@@ -2,7 +2,7 @@
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
 // (naam, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
-import { PAKKETTEN, zetPakket } from '../klantPakket'
+import { PAKKETTEN, zetPakket, zetMaandag } from '../klantPakket'
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
@@ -65,7 +65,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus, pakket = null }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus, pakket = null, maandagCheckin = null }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
   const [lokaal, setLokaal] = useState(null)
@@ -586,6 +586,15 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
                       ))}
                     </div>
                   </div>
+                )}
+                {/* Maandag check-in-video aan/uit voor deze klant (24 nov 2026). */}
+                {maandagCheckin !== null && pakket !== 'app' && (
+                  <button onClick={() => { setShowMenu(false); zetMaandag(db.supabase, client.id, !maandagCheckin).catch(e => console.error('Maandag check-in opslaan mislukt:', e)) }}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <Video size={15} />
+                    <span style={{ flex: 1 }}>Maandag check-in</span>
+                    <span style={{ fontWeight: 900, color: maandagCheckin ? '#22c55e' : 'rgba(255,255,255,0.6)' }}>{maandagCheckin ? 'Aan' : 'Uit'}</span>
+                  </button>
                 )}
                 {/* Onomkeerbaar — de bevestiging zit in DeleteClientModal. */}
                 <button onClick={() => { setShowDelete(true); setShowMenu(false) }} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>

@@ -48,3 +48,21 @@ update public.clients c set pakket = s.p
          where client_id is not null and reverted_at is null and public.pakket_uit_aanbod(aanbod) is not null
          order by client_id, moved_at desc) s
  where s.client_id = c.id and c.pakket is distinct from s.p;
+
+-- Maandag check-in-video (24 nov 2026, Kersten): Op koers, Coaching en All-in
+-- krijgen elke maandag een video. Met deze vlag zet je een klant er los van
+-- uit (niet geschikt). Gepauzeerd, niet-betalend en Solo tellen sowieso niet.
+alter table public.clients add column if not exists maandag_checkin boolean not null default true;
+comment on column public.clients.maandag_checkin is 'false = krijgt geen maandag check-in-video, ook al zit het in het pakket. 24 nov 2026.';
+
+-- Eenmalig: door Kersten genoemd (Joris, Dirk Jan, kstest) + testaccounts.
+update public.clients set maandag_checkin = false where id in (
+  'c3208491-9d3b-4ef2-b0bc-061d59deb34a', -- Joris Harteel
+  'db783ee4-294d-4b8f-b518-5d10bb33a963', -- Dirk Jan Stap
+  'b30f2f73-6685-4ccc-a39e-33d6209a7015', -- Kersten (kstest)
+  '7e176d2d-a85b-4132-a1e3-59b1ddd9816d', -- Kersten (ks10k, eigen klantaccount)
+  'fdba8fa8-5f25-4a55-9a95-4087590a7e4d', -- Demo Persoon
+  '2be73d7f-3af6-46b6-94f1-4d97ba61af97', -- Jenny Rosen (Stripe-test)
+  '6a879fc6-2db7-4fdb-9036-ff304621506f', -- JT
+  '94bc4d3e-0680-4354-80c9-7c15846a1b65'  -- Success Test User
+);

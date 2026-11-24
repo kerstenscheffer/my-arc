@@ -16,3 +16,19 @@ export async function zetPakket(supabase, clientId, pakket) {
   if (error) throw error
   window.dispatchEvent(new CustomEvent('myarc:pakket', { detail: { id: clientId, pakket } }))
 }
+
+// Maandag check-in-video (clients.maandag_checkin, 24 nov 2026). Op koers,
+// Coaching en All-in krijgen er elke maandag een; met de vlag zet je een
+// klant er los van uit. Gepauzeerd, gestopt en niet-betalend tellen niet.
+export const krijgtMaandag = (client, { pakket, maandagUit, nietBetalend }) =>
+  client.status === 'active'
+  && (client.coaching_status || 'active') === 'active'
+  && pakket !== 'app'
+  && !maandagUit.has(client.id)
+  && !nietBetalend.has(client.id)
+
+export async function zetMaandag(supabase, clientId, aan) {
+  const { error } = await supabase.from('clients').update({ maandag_checkin: aan }).eq('id', clientId)
+  if (error) throw error
+  window.dispatchEvent(new CustomEvent('myarc:maandag', { detail: { id: clientId, aan } }))
+}
