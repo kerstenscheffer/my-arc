@@ -19,6 +19,7 @@ import pushNotificationService from './services/PushNotificationService'
 const UiDemo = lazy(() => import('./ui/UiDemo'))
 const LaadTest = lazy(() => import('./pages/LaadTest'))
 const OnboardingTest = lazy(() => import('./pages/OnboardingTest'))
+const AppOnboarding = lazy(() => import('./modules/app-onboarding/AppOnboarding'))
 const InfoPage = lazy(() => import('./pages/InfoPage'))
 const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
 const SalesSlider = lazy(() => import('./pages/SalesSlider'))
@@ -205,6 +206,11 @@ function App() {
   // Interne UI-controle-pagina (Fase 1 fundament) — niet gelinkt in menu's.
   if (currentPath === '/ui-demo') {
     return <UiDemo />
+  }
+
+  // Onboarding nieuwe app-gebruikers (24 nov 2026). ?voorbeeld=1 = niets aanmaken.
+  if (currentPath === '/aanmelden') {
+    return <AppOnboarding />
   }
 
   // Keuzepagina voor de onboarding-mascottes (21 nov 2026) — niet gelinkt in menu's.
