@@ -47,6 +47,10 @@
 //                               rij (icoon) blijven staan.
 // normaliseer() laat velden die het niet kent staan (in een tier en bovenaan): de
 // kolom is één object, wat er niet in teruggaat is na één opslag weg.
+// Icoon per rij (24 nov 2026, later): vergelijking[].icoon = naam van een lucide-icoon
+// uit RIJ_ICONEN. Aanbod.jsx toont het links voor de onderdeelnaam en laat het in
+// Rekenen kiezen. Geen naam of een naam buiten de lijst = geen icoon; de naam zelf
+// blijft in de rij staan tot Kersten een ander icoon kiest.
 
 export const DUREN = [3, 6, 12]
 // Looptijden die altijd een plek in prijs hebben, ook als ze niet getoond worden.
@@ -244,6 +248,21 @@ const leesCel = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return String(v)
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
+
+// Iconen die een rij in de vergelijking mag hebben, in de volgorde van de kiezer.
+// Aanbod.jsx heeft bij elke naam het lucide-icoon (RIJ_ICOON): komt er hier een
+// naam bij, zet hem daar ook.
+export const RIJ_ICONEN = [
+  'Dumbbell', 'Utensils', 'Smartphone', 'Activity', 'MessageCircle', 'Phone',
+  'Video', 'Camera', 'Calendar', 'Users', 'MapPin', 'ShieldCheck',
+  'Gift', 'Star', 'Trophy', 'Pill', 'Shirt',
+]
+const kaleNaam = (s) => String(s).replace(/[\s_-]/g, '').toLowerCase()
+const ICOON_OP_KAAL = new Map(RIJ_ICONEN.map(n => [kaleNaam(n), n]))
+
+// Het icoon van één rij: de naam zoals hij in RIJ_ICONEN staat, of null (geen icoon,
+// lege of onbekende naam). Schrijfwijze telt niet: 'shield-check' leest als ShieldCheck.
+export const rijIcoonNaam = (rij) => (typeof rij?.icoon === 'string' && ICOON_OP_KAAL.get(kaleNaam(rij.icoon))) || null
 
 // Lege rij met één cel per tier (sleutels = tierSleutels van de gegevens).
 export const nieuweVergelijkRij = (sleutels = VASTE_SLEUTELS) => ({ onderdeel: '', ...Object.fromEntries(sleutels.map(k => [k, null])) })
