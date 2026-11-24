@@ -4,7 +4,8 @@
 import { PAKKETTEN } from './klantPakket'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Keuze from '../meal-plan/components/Keuze'
-import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff, Columns3, LayoutGrid } from 'lucide-react'
+import KlantBord from './components/KlantBord'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
@@ -47,6 +48,9 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const [pakketFilter, setPakketFilter] = useState('all')
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
+  // Lijst of bord (kanban met eigen secties). Onthouden per apparaat.
+  const [weergave, setWeergave] = useState(() => { try { return localStorage.getItem('myarc:command-weergave') === 'bord' ? 'bord' : 'lijst' } catch { return 'lijst' } })
+  const zetWeergave = (w) => { setWeergave(w); try { localStorage.setItem('myarc:command-weergave', w) } catch { /* geen storage */ } }
   const [showAddClient, setShowAddClient] = useState(false)
   const [journeyClient, setJourneyClient] = useState(null)
   const [coachId, setCoachId] = useState(null)
@@ -405,6 +409,34 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
     return aw - bw
   })
 
+  const kaartVoor = (client) => (
+    <ClientWeightCard
+      key={client.id}
+      client={client}
+      isMobile={isMobile}
+      pakket={pakketVan ? pakketVanKlant(client) : null}
+      onToggleStatus={handleToggleStatus}
+      onDeleted={handleClientDeleted}
+      showStatusToggle={true}
+      onOpenJourney={() => setJourneyClient(client)}
+      onNavigatePlan={onNavigatePlan}
+      onNavigateWorkout={onNavigateWorkout}
+      onNavigateTab={onNavigateTab}
+      db={db}
+      coachId={coachId}
+      onOpenMealPanel={onOpenMealPanel}
+      onOpenWorkoutPanel={onOpenWorkoutPanel}
+      onDagCheckChange={verwerkDagCheck}
+      doorstap={doorstap ? (doorstap[client.id] || null) : undefined}
+      onDoorstap={(rij) => setDoorstap(m => ({ ...(m || {}), [client.id]: rij }))}
+      openVideos={openVideos[client.id]?.length || 0}
+      onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
+      openInzicht={kaartKlantId === client.id}
+      onInzichtGeopend={() => setKaartKlantId(null)}
+      klantStatus={klantStatus ? (klantStatus[client.id] || null) : undefined}
+    />
+  )
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '0.75rem' }}>
@@ -527,6 +559,19 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
           {prive ? <EyeOff size={15} strokeWidth={2.4} /> : <Eye size={15} strokeWidth={2.4} />}
         </button>
 
+        <button onClick={() => { zetWeergave(weergave === 'bord' ? 'lijst' : 'bord'); if (activeView !== 'clients') setActiveView('clients') }}
+          title={weergave === 'bord' ? 'Lijst' : 'Bord met secties'}
+          aria-label={weergave === 'bord' ? 'Lijst tonen' : 'Bord tonen'}
+          style={{
+            flexShrink: 0, width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.85)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          {weergave === 'bord' ? <LayoutGrid size={15} strokeWidth={2.4} /> : <Columns3 size={15} strokeWidth={2.4} />}
+        </button>
+
         <button onClick={() => setActiveView(activeView === 'video' ? 'clients' : 'video')}
           title={activeView === 'video' ? 'Terug naar klanten' : 'Video-feedback'}
           style={{
@@ -620,6 +665,9 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
 
           {/* CLIENT CARDS — als skelet tot de urgentie-sortering er is, dan
               één keer in met een korte fade. Zelfde hoogte als de echte kaart. */}
+          {weergave === 'bord' && kaartFase === 'klaar' ? (
+            <KlantBord supabase={db.supabase} klanten={filteredClients} renderKaart={kaartVoor} isMobile={isMobile} />
+          ) : (
           <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem', animation: kaartFase === 'klaar' ? 'ccKaartIn 0.28s ease' : 'none' }}>
             <style>{'@keyframes ccKaartIn { from { opacity: 0.35; } to { opacity: 1; } } @keyframes ccSkelet { 0% { opacity: 0.55; } 50% { opacity: 0.85; } 100% { opacity: 0.55; } }'}</style>
             {kaartFase === 'skelet' && filteredClients.map(client => (
@@ -636,34 +684,9 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
                 </div>
               </div>
             ))}
-            {kaartFase === 'klaar' && filteredClients.map(client => (
-              <ClientWeightCard
-                key={client.id}
-                client={client}
-                isMobile={isMobile}
-                pakket={pakketVan ? pakketVanKlant(client) : null}
-                onToggleStatus={handleToggleStatus}
-                onDeleted={handleClientDeleted}
-                showStatusToggle={true}
-                onOpenJourney={() => setJourneyClient(client)}
-                onNavigatePlan={onNavigatePlan}
-                onNavigateWorkout={onNavigateWorkout}
-                onNavigateTab={onNavigateTab}
-                db={db}
-                coachId={coachId}
-                onOpenMealPanel={onOpenMealPanel}
-                onOpenWorkoutPanel={onOpenWorkoutPanel}
-                onDagCheckChange={verwerkDagCheck}
-                doorstap={doorstap ? (doorstap[client.id] || null) : undefined}
-                onDoorstap={(rij) => setDoorstap(m => ({ ...(m || {}), [client.id]: rij }))}
-                openVideos={openVideos[client.id]?.length || 0}
-                onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
-                openInzicht={kaartKlantId === client.id}
-                onInzichtGeopend={() => setKaartKlantId(null)}
-                klantStatus={klantStatus ? (klantStatus[client.id] || null) : undefined}
-              />
-            ))}
+            {kaartFase === 'klaar' && filteredClients.map(kaartVoor)}
           </div>
+          )}
 
           {filteredClients.length === 0 && (
             <div style={{ padding: isMobile ? '3rem 1.5rem' : '4rem 2rem', textAlign: 'center' }}>
