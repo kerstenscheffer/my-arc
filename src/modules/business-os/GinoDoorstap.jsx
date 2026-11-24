@@ -122,7 +122,8 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [bevestig, setBevestig] = useState(null) // client_id die 'Zeker?' toont (4 s)
   const bevestigKlok = useRef(null)
   const [rijFout, setRijFout] = useState({}) // client_id → fout, rood onder de naam
-  const [traject, setTraject] = useState(null) // { client, rij, sinds }
+  const [traject, setTraject] = useState(null) // { client, rij, betaald, borgId, jaZonderBoeking }
+  const geboektRef = useRef(false)
   const [borgen, setBorgen] = useState([]) // open challenge-sales die al betaald zijn
   const [borgKeuze, setBorgKeuze] = useState({}) // client_id → gekozen borg
   const [coachId, setCoachId] = useState(null)
@@ -143,6 +144,8 @@ export default function GinoDoorstap({ isMobile = false }) {
 
   // De borg die al aan de klant hangt (challenge-sale, open en betaald). Dan hoef je hem niet te kiezen.
   const bekendeBorg = (clientId) => { const id = instellingen.get(clientId)?.sale_id; return id && borgen.some(b => b.id === id) ? id : null }
+  // Voor boekVerlenging: gekozen of bekende borg; undefined = laat hem zelf de gekoppelde challenge-sale zoeken.
+  const borgVoor = (clientId) => borgKeuze[clientId] || bekendeBorg(clientId) || undefined
 
   const laad = useCallback(async () => {
     const [ds, kl, au, bg, ch, vl] = await Promise.all([
@@ -281,7 +284,21 @@ export default function GinoDoorstap({ isMobile = false }) {
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
       .then(x => x, e => ({ error: e }))
     if (error) { setFout(error.message || 'Klant laden mislukt'); return }
-    setTraject({ client, rij: r, sinds: new Date().toISOString() })
+    geboektRef.current = false
+    setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
+  }
+
+  // Ja gekozen: meteen de afspraak vastleggen in hetzelfde venster als Einde traject en
+  // Coach Inzicht (startdatum, prijs, nog niet betaald). Sluit je het zonder te boeken,
+  // dan staat hij alsnog op Ja.
+  const kiesJa = async (r) => {
+    setBezig(r.client_id); rijFoutWeg(r.client_id)
+    const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
+      .then(x => x, e => ({ error: e }))
+    setBezig(null)
+    if (error) { rijMislukt(r.client_id, error, 'Klant laden mislukt'); return }
+    geboektRef.current = false
+    setTraject({ client, rij: r, betaald: false, borgId: borgVoor(r.client_id), jaZonderBoeking: true })
   }
 
   const zetStatus = async (clientId, klantCoach, status, pakket = null) => {
@@ -405,7 +422,8 @@ export default function GinoDoorstap({ isMobile = false }) {
         .then(x => x, e => ({ error: e }))
       setBezig(null)
       if (error) { rijMislukt(r.client_id, error, 'Klant laden mislukt'); return }
-      setTraject({ client, rij: r, sinds: new Date().toISOString() })
+      geboektRef.current = false
+      setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
       return
     }
     setBezig(r.client_id)
@@ -424,24 +442,15 @@ export default function GinoDoorstap({ isMobile = false }) {
     setBezig(null)
   }
 
-  // TrajectModal dicht: alleen op betaald als er echt een verlenging is geboekt.
+  // TrajectModal dicht. Stand, omzetregel en borg zet boekVerlenging zelf (zelfde route als
+  // Einde traject en Coach Inzicht). Alleen Ja zonder boeking moet hier nog opgeslagen.
   const trajectDicht = async () => {
     const t = traject
     setTraject(null)
-    const { data } = await supabase.from('lead_movements').select('id')
-      .eq('client_id', t.rij.client_id).eq('outcome_type', 'verlenging').eq('payment_received', true)
-      .gte('moved_at', t.sinds).limit(1)
-      .then(x => x, () => ({ data: [] }))
-    if (!data?.length) { await laad(); return }
-    await wijzig(t.rij.client_id, t.rij.coach_id, 'betaald', t.rij.pakket)
-    const borg = borgKeuze[t.rij.client_id] || bekendeBorg(t.rij.client_id)
-    if (borg) {
-      const { error } = await supabase.from('lead_movements').update({ borg_movement_id: borg }).eq('id', data[0].id)
-        .then(x => x, e => ({ error: e }))
-      if (error) rijMislukt(t.rij.client_id, error, 'Borg koppelen mislukt')
-      else await laad()
-    }
+    if (t?.jaZonderBoeking && !geboektRef.current) { await wijzig(t.rij.client_id, t.rij.coach_id, 'ja_mondeling', t.rij.pakket); return }
+    await laad()
   }
+
 
   if (rijen === null) return null
   const ja = rijen.filter(r => r.status === 'ja_mondeling')
@@ -769,7 +778,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                           <span title="Stand kiezen" style={{ ...cel, borderLeft: 'none' }}>
                             <ChevronsUpDown size={15} strokeWidth={2.4} />
                             <select className="gd-stand" aria-label={`Stand ${naamVan(r.klant)}`} value={r.status || ''} disabled={laadt}
-                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
+                              onChange={ev => (ev.target.value === 'hervat' ? hervat(r) : ev.target.value === 'ja_mondeling' && !r.sale && !r.betaaldeSale ? kiesJa(r) : wijzig(r.client_id, r.coach_id, ev.target.value, r.pakket))}
                               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
                               <option value="">{nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : 'Stand'}</option>
                               {r.status === 'betaald' && <option value="betaald">Betaald</option>}
@@ -876,7 +885,9 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
       )}
 
       {traject && (
-        <TrajectModal open modus="verleng" client={traject.client} coachId={coachId} onClose={trajectDicht} />
+        <TrajectModal open modus="verleng" client={traject.client} coachId={coachId}
+          betaald={traject.betaald !== false} borgId={traject.borgId}
+          onGeboekt={() => { geboektRef.current = true }} onClose={trajectDicht} />
       )}
     </div>
   )

@@ -654,6 +654,7 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
         client={client}
         coachId={coachId}
         onClose={() => setVerlengOpen(false)}
+        onGeboekt={(_, rij) => { if (rij) onDoorstap?.(rij) }}
       />
 
     </div>

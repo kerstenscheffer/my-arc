@@ -234,6 +234,9 @@ function BetaalRegel({ rij, mijnId, onBetaling, onTerugdraaien }) {
   // afvinken mag iedereen; terugdraaien verplaatst de lead op het bord van de
   // eigenaar, dus dat laten we bij hem.
   const vanAnder = !!(rij.coach_id && mijnId && rij.coach_id !== mijnId)
+  // Verlenging van een bestaande klant (TrajectModal). Geen lead om te verplaatsen:
+  // gaat hij niet door, dan regel je dat bij Einde traject.
+  const isVerlenging = !!rij.verlenging
   const [open, setOpen] = useState(false)
   // Soms zegt een klant tóch af voordat er betaald is. Dan is de close geen
   // close meer: sale terugdraaien en als verloren boeken, mét objectie.
@@ -275,9 +278,11 @@ function BetaalRegel({ rij, mijnId, onBetaling, onTerugdraaien }) {
             {rij.lead_name || 'Lead'}
           </div>
           <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+            {isVerlenging && 'Verlenging · '}
             {rij.order_value != null
               ? `€${Number(rij.order_value).toLocaleString('nl-NL')} afgesproken`
               : 'Bedrag nog niet ingevuld'}
+            {isVerlenging && rij.payment_due_date && ` · verwacht ${new Date(`${rij.payment_due_date}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
             {dagen != null && ` · ${dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'} geleden`}`}
             {vanAnder && ' · lead van je teamgenoot'}
           </div>
@@ -322,7 +327,7 @@ function BetaalRegel({ rij, mijnId, onBetaling, onTerugdraaien }) {
         />
       )}
 
-      {open && !verloren && !vanAnder && (
+      {open && !verloren && !vanAnder && !isVerlenging && (
         <button
           style={{ ...knop('#ef4444'), width: '100%', minHeight: 34, marginTop: 6, fontSize: '0.74rem' }}
           onClick={() => setVerloren(true)}

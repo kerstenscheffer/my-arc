@@ -76,3 +76,153 @@ export async function hervatTraject(supabase, client) {
     .is('resumed_at', null)
   return payload
 }
+
+// ── Verlengen / vervolg boeken (24 nov 2026) ──────────────────────────────
+// Eén route voor Coach Inzicht, Einde traject (leadbord) en Business OS → Klanten.
+// Een vervolg kan later ingaan dan het huidige einde (challenge tot 24 nov, 6 mnd
+// vanaf 1 jan). De klant houdt tussendoor gewoon toegang: de weken lopen door tot het
+// nieuwe einde. Oude app-versies lezen alleen clients.coaching_*, die blijven kloppen.
+
+const DAG_MS = 86400000
+const isoVan = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+export const vandaagIso = () => isoVan(new Date())
+export const plusMaandenIso = (iso, n) => { const d = new Date(`${iso}T00:00:00`); d.setMonth(d.getMonth() + n); return isoVan(d) }
+const dagenTussen = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / DAG_MS)
+const kortDatum = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '')
+
+// De omzetregel heeft een eigen sectietitel zonder "sale": telt als omzet, niet als nieuwe sale.
+export const VERLENGING_TITEL = 'Verlenging 🔁'
+// Zelfde standaard als SaleForm en getPartnerPayouts als de oorspronkelijke sale onbekend is.
+export const STANDAARD_PARTNER_PCT = 50
+
+// Waar een vervolg vanzelf begint: direct na het huidige einde, of vandaag als dat al voorbij is.
+export function directeStart(client) {
+  const p = computePeriod(client)
+  const vandaag = vandaagIso()
+  return p && p.endDate > vandaag ? p.endDate : vandaag
+}
+
+// Nieuw einde en totaal aantal weken (vanaf de oorspronkelijke start, pauzes eraf).
+export function planVervolg(client, { maanden, startOp }) {
+  const start = startOp || directeStart(client)
+  const eind = plusMaandenIso(start, maanden)
+  const klantStart = client.coaching_start_date || start
+  const totaalWeken = Math.max(1, Math.round((dagenTussen(klantStart, eind) - (client.coaching_paused_days_total || 0)) / 7))
+  const huidigEind = computePeriod(client)?.endDate || null
+  // Tussen het huidige einde en de start van het vervolg: toegang loopt door.
+  const gatDagen = huidigEind && start > huidigEind ? dagenTussen(huidigEind, start) : 0
+  return { start, eind, totaalWeken, huidigEind, gatDagen }
+}
+
+// Korte omschrijving voor client_doorstap.pakket en de schermen die die tonen.
+export function pakketTekst({ maanden, betaling, prijs, start, betaald, betaalDatum }) {
+  const geld = betaling === 'monthly' ? `${maanden}x €${prijs}` : `€${prijs}`
+  const open = betaald ? '' : `, nog niet betaald${betaalDatum ? ` (verwacht ${kortDatum(betaalDatum)})` : ''}`
+  return `${maanden} mnd vanaf ${kortDatum(start)}, ${geld}${open}`
+}
+
+// De laatste coaching-sale van deze klant: eerst via client_id, anders via de lead op e-mail.
+// Geeft { leadId, pct, sale } of null.
+export async function vorigeSale(supabase, client) {
+  const kol = 'id, lead_id, order_value, payment_type, duration_months, partner_share_pct, sale_kind, challenge_status'
+  const { data: eigen } = await supabase.from('lead_movements').select(kol)
+    .eq('client_id', client.id).not('order_value', 'is', null).is('reverted_at', null)
+    .order('moved_at', { ascending: false }).limit(5)
+    .then(r => r, () => ({ data: [] }))
+  const coaching = (eigen || []).find(s => s.sale_kind !== 'challenge')
+  const metLead = (eigen || []).find(s => s.lead_id)
+  if (coaching || metLead) {
+    const s = coaching || metLead
+    return { leadId: metLead?.lead_id || null, pct: s.partner_share_pct ?? null, sale: coaching || null }
+  }
+  const email = (client.email || '').trim()
+  if (!email) return null
+  const { data: leads } = await supabase.from('call_leads').select('id').ilike('email', email).limit(5)
+    .then(r => r, () => ({ data: [] }))
+  const ids = (leads || []).map(l => l.id)
+  if (!ids.length) return null
+  const { data: sales } = await supabase.from('lead_movements').select(kol)
+    .in('lead_id', ids).not('order_value', 'is', null).is('reverted_at', null).eq('sale_kind', 'coaching')
+    .order('moved_at', { ascending: false }).limit(1)
+    .then(r => r, () => ({ data: [] }))
+  const s = sales?.[0]
+  return { leadId: s?.lead_id || ids[0], pct: s?.partner_share_pct ?? null, sale: s || null }
+}
+
+// Boekt een verlenging of vervolg in één keer:
+//   1. clients: weken tot het nieuwe einde (toegang + check-ins lopen door)
+//   2. lead_movements: de omzetregel met start_op, betaald of nog open, termijnen vanaf payment_due_date
+//   3. client_doorstap: betaald of ja_mondeling, met de afspraak als pakket
+// borgId: challenge-sale die bij deze doorstap hoort. Leeg = de open challenge-sale van deze
+// klant als die gekoppeld is. De trigger zet de borg op behouden zodra dit betaald is.
+// Geeft { clientPayload, pakket, doorstap }. Gooit een fout als stap 1 of 2 mislukt.
+export async function boekVerlenging(supabase, {
+  client, coachId, maanden, betaling, prijs, startOp = null,
+  betaald = true, betaalDatum = null, vorige = null, borgId,
+}) {
+  const plan = planVervolg(client, { maanden, startOp })
+  const totaal = betaling === 'monthly' ? prijs * maanden : prijs
+  const vandaag = vandaagIso()
+
+  const clientPayload = {
+    coaching_total_weeks: plan.totaalWeken,
+    coaching_onbeperkt: false,
+    coaching_status: 'active',
+    payment_plan: betaling,
+    goal_deadline: plan.eind,
+    ...(client.coaching_start_date ? {} : { coaching_start_date: plan.start }),
+  }
+  const { error } = await supabase.from('clients').update(clientPayload).eq('id', client.id)
+  if (error) throw error
+
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const coach = user?.id || coachId || null
+
+  let borg = borgId
+  if (borg === undefined) {
+    const { data: open } = await supabase.from('lead_movements').select('id')
+      .eq('client_id', client.id).eq('sale_kind', 'challenge').eq('challenge_status', 'open').is('reverted_at', null)
+      .order('moved_at', { ascending: false }).limit(1)
+      .then(r => r, () => ({ data: [] }))
+    borg = open?.[0]?.id || null
+  }
+
+  if (totaal > 0) {
+    // Termijnen starten op payment_due_date (get_payment_schedule). Nog niet betaald: de
+    // verwachte datum. Betaald maar maandelijks en later ingaand: eerste termijn op de start.
+    const betaalVanaf = !betaald
+      ? (betaalDatum || (plan.start > vandaag ? plan.start : vandaag))
+      : (betaling === 'monthly' && plan.start > vandaag ? plan.start : null)
+    const { error: omzetFout } = await supabase.from('lead_movements').insert({
+      lead_id: vorige?.leadId || null,
+      client_id: client.id,
+      to_section_title: VERLENGING_TITEL,
+      lead_name: client.name || [client.first_name, client.last_name].filter(Boolean).join(' ') || client.email || 'Klant',
+      coach_id: coach,
+      outcome_type: 'verlenging',
+      order_value: totaal,
+      payment_type: betaling,
+      duration_months: betaling === 'monthly' ? maanden : 1,
+      partner_share_pct: vorige?.pct ?? STANDAARD_PARTNER_PCT,
+      payment_received: !!betaald,
+      payment_due_date: betaalVanaf,
+      start_op: plan.start,
+      borg_movement_id: borg || null,
+      sale_kind: 'coaching',
+    })
+    if (omzetFout) {
+      const e = new Error('Verlengd, maar de omzet is niet geboekt: ' + omzetFout.message)
+      e.clientPayload = clientPayload
+      throw e
+    }
+  }
+
+  const pakket = pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum })
+  const { data: doorstap } = await supabase.from('client_doorstap').insert({
+    client_id: client.id, coach_id: client.coach_id || coach, status: betaald ? 'betaald' : 'ja_mondeling',
+    pakket, gezet_door: coach,
+  }).select('id, client_id, status, pakket, notitie, gezet_at').single()
+    .then(r => r, () => ({ data: null }))
+
+  return { clientPayload, pakket, doorstap, plan }
+}

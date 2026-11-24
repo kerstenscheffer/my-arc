@@ -2737,8 +2737,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // ze niet kwijtraakt tussen de leads die wél betaald hebben.
   async getAwaitingPayment(coachId = null) {
     try {
-      const { data, error } = await this.db.supabase
-        .rpc('get_awaiting_payment', { p_coach_id: coachId })
+      // _v2 geeft ook onbetaalde verlengingen (Coach Inzicht / Einde traject / Business OS).
+      // Valt terug op de oude als v2 er (nog) niet is.
+      let { data, error } = await this.db.supabase
+        .rpc('get_awaiting_payment_v2', { p_coach_id: coachId })
+      if (error) ({ data, error } = await this.db.supabase.rpc('get_awaiting_payment', { p_coach_id: coachId }))
       if (error) throw error
       return data || []
     } catch (error) {

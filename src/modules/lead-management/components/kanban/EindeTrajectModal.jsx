@@ -104,8 +104,9 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
       }).eq('id', r.client_id).then(x => x, e => ({ error: e })),
     ])
   }
-  // Ja: het verlengvenster doet het echte werk (einddatum opschuiven en de
-  // verlenging als omzet boeken). Hier komt alleen de klant erbij.
+  // Ja: het verlengvenster doet het echte werk (einddatum, omzetregel en
+  // doorstap-stand via boekVerlenging). Hier komt alleen de klant erbij.
+  // betaald = startwaarde; in het venster kies je nog betaald / nog niet + startdatum.
   const kiesJa = async (r, voorstel = null, betaald = true) => {
     setBezig(r.client_id); setFout(null)
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single().then(x => x, e => ({ error: e }))
@@ -193,11 +194,9 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
         <TrajectModal
           open modus="verleng" client={traject.client} coachId={coachId}
           voorstel={traject.voorstel} betaald={traject.betaald}
-          onGeboekt={(pakket) => {
-            // De afspraak erbij, zodat Gino → Klanten hetzelfde laat zien.
-            bewaarKeuze(traject.rij, traject.betaald ? 'betaald' : 'ja_mondeling', { pakket })
-              .then(() => onGewijzigd?.())
-          }}
+          // De doorstap-stand (betaald / ja + afspraak) zet boekVerlenging zelf, net als in
+          // Coach Inzicht en Business OS → Klanten.
+          onGeboekt={() => onGewijzigd?.()}
           onClose={() => setTraject(null)}
         />
       )}

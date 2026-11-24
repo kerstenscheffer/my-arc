@@ -129,6 +129,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // Looptijd-blad: 'start' (nog geen looptijd) of 'verleng'. Een klant zonder
   // startdatum krijgt de vraag vanzelf, één keer per sessie.
   const [trajectModus, setTrajectModus] = useState(null)
+  const [trajectBetaald, setTrajectBetaald] = useState(true) // startwaarde "Betaald?" in het verlengvenster
   const gevraagdRef = useRef(new Set())
   useEffect(() => {
     if (!isOpen || !client?.id || gevraagdRef.current.has(client.id)) return
@@ -515,7 +516,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <span style={{ flex: 1 }} />
                 <DoorstapKeuze client={effectiveClient} coachId={coachId}
                   waarde={doorstap} zelfLaden={doorstap === undefined}
-                  onGewijzigd={onDoorstap} onBetaald={() => setTrajectModus('verleng')} />
+                  onGewijzigd={onDoorstap} onBetaald={(b) => { setTrajectBetaald(b !== false); setTrajectModus('verleng') }} />
                 {dagCheck && (
                   <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
                     title={dagCheck.gehad ? 'Vandaag afgevinkt — tik om terug te draaien' : 'Vandaag afvinken'}
@@ -940,8 +941,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         modus={trajectModus || 'verleng'}
         client={effectiveClient}
         coachId={coachId}
-        onClose={() => setTrajectModus(null)}
+        onClose={() => { setTrajectModus(null); setTrajectBetaald(true) }}
         onClientUpdate={handleClientUpdate}
+        betaald={trajectBetaald}
+        onGeboekt={(_, rij) => { if (rij) onDoorstap?.(rij) }}
       />
 
       <SendNotificationModal

@@ -379,7 +379,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
               <span>{client.coaching_pause_reason}</span>
             </div>
           )}
-          <div style={{ padding: '0 0.35rem' }}><BetaalPauze client={client} status={status} /></div>
+          <div style={{ padding: '0 0.35rem' }}><BetaalPauze client={client} status={status} menu /></div>
         </div>
       ) : (
       <div style={panelShell(status, isMobile)}>

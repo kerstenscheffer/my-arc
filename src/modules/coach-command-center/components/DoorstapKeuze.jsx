@@ -9,7 +9,9 @@
 // Bestaat de tabel nog niet, dan toont dit component niets.
 //
 // 'Betaald' boekt zelf niets: de verlenging gaat via de bestaande
-// TrajectModal (onBetaald), anders telt de omzet dubbel.
+// TrajectModal (onBetaald(true)), anders telt de omzet dubbel. Bij 'Ja' kun je
+// meteen de afspraak boeken (onBetaald(false)): startdatum, prijs, nog niet betaald.
+// Zelfde venster en route als Einde traject en Business OS → Klanten.
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
@@ -77,10 +79,11 @@ export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = fal
       .select('id, client_id, status, pakket, notitie, gezet_at').single()
       .then(r => r, e => ({ data: null, error: e }))
     setBezig(false)
-    if (error) { setFout(tabelOntbreekt(error) ? 'Tabel client_doorstap bestaat nog niet' : (error.message || 'Opslaan mislukt')); return }
+    if (error) { setFout(tabelOntbreekt(error) ? 'Tabel client_doorstap bestaat nog niet' : (error.message || 'Opslaan mislukt')); return false }
     if (zelfLaden) setEigen(data)
     onGewijzigd?.(data)
     setOpen(false)
+    return true
   }
 
   const gezet = !!huidig?.status
@@ -135,10 +138,20 @@ export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = fal
             {keuze === 'betaald' && onBetaald && (
               <div style={{ margin: '0.35rem 0.2rem 0', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
                 De betaling zelf boek je als verlenging, niet hier.{' '}
-                <button onClick={() => { setOpen(false); onBetaald() }} style={{
+                <button onClick={() => { setOpen(false); onBetaald(true) }} style={{
                   background: 'none', border: 'none', padding: 0, color: '#10b981',
                   fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer',
                 }}>Verlenging boeken →</button>
+              </div>
+            )}
+
+            {keuze === 'ja_mondeling' && onBetaald && (
+              <div style={{ margin: '0.35rem 0.2rem 0', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
+                Weet je al wat hij gaat doen?{' '}
+                <button onClick={async () => { if (await opslaan()) onBetaald(false) }} disabled={bezig} style={{
+                  background: 'none', border: 'none', padding: 0, color: '#10b981',
+                  fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer',
+                }}>Afspraak boeken →</button>
               </div>
             )}
 

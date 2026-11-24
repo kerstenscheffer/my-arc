@@ -1572,6 +1572,7 @@ export default function KanbanBoard({
   // betaalschema), de lead gaat naar Sale verloren en de objectie landt op die
   // nieuwe rij. Zo klopt de close rate én de objectie-verdeling achteraf.
   const handleSaleTerugdraaien = async (rij, reason) => {
+    if (rij.verlenging) return // verlenging: geen lead te verplaatsen, loopt via Einde traject
     setWachtBetaling(prev => prev.filter(r => r.movement_id !== rij.movement_id))
     const res = await leadService.revertMovement(rij.movement_id)
     if (!res?.success) {
