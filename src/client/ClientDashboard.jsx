@@ -717,6 +717,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             )
           })}
 
+          {/* App-gebruikers (geen coaching): geen video-knop. */}
+          {!appGebruiker && (<>
           {/* Video — opent de video-balk van de coach omhoog; staat er niets
               klaar, dan de bibliotheek. Stond eerder als los rond knopje
               rechtsboven de balk. */}
@@ -751,6 +753,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
               Video
             </span>
           </button>
+          </>)}
 
           {/* Meer — klapt boven de balk open. */}
           <button

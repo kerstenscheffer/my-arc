@@ -13,12 +13,23 @@ const GOUD = '#FFD700'
 const KOP = { fontFamily: '"Archivo Black", "Arial Black", sans-serif', fontStyle: 'italic', textTransform: 'uppercase', fontSize: '1.45rem', lineHeight: 1.1, letterSpacing: '-0.01em', color: '#fff' }
 const ZIN = { fontSize: '1.1rem', fontWeight: 800, color: '#fff', lineHeight: 1.35, marginTop: 6 }
 
+// Per pagina twee stappen (Kersten, 24 nov 2026): eerst de knop onderin,
+// dan wat je op die pagina ziet. 'pagina' = welke pagina open moet staan,
+// 'wijs' = data-rondleiding van het element dat oplicht. Vindt hij het
+// element niet, dan toont hij de stap zonder aanwijzing.
 const STAPPEN = [
   { pose: 'juichen', titel: 'Welkom bij MY ARC!', zin: 'Ik laat je snel zien hoe het werkt.' },
-  { doel: 'home', pose: 'wijzen', titel: 'Dit is Home', zin: 'Hier zie je je dag in één keer.' },
-  { doel: 'workout', pose: 'wijzen', titel: 'Je training', zin: 'Hier staat je schema. Log je sets na elke oefening.' },
-  { doel: 'meal', pose: 'wijzen', titel: 'Je eten', zin: 'Hier staat wat je eet. Log je maaltijden met één tik.' },
-  { doel: 'tracking', pose: 'wijzen', titel: 'Je voortgang', zin: 'Weeg jezelf en maak foto\'s. Zo zie je wat werkt.' },
+  { pagina: 'home', wijs: 'home', pose: 'wijzen', titel: 'Dit is Home', zin: 'Hier begint je dag.' },
+  { pagina: 'home', wijs: 'home-dagkiezer', pose: 'wijzen', titel: 'Kies je dag', zin: 'Tik op de pijltjes. Zo zie je een andere dag.' },
+  { pagina: 'home', wijs: 'home-dag', pose: 'wijzen', titel: 'Je dag', zin: 'Hier zie je wat je vandaag doet. Training, eten en meer.' },
+  { pagina: 'workout', wijs: 'workout', pose: 'wijzen', titel: 'Dit is Workout', zin: 'Hier staat je training.' },
+  { pagina: 'workout', wijs: 'workout-vandaag', pose: 'wijzen', titel: 'Je training', zin: 'Tik hierop om te starten. Log je sets na elke oefening.' },
+  { pagina: 'meal', wijs: 'meal', pose: 'wijzen', titel: 'Dit is Meal', zin: 'Hier staat je eten.' },
+  { pagina: 'meal', wijs: 'meal-macros', pose: 'wijzen', titel: 'Je doel van vandaag', zin: 'Hier zie je hoeveel je nog mag eten.' },
+  { pagina: 'meal', wijs: 'meal-lijst', pose: 'wijzen', titel: 'Je maaltijden', zin: 'Vink af wat je hebt gegeten. Of wissel een maaltijd.' },
+  { pagina: 'tracking', wijs: 'tracking', pose: 'wijzen', titel: 'Dit is Tracking', zin: 'Hier hou je je voortgang bij.' },
+  { pagina: 'tracking', wijs: 'tracking-gewicht', pose: 'wijzen', titel: 'Je gewicht', zin: 'Weeg jezelf en sla het op.' },
+  { pagina: 'tracking', wijs: 'tracking-fotos', pose: 'wijzen', titel: 'Je foto\'s', zin: 'Maak elke week een foto. Dan zie je het verschil.' },
   { pose: 'spierballen', titel: 'Je bent klaar!', zin: 'Succes. Je kunt het!' },
 ]
 
@@ -42,19 +53,45 @@ export default function AppRondleiding({ clientId, onKiesPagina, onKlaar }) {
   const stap = STAPPEN[i]
   const laatste = i === STAPPEN.length - 1
 
-  // Bij een stap met een doel: die pagina openen en de knop opzoeken.
+  // Pagina openen en het element opzoeken dat oplicht. Een element op de
+  // pagina zelf eerst in beeld scrollen; is het hoger dan het halve scherm,
+  // dan alleen het bovenste stuk uitlichten.
   useLayoutEffect(() => {
-    if (!stap.doel) { setVak(null); return }
-    onKiesPagina?.(stap.doel)
-    const meet = () => {
-      const el = document.querySelector(`[data-rondleiding="${stap.doel}"]`)
-      const r = el?.getBoundingClientRect()
-      setVak(r ? { x: r.left - 6, y: r.top - 6, b: r.width + 12, h: r.height + 12 } : null)
+    setVak(null)
+    if (stap.pagina) onKiesPagina?.(stap.pagina)
+    if (!stap.wijs) return
+    const zoek = () => {
+      // Er kunnen verborgen kopieën staan (pagina's blijven open): neem de zichtbare.
+      return [...document.querySelectorAll(`[data-rondleiding="${stap.wijs}"]`)].find(e => e.getClientRects().length > 0)
     }
-    meet()
+    // Omtrek van het element. Is het zelf (bijna) plat, bijvoorbeeld omdat de
+    // inhoud absoluut staat, dan de omtrek van alles wat erin zichtbaar is.
+    const omtrek = (el) => {
+      const r = el.getBoundingClientRect()
+      if (r.height >= 40 && r.width >= 40) return r
+      let l = Infinity, t = Infinity, re = -Infinity, o = -Infinity
+      for (const k of [el, ...el.querySelectorAll('*')].slice(0, 400)) {
+        const q = k.getBoundingClientRect()
+        if (q.width < 2 || q.height < 2) continue
+        l = Math.min(l, q.left); t = Math.min(t, q.top); re = Math.max(re, q.right); o = Math.max(o, q.bottom)
+      }
+      return l === Infinity ? null : { left: l, top: t, width: re - l, height: o - t }
+    }
+    const meet = () => {
+      const el = zoek()
+      const r = el ? omtrek(el) : null
+      if (!r) { setVak(null); return }
+      const max = window.innerHeight * 0.45
+      setVak({ x: Math.max(4, r.left - 6), y: Math.max(4, r.top - 6), b: Math.min(window.innerWidth - 8, r.width + 12), h: Math.min(max, r.height + 12) })
+    }
+    const t1 = setTimeout(() => {
+      const el = zoek()
+      if (el && stap.wijs.includes('-')) el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      meet()
+    }, 120)
+    const t2 = setTimeout(meet, 600) // na het scrollen en laden nog eens meten
     window.addEventListener('resize', meet)
-    const t = setTimeout(meet, 250) // na het wisselen van pagina nog eens meten
-    return () => { window.removeEventListener('resize', meet); clearTimeout(t) }
+    return () => { window.removeEventListener('resize', meet); clearTimeout(t1); clearTimeout(t2) }
   }, [i]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const klaar = () => {
@@ -100,8 +137,10 @@ export default function AppRondleiding({ clientId, onKiesPagina, onKlaar }) {
 
       {/* Kersten + tekst: midden in beeld, boven de balk onderin. */}
       <div style={{
-        position: 'fixed', left: 0, right: 0, bottom: vak ? Math.max(130, window.innerHeight - vak.y + 18) : '50%',
-        transform: vak ? 'none' : 'translateY(50%)',
+        position: 'fixed', left: 0, right: 0,
+        ...(!vak ? { bottom: '50%', transform: 'translateY(50%)' }
+          : vak.y > window.innerHeight / 2 ? { bottom: window.innerHeight - vak.y + 18 }
+          : { top: Math.min(vak.y + vak.h + 18, window.innerHeight - 330) }),
         display: 'flex', justifyContent: 'center', padding: '0 1.25rem',
       }}>
         <div style={{ width: '100%', maxWidth: 400 }}>

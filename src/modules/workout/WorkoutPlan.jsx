@@ -224,7 +224,7 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
         )
       })()}
 
-      <div id="todays-workout-anchor">
+      <div id="todays-workout-anchor" data-rondleiding="workout-vandaag">
         <TodaysWorkoutMain
           client={client}
           schema={localSchema}

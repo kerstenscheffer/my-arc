@@ -312,7 +312,7 @@ export default function ProgressMain({ db, client }) {
       {/* Negatieve marge: het getal ligt half op de foto. Eigen laag, zodat
           het boven de foto staat en je hem gewoon kunt vegen. */}
       {!photosOpen && (
-        <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -40 : -50 }}>
+        <div data-rondleiding="tracking-gewicht" style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -40 : -50 }}>
         <WeightProgressRing
           key={weegDatum}
           weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
@@ -446,6 +446,7 @@ export default function ProgressMain({ db, client }) {
             moet drukken. */}
       {!photosOpen && (
         <div
+          data-rondleiding="tracking-fotos"
           onClick={() => setPhotosOpen(true)}
           style={{
             marginTop: isMobile ? '2rem' : '2.5rem',

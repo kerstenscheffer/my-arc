@@ -153,7 +153,7 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag, knoppenSlot = 
         }}>
           <span>{getGreeting()}, {firstName}</span>
         </div>
-        <div style={{
+        <div data-rondleiding="home-dagkiezer" style={{
           marginTop: 0, position: 'relative',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
           // De datum in dezelfde stijl als de begroeting erboven, een maat kleiner.
@@ -673,7 +673,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
           compact), niet meer als losse kaarten ertussen. Geen FadeOnScroll:
           het eerste wat je ziet hoort er meteen te staan. */}
       <div style={{ marginTop: isMobile ? '0.2rem' : '0.45rem' }}>
-        <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+        <div data-rondleiding="home-dag" style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
           <DagAgenda
             client={client}
             db={db}

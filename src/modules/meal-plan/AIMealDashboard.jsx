@@ -813,7 +813,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           flexShrink: 0 — in de flex-kolom van het vaste scherm zou dit blok
           anders indrukken zodra de lijst eronder om ruimte vraagt, en dan
           krimpen de ringen mee. */}
-      <div style={{ flexShrink: 0 }}>
+      <div data-rondleiding="meal-macros" style={{ flexShrink: 0 }}>
       {(() => {
         const currentDayIdx = dayKeyToIndex(selectedDay)
         const selectedDate = indexToDate(currentDayIdx, weekOffset)
@@ -844,7 +844,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       </div>
 
       {/* Alles hieronder scrolt; de kop erboven blijft staan. */}
-      <div style={{
+      <div data-rondleiding="meal-lijst" style={{
         flex: 1, minHeight: 0,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         // Ruimte voor de zwevende onderbalk en de log-knop.
