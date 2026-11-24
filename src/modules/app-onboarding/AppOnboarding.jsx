@@ -31,7 +31,7 @@ const OPSLAG = 'myarc_app_onboarding'
 // ── Stijlen ───────────────────────────────────────────────────────────────────
 // Kersten (24 nov 2026): op /test meerdere stijlen naast elkaar om te kiezen.
 // 'speels' = de Yazio-achtige versie; de rest is stoerder maar even simpel.
-const ThemaCtx = createContext(THEMAS.speels)
+const ThemaCtx = createContext(THEMAS.arc)
 const useT = () => useContext(ThemaCtx)
 const VoorbeeldCtx = createContext(VOORBEELD_URL)
 
@@ -143,9 +143,9 @@ function Optie({ actief, titel, onClick, vinkje }) {
   return (
     <button className="knop3d" onClick={onClick} style={{
       width: '100%', minHeight: 58, textAlign: vinkje ? 'left' : 'center', padding: '0 1.1rem', borderRadius: T.radius, cursor: 'pointer',
-      background: actief ? T.primair : T.vak, border: T.rand || 'none',
-      boxShadow: T.schaduw(actief ? T.primairRand : T.vakRand),
-      color: actief ? T.primairTekst : '#fff', fontFamily: 'inherit', fontSize: '1.15rem', fontWeight: 900, marginBottom: 5,
+      background: actief ? (T.actief || T.primair) : T.vak, border: T.rand || 'none',
+      boxShadow: T.schaduw(actief ? (T.actiefRand || T.primairRand) : T.vakRand),
+      color: actief ? (T.actiefTekst || T.primairTekst) : '#fff', fontFamily: 'inherit', fontSize: '1.15rem', fontWeight: 900, marginBottom: 5,
       textTransform: T.kop.textTransform || 'none',
       display: 'flex', alignItems: 'center', justifyContent: vinkje ? 'space-between' : 'center', gap: 10,
     }}>
@@ -181,6 +181,22 @@ function Kersten({ sleutel, hoogte, pose, blij }) {
   )
 }
 
+// Bovenlijf linksboven op de knoppen, alsof Kersten eroverheen kijkt
+// (24 nov 2026). Het kader knipt hem af net onder de bovenrand van de eerste
+// knop; die knop ligt erover, zodat de onderkant nooit zichtbaar is.
+const KIJK = 118   // zichtbaar stuk boven de knoppen
+const ONDER = 18   // stuk dat achter de eerste knop valt
+const KIJK_FIGUUR = 250
+function KerstenKijkt({ sleutel, pose }) {
+  return (
+    <div aria-hidden style={{ position: 'relative', zIndex: 0, height: KIJK + ONDER, width: Math.round(KIJK_FIGUUR * 2 / 3), overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ height: KIJK_FIGUUR }}>
+        <Kersten sleutel={sleutel} hoogte={KIJK_FIGUUR} pose={pose} />
+      </div>
+    </div>
+  )
+}
+
 // Typt een tekst letter voor letter. Begint opnieuw als de tekst verandert.
 function useTypen(tekst, snelheid = 24) {
   const [n, setN] = useState(0)
@@ -196,8 +212,8 @@ function useTypen(tekst, snelheid = 24) {
 
 // Wat Kersten zegt: groot, wit, gecentreerd, getypt. Vaste hoogte (onzichtbare
 // volledige tekst eronder), zodat er niets verspringt tijdens het typen.
-function Praat({ titel, zin }) {
-  const kop = kopVan(useT())
+function Praat({ titel, zin, links = false, klein = false }) {
+  const kop = { ...kopVan(useT()), ...(klein ? { fontSize: '1.4rem' } : {}) }
   const heel = zin ? `${titel}\n${zin}` : titel
   const { getypt, klaar } = useTypen(heel)
   const [t1, t2 = ''] = getypt.split('\n')
@@ -210,7 +226,7 @@ function Praat({ titel, zin }) {
     </div>
   )
   return (
-    <div style={{ display: 'grid', textAlign: 'center' }}>
+    <div style={{ display: 'grid', textAlign: links ? 'left' : 'center' }}>
       {blok(titel, zin, false)}
       {blok(t1, t2, true)}
     </div>
@@ -218,8 +234,8 @@ function Praat({ titel, zin }) {
 }
 
 // ── De pagina ─────────────────────────────────────────────────────────────────
-export default function AppOnboarding({ thema = 'speels', voorbeeld = false }) {
-  const T = THEMAS[thema] || THEMAS.speels
+export default function AppOnboarding({ thema = 'arc', voorbeeld = false }) {
+  const T = THEMAS[thema] || THEMAS.arc
   return (
     <ThemaCtx.Provider value={T}>
       <VoorbeeldCtx.Provider value={voorbeeld || VOORBEELD_URL}>
@@ -285,6 +301,8 @@ function Onboarding() {
     : stap === 'resultaat' ? 'juichen'
     : 'duim'
   const groot = stap === 'intro' || stap === 'rekenen' || stap === 'bouwen'
+  // Bij vragen en account kijkt Kersten linksboven over de knoppen.
+  const kijkt = !!vraag || stap === 'account'
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: T.glow ? `${T.glow}, ${T.bg}` : T.bg, color: '#fff', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -325,12 +343,26 @@ function Onboarding() {
           )}
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: groot ? 'center' : 'flex-start', paddingTop: groot ? 0 : '1rem' }}>
-            <Kersten sleutel={String(stap)} hoogte={groot ? 300 : 190} pose={pose} blij={stap === 'resultaat'} />
-            <div style={{ marginTop: '1.4rem' }}>
-              <Praat key={String(stap)} titel={zegt.titel} zin={zegt.zin} />
-            </div>
+            {kijkt ? (
+              <>
+                {/* Kersten links, zijn tekst rechts; samen staan ze op de knoppen. */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: '0.5rem', marginBottom: -ONDER }}>
+                  <KerstenKijkt sleutel={String(stap)} pose={pose} />
+                  <div style={{ flex: 1, minWidth: 0, paddingBottom: ONDER + 12 }}>
+                    <Praat key={String(stap)} titel={zegt.titel} zin={zegt.zin} links klein />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Kersten sleutel={String(stap)} hoogte={groot ? 300 : 190} pose={pose} blij={stap === 'resultaat'} />
+                <div style={{ marginTop: '1.4rem' }}>
+                  <Praat key={String(stap)} titel={zegt.titel} zin={zegt.zin} />
+                </div>
+              </>
+            )}
 
-            <div style={{ marginTop: '1.75rem' }}>
+            <div style={{ marginTop: kijkt ? 0 : '1.75rem', position: 'relative', zIndex: 1 }}>
               {stap === 'intro' && (
                 <>
                   <RondeKnop label="Start!" onClick={() => setStap(0)} />

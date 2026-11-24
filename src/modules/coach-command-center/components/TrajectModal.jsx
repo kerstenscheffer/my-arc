@@ -515,6 +515,20 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
               {maanden} mnd vanaf {mooiKort(plan.start)} · loopt tot <span style={{ color: '#fff', fontWeight: 900 }}>{mooi(nieuwEind)}</span>
               {vorige?.pct ? <> · {Number(vorige.pct)}% partner</> : null}
             </div>
+            {/* Maandelijks + betaald = alleen termijn 1 is binnen (24 nov 2026, Ronald: €303 in één keer
+                betaald, geboekt als 6 termijnen, omzet liet €50 zien). Zeg het hardop, met een weg terug. */}
+            {isBetaald && betaling === 'monthly' && !isStart && (
+              <div style={{ margin: '0 0 10px', padding: '0.6rem 0.75rem', borderRadius: 12, border: '1px solid rgba(245,158,11,0.5)', background: 'rgba(245,158,11,0.08)', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, textAlign: 'left' }}>
+                Vandaag telt alleen termijn 1 als binnen: <b style={{ color: '#fff' }}>{euro(perTermijn)}</b>, de rest per maand.
+                {STAPPEN.includes('betaling') && (
+                  <> Heeft hij alles in één keer betaald?{' '}
+                    <button type="button" onClick={() => setStap(STAPPEN.indexOf('betaling') + 1)} style={{ padding: 0, border: 'none', background: 'none', font: 'inherit', fontWeight: 900, color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3, cursor: 'pointer' }}>
+                      Kies In één keer
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               {pil(isBetaald, () => setIsBetaald(true), 'Betaald')}
               {pil(!isBetaald, () => { setIsBetaald(false); if (!betaalDatum) setBetaalDatum(plan.start > vandaagIso() ? plan.start : vandaagIso()) }, 'Nog niet betaald')}

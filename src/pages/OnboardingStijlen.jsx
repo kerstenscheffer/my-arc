@@ -10,7 +10,7 @@ import { THEMAS } from '../modules/app-onboarding/onboardingThemas'
 
 export default function OnboardingStijlen() {
   const [thema, setThema] = useState(() => {
-    try { return localStorage.getItem('onboarding_test_stijl') || 'zwartwit' } catch { return 'zwartwit' }
+    try { return localStorage.getItem('onboarding_test_stijl') || 'arc' } catch { return 'arc' }
   })
   const kies = (t) => { setThema(t); try { localStorage.setItem('onboarding_test_stijl', t) } catch { /* niets */ } }
 
