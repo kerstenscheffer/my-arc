@@ -558,7 +558,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   return (
     <div style={{
       // De week even breed als Google Agenda; de andere weergaven zijn smal beter te lezen.
-      position: 'relative', width: '100%', maxWidth: weergave === 'week' && !isMobile ? 'min(1600px, calc(100vw - 48px))' : 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
+      position: 'relative', width: '100%', maxWidth: isMobile ? 1180 : weergave === 'week' ? 'min(1600px, calc(100vw - 48px))' : weergave === 'klanten' && klantenDeel === 'challenge' ? 'calc(100vw - 140px)' : 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
       transformOrigin: '50% 100%', animation: 'gk-op .55s cubic-bezier(.2,.8,.2,1) both',
     }}>
       <style>{`

@@ -14,7 +14,7 @@
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, FileDown, Search, X } from 'lucide-react'
+import { Loader2, FileDown, Search, X, MessageCircle, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
@@ -27,6 +27,7 @@ import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
 import { haalEisen, haalInstellingen, zetInstelling, borgOordeel } from '../challenge-monitor/challengeCoach'
 import { rekenGeld } from './challengeGeld'
 import { maakChallengePdf } from './challengePdf'
+import { waNummer, kopieer } from './berichtTekst'
 
 const STATUS_KEUZE = [
   ['ja_mondeling', 'Ja'],
@@ -53,19 +54,39 @@ const volgorde = (r) => (r.eindcallNodig ? 0 : r.status === 'ja_mondeling' ? 1 :
 const watNu = (r) => {
   if (r.status === 'betaald') return { groep: 'klaar', tekst: 'Door, betaald' }
   if (r.status === 'nee') return { groep: 'klaar', tekst: 'Gestopt' }
-  if (r.status === 'ja_mondeling') return { groep: 'actie', tekst: 'Betaling ophalen' }
-  if (r.eindcallNodig) return { groep: 'actie', tekst: 'Eindcall plannen' }
-  if (r.status === 'denkt_na') return { groep: 'actie', tekst: 'Opvolgen: denkt na' }
-  if (gesprekNodig(r)) return { groep: 'actie', tekst: 'Doorstapgesprek voeren' }
-  if (!r.status && !r.gepauzeerd && !r.onbeperkt && r.dagen != null && r.dagen < 0) return { groep: 'actie', tekst: 'Traject voorbij: beslissen' }
+  // Kanban (24 nov 2026): door maar nog niet betaald is een eigen kolom.
+  if (r.status === 'ja_mondeling' && r.sale) return { groep: 'betaling', tekst: 'Betaling ophalen', bericht: 'betaling' }
+  if (r.status === 'ja_mondeling') return { groep: 'actie', tekst: 'Traject boeken' }
+  if (r.eindcallNodig) return { groep: 'actie', tekst: 'Eindcall plannen', bericht: 'eindcall' }
+  if (r.status === 'denkt_na') return { groep: 'actie', tekst: 'Opvolgen: denkt na', bericht: 'denkt_na' }
+  if (gesprekNodig(r)) return { groep: 'actie', tekst: 'Doorstapgesprek voeren', bericht: 'eindcall' }
+  if (!r.status && !r.gepauzeerd && !r.onbeperkt && r.dagen != null && r.dagen < 0) return { groep: 'actie', tekst: 'Traject voorbij: beslissen', bericht: 'eindcall' }
   if (r.gepauzeerd) return { groep: 'loopt', tekst: 'Op pauze' }
   if (r.status === 'call') return { groep: 'loopt', tekst: 'Call ingepland' }
   return { groep: 'loopt', tekst: '' }
 }
+
+// Voorstel voor een WhatsApp-bericht bij de actie. Kersten past aan en verstuurt zelf.
+const voornaamVan = (c) => String(c?.first_name || '').trim().split(/\s+/)[0] || ''
+const geldKort = (v) => `€${Math.round(Number(v) || 0).toLocaleString('nl-NL')}`
+function berichtVoorstel(r, soort) {
+  const naam = voornaamVan(r.klant)
+  const hoi = `Hoi ${naam}!`
+  if (soort === 'betaling') {
+    const s = r.sale || {}
+    const maanden = Math.max(1, Number(s.duration_months) || 1)
+    const bedrag = s.payment_type === 'monthly' ? `${maanden} termijnen van ${geldKort(Number(s.order_value) / maanden)}` : geldKort(s.order_value)
+    const wanneer = s.payment_due_date ? ` vóór ${dagKort(s.payment_due_date)}` : ''
+    return `${hoi} Super dat je doorgaat!\n\nWil je ${s.payment_type === 'monthly' ? 'de eerste van de ' : ''}${bedrag}${wanneer} overmaken? Dan staat alles voor je klaar en gaan we gewoon door.\n\nLaat even weten als je ergens vragen over hebt!`
+  }
+  if (soort === 'denkt_na') return `${hoi} Ik was benieuwd of je al hebt kunnen nadenken over doorgaan na je traject. Heb je nog vragen waar ik je mee kan helpen?`
+  const einde = r.dagen != null && r.dagen < 0 ? 'is net afgelopen' : `loopt ${r.eind ? `op ${dagKort(r.eind)} ` : 'bijna '}af`
+  return `${hoi} Je traject ${einde}. Zullen we een korte call plannen om je resultaten door te nemen en te kijken hoe we verder gaan? Wanneer past het jou?`
+}
 const dagenTekst = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} ${r.dagen === -1 ? 'dag' : 'dagen'} voorbij` : r.dagen === 0 ? 'Eindigt vandaag' : `Nog ${r.dagen} ${r.dagen === 1 ? 'dag' : 'dagen'}`)
 // Kort voor op de kaart: '11 d voorbij', 'nog 2 d'. De volle tekst staat in de pdf en de tooltip.
 const dagenKort = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} d voorbij` : r.dagen === 0 ? 'Vandaag' : `Nog ${r.dagen} d`)
-const GROEPEN = [['actie', 'Actie nodig'], ['loopt', 'Loopt'], ['klaar', 'Afgerond']]
+const GROEPEN = [['actie', 'Actie nodig'], ['betaling', 'Door, nog niet betaald'], ['loopt', 'Loopt'], ['klaar', 'Afgerond']]
 
 const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '') : '—')
 const callKort = (iso) => {
@@ -140,6 +161,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [pdfBezig, setPdfBezig] = useState(false)
   const [zoek, setZoek] = useState('')
   const [afhandel, setAfhandel] = useState(null) // client_id waar het Afhandelen-venster voor open staat
+  const [bericht, setBericht] = useState(null)   // { id, tekst, fout } voorstel-bericht dat openstaat
 
   // De borg die al aan de klant hangt (challenge-sale, open en betaald). Dan hoef je hem niet te kiezen.
   const bekendeBorg = (clientId) => { const id = instellingen.get(clientId)?.sale_id; return id && borgen.some(b => b.id === id) ? id : null }
@@ -151,7 +173,7 @@ export default function GinoDoorstap({ isMobile = false }) {
       supabase.from('client_doorstap').select('client_id, coach_id, status, pakket, gezet_at, call_datum')
         .order('gezet_at', { ascending: false }).order('id', { ascending: false })
         .then(r => r, e => ({ error: e })),
-      supabase.from('clients').select('id, first_name, last_name, email, coach_id, coaching_onbeperkt, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status, coaching_paused_at').eq('status', 'active').order('first_name')
+      supabase.from('clients').select('id, first_name, last_name, email, coach_id, coaching_onbeperkt, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status, coaching_paused_at, phone').eq('status', 'active').order('first_name')
         .then(r => r, e => ({ error: e })),
       supabase.auth.getUser(),
       supabase.from('lead_movements').select('id, lead_name, order_value')
@@ -195,7 +217,7 @@ export default function GinoDoorstap({ isMobile = false }) {
     // Verlengingen van deze klanten: het bedrag dat nog moet komen, of al betaald is.
     const ids = alle.map(c => c.id)
     const { data: sales, error: saleFout } = ids.length
-      ? await supabase.from('lead_movements').select('id, client_id, order_value, borg_movement_id, payment_received')
+      ? await supabase.from('lead_movements').select('id, client_id, order_value, borg_movement_id, payment_received, payment_due_date, start_op, payment_type, duration_months')
         .in('client_id', ids).eq('outcome_type', 'verlenging').is('reverted_at', null)
         .order('moved_at', { ascending: false })
         .then(r => r, e => ({ error: e }))
@@ -499,6 +521,18 @@ export default function GinoDoorstap({ isMobile = false }) {
     },
   })
   // Klein label achter een cijfer op de kaart, zoals KCAL / E / K / V op een maaltijdkaart.
+  // Bericht naar het klembord en WhatsApp open bij de klant, met de tekst al ingevuld. Het venster
+  // gaat meteen open (anders blokkeert de browser het). Versturen doet Kersten zelf.
+  const naarWhatsApp = async (r, tekst) => {
+    const nr = waNummer(r.klant?.phone)
+    const venster = nr ? window.open('', '_blank') : null
+    const ok = await kopieer(tekst)
+    if (!nr) { setBericht(b => ({ ...b, fout: ok ? 'Geen telefoonnummer bekend. Het bericht staat in je klembord.' : 'Geen telefoonnummer bekend.' })); return }
+    const url = `https://wa.me/${nr}?text=${encodeURIComponent(tekst)}`
+    if (venster) venster.location.href = url; else window.location.href = url
+    setBericht(null)
+  }
+
   // Afhandelen-venster: de rij, de borg van die klant en "stopt" (stand nee + borg).
   const afhandelRij = afhandel ? (rijen || []).find(x => x.client_id === afhandel) || null : null
   const borgVan = (r) => {
@@ -643,20 +677,34 @@ export default function GinoDoorstap({ isMobile = false }) {
             style={{ padding: '0 0 6px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>
 Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           </button>
+          {/* Kanban (24 nov 2026, Kersten): vier kolommen, zodat altijd helder is waar actie nodig is.
+              Actie nodig: wie het dichtst bij het einde zit bovenaan. Door, nog niet betaald: vroegste
+              betaaldatum bovenaan. Loopt: begin of midden traject. Afgerond staat standaard dicht. */}
+          <div style={{
+            // Volle breedte; Afgerond is smal zolang hij dicht staat.
+            display: 'grid', gap: isMobile ? 10 : 14,
+            ...(isMobile
+              ? { gridAutoFlow: 'column', gridAutoColumns: '86%' }
+              : { gridTemplateColumns: `repeat(3, minmax(320px, 1fr)) ${!klaarOpen && !zoekTerm ? '180px' : 'minmax(320px, 1fr)'}` }),
+            overflowX: 'auto', scrollSnapType: isMobile ? 'x mandatory' : undefined, WebkitOverflowScrolling: 'touch', alignItems: 'start', paddingBottom: 6,
+          }}>
           {GROEPEN.map(([groep, groepLabel]) => {
-            // Actie nodig op belang (wie het eerst iets van je nodig heeft), de rest op einddatum.
             const inGroep = getoond.filter(x => watNu(x).groep === groep)
-            const lijst = groep === 'actie' ? [...inGroep].sort((a, b) => volgorde(a) - volgorde(b) || (a.dagen ?? 999) - (b.dagen ?? 999)) : inGroep
-            if (!lijst.length) return null
+            const dag = (x) => (x.dagen ?? 9999)
+            const betaalDag = (x) => String(x.sale?.payment_due_date || x.sale?.start_op || '9999')
+            const lijst = groep === 'actie' ? [...inGroep].sort((a, b) => dag(a) - dag(b) || volgorde(a) - volgorde(b))
+              : groep === 'betaling' ? [...inGroep].sort((a, b) => betaalDag(a).localeCompare(betaalDag(b)))
+                : inGroep
             const dicht = groep === 'klaar' && !klaarOpen && !zoekTerm
             return (
-              <div key={groep} style={{ marginBottom: 12 }}>
+              <div key={groep} style={{ minWidth: 0, scrollSnapAlign: 'start', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: 8 }}>
                 <button type="button" onClick={groep === 'klaar' ? () => setKlaarOpen(o => !o) : undefined} aria-expanded={groep === 'klaar' ? klaarOpen : undefined}
-                  style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '2px 0 6px', background: 'none', border: 'none', fontFamily: 'inherit', cursor: groep === 'klaar' ? 'pointer' : 'default', color: colors.textPrimary }}>
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 7, width: '100%', padding: '2px 4px 8px', background: 'none', border: 'none', fontFamily: 'inherit', cursor: groep === 'klaar' ? 'pointer' : 'default', color: colors.textPrimary, textAlign: 'left' }}>
                   <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: colors.textPrimary }}>{groepLabel}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>{lijst.length}{groep === 'klaar' ? (klaarOpen ? ' · verbergen' : ' · tonen') : ''}</span>
                 </button>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 7, alignItems: 'start' }}>
+                {!lijst.length && <div style={{ padding: '4px 4px 6px', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary }}>{groep === 'actie' ? 'Niets te doen' : 'Niemand'}</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6 }}>
                 {!dicht && lijst.map((r) => {
             const nodig = gesprekNodig(r)
             const nu = watNu(r)
@@ -666,14 +714,19 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
             // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
             const borgId = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id
             const borgSale = borgId ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === borgId) : null
-            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id]
+            const open = looptijd?.id === r.client_id || openEisen === r.client_id || rijFout[r.client_id] || bericht?.id === r.client_id
             return (
-              <div key={r.client_id} style={{ minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+              <div key={r.client_id} style={{ position: 'relative', minWidth: 0, opacity: nu.groep === 'klaar' ? 0.6 : 1, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+                {/* Nog niet betaald: oranje label rechtsboven, half over de rand (24 nov 2026, Kersten).
+                    Alleen met een geboekte verlenging (r.sale); Ja zonder traject krijgt hem niet. */}
+                {r.sale && r.status !== 'betaald' && (
+                  <span title={r.pakket || 'Ja gezegd, nog niet betaald'} style={{ position: 'absolute', top: -10, right: 12, zIndex: 1, display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 9px', borderRadius: 999, background: '#f59e0b', color: '#0a0a0a', fontSize: '0.66rem', fontWeight: 900, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>Nog niet betaald</span>
+                )}
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
                   {/* Tegel: de week van het traject. Klik = start en aantal weken aanpassen. */}
                   <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt}
                     onClick={() => setLooptijd(o => (o?.id === r.client_id ? null : { id: r.client_id, start: r.klant.coaching_start_date || '', weken: r.klant.coaching_total_weeks || 6 }))}
-                    style={{ width: isMobile ? 60 : 68, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'rgba(255,255,255,0.05)', border: 'none', color: colors.textPrimary, fontFamily: 'inherit', cursor: r.onbeperkt ? 'default' : 'pointer' }}>
+                    style={{ width: isMobile ? 60 : 68, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'rgba(255,255,255,0.05)', border: 'none', borderTopLeftRadius: 11, borderBottomLeftRadius: open ? 0 : 11, color: colors.textPrimary, fontFamily: 'inherit', cursor: r.onbeperkt ? 'default' : 'pointer' }}>
                     <span style={{ fontSize: '1.05rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{r.onbeperkt ? '∞' : r.week ? `${r.week}/${r.weken}` : '—'}</span>
                     <span style={{ fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textSecondary }}>{r.gepauzeerd ? 'Pauze' : 'Week'}</span>
                     <WeekBalk week={r.week} weken={r.weken} />
@@ -682,36 +735,42 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.8rem' }}>
                     {/* Naam, bedrag en de stand als woord. De knoppen staan in de balk eronder. */}
+                    {/* Naam op een eigen regel (24 nov 2026: in de kanban-kolom vielen namen weg achter de labels). */}
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-                      <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
-                      {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: colors.textSecondary }}>{euro(bedrag)}</span> : null}
-                      {/* Geboekte verlenging, geld nog niet binnen: omlijnd label (24 nov 2026, Kersten: Patrick,
-                          Martijn). Alleen met een echte boeking (r.sale); Ja zonder traject blijft "Ja".
-                          Wit gevuld blijft voor geld dat wél verrekend is. */}
-                      {r.sale && r.status !== 'betaald' ? (
-                        <span title={r.pakket || 'Ja gezegd, nog niet betaald'} style={{ flexShrink: 0, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 6, border: `1px solid ${colors.textPrimary}`, color: colors.textPrimary, fontSize: '0.68rem', fontWeight: 900, whiteSpace: 'nowrap' }}>Nog niet betaald</span>
-                      ) : r.status !== 'betaald' && (
-                        <span style={{ flexShrink: 0, color: r.status ? colors.textPrimary : colors.textSecondary }}>
-                          {STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : '')}
-                        </span>
-                      )}
-                      {/* Wit label zodra er geld verrekend is: verlenging betaald, borg behouden of terugbetaald. */}
+                      <span title={r.pakket || undefined} style={{ flex: '0 1 auto', minWidth: 0, fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
+                      {/* Wit label direct achter de naam zodra er geld verrekend is: betaald, borg behouden of terugbetaald. */}
                       {(() => {
                         const geldLabel = r.status === 'betaald' ? 'Betaald' : borgSale?.challenge_status === 'behouden' ? 'Behouden' : borgSale?.challenge_status === 'terugbetaald' ? 'Terugbetaald' : null
                         return geldLabel && (
                           <span style={{ flexShrink: 0, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 6, background: colors.textPrimary, color: colors.bg, fontSize: '0.68rem', fontWeight: 900 }}>{geldLabel}</span>
                         )
                       })()}
+                      {/* Rechts: de stand als woord (Ja, Denkt na, Gesprek, Pauze) of het bedrag. */}
+                      {r.status !== 'betaald' && !r.sale && (STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || nodig || r.gepauzeerd) && (
+                        <span style={{ flexShrink: 0, marginLeft: 'auto', color: r.status ? colors.textPrimary : colors.textSecondary }}>
+                          {STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : 'Pauze')}
+                        </span>
+                      )}
+                      {bedrag ? <span style={{ flexShrink: 0, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 900, color: colors.textPrimary }}>{euro(bedrag)}</span> : null}
                     </div>
 
                     {/* Cijferregel zoals op de maaltijdkaart: waarde, klein label erachter. */}
                     <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isMobile ? '2px 9px' : '2px 11px', minWidth: 0 }}>
                       {/* Wat nu: jouw volgende stap, vooraan en in gewone taal. */}
-                      {nu.tekst && (
+                      {nu.tekst && (nu.bericht || nu.tekst === 'Traject boeken' ? (
+                        // Klik: voorstel-bericht (kopiëren + WhatsApp), of bij Traject boeken het Afhandelen-venster.
+                        <button type="button" title={nu.bericht ? 'Voorstel-bericht, kopiëren en WhatsApp openen' : 'Afhandelen'}
+                          onClick={() => (nu.bericht
+                            ? setBericht(b => (b?.id === r.client_id ? null : { id: r.client_id, tekst: berichtVoorstel(r, nu.bericht), fout: null }))
+                            : setAfhandel(r.client_id))}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0, background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', fontWeight: 900, whiteSpace: 'nowrap', color: colors.textPrimary, textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,0.3)' }}>
+                          {nu.bericht ? <MessageCircle size={13} strokeWidth={2.6} /> : <ChevronRight size={13} strokeWidth={2.8} />}{nu.tekst}
+                        </button>
+                      ) : (
                         <span style={{ whiteSpace: 'nowrap', fontWeight: 900, color: nu.groep === 'klaar' ? colors.textSecondary : colors.textPrimary }}>
                           {nu.groep === 'actie' ? '→ ' : ''}{nu.tekst}
                         </span>
-                      )}
+                      ))}
                       {/* Dagen in plaats van datums; de datums staan in de tooltip. */}
                       <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Klik: looptijd of verlenging aanpassen`}
                         style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', color: eindKleur }}>
@@ -774,6 +833,20 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                         </div>
                       )
                     })()}
+                    {bericht?.id === r.client_id && (
+                      <div style={{ padding: '2px 0 6px' }}>
+                        <textarea value={bericht.tekst} onChange={ev => setBericht(b => ({ ...b, tekst: ev.target.value }))} rows={5} aria-label={`Bericht aan ${naamVan(r.klant)}`}
+                          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.45, padding: '0.5rem 0.6rem', outline: 'none' }} />
+                        {bericht.fout && <div role="alert" style={{ marginTop: 4, fontSize: '0.74rem', fontWeight: 800, color: colors.danger }}>{bericht.fout}</div>}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                          <button type="button" onClick={() => naarWhatsApp(r, bericht.tekst)} disabled={!bericht.tekst.trim()}
+                            style={{ flex: 1, minHeight: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 9, border: 'none', cursor: 'pointer', background: colors.textPrimary, color: colors.bg, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900 }}>
+                            <MessageCircle size={14} strokeWidth={2.6} /> Kopieer en open WhatsApp
+                          </button>
+                          <button type="button" onClick={() => setBericht(null)} style={{ minHeight: 34, padding: '0 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.2)', background: 'none', color: colors.textSecondary, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}>Sluit</button>
+                        </div>
+                      </div>
+                    )}
                     {openEisen === r.client_id && <div style={{ padding: '0 0 6px' }}><EisenLijst eisen={e} instelling={instellingen.get(r.client_id)} onZet={(v) => zetKeuze(r.client_id, v)} /></div>}
                   </div>
                 )}
@@ -784,6 +857,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
               </div>
             )
           })}
+          </div>
           {zoekTerm && !getoond.length && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: colors.textSecondary }}>Niemand gevonden met "{zoek.trim()}".</div>}
         </div>
       )}
