@@ -5,7 +5,7 @@
 // bewaren zit in aanbodOpslag.js. Vorm van de opgeslagen gegevens:
 //   { partnerPct, vooruitPct, borgAan, borgBedrag,
 //     tiers: { premium|midden|basis: { prijs: { 4, 6, 12 },
-//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst] } },
+//     kostenMaand, kostenEenmalig, urenMaand, urenEenmalig, onderdelen: [tekst], zin } },
 //     producten: [...], vergelijking: [...] }
 // Leeg veld = null. Een onbekende of oudere vorm wordt door normaliseer()
 // aangevuld met de beginwaarden, zodat het scherm altijd iets kan tonen.
@@ -21,6 +21,10 @@
 // Staat er minstens één gevulde rij, dan toont Aanbod.jsx de tabel in plaats van
 // de lijstjes uit tiers.*.onderdelen. Die lijstjes blijven in de data staan: een
 // oudere app-versie leest ze nog, en zonder vergelijking tonen we ze zoals altijd.
+// zin (24 nov 2026): per tier het aanbod in één zin (tekst, leeg = ''). Laten zien
+// toont hem achter een knopje bij de tiernaam, Rekenen bewerkt hem. Hij moet bij
+// laden, normaliseren, opslaan en in Gino's context blijven staan: de kolom is één
+// object, wat er niet in teruggaat is weg.
 
 export const DUREN = [4, 6, 12]
 export const TIERS = [['premium', 'Premium'], ['midden', 'Midden'], ['basis', 'Basis']]
@@ -41,6 +45,7 @@ const maakTier = (onderdelen, prijs, rest = {}) => ({
   urenEenmalig: null,
   ...rest,
   onderdelen,
+  zin: '',
 })
 
 // Beginwaarden: de drie tiers die Kersten op 23 nov 2026 koos. Kosten en uren
@@ -92,6 +97,9 @@ const getalOfNull = (v) => {
   return Number.isFinite(n) ? n : null
 }
 
+// Het aanbod van één tier in één zin, zonder spaties eromheen. '' = geen zin.
+export const tierZin = (tier) => (typeof tier?.zin === 'string' ? tier.zin.trim() : '')
+
 // Maakt van wat er in de database staat altijd de volledige vorm.
 export function normaliseer(ruw) {
   const r = ruw && typeof ruw === 'object' ? ruw : {}
@@ -111,6 +119,7 @@ export function normaliseer(ruw) {
       onderdelen: Array.isArray(t.onderdelen)
         ? t.onderdelen.filter(o => typeof o === 'string' && o.trim())
         : [...begin.onderdelen],
+      zin: tierZin(t),
     }
   }
   return {
@@ -246,11 +255,12 @@ export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur 
       prijs: zonderLeeg(t.prijs),
       ...zonderLeeg({ kostenMaand: t.kostenMaand, kostenEenmalig: t.kostenEenmalig, urenMaand: t.urenMaand, urenEenmalig: t.urenEenmalig }),
       onderdelen: (t.onderdelen || []).filter(o => typeof o === 'string' && o.trim()),
+      ...zonderLeeg({ zin: tierZin(t) || null }),
     }
   }
   return {
     ...kop,
-    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten en vergelijking, anders verdwijnen ze). prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, vergelijking en zin per tier, anders verdwijnen ze). prijs = totaal per duur in maanden, zin = het aanbod van die tier in één zin (achter het knopje bij de tiernaam), vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn). vergelijking = de tabel die de klant ziet: per rij onderdeel en per tier true (zit erin), tekst (de vorm in die tier) of null (zit er niet in); staat er een vergelijking, dan toont het scherm die in plaats van onderdelen.',
     in_beeld: { duur, stand },
     gegevens: {
       partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,

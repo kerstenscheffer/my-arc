@@ -14,6 +14,10 @@
 -- Later op 23 nov: vooruitPct (korting bij vooruitbetalen), borgAan en borgBedrag
 -- erbij in gegevens. Geen schemawijziging; een rij zonder die velden leest als
 -- 20 procent, borg uit, 300. Kerstens rij is toen gevuld met zijn drie tiers.
+-- 24 nov: producten, vergelijking en tiers.<tier>.zin (het aanbod in één zin) erbij
+-- in gegevens. Geen schemawijziging; een rij zonder leest als leeg. De vorm staat
+-- in aanbodData.js. Nieuw veld = ook in normaliseer en aanbodVoorGino zetten: de
+-- pagina schrijft het hele object terug, wat daar niet in zit is na één opslag weg.
 
 create table if not exists public.business_os_aanbod (
   coach_id uuid primary key default auth.uid(),

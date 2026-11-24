@@ -49,16 +49,28 @@
 // tot 1400 px (was 1120) en de tabel verdeelt de tier-kolommen naar inhoud, zodat
 // de lange teksten van Premium en Midden op één regel staan. Telefoon en Rekenen
 // zijn niet veranderd.
+//
+// Aanbod in één zin (24 nov 2026): gegevens.tiers.<tier>.zin (tekst, leeg = geen).
+//   Laten zien  knopje (Quote) bij de tiernaam, alleen als er een zin is. Een tik
+//               klapt onder de prijs de zin open in dik wit, met de prijs per
+//               maand van de gekozen duur in groen erachter. Elke tier los.
+//               Telefoon (drie smalle koppen): het tier-icoon staat op een eigen
+//               regel en het knopje direct achter de naam eronder (icoon, naam en
+//               knopje passen niet naast elkaar in 100 px). De zin klapt over de
+//               volle breedte open tussen de koppen en de tabel: in zo'n smalle
+//               kolom is een zin niet te lezen.
+//   Rekenen     tekstveld in de uitgeklapte tier, bewaard via wijzig zoals de rest.
+// Welke zinnen open staan onthoudt alleen dit scherm (openZin).
 
 import { Fragment, useState, useEffect, useLayoutEffect, useRef, useId } from 'react'
 import {
   CalendarDays, Calculator, Eye, Settings, Info, Crown, Target, Layers, Wallet, Clock, List,
-  ChevronDown, Check, Plus, X, CloudOff, Trash2,
+  ChevronDown, Check, Plus, X, CloudOff, Trash2, Quote,
 } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 import {
   DUREN, TIERS, prijzen, reken, euro, leesGetal, normaliseerProduct,
-  celSoort, nieuweVergelijkRij, vergelijkRijen,
+  celSoort, nieuweVergelijkRij, vergelijkRijen, tierZin,
 } from './aanbodData'
 
 const C = {
@@ -227,6 +239,54 @@ function Pijl({ open, size = 18 }) {
   )
 }
 
+// Knopje bij de tiernaam in Laten zien: klapt het aanbod in één zin open en dicht.
+// Het tikvlak is groter dan het icoon; de negatieve marge houdt de regel even
+// hoog als bij een tier zonder zin, zodat de prijzen op één lijn blijven, en zet
+// het icoon dicht tegen de naam.
+function ZinKnop({ naam, open, onClick, controls, compact = false }) {
+  const maat = compact ? 30 : 32
+  return (
+    <button type="button" aria-expanded={open} aria-controls={controls} title={`${naam} in één zin`} aria-label={`${naam} in één zin`}
+      onClick={onClick} style={{
+        ...KAAL, flexShrink: 0, width: maat, height: maat, padding: 0, borderRadius: '50%',
+        margin: compact ? '-8px -6px' : '-4px 0 -4px -4px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: open ? C.groen : C.zacht, background: open ? 'rgba(255,255,255,0.1)' : 'transparent',
+        transition: 'color 0.2s, background 0.2s',
+      }}>
+      <Quote size={compact ? 15 : 17} strokeWidth={2.4} aria-hidden="true" />
+    </button>
+  )
+}
+
+// Het aanbod van één tier in één zin, met de prijs per maand erachter. Staat in
+// de pagina zolang er een zin is, ook dicht: zo schuift open en dicht rustig (de
+// rij gaat van 0fr naar 1fr; een browser die dat niet kan animeren klapt gewoon).
+// width 0 + minWidth 100%: de zin telt niet mee in de breedte van zijn kolom,
+// anders trekt een lange zin de vergelijkingstabel scheef zodra hij opengaat.
+// kop = klein label erboven (telefoon: welke tier). ruimte = [boven, onder] in px.
+function ZinVak({ id, open, zin, perMaand, kop = null, klein = false, ruimte = [18, 0] }) {
+  return (
+    <div id={id} aria-hidden={!open} style={{
+      display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', width: 0, minWidth: '100%',
+      opacity: open ? 1 : 0, visibility: open ? 'visible' : 'hidden',
+      transition: 'grid-template-rows 0.28s ease, opacity 0.28s ease, visibility 0.28s',
+    }}>
+      <div style={{ minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ margin: `${ruimte[0]}px 0 ${ruimte[1]}px`, paddingLeft: klein ? 10 : 14, borderLeft: `2px solid ${C.lijn}` }}>
+          {kop}
+          <p style={{ margin: 0, fontSize: klein ? '0.95rem' : '1.05rem', fontWeight: 800, lineHeight: 1.4, color: C.wit, overflowWrap: 'anywhere' }}>
+            {zin}
+            {perMaand !== null && (
+              <> <span style={{ ...NUM, fontWeight: 900, color: C.groen, whiteSpace: 'nowrap' }}>{euro(perMaand)} per maand</span></>
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Kop van één tier: het hele vlak is de knop die uitklapt.
 const KOP_KNOP = { ...KAAL, display: 'block', width: '100%', minWidth: 0, padding: 0, textAlign: 'left', color: C.wit }
 
@@ -328,6 +388,14 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
             <Uitkomst label="Per uur" gewoon={r.perUur} vooruit={vu.perUur} groot kleur={roodOnderNul(C.groen)} />
           </div>
 
+          {/* Het aanbod in één zin: Laten zien toont hem achter het knopje bij de naam. */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginTop: 20 }}>
+            <span role="img" aria-label="In één zin" title="In één zin" style={{ display: 'flex', flexShrink: 0, paddingTop: 11, color: C.zacht }}>
+              <Quote size={18} strokeWidth={2.4} />
+            </span>
+            <TekstVeld waarde={tier.zin || ''} onChange={v => onVeld('zin', v)} label={`${naam} in één zin`} placeholder="In één zin" />
+          </div>
+
           {metLijst && (
             <button type="button" aria-expanded={lijstOpen} title="Onderdelen" aria-label={`Onderdelen ${naam}: ${aantal}`}
               onClick={() => setLijstOpen(o => !o)} style={{
@@ -371,25 +439,52 @@ function TierRekenen({ sleutel, naam, tier, duur, g, open, onWissel, onVeld, onP
 // ── Stand Laten zien: één tier. Hier komt niets van kosten, uren of partner in. ──
 // metLijst = false: kolomkop van de vergelijkingstabel, de onderdelen staan in de
 // rijen eronder. compact = drie koppen naast elkaar op een smal scherm.
-function TierTonen({ sleutel, naam, tier, duur, g, open, onWissel, metLijst = true, compact = false }) {
+// Zin: onZin = tik op het knopje (zonder onZin of zonder zin geen knopje), zinOpen
+// = hij staat open. zinBinnen = false: de zin klapt niet in deze kolom open maar
+// eronder over de volle breedte (telefoon, zie VergelijkingTonen); zinId is dan
+// het id van dat vak. zinRegel = compact en minstens één tier heeft een zin: het
+// tier-icoon staat dan bij alle drie op een eigen regel, zodat het knopje achter
+// de naam past en de prijzen op één lijn blijven.
+// De naamregel en de prijs zijn losse blokken: het zin-knopje mag niet in de knop
+// zitten die de onderdelen uitklapt. Een tik op de prijs klapt de lijst nog wel uit.
+function TierTonen({
+  sleutel, naam, tier, duur, g, open, onWissel, metLijst = true, compact = false,
+  zinOpen = false, onZin = null, zinId = null, zinRegel = false, zinBinnen = true,
+}) {
   const Icoon = TIER_ICOON[sleutel]
   const p = prijzen(tier, duur, g)
   const lijst = metLijst ? tier.onderdelen.filter(o => o.trim()) : []
   const prijsMaat = compact ? 'clamp(1.3rem, 6.4vw, 2.2rem)' : 'clamp(2.6rem, 5vw, 3.6rem)'
   const kleinMaat = compact ? '0.72rem' : '0.85rem'
-  // Zonder onderdelen valt er niets uit te klappen: dan is de kop geen knop.
+  // Zonder onderdelen valt er niets uit te klappen: dan is de naam geen knop.
   const kan = lijst.length > 0
   const id = useId()
-  const Kop = kan ? 'button' : 'div'
-  const kopProps = kan ? { type: 'button', 'aria-expanded': open, 'aria-controls': open ? id : undefined, onClick: onWissel } : {}
+  const eigenZinId = useId()
+  const zin = onZin ? tierZin(tier) : ''
+  const zId = zinId || eigenZinId
+  const rij = { display: 'flex', alignItems: 'center', flexWrap: compact ? 'wrap' : 'nowrap', gap: compact ? '4px 6px' : 12 }
+  const icoon = <Icoon size={compact ? 18 : 24} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />
+  const naamStijl = { minWidth: 0, fontSize: compact ? '0.78rem' : '1.25rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', overflowWrap: 'anywhere' }
+  const icoonBoven = compact && zinRegel
   return (
     <div style={{ minWidth: 0 }}>
-      <Kop {...kopProps} style={{ ...KOP_KNOP, cursor: kan ? 'pointer' : 'default' }}>
-        <span style={{ display: 'flex', alignItems: 'center', flexWrap: compact ? 'wrap' : 'nowrap', gap: compact ? '4px 6px' : 12 }}>
-          <Icoon size={compact ? 18 : 24} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1, minWidth: 0, fontSize: compact ? '0.78rem' : '1.25rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>{naam}</span>
-          {kan && <Pijl open={open} size={20} />}
-        </span>
+      <div style={rij}>
+        {kan ? (
+          <button type="button" aria-expanded={open} aria-controls={open ? id : undefined} onClick={onWissel}
+            style={{ ...KOP_KNOP, ...rij, flex: 1, width: 'auto' }}>
+            {icoon}
+            <span style={{ ...naamStijl, flex: 1 }}>{naam}</span>
+            <Pijl open={open} size={20} />
+          </button>
+        ) : (
+          <>
+            {icoonBoven ? <span style={{ display: 'flex', flex: '0 0 100%' }}>{icoon}</span> : icoon}
+            <span style={{ ...naamStijl, flex: zin ? '0 1 auto' : 1 }}>{naam}</span>
+          </>
+        )}
+        {zin && <ZinKnop naam={naam} open={zinOpen} onClick={onZin} controls={zId} compact={compact} />}
+      </div>
+      <div onClick={kan ? onWissel : undefined} style={{ cursor: kan ? 'pointer' : 'default' }}>
         {!p && <span style={{ display: 'block', marginTop: compact ? 10 : 16, fontSize: prijsMaat, fontWeight: 900, lineHeight: 1, color: C.zacht }}>–</span>}
         {p && (
           <>
@@ -410,7 +505,8 @@ function TierTonen({ sleutel, naam, tier, duur, g, open, onWissel, metLijst = tr
             )}
           </>
         )}
-      </Kop>
+      </div>
+      {zin && zinBinnen && <ZinVak id={zId} open={zinOpen} zin={zin} perMaand={p ? p.perMaand : null} />}
       {kan && open && (
         <ul id={id} style={{ listStyle: 'none', margin: '24px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {lijst.map((tekst, i) => (
@@ -466,8 +562,13 @@ const vglRaster = (smal, ruim, staart = false) => ({
 // tier-kolommen op hun inhoud: een kolom met lange teksten wordt breder dan een
 // kolom met alleen vinkjes, en wat over is gaat gelijk over de drie. De naamkolom
 // blijft een vijfde van de breedte zoals voorheen, met 196 px als plafond.
-function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte }) {
+// Zin per tier (openZin, onZin): breed klapt hij in zijn eigen kolom open, onder
+// de prijs. Smal staat hij tussen de koppen en de eerste rij, over de volle
+// breedte en met de tiernaam erboven.
+function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte, openZin, onZin }) {
   const raster = vglRaster(smal, ruim)
+  const zinBasis = useId()
+  const zinRegel = smal && TIERS.some(([k]) => tierZin(g.tiers[k]))
   const naamBreed = Math.max(0, Math.min(196, Math.round((breedte - 3 * raster.columnGap) * 0.2)))
   const tabel = smal ? null : { ...raster, gridTemplateColumns: `${naamBreed}px repeat(3, minmax(0, auto))` }
   const lijn = `1px solid ${C.rand}`
@@ -477,10 +578,25 @@ function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte }) {
         {!smal && <span role="columnheader" style={{ gridColumn: 1 }} />}
         {TIERS.map(([k, naam]) => (
           <div key={k} role="columnheader" style={{ minWidth: 0, paddingBottom: smal ? 0 : 36 }}>
-            <TierTonen sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} metLijst={false} compact={smal} />
+            <TierTonen sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} metLijst={false} compact={smal}
+              zinOpen={!!openZin[k]} onZin={() => onZin(k)} zinId={`${zinBasis}-${k}`} zinRegel={zinRegel} zinBinnen={!smal} />
           </div>
         ))}
       </div>
+      {smal && TIERS.map(([k, naam]) => {
+        const zin = tierZin(g.tiers[k])
+        if (!zin) return null
+        const Icoon = TIER_ICOON[k]
+        const p = prijzen(g.tiers[k], duur, g)
+        return (
+          <ZinVak key={k} id={`${zinBasis}-${k}`} open={!!openZin[k]} zin={zin} perMaand={p ? p.perMaand : null} klein ruimte={[0, 20]}
+            kop={(
+              <span style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: '0.68rem', color: C.zacht }}>
+                <Icoon size={14} strokeWidth={2.4} aria-hidden="true" style={{ flexShrink: 0 }} />{naam}
+              </span>
+            )} />
+        )
+      })}
       {rijen.map((r, i) => (
         <Fragment key={i}>
           {!smal && <span role="presentation" aria-hidden="true" style={{ gridColumn: '1 / -1', borderTop: lijn }} />}
@@ -611,6 +727,8 @@ export default function Aanbod({ a, onSluit = null }) {
   // Welke tiers open staan (er mogen er meer tegelijk open) en welke dropdown
   // in de kop: 'info', 'instel' of niets.
   const [openTiers, setOpenTiers] = useState({})
+  // Laten zien: van welke tiers de zin open staat. Elke tier los van de andere.
+  const [openZin, setOpenZin] = useState({})
   const [pop, setPop] = useState(null)
   const paneel = useRef(null)
 
@@ -638,6 +756,7 @@ export default function Aanbod({ a, onSluit = null }) {
 
   const zetTier = (k, maak) => wijzig(oud => ({ ...oud, tiers: { ...oud.tiers, [k]: maak(oud.tiers[k]) } }))
   const wisselTier = (k) => setOpenTiers(o => ({ ...o, [k]: !o[k] }))
+  const wisselZin = (k) => setOpenZin(o => ({ ...o, [k]: !o[k] }))
 
   const smal = breedte < 760
   // Rekenen heeft per tier twee bedragen naast elkaar en dus meer breedte nodig.
@@ -769,7 +888,8 @@ export default function Aanbod({ a, onSluit = null }) {
       )}
 
       {g && tonen && vglTonen.length > 0 && (
-        <VergelijkingTonen rijen={vglTonen} g={g} duur={duur} smal={smal} ruim={ruim} breedte={breedte} />
+        <VergelijkingTonen rijen={vglTonen} g={g} duur={duur} smal={smal} ruim={ruim} breedte={breedte}
+          openZin={openZin} onZin={wisselZin} />
       )}
 
       {g && tonen && vglTonen.length === 0 && (
@@ -779,7 +899,8 @@ export default function Aanbod({ a, onSluit = null }) {
         }}>
           {TIERS.map(([k, naam]) => (
             <TierTonen key={k} sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g}
-              open={!!openTiers[k]} onWissel={() => wisselTier(k)} />
+              open={!!openTiers[k]} onWissel={() => wisselTier(k)}
+              zinOpen={!!openZin[k]} onZin={() => wisselZin(k)} />
           ))}
         </div>
       )}
