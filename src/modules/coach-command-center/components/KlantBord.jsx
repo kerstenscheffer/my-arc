@@ -39,7 +39,11 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   const sectieById = Object.fromEntries(bord.secties.map(s => [s.id, s]))
   const sectieVan = (c) => (bestaand.has(bord.plek[c.id]) ? bord.plek[c.id] : NOG)
   const perKolom = {}
+  const volheid = (c) => kaartVolheid({ sectie: sectieById[sectieVan(c)], startId, tijd: bord.tijd?.[c.id], dagen: c.dagCheck?.dagen, moment })
   for (const c of klanten) (perKolom[sectieVan(c)] ||= []).push(c)
+  // Afgerond (afgevinkt of al gedaan deze week) zakt naar onderen; verder blijft
+  // de urgentie-volgorde staan (sort is stabiel).
+  for (const k of Object.keys(perKolom)) perKolom[k].sort((a, b) => (volheid(a) < 1) - (volheid(b) < 1))
   const kolommen = [
     ...(perKolom[NOG]?.length ? [{ id: NOG, naam: 'Nog indelen', kleur: 'wit', virtueel: true }] : []),
     ...bord.secties,
@@ -179,7 +183,7 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
                   onClickCapture={e => { if (lang.current.vuurde) { e.stopPropagation(); e.preventDefault(); lang.current.vuurde = false } }}
                   className="kb-kaart"
                   style={(() => {
-                    const vol = kaartVolheid({ sectie: sectieById[sectieVan(c)], startId, tijd: bord.tijd?.[c.id], dagen: c.dagCheck?.dagen, moment })
+                    const vol = volheid(c)
                     return {
                       cursor: isMobile ? 'auto' : 'grab', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
                       '--kb-vol': vol, opacity: vol, filter: vol < 1 ? 'grayscale(0.6)' : 'none',

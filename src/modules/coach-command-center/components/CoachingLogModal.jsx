@@ -7,6 +7,7 @@ import CallBlad, { PrecallKnop } from '../../business-os/CallBlad'
 import BerichtVak from '../../business-os/BerichtVak'
 import { ITEM_KOLOMMEN } from '../../business-os/berichtTekst'
 import { callHeeftInhoud } from '../../business-os/callBladData'
+import { schrijfBijsturing, BIJSTURING } from '../bijsturing'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, Phone, FileText, History, Rocket } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -76,7 +77,7 @@ function CallVoorbereiding({ client, db, precall }) {
 // kunt kiezen. Zonder deze lijst zou een oud WhatsApp-item naamloos worden.
 const CATEGORIE_LABEL = {
   algemeen: 'Algemeen', checkin: 'Check-in', onboarding: 'Onboarding', change_log: 'Wijziging',
-  status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep', call_summary: 'Call',
+  status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep', call_summary: 'Call', [BIJSTURING]: 'Bijsturing',
 }
 
 const DEFAULT_SIZE = { w: 400, h: 620 }
@@ -135,6 +136,11 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   const [note, setNote]           = useState('')
   const [status, setStatus]       = useState('on_track')
   const category = 'algemeen'
+  // Notitie of bijsturing (laatste punt + wat je deze week aanpast). De
+  // bijsturing komt als label op de klantkaart in Command.
+  const [soort, setSoort] = useState('notitie')
+  const [punt, setPunt] = useState('')
+  const [bijsturing, setBijsturing] = useState('')
   // Wijzigingen (automatisch, 9 van de 10 items) standaard niet in de tijdlijn.
   const [filterCat, setFilterCat] = useState('notities')
   const [weergave, setWeergave]   = useState('call')
@@ -186,6 +192,18 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   }
 
   const handleSave = async () => {
+    if (soort === BIJSTURING) {
+      if (!punt.trim()) return
+      setSaving(true)
+      try {
+        const data = await schrijfBijsturing(db.supabase, { clientId: client.id, coachId, status, punt, bijsturing })
+        if (data) setLogs(prev => [data, ...prev])
+        setPunt(''); setBijsturing('')
+        onLogSaved?.(data)
+      } catch (e) { console.error('❌ save bijsturing:', e) }
+      setSaving(false)
+      return
+    }
     if (!note.trim()) return
     setSaving(true)
     try {
@@ -357,6 +375,16 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
             WebkitOverflowScrolling: 'touch',
           }}>
 
+            <div style={{ display: 'flex', gap: 16, marginBottom: '0.5rem' }}>
+              {[['notitie', 'Notitie'], [BIJSTURING, 'Bijsturing deze week']].map(([id, label]) => (
+                <button key={id} type="button" onClick={() => setSoort(id)} style={{
+                  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', minHeight: 28,
+                  fontSize: '0.8rem', fontWeight: 900, color: soort === id ? '#fff' : 'rgba(255,255,255,0.4)',
+                  borderBottom: soort === id ? '2px solid #fff' : '2px solid transparent',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{label}</button>
+              ))}
+            </div>
             {/* Statuskeuze hoort bij een notitie, niet bij de check-in:
                 daar bepaalt de snelle check hierboven al hoe het ervoor staat. */}
             {(
@@ -380,7 +408,31 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               </div>
             )}
 
-            {(
+            {soort === BIJSTURING ? (
+              <>
+                {[['Laatste punt', punt, setPunt, 'Wat speelde er? (bv. weekend 2x uit eten)'], ['Bijsturing', bijsturing, setBijsturing, 'Wat pas je aan? (bv. stappen naar 10k)']].map(([label, waarde, zet, ph]) => (
+                  <input key={label} value={waarde} onChange={e => zet(e.target.value)} onKeyDown={handleKeyDown}
+                    placeholder={`${label}: ${ph}`} aria-label={label}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', marginBottom: '0.375rem', minHeight: 40,
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '6px',
+                      color: '#fff', fontSize: '0.85rem', fontWeight: 700, padding: '0 0.625rem', outline: 'none', fontFamily: 'inherit',
+                    }} />
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={handleSave} disabled={!punt.trim() || saving} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.9rem',
+                    background: punt.trim() ? '#fff' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '6px',
+                    color: punt.trim() ? '#0a0a0a' : 'rgba(255,255,255,0.25)', fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit',
+                    cursor: punt.trim() ? 'pointer' : 'default', opacity: saving ? 0.5 : 1, minHeight: '32px',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    {saving ? <Loader2 size={11} style={{ animation: 'logSpin 1s linear infinite' }} /> : <Plus size={11} />}
+                    Opslaan
+                  </button>
+                </div>
+              </>
+            ) : (
               <>
                 <textarea
                   ref={textareaRef}

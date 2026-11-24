@@ -114,6 +114,8 @@ export function weekMoment(nu = new Date()) {
 }
 
 export function kaartVolheid({ sectie, startId, tijd, dagen, moment }) {
+  // Vandaag afgevinkt (het rondje op de kaart) = afgerond, in elke kolom.
+  if ((dagen || []).includes(new Date().toLocaleDateString('sv-SE'))) return FADE_GEDAAN
   if (!sectie || sectie.id === startId) return 1
   if (sectie.rol === 'donderdag') {
     if (moment.dag < 3) return FADE_GEDAAN

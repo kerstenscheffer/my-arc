@@ -6,6 +6,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Keuze from '../meal-plan/components/Keuze'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff, Columns3, LayoutGrid } from 'lucide-react'
 import KlantBord from './components/KlantBord'
+import BijsturingLabel from './components/BijsturingLabel'
+import { laadBijsturingen, EVENT_BIJSTURING } from './bijsturing'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
@@ -49,6 +51,15 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   // Maandag check-in: wie er los van staat (maandag_checkin = false) en wie niet betaalt.
   const [maandagUit, setMaandagUit] = useState(() => new Set())
   const [nietBetalend, setNietBetalend] = useState(() => new Set())
+  // Laatste punt + bijsturing per klant (logboek, category 'bijsturing').
+  const [bijsturingen, setBijsturingen] = useState(() => new Map())
+  useEffect(() => {
+    let weg = false
+    laadBijsturingen(db.supabase).then(m => { if (!weg) setBijsturingen(m) })
+    const op = (e) => { const b = e?.detail; if (b?.clientId) setBijsturingen(m => new Map(m).set(b.clientId, b)) }
+    window.addEventListener(EVENT_BIJSTURING, op)
+    return () => { weg = true; window.removeEventListener(EVENT_BIJSTURING, op) }
+  }, [db.supabase])
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   // Lijst of bord (kanban met eigen secties). Onthouden per apparaat.
@@ -427,7 +438,14 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
     return aw - bw
   })
 
-  const kaartVoor = (client) => (
+  const kaartVoor = (client) => bijsturingen.get(client.id) ? (
+    <div key={client.id} style={{ minWidth: 0 }}>
+      <BijsturingLabel b={bijsturingen.get(client.id)} />
+      {kaartZelf(client)}
+    </div>
+  ) : kaartZelf(client)
+
+  const kaartZelf = (client) => (
     <ClientWeightCard
       key={client.id}
       client={client}

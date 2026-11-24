@@ -11,12 +11,10 @@ import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 // screen gewoon document.body, dus daar verandert er niets.
 import { useModalHost } from '../../../coach/ModalHost'
 import {
-  TrendingDown, TrendingUp,
   MessageCircle, Power, MoreHorizontal, Trash2,
   BarChart3, Pause, CheckCircle2, Circle, Video
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
-import KlantStatusStip from './KlantStatusStip'
 import { computePeriod, hervatTraject, pauzeerTraject } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
 import TrajectModal from './TrajectModal'
@@ -65,7 +63,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, klantStatus, pakket = null, maandagCheckin = null }) {
+export default function ClientWeightCard({ client: clientProp, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap, openInzicht = false, onInzichtGeopend, pakket = null, maandagCheckin = null }) {
   const [verlengOpen, setVerlengOpen] = useState(false)
   // Pauze via de foto: direct op de kaart tonen, ook in het inzichtpaneel.
   const [lokaal, setLokaal] = useState(null)
@@ -136,13 +134,6 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
   const history       = weightData?.history || []
   const isInactive    = client.status === 'inactive'
 
-  const getTrend = () => {
-    if (history.length < 2) return null
-    const diff = history[0].weight - history[1].weight
-    if (Math.abs(diff) < 0.1) return null
-    return diff < 0 ? 'down' : 'up'
-  }
-  const trend = getTrend()
 
   // Zaterdag op zaterdag, dezelfde som als de tempo-strook op de klantpagina
   // en in het inzichtpaneel (WeightStatsGrid). "Deze week" is het venster
@@ -439,7 +430,7 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
         gap: isMobile ? '0.4rem' : '0.5rem',
       }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
-          {klantStatus !== undefined && !isInactive && <KlantStatusStip status={klantStatus} isMobile={isMobile} />}
+          {/* Statusstip weg (Kersten, 24 nov): het bijsturingslabel boven de kaart zegt het nu. */}
           <h3 className={PRIVE} style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
           </h3>
@@ -454,11 +445,6 @@ export default function ClientWeightCard({ client: clientProp, isMobile, onToggl
             {latest?.weight ? latest.weight.toFixed(1) : '—'}
           </span>
           <span style={{ fontSize: '0.6rem', fontWeight: 700, color: isInactive ? 'rgba(107,114,128,0.5)' : 'rgba(255,255,255,0.4)' }}>kg</span>
-          {trend && !isInactive && (
-            trend === 'down'
-              ? <TrendingDown size={14} color="#10b981" />
-              : <TrendingUp size={14} color="#ef4444" />
-          )}
           {latest?.date && (
             <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
               {new Date(latest.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
