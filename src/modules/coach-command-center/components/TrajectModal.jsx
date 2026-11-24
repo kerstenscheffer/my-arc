@@ -18,6 +18,8 @@ import { X, Check, ChevronLeft, CalendarPlus, Clock } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'
 import { computePeriod, planVervolg, directeStart, vorigeSale, boekVerlenging } from './trajectPeriode'
+import { laadAanbod } from '../../business-os/aanbodOpslag'
+import { aanbodOpties } from '../../business-os/aanbodData'
 
 const isoVan = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const vandaagIso = () => isoVan(new Date())
@@ -50,6 +52,10 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const [startDatum, setStartDatum] = useState('')
   const [isBetaald, setIsBetaald] = useState(true)
   const [betaalDatum, setBetaalDatum] = useState('')
+  // Aanbod uit Business OS → Aanbod (producten + tiers met prijs). keuzeAanbod = gekozen optie of null (zelf invullen).
+  const [opties, setOpties] = useState([])
+  const [keuzeAanbod, setKeuzeAanbod] = useState(null)
+  const [eigenPrijs, setEigenPrijs] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
 
@@ -62,6 +68,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     setStap(1); setFout(null); setBezig(false)
     setStartOffset(0); setMaanden(4); setWeken('12')
     setStartKeuze('direct'); setStartDatum(''); setIsBetaald(betaald !== false); setBetaalDatum('')
+    setKeuzeAanbod(null); setEigenPrijs(false); setOpties([])
     setBetaling(client.payment_plan === 'monthly' ? 'monthly' : 'prepaid')
     setPrijs(client.payment_plan === 'monthly' ? 150 : 500)
     if (voorstel) {
@@ -71,6 +78,8 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     }
     setVorige(null)
     if (modus !== 'verleng') return
+    // Met een voorstel (Einde traject → challenge-afspraak) geen aanbod-stap.
+    if (!voorstel) laadAanbod().then(a => { if (!weg && !a.fout) setOpties(aanbodOpties(a.gegevens)) }).catch(() => {})
     ;(async () => {
       const v = await vorigeSale(supabase, client)
       if (weg || !v) return
@@ -95,7 +104,16 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   if (!open || !client?.id) return null
 
   const isStart = modus === 'start'
-  const stappen = 3
+  // Volgorde van de stappen per modus. Verlengen begint met het aanbod (behalve met een voorstel).
+  const STAPPEN = isStart ? ['start', 'duur', 'betaling'] : (voorstel ? ['duur', 'betaling', 'prijs'] : ['aanbod', 'duur', 'betaling', 'prijs'])
+  const stappen = STAPPEN.length
+  const prijsVan = (o, b) => (b === 'monthly' ? o.perMaand : o.vooruit)
+  const kiesAanbod = (o) => {
+    setKeuzeAanbod(o); setEigenPrijs(false); setMaanden(o.maanden)
+    const b = o.vooruit && o.perMaand ? betaling : o.perMaand ? 'monthly' : 'prepaid'
+    setBetaling(b); setPrijs(prijsVan(o, b))
+    setStap(2)
+  }
   const periode = computePeriod(client)
 
   // Nieuwe einddatum. Verlengen gaat standaard vanaf het huidige eind, of vanaf
@@ -138,6 +156,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         betaalDatum: isBetaald ? null : (betaalDatum || null),
         vorige,
         borgId,
+        aanbod: keuzeAanbod?.naam || null,
       })
       onClientUpdate?.(uit.clientPayload)
       onGeboekt?.(uit.pakket, uit.doorstap)
@@ -191,7 +210,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const keuze = (id, titel, sub) => {
     const aan = betaling === id
     return (
-      <button key={id} onClick={() => setBetaling(id)} style={{
+      <button key={id} onClick={() => { setBetaling(id); if (keuzeAanbod && !eigenPrijs && prijsVan(keuzeAanbod, id)) setPrijs(prijsVan(keuzeAanbod, id)) }} style={{
         width: '100%', minHeight: 58, marginBottom: 8, padding: '0 1rem',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
@@ -223,8 +242,6 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     color: '#fff', fontSize: '0.95rem', fontWeight: 800, fontFamily: 'inherit', colorScheme: 'dark', outline: 'none',
   }
 
-  // Volgorde van de stappen per modus.
-  const STAPPEN = isStart ? ['start', 'duur', 'betaling'] : ['duur', 'betaling', 'prijs']
   const huidig = STAPPEN[stap - 1]
   const laatste = stap === stappen
 
@@ -302,6 +319,38 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           </>
         )}
 
+        {huidig === 'aanbod' && (
+          <>
+            {vraag('Wat neemt hij?')}
+            {opties.map((o, i) => {
+              const geld = [o.vooruit ? `${euro(o.vooruit)} ineens` : null, o.perMaand ? `${euro(o.perMaand)}/mnd` : null].filter(Boolean).join(' · ')
+              const aan = keuzeAanbod?.id === o.id
+              return (
+                <div key={o.id}>
+                  {o.soort === 'tier' && opties[i - 1]?.soort !== 'tier' && (
+                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '12px 0 6px' }}>Tiers</div>
+                  )}
+                  <button type="button" onClick={() => kiesAanbod(o)} style={{
+                    width: '100%', minHeight: 54, marginBottom: 8, padding: '0 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                    background: aan ? '#fff' : 'rgba(255,255,255,0.05)', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`, borderRadius: 14,
+                    color: aan ? '#0a0a0a' : '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 900 }}>{o.naam}</span>
+                      <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, opacity: 0.6 }}>{o.maanden} mnd · {geld}</span>
+                    </span>
+                    {aan && <Check size={18} strokeWidth={3} />}
+                  </button>
+                </div>
+              )
+            })}
+            <button type="button" onClick={() => { setKeuzeAanbod(null); setEigenPrijs(false); setStap(2) }} style={{ ...primair, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', marginTop: 4 }}>
+              Zelf invullen
+            </button>
+            {!opties.length && onder('Nog geen aanbod geladen. Vul je aanbod in via Business OS → Aanbod.')}
+          </>
+        )}
+
         {huidig === 'duur' && !isStart && (
           <>
             {vraag('Hoe lang verlengen?')}
@@ -333,8 +382,8 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         {huidig === 'betaling' && (
           <>
             {vraag('Hoe betaalt hij?')}
-            {keuze('prepaid', 'In één keer', 'Prepaid, alles vooraf')}
-            {keuze('monthly', 'Maandelijks', 'Elke maand een termijn')}
+            {(!keuzeAanbod || keuzeAanbod.vooruit || eigenPrijs) && keuze('prepaid', 'In één keer', keuzeAanbod?.vooruit && !eigenPrijs ? euro(keuzeAanbod.vooruit) : 'Prepaid, alles vooraf')}
+            {(!keuzeAanbod || keuzeAanbod.perMaand || eigenPrijs) && keuze('monthly', 'Maandelijks', keuzeAanbod?.perMaand && !eigenPrijs ? `${keuzeAanbod.maanden} × ${euro(keuzeAanbod.perMaand)}` : 'Elke maand een termijn')}
             <div style={{ height: 10 }} />
           </>
         )}
@@ -342,15 +391,28 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         {huidig === 'prijs' && (
           <>
             {vraag(betaling === 'monthly' ? 'Wat betaalt hij per maand?' : 'Wat is de prijs?')}
-            <HorizontaleSlider
-              key={betaling}
-              waarden={betaling === 'monthly' ? PRIJZEN_MAAND : PRIJZEN_PREPAID}
-              waarde={prijs}
-              onChange={setPrijs}
-              toon={(v) => `€${v}`}
-              itemBreedte={96}
-              groot="1.6rem"
-            />
+            {keuzeAanbod && !eigenPrijs ? (
+              // Prijs uit het aanbod: exact, geen slider (die kent alleen stappen van €25 / €5).
+              <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{keuzeAanbod.naam}</div>
+                <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>
+                  {betaling === 'monthly' ? `${maanden} × ${euro(prijs)}` : euro(prijs)}
+                </div>
+                <button type="button" onClick={() => setEigenPrijs(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '4px 8px' }}>
+                  Andere prijs
+                </button>
+              </div>
+            ) : (
+              <HorizontaleSlider
+                key={betaling}
+                waarden={betaling === 'monthly' ? PRIJZEN_MAAND : PRIJZEN_PREPAID}
+                waarde={prijs}
+                onChange={setPrijs}
+                toon={(v) => `€${v}`}
+                itemBreedte={96}
+                groot="1.6rem"
+              />
+            )}
             {onder(betaling === 'monthly'
               ? `${maanden} × ${euro(prijs)} = ${euro(totaalBedrag)} omzet`
               : `${euro(totaalBedrag)} omzet${isBetaald ? ', deze maand binnen' : ''}`)}
@@ -381,7 +443,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
               {bezig ? 'Opslaan…' : isStart ? 'Looptijd opslaan' : `${isBetaald ? 'Verlengen' : 'Boeken, nog niet betaald'} · ${euro(totaalBedrag)}`}
             </button>
           )
-          : (() => {
+          : huidig === 'aanbod' ? null : (() => {
               const geblokkeerd = (isStart && huidig === 'duur' && !wekenGeldig) || (!isStart && huidig === 'duur' && !startGeldig)
               return (
                 <button

@@ -10,12 +10,21 @@
 // aangevuld met de beginwaarden, zodat het scherm altijd iets kan tonen.
 // vooruitPct, borgAan en borgBedrag kwamen er later op 23 nov bij: een rij
 // zonder die velden leest als 20 procent, borg uit, 300.
+// producten (24 nov 2026): wat Kersten nu echt verkoopt, als lijst
+//   [{ id, naam, maanden, vooruit, perMaand }]   vooruit = in één keer, perMaand = termijnbedrag.
+// Het verlengvenster (TrajectModal) kiest hieruit en uit de tiers met een prijs
+// (aanbodOpties). Een rij zonder producten leest als BEGIN.producten.
 
 export const DUREN = [4, 6, 12]
 export const TIERS = [['premium', 'Premium'], ['midden', 'Midden'], ['basis', 'Basis']]
 
-// Ter info in de stand Rekenen (Kersten, 23 nov 2026).
-export const HUIDIGE_PRIJZEN = '6 weken €297 borg · 12 weken €450 · 6 maanden €125 per maand · app 1 jaar €300'
+// Wat Kersten nu verkoopt (23-24 nov 2026). Alleen wat hij zelf noemde; lege bedragen vult hij in Aanbod.
+// De challenge (6 weken €297 borg) staat er niet tussen: die verkoop je op het leadbord, niet bij verlengen.
+export const BEGIN_PRODUCTEN = [
+  { id: '12-weken', naam: '12 weken', maanden: 3, vooruit: 450, perMaand: null },
+  { id: '6-maanden', naam: '6 maanden', maanden: 6, vooruit: null, perMaand: 125 },
+  { id: 'app-1-jaar', naam: 'App 1 jaar', maanden: 12, vooruit: 300, perMaand: 30 },
+]
 
 const maakTier = (onderdelen, prijs, rest = {}) => ({
   prijs: { 4: null, 6: null, 12: null, ...prijs },
@@ -34,6 +43,7 @@ export const BEGIN = {
   vooruitPct: 20,     // korting bij vooruitbetalen
   borgAan: false,     // borg verrekenen: nog geen besluit, dus standaard uit
   borgBedrag: 300,
+  producten: BEGIN_PRODUCTEN,
   tiers: {
     premium: maakTier([
       'Maandelijkse supplementenbundel',
@@ -101,8 +111,39 @@ export function normaliseer(ruw) {
     vooruitPct: r.vooruitPct === undefined ? BEGIN.vooruitPct : getalOfNull(r.vooruitPct),
     borgAan: r.borgAan === true,
     borgBedrag: r.borgBedrag === undefined ? BEGIN.borgBedrag : getalOfNull(r.borgBedrag),
+    producten: Array.isArray(r.producten) ? r.producten.filter(x => x && typeof x === 'object').map(normaliseerProduct) : BEGIN_PRODUCTEN.map(x => ({ ...x })),
     tiers,
   }
+}
+
+export function normaliseerProduct(x, i = 0) {
+  const maanden = getalOfNull(x?.maanden)
+  return {
+    id: String(x?.id || `product-${i}-${Date.now()}`),
+    naam: typeof x?.naam === 'string' ? x.naam : '',
+    maanden: maanden && maanden > 0 ? Math.round(maanden) : null,
+    vooruit: getalOfNull(x?.vooruit),
+    perMaand: getalOfNull(x?.perMaand),
+  }
+}
+
+// Keuzes voor het verlengvenster: eerst de producten, dan de tiers met een ingevulde prijs.
+// → [{ id, naam, maanden, vooruit, perMaand, soort: 'product'|'tier' }]
+export function aanbodOpties(g) {
+  if (!g) return []
+  const uit = []
+  for (const p of g.producten || []) {
+    if (!p.naam?.trim() || !p.maanden || (!(p.vooruit > 0) && !(p.perMaand > 0))) continue
+    uit.push({ id: p.id, naam: p.naam.trim(), maanden: p.maanden, vooruit: p.vooruit > 0 ? p.vooruit : null, perMaand: p.perMaand > 0 ? p.perMaand : null, soort: 'product' })
+  }
+  for (const [k, label] of TIERS) {
+    for (const d of DUREN) {
+      const pr = prijzen(g.tiers?.[k], d, g)
+      if (!pr) continue
+      uit.push({ id: `tier-${k}-${d}`, naam: `${label} ${d} mnd`, maanden: d, vooruit: pr.vooruit, perMaand: Math.round(pr.teBetalen / d), soort: 'tier' })
+    }
+  }
+  return uit
 }
 
 const n = (v) => Number(v) || 0
@@ -171,11 +212,12 @@ export function aanbodVoorGino({ id = null, gegevens = null, open = false, duur 
   }
   return {
     ...kop,
-    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin. prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen.',
+    vorm: 'Eén jsonb-object: stuur altijd het hele object terug met jouw wijziging erin (ook producten, anders verdwijnen ze). prijs = totaal per duur in maanden, vooruitPct = % korting bij vooruitbetalen, borgAan/borgBedrag = borg verrekenen. producten = wat nu verkocht wordt: naam, maanden, vooruit (in één keer), perMaand (termijn).',
     in_beeld: { duur, stand },
     gegevens: {
       partnerPct: gegevens.partnerPct, vooruitPct: gegevens.vooruitPct,
       borgAan: gegevens.borgAan, borgBedrag: gegevens.borgBedrag, tiers,
+      producten: gegevens.producten || [],
     },
   }
 }

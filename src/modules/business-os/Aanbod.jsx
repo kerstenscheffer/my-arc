@@ -41,7 +41,7 @@ import {
   ChevronDown, Check, Plus, X, CloudOff,
 } from 'lucide-react'
 import { colors } from '../../ui/tokens'
-import { DUREN, TIERS, HUIDIGE_PRIJZEN, prijzen, reken, euro, leesGetal } from './aanbodData'
+import { DUREN, TIERS, prijzen, reken, euro, leesGetal, normaliseerProduct } from './aanbodData'
 
 const C = {
   wit: colors.textPrimary,
@@ -78,6 +78,39 @@ function GetalVeld({ waarde, onChange, label, title = label, placeholder = '', g
         textAlign: groot ? 'left' : 'right', fontSize: groot ? '1.5rem' : '1rem', fontWeight: groot ? 900 : 800,
         padding: groot ? '4px 0' : '8px 0', minHeight: groot ? 48 : 40,
       }} />
+  )
+}
+
+// Wat Kersten nu verkoopt (24 nov 2026). Hieruit kies je bij verlengen (TrajectModal),
+// samen met de tiers die een prijs hebben. Naam, maanden, in één keer en per maand.
+function Producten({ lijst, onChange }) {
+  const zet = (i, veld, v) => onChange(lijst.map((p, j) => (j === i ? { ...p, [veld]: v } : p)))
+  const kolom = { fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.zacht, textAlign: 'right' }
+  const raster = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 44px 64px 56px 28px', alignItems: 'center', gap: 8 }
+  return (
+    <div style={{ padding: '6px 0' }}>
+      <div style={{ ...LABEL, color: C.zacht, marginBottom: 6 }}>Nu verkopen</div>
+      <div style={{ ...raster, marginBottom: 2 }}>
+        <span style={{ ...kolom, textAlign: 'left' }}>Naam</span><span style={kolom}>Mnd</span><span style={kolom}>Ineens</span><span style={kolom}>/mnd</span><span />
+      </div>
+      {lijst.map((p, i) => (
+        <div key={p.id} style={raster}>
+          <input type="text" value={p.naam} onChange={e => zet(i, 'naam', e.target.value)} aria-label="Naam aanbod" placeholder="Naam"
+            style={{ minWidth: 0, background: 'transparent', border: 'none', borderBottom: `1px solid ${C.lijn}`, outline: 'none', color: C.wit, fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 800, padding: '8px 0', minHeight: 40 }} />
+          <GetalVeld waarde={p.maanden} onChange={v => zet(i, 'maanden', v === null ? null : Math.round(v))} label={`Maanden ${p.naam}`} placeholder="0" breedte={44} />
+          <GetalVeld waarde={p.vooruit} onChange={v => zet(i, 'vooruit', v)} label={`In één keer ${p.naam}`} placeholder="€" breedte={64} />
+          <GetalVeld waarde={p.perMaand} onChange={v => zet(i, 'perMaand', v)} label={`Per maand ${p.naam}`} placeholder="€" breedte={56} />
+          <button type="button" onClick={() => onChange(lijst.filter((_, j) => j !== i))} title={`${p.naam || 'Aanbod'} weghalen`} aria-label={`${p.naam || 'Aanbod'} weghalen`}
+            style={{ ...KAAL, width: 28, height: 40, color: C.zacht, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={15} />
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...lijst, normaliseerProduct({ naam: '' }, lijst.length)])}
+        style={{ ...KAAL, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 40, marginTop: 6, padding: 0, color: C.wit, fontSize: '0.85rem', fontWeight: 800 }}>
+        <Plus size={15} /> Aanbod toevoegen
+      </button>
+    </div>
   )
 }
 
@@ -434,7 +467,7 @@ export default function Aanbod({ a, onSluit = null }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' }}>
           {rekenen && (
             <>
-              <IcoonKnop icoon={Info} naam="Huidige prijzen" smal={smal} aan={popOpen === 'info'} data-aanbod-pop aria-haspopup="dialog" aria-expanded={popOpen === 'info'}
+              <IcoonKnop icoon={Info} naam="Wat je nu verkoopt" smal={smal} aan={popOpen === 'info'} data-aanbod-pop aria-haspopup="dialog" aria-expanded={popOpen === 'info'}
                 onClick={() => setPop(v => (v === 'info' ? null : 'info'))} />
               <IcoonKnop icoon={Settings} naam={`Partner, korting en borg${g.borgAan ? ' (borg aan)' : ''}`} smal={smal} aan={popOpen === 'instel'} stip={g.borgAan}
                 data-aanbod-pop aria-haspopup="dialog" aria-expanded={popOpen === 'instel'}
@@ -457,17 +490,12 @@ export default function Aanbod({ a, onSluit = null }) {
         </div>
 
         {popOpen && (
-          <div ref={paneel} role="dialog" aria-label={popOpen === 'info' ? 'Huidige prijzen' : 'Partner, korting en borg'} style={{
+          <div ref={paneel} role="dialog" aria-label={popOpen === 'info' ? 'Wat je nu verkoopt' : 'Partner, korting en borg'} style={{
             position: 'absolute', top: onSluit ? 'calc(100% - 6px)' : 'calc(100% + 6px)', right: 0, zIndex: 3, boxSizing: 'border-box',
-            minWidth: 248, maxWidth: '100%', padding: '10px 18px', borderRadius: 16, background: C.vlak, boxShadow: '0 18px 44px rgba(0,0,0,0.7)',
+            minWidth: popOpen === 'info' ? Math.min(440, breedte) : 248, maxWidth: '100%', padding: '10px 18px', borderRadius: 16, background: C.vlak, boxShadow: '0 18px 44px rgba(0,0,0,0.7)',
           }}>
             {popOpen === 'info' && (
-              <div style={{ padding: '6px 0' }}>
-                <div style={{ ...LABEL, color: C.zacht }}>Nu</div>
-                {HUIDIGE_PRIJZEN.split(' · ').map(regel => (
-                  <div key={regel} style={{ ...NUM, fontSize: '0.95rem', fontWeight: 800, lineHeight: 1.3, color: C.wit, marginTop: 10 }}>{regel}</div>
-                ))}
-              </div>
+              <Producten lijst={g.producten || []} onChange={lijst => wijzig(oud => ({ ...oud, producten: lijst }))} />
             )}
             {popOpen === 'instel' && (
               <>

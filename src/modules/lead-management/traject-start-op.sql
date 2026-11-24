@@ -104,3 +104,10 @@ create trigger verlenging_betaald_doorstap after update of payment_received on p
 revoke all on function public.get_awaiting_payment_v2(uuid) from public, anon;
 grant execute on function public.get_awaiting_payment_v2(uuid) to authenticated;
 revoke all on function public.verlenging_betaald_doorstap() from public, anon, authenticated;
+
+-- 4) Aanbod kiezen bij verlengen (24 nov 2026). Live gedraaid.
+--    business_os_aanbod.gegevens.producten = lijst van wat nu verkocht wordt (Aanbod-tab, info-icoon).
+--    lead_movements.aanbod = de gekozen naam, zodat je later ziet wat iemand nam.
+alter table public.lead_movements add column if not exists aanbod text;
+comment on column public.lead_movements.aanbod is 'Gekozen aanbod bij verlengen (Business OS → Aanbod), bv. App 1 jaar. 24 nov 2026.';
+-- Kerstens rij gevuld met 12 weken €450, 6 maanden €125/mnd, App 1 jaar €300 of €30/mnd.

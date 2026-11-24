@@ -118,10 +118,10 @@ export function planVervolg(client, { maanden, startOp }) {
 }
 
 // Korte omschrijving voor client_doorstap.pakket en de schermen die die tonen.
-export function pakketTekst({ maanden, betaling, prijs, start, betaald, betaalDatum }) {
+export function pakketTekst({ maanden, betaling, prijs, start, betaald, betaalDatum, aanbod = null }) {
   const geld = betaling === 'monthly' ? `${maanden}x €${prijs}` : `€${prijs}`
   const open = betaald ? '' : `, nog niet betaald${betaalDatum ? ` (verwacht ${kortDatum(betaalDatum)})` : ''}`
-  return `${maanden} mnd vanaf ${kortDatum(start)}, ${geld}${open}`
+  return `${aanbod ? `${aanbod}: ` : ''}${maanden} mnd vanaf ${kortDatum(start)}, ${geld}${open}`
 }
 
 // De laatste coaching-sale van deze klant: eerst via client_id, anders via de lead op e-mail.
@@ -161,7 +161,7 @@ export async function vorigeSale(supabase, client) {
 // Geeft { clientPayload, pakket, doorstap }. Gooit een fout als stap 1 of 2 mislukt.
 export async function boekVerlenging(supabase, {
   client, coachId, maanden, betaling, prijs, startOp = null,
-  betaald = true, betaalDatum = null, vorige = null, borgId,
+  betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null,
 }) {
   const plan = planVervolg(client, { maanden, startOp })
   const totaal = betaling === 'monthly' ? prijs * maanden : prijs
@@ -210,6 +210,7 @@ export async function boekVerlenging(supabase, {
       payment_received: !!betaald,
       payment_due_date: betaalVanaf,
       start_op: plan.start,
+      aanbod: aanbod || null,
       borg_movement_id: borg || null,
       sale_kind: 'coaching',
     })
@@ -220,7 +221,7 @@ export async function boekVerlenging(supabase, {
     }
   }
 
-  const pakket = pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum })
+  const pakket = pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum, aanbod })
   const { data: doorstap } = await supabase.from('client_doorstap').insert({
     client_id: client.id, coach_id: client.coach_id || coach, status: betaald ? 'betaald' : 'ja_mondeling',
     pakket, gezet_door: coach,

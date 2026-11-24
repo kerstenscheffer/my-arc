@@ -20,15 +20,19 @@
 // Opmaakbalk tijdens bewerken: titel/kop/subkop, opsomming, genummerd, pijl, lijn,
 // vet en schuin (ook ⌘B / ⌘I; Tab = inspringen). Het blijft gewone markdown,
 // zodat Gino het kan lezen en schrijven.
+// Lezen (24 nov 2026): elk ###-onderdeel is uitklapbaar en staat standaard dicht;
+// tekst onder # en ## blijft open. Welke open staan wordt per tab onthouden
+// (localStorage bos_doc_open, op koptekst). Knop in de kopbalk: alles open/dicht.
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus } from 'lucide-react'
 import { createPortal } from '../../client/paginaPortal'
 
 const POS_SLEUTEL = 'bos_doc_pos'
 const TAB_SLEUTEL = 'bos_doc_tab_id'
 const MAAT_SLEUTEL = 'bos_doc_maat'
 const DICHT_SLEUTEL = 'bos_doc_ingeklapt'
+const OPEN_SLEUTEL = 'bos_doc_open'
 const RAND = 8
 // Langer dan dit: tikken in de tekst opent geen bewerkvak (je wilt kunnen scrollen en selecteren).
 const TIK_BEWERK_MAX = 5000
@@ -74,29 +78,86 @@ function Tabel({ rijen }) {
   )
 }
 
-function Weergave({ tekst }) {
-  const regels = String(tekst || '').split('\n')
+const KOPREGEL = /^(#{1,4})\s+(.*)$/
+
+// Sleutel van een ###-onderdeel: het kopje erboven (# of ##) plus de eigen tekst,
+// zodat hetzelfde onderwerp onder twee calls los open kan. Een dubbele krijgt een volgnummer.
+function sleutelMaker() {
+  let ouder = ''
+  const gezien = {}
+  return (n, kopTekst) => {
+    if (n < 3) { ouder = kopTekst.trim(); return null }
+    if (n > 3) return null
+    const basis = `${ouder}\n${kopTekst.trim()}`
+    gezien[basis] = (gezien[basis] || 0) + 1
+    return gezien[basis] > 1 ? `${basis}\n${gezien[basis]}` : basis
+  }
+}
+
+// Alle ###-onderdelen van een document, in volgorde.
+function onderdeelSleutels(tekst) {
+  const maak = sleutelMaker()
   const uit = []
+  for (const r of String(tekst || '').split('\n')) {
+    const kop = r.match(KOPREGEL)
+    const s = kop && maak(kop[1].length, kop[2])
+    if (s) uit.push(s)
+  }
+  return uit
+}
+
+// open = sleutels van de ###-onderdelen die open staan; wissel(sleutel) klapt er één om.
+function Weergave({ tekst, open, wissel }) {
+  const regels = String(tekst || '').split('\n')
+  const maak = sleutelMaker()
+  const uit = []
+  // Binnen een dicht ###-onderdeel wordt niets getoond tot het volgende kopje van niveau 1-3.
+  let verborgen = false
   for (let i = 0; i < regels.length; i++) {
     const r = regels[i]
     if (/^\s*\|/.test(r)) {
       const blok = []
       while (i < regels.length && /^\s*\|/.test(regels[i])) blok.push(regels[i++])
       i--
-      uit.push(<Tabel key={i} rijen={blok} />)
+      if (!verborgen) uit.push(<Tabel key={i} rijen={blok} />)
       continue
     }
-    const kop = r.match(/^(#{1,4})\s+(.*)$/)
+    const kop = r.match(KOPREGEL)
     if (kop) {
       const n = kop[1].length
+      const sleutel = maak(n, kop[2])
+      if (n === 3) {
+        const isOpen = open.includes(sleutel)
+        verborgen = !isOpen
+        const klap = (e) => {
+          // Tekst in de kop selecteren is geen tik.
+          const sel = e.type === 'click' ? window.getSelection?.() : null
+          if (sel && !sel.isCollapsed && e.currentTarget.contains(sel.anchorNode)) return
+          wissel(sleutel)
+        }
+        uit.push(
+          <div key={i} data-uitklap role="button" tabIndex={0} aria-expanded={isOpen} title={isOpen ? 'Inklappen' : 'Uitklappen'}
+            onClick={klap} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); klap(e) } }}
+            style={{ ...KOP, fontSize: '0.8rem', marginTop: 20, paddingTop: 10, paddingBottom: 6, marginBottom: -4, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            {/* Het onzichtbare teken geeft de chevron de hoogte van één tekstregel, ook als de kop afbreekt. */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+              {'\u200b'}{isOpen ? <ChevronDown size={14} strokeWidth={2.6} /> : <ChevronRight size={14} strokeWidth={2.6} />}
+            </span>
+            <span style={{ minWidth: 0 }}><Inline tekst={kop[2]} /></span>
+          </div>
+        )
+        continue
+      }
+      if (n < 3) verborgen = false
+      if (verborgen) continue
       const stijl = n === 1
         ? { color: '#fff', fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', marginTop: i ? 18 : 0 }
         : n === 4 ? { color: '#fff', fontSize: '0.9rem', fontWeight: 800, marginTop: 12 }
-        : n === 3 ? { ...KOP, fontSize: '0.8rem', marginTop: 20, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }
         : { ...KOP, marginTop: i ? 14 : 0 }
       uit.push(<div key={i} style={{ ...stijl, marginBottom: 2 }}><Inline tekst={kop[2]} /></div>)
       continue
     }
+    if (verborgen) continue
     if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(r)) {
       uit.push(<div key={i} style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />)
       continue
@@ -322,6 +383,8 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
   const actief = tabs.find(t => t.id === actiefId) || tabs[0] || null
   const [lijstOpen, setLijstOpen] = useState(!isMobile)
   const [ingeklapt, setIngeklapt] = useState(() => lees(DICHT_SLEUTEL, []))
+  // Per tab-id de ###-onderdelen die open staan; niets bewaard = alles dicht.
+  const [openPerTab, setOpenPerTab] = useState(() => { const o = lees(OPEN_SLEUTEL, null); return o && typeof o === 'object' && !Array.isArray(o) ? o : {} })
   const [menuVoor, setMenuVoor] = useState(null)
   const [hernoemVoor, setHernoemVoor] = useState(null)
   const [sleepTab, setSleepTab] = useState(null)
@@ -509,6 +572,22 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
   const tekst = actief?.inhoud || ''
   const tikBewerk = tekst.length <= TIK_BEWERK_MAX
+  // Uitklapbare ###-onderdelen van dit tabblad.
+  const onderdelen = useMemo(() => onderdeelSleutels(tekst), [tekst])
+  const bewaardOpen = actief ? openPerTab[actief.id] : null
+  const openLijst = Array.isArray(bewaardOpen) ? bewaardOpen : []
+  const allesOpen = onderdelen.length > 0 && onderdelen.every(s => openLijst.includes(s))
+  // Bewaart alleen kopjes die nu bestaan: een hernoemd kopje is daarna gewoon weer dicht.
+  const zetOpen = (lijst) => {
+    if (!actief) return
+    const n = { ...openPerTab }
+    const geldig = lijst.filter(s => onderdelen.includes(s))
+    if (geldig.length) n[actief.id] = geldig
+    else delete n[actief.id]
+    setOpenPerTab(n)
+    schrijf(OPEN_SLEUTEL, n)
+  }
+  const wisselOnderdeel = (s) => zetOpen(openLijst.includes(s) ? openLijst.filter(x => x !== s) : [...openLijst, s])
   // Vastgezet = bovenaan als eigen boom (met subtabs); de gewone lijst toont de rest.
   const ouderVan = (t) => tabs.find(x => x.id === t.parent_id)
   const vastVoorouder = (t) => { for (let p = ouderVan(t); p; p = ouderVan(p)) if (p.vastgezet) return true; return false }
@@ -543,6 +622,11 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
         </div>
         {!dicht && actief && (
           <>
+            {!bewerk && onderdelen.length > 0 && (
+              <button type="button" onClick={() => zetOpen(allesOpen ? [] : onderdelen)} title={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} aria-label={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} style={knop}>
+                {allesOpen ? <ChevronsDownUp size={15} strokeWidth={2.4} /> : <ChevronsUpDown size={15} strokeWidth={2.4} />}
+              </button>
+            )}
             <button type="button" onClick={() => (bewerk ? setConcept(c => `${c.replace(/\s*$/, '')}\n\n## Nieuw onderdeel\n`) : start(`${tekst && !tekst.endsWith('\n') ? '\n' : ''}${tekst ? '\n' : ''}## Nieuw onderdeel\n`))} title="Onderdeel toevoegen" aria-label="Onderdeel toevoegen" style={knop}>
               <Plus size={15} strokeWidth={2.6} />
             </button>
@@ -600,7 +684,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
               }} />
             </div>
           ) : (
-            <div key={actief?.id || 'leeg'} onClick={tikBewerk && actief ? () => start() : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
+            <div key={actief?.id || 'leeg'} onClick={tikBewerk && actief ? (e) => { if (!e.target.closest('[data-uitklap]')) start() } : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
               style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 16px' : '20px 28px 24px' }}>
               {!docs.geladen ? <div style={{ ...TEKST, color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
                 : !actief ? (
@@ -608,7 +692,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
                     <Plus size={14} strokeWidth={2.6} /> Eerste tabblad maken
                   </button>
                 )
-                : tekst.trim() ? <Weergave tekst={tekst} />
+                : tekst.trim() ? <Weergave tekst={tekst} open={openLijst} wissel={wisselOnderdeel} />
                 : <div style={{ ...TEKST, color: 'rgba(255,255,255,0.3)' }}>Leeg tabblad. Tik om te schrijven, of vraag Gino iets vast te leggen.</div>}
             </div>
           )}
