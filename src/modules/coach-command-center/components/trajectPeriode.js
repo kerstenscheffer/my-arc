@@ -226,9 +226,9 @@ export async function boekVerlenging(supabase, {
     }
   }
 
-  // Borg die (deels) de betaling is: aan de klant hangen. Dekt hij alles (niets meer te betalen),
-  // dan meteen behouden, net als bij omzetten.
-  const borgBetaling = borgOmzetten || (borgVerrekend && totaal <= 0 ? borgVerrekend : null)
+  // Borg die (deels) de betaling is: aan de klant hangen en meteen behouden. Hij zei ja tegen het
+  // vervolg, dus de borg gaat niet meer terug, ook als de rest nog moet komen (24 nov 2026, Patrick).
+  const borgBetaling = borgOmzetten || borgVerrekend || null
   if (borgBetaling?.id || borgVerrekend?.id) {
     const b = borgBetaling || borgVerrekend
     const patch = { client_id: client.id, ...(borgBetaling && b.challenge_status === 'open' ? { challenge_status: 'behouden' } : {}) }

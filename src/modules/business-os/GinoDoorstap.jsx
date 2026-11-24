@@ -20,6 +20,7 @@ import { meldFout } from '../../ui/PaginaVangnet'
 import { colors } from '../../ui/tokens'
 import TrajectModal from '../coach-command-center/components/TrajectModal'
 import AfhandelModal from './AfhandelModal'
+import { borgAfronden } from './borgAfronden'
 import { computePeriod, hervatTraject } from '../coach-command-center/components/trajectPeriode'
 import { haalVerlengen, EINDCALL_NODIG } from './verlengenData'
 import { EisenLijst } from '../challenge-monitor/ChallengeEisenRegel'
@@ -83,15 +84,16 @@ function Getal({ label, waarde, sub, kleur, regels, open, onKlik, leeg = 'Nieman
       </button>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, width: 270, maxWidth: '86vw', maxHeight: 280, overflowY: 'auto', padding: '6px 10px',
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, width: 380, maxWidth: '92vw', maxHeight: 280, overflowY: 'auto', padding: '6px 10px',
           background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
         }}>
           {sub && <div style={{ padding: '2px 0 4px', fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary }}>{sub}</div>}
           {regels.length === 0 && <div style={{ padding: '4px 0', fontSize: '0.78rem', fontWeight: 700, color: colors.textSecondary }}>{leeg}</div>}
           {regels.map((x, i) => (
             <div key={x.id || i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '3px 0', fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.naam}</span>
-              {x.sub && <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary }}>{x.sub}</span>}
+              {/* Naam gaat voor: de toelichting krimpt eerst (24 nov 2026, namen waren onleesbaar). */}
+              <span title={x.naam} style={{ flex: '1 0 auto', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.naam}</span>
+              {x.sub && <span title={x.sub} style={{ flex: '0 1 auto', minWidth: 0, marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary }}>{x.sub}</span>}
               {x.bedrag != null && <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{euro(x.bedrag)}</span>}
             </div>
           ))}
@@ -156,7 +158,7 @@ export default function GinoDoorstap({ isMobile = false }) {
         .eq('sale_kind', 'challenge').eq('challenge_status', 'open').eq('payment_received', true).is('reverted_at', null)
         .order('lead_name')
         .then(r => r, e => ({ error: e })),
-      supabase.from('lead_movements').select('id, lead_name, moved_at, order_value, challenge_status, payment_received, borg_movement_id, sale_kind')
+      supabase.from('lead_movements').select('id, lead_name, moved_at, order_value, challenge_status, payment_received, borg_movement_id, sale_kind, client_id')
         .or('sale_kind.eq.challenge,borg_movement_id.not.is.null').is('reverted_at', null)
         .then(r => r, e => ({ error: e })),
       // Einddatum en eindcall: dezelfde regels als het overzicht Verlengen. Lukt de agenda niet,
@@ -175,7 +177,13 @@ export default function GinoDoorstap({ isMobile = false }) {
     const alle = (kl.data || []).filter(c => !isTest(c) && (laatste.get(c.id)?.status
       || (c.coaching_status !== 'ended' && ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_onbeperkt))))
     if (!ch.error) setSaleRijen(ch.data || [])
-    setInstellingen(await haalInstellingen().catch(() => new Map()))
+    const inst = await haalInstellingen().catch(() => new Map())
+    setInstellingen(inst)
+    // Challenge-klant = er hangt een challenge-borg aan hem (instelling of client_id), of hij loopt
+    // nu een traject van 6 weken. Een doorstap-stand alleen maakt het geen challenge (24 nov 2026:
+    // Elijah, 12 weken coaching, stond met eisen in de challenge-lijst).
+    const metBorg = new Set((ch.data || []).filter(x => x.sale_kind === 'challenge' && x.client_id).map(x => x.client_id))
+    for (const [id, i] of inst) if (i.sale_id) metBorg.add(id)
     // Gestopt telt ook wie niet meer actief is, dus los van de klantenlijst hierboven.
     // Traject beëindigd, of het account staat niet meer op actief terwijl coaching_status
     // nog op active bleef hangen (18 nov 2026: zo vielen twee refunds uit beide lijsten).
@@ -203,8 +211,7 @@ export default function GinoDoorstap({ isMobile = false }) {
         const eigen = (sales || []).filter(x => x.client_id === c.id)
         const periode = computePeriod(c)
         return {
-          // Geen vlag op de klant: challenge = traject van 6 weken, of al een doorstap-stand.
-          challenge: c.coaching_total_weeks === CHALLENGE_WEKEN || !!stand?.status, onbeperkt: !!c.coaching_onbeperkt,
+                  challenge: c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id), onbeperkt: !!c.coaching_onbeperkt,
           client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: stand?.call_datum || null,
           klant: c, sale: eigen.find(x => !x.payment_received) || null, betaaldeSale: eigen.find(x => x.payment_received) || null,
           week: periode ? Math.min(periode.weeksDone + 1, periode.weeksTotal) : null, weken: periode?.weeksTotal || null,
@@ -358,19 +365,10 @@ export default function GinoDoorstap({ isMobile = false }) {
   // terugbetaald terug: de automatische stap hierboven en de trigger borg-na-doorstap
   // pakken alleen een borg die nog open staat. Geeft true als het gelukt is.
   const zetBorg = async (r, sale, status) => {
-    if (sale.challenge_status === status) return true
     rijFoutWeg(r.client_id)
-    // Was hij behouden en al aan Marcel uitbetaald, dan blijft die maand vast staan: melden.
-    const { data: alBetaald } = sale.challenge_status === 'behouden' && status === 'terugbetaald'
-      ? await supabase.from('partner_payout_items').select('id').eq('movement_id', sale.id).limit(1).then(x => x, () => ({ data: [] }))
-      : { data: [] }
-    // Terugbetaald: de uitbetaalmaand gaat leeg, zodat hij bij later toch behouden in de
-    // dan lopende periode valt (de trigger laat een gevulde maand staan).
-    const patch = status === 'terugbetaald' ? { challenge_status: status, telt_mee_vanaf: null } : { challenge_status: status }
-    const { data, error } = await supabase.from('lead_movements').update(patch)
-      .eq('id', sale.id).in('challenge_status', ['open', 'behouden', 'terugbetaald']).select('id').then(x => x, e => ({ error: e }))
-    if (error || !data?.length) { rijMislukt(r.client_id, error, 'Borg afronden mislukt'); return false }
-    if (alBetaald?.length) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
+    const uit = await borgAfronden(sale, status)
+    if (!uit.ok) { rijMislukt(r.client_id, uit.error, 'Borg afronden mislukt'); return false }
+    if (uit.alUitbetaald) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
     return true
   }
 
@@ -687,7 +685,12 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
                       <span title={r.pakket || undefined} style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamVan(r.klant)}</span>
                       {bedrag ? <span style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: colors.textSecondary }}>{euro(bedrag)}</span> : null}
-                      {r.status !== 'betaald' && (
+                      {/* Geboekte verlenging, geld nog niet binnen: omlijnd label (24 nov 2026, Kersten: Patrick,
+                          Martijn). Alleen met een echte boeking (r.sale); Ja zonder traject blijft "Ja".
+                          Wit gevuld blijft voor geld dat wél verrekend is. */}
+                      {r.sale && r.status !== 'betaald' ? (
+                        <span title={r.pakket || 'Ja gezegd, nog niet betaald'} style={{ flexShrink: 0, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 6, border: `1px solid ${colors.textPrimary}`, color: colors.textPrimary, fontSize: '0.68rem', fontWeight: 900, whiteSpace: 'nowrap' }}>Nog niet betaald</span>
+                      ) : r.status !== 'betaald' && (
                         <span style={{ flexShrink: 0, color: r.status ? colors.textPrimary : colors.textSecondary }}>
                           {STATUS_KEUZE.find(([id]) => id === r.status)?.[1] || (nodig ? 'Gesprek' : r.gepauzeerd ? 'Pauze' : '')}
                         </span>

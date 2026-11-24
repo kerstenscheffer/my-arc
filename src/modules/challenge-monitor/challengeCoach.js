@@ -42,7 +42,9 @@ export async function haalEisen(client) {
     behaald: EISEN.filter(e => w[e.key] >= e.nodig).length,
     totaal: EISEN.length,
     alles: allesGehaald(stand),
-    voorbij: venster.end_date < new Date().toLocaleDateString('sv-SE'),
+    // Op pauze is de challenge nooit voorbij: de klok staat stil (24 nov 2026, Dirk Jan: borg ging
+    // ten onrechte op behouden omdat de lopende pauze nog niet in de pauzedagen zat).
+    voorbij: client.coaching_status !== 'paused' && venster.end_date < new Date().toLocaleDateString('sv-SE'),
   }
 }
 

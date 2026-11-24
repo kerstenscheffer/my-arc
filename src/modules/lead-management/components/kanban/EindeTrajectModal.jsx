@@ -13,9 +13,17 @@
 // De lijst komt uit de RPC einde_traject_open(); de keuze staat in
 // client_doorstap, dezelfde tabel als Gino → Klanten. De nachtregel zet alleen
 // nog op slot bij 'nee' (SQL in ../../einde-traject.sql).
+//
+// 24 nov 2026: geen eigen keuzelijst meer. Per klant één knop Afhandelen met
+// hetzelfde venster als Business OS → Klanten (AfhandelModal): verlengt (aanbod,
+// start, prijs, borg, korting), borg omzetten, stopt (borg terug of niet), denkt
+// na, call. Op pauze staat iemand onder Wacht: zijn einde ligt nog niet vast.
 
 import { useEffect, useState } from 'react'
 import { Lock } from 'lucide-react'
+import AfhandelModal from '../../../business-os/AfhandelModal'
+import { borgAfronden, borgVanKlant, losseBorgen } from '../../../business-os/borgAfronden'
+import { hervatTraject } from '../../../coach-command-center/components/trajectPeriode'
 import { supabase } from '../../../../lib/supabase'
 import { Venster, VensterKop } from '../../../../components/arc-ui'
 import TrajectModal from '../../../coach-command-center/components/TrajectModal'
@@ -28,6 +36,8 @@ const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`)
 // Vraagt deze klant nu om een keuze, of wacht hij op een call of bedenktijd?
 // eslint-disable-next-line react-refresh/only-export-components -- hoort bij deze pop-up
 export function vraagtNuActie(r) {
+  // Op pauze: het einde schuift nog op, dus nu niets te beslissen (Dirk Jan, 24 nov 2026).
+  if (r.gepauzeerd) return false
   if (r.status === 'call' && r.call_datum && r.call_datum >= vandaagIso()) return false
   if (r.status === 'denkt_na' && r.gezet_at && Date.now() - new Date(r.gezet_at).getTime() < DENKT_NA_DAGEN * 864e5) return false
   // Nog niet afgelopen en al een keuze: wacht tot het einde.
@@ -52,15 +62,14 @@ const standTekst = (r) => (r.status === 'call' ? `call ${dagKort(r.call_datum)}`
 export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, onGewijzigd }) {
   const [bezig, setBezig] = useState(null)        // client_id waar een actie op loopt
   const [fout, setFout] = useState(null)
-  const [callVoor, setCallVoor] = useState(null)  // client_id waar de datum gevraagd wordt
-  const [callDatum, setCallDatum] = useState('')
-  const [traject, setTraject] = useState(null)    // { client, rij, voorstel, betaald }
+  const [traject, setTraject] = useState(null)    // { client, rij, voorstel, betaald, borgId, borgOmzetten }
+  const [afhandel, setAfhandel] = useState(null)  // { r, borg, kandidaten, gekozen } voor het Afhandelen-venster
 
   useEffect(() => {
-    const esc = (e) => { if (e.key === 'Escape' && !traject) onClose?.() }
+    const esc = (e) => { if (e.key === 'Escape' && !traject && !afhandel) onClose?.() }
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
-  }, [onClose, traject])
+  }, [onClose, traject, afhandel])
 
   const nu = rijen.filter(vraagtNuActie)
   const wacht = rijen.filter(r => !vraagtNuActie(r))
@@ -88,15 +97,8 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
     } finally { setBezig(null) }
   }
 
-  const kiesCall = (r) => {
-    if (!callDatum) return
-    doe(r, async () => [await bewaarKeuze(r, 'call', { call_datum: callDatum }), await slotEraf(r)])
-      .then(() => { setCallVoor(null); setCallDatum('') })
-  }
-  const kiesDenktNa = (r) => doe(r, async () => [await bewaarKeuze(r, 'denkt_na'), await slotEraf(r)])
   const kiesNee = (r) => {
-    if (!window.confirm(`${r.naam} stopt?\n\nZijn account gaat op slot en hij telt vanaf vandaag als gestopt.`)) return
-    doe(r, async () => [
+    return doe(r, async () => [
       await bewaarKeuze(r, 'nee'),
       await supabase.from('clients').update({
         account_locked_at: new Date().toISOString(), account_locked_reason: 'Gestopt na einde traject',
@@ -107,24 +109,50 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
   // Ja: het verlengvenster doet het echte werk (einddatum, omzetregel en
   // doorstap-stand via boekVerlenging). Hier komt alleen de klant erbij.
   // betaald = startwaarde; in het venster kies je nog betaald / nog niet + startdatum.
-  const kiesJa = async (r, voorstel = null, betaald = true) => {
+  const kiesJa = async (r, voorstel = null, betaald = true, extra = {}) => {
     setBezig(r.client_id); setFout(null)
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single().then(x => x, e => ({ error: e }))
     setBezig(null)
     if (error || !client) { setFout(`${r.naam}: klant laden mislukt`); return }
-    setTraject({ client, rij: r, voorstel, betaald })
+    setTraject({ client, rij: r, voorstel, betaald, ...extra })
   }
 
-  // Eén regel per klant met één keuzelijst (16 nov 2026, Kersten: veel te druk
-  // met vijf knoppen per klant).
-  const kies = (r, keuze) => {
-    if (keuze === 'call') { setCallVoor(r.client_id); setCallDatum(r.call_datum && r.call_datum >= vandaagIso() ? r.call_datum : '') }
-    else if (keuze === 'denkt_na') kiesDenktNa(r)
-    else if (keuze === 'ja') kiesJa(r, null, true)
-    else if (keuze === 'ja_open') kiesJa(r, null, false)
-    else if (keuze === 'challenge') kiesJa(r, { maanden: 3, betaling: 'monthly', prijs: 50 }, false)
-    else if (keuze === 'nee') kiesNee(r)
+  // Afhandelen: borg van de klant erbij zoeken, dan het gedeelde venster openen.
+  const openAfhandel = async (r) => {
+    setBezig(r.client_id); setFout(null)
+    const [borg, kandidaten, { data: klant }] = await Promise.all([
+      borgVanKlant(r.client_id), losseBorgen(),
+      supabase.from('clients').select('coaching_total_weeks').eq('id', r.client_id).single().then(x => x, () => ({ data: null })),
+    ])
+    setBezig(null)
+    // Challenge = er hangt een borg aan, of hij loopt een traject van 6 weken. Alleen dan de borg-keuze
+    // (Elijah, 12 weken coaching, deed nooit een challenge).
+    const challenge = !!borg || klant?.coaching_total_weeks === 6
+    setAfhandel({ r, borg: borg && borg.payment_received ? borg : null, kandidaten: challenge ? kandidaten : [], challenge, gekozen: '' })
   }
+  const sluitAfhandel = () => setAfhandel(null)
+  const afhandelBorg = (a) => a.borg || (a.gekozen ? { ...a.kandidaten.find(k => k.id === a.gekozen), challenge_status: 'open', payment_received: true } : null)
+  // Gekozen losse borg meteen aan de klant hangen, zodat alle schermen hem kennen.
+  const kiesBorg = async (id) => {
+    setAfhandel(a => ({ ...a, gekozen: id }))
+    if (id) await supabase.from('lead_movements').update({ client_id: afhandel.r.client_id }).eq('id', id).is('client_id', null).then(x => x, () => null)
+  }
+  const afhandelStopt = async (borg, borgStatus) => {
+    const r = afhandel.r
+    if (borg && borgStatus) {
+      const uit = await borgAfronden(borg, borgStatus)
+      if (!uit.ok) { setFout(`${r.naam}: ${uit.error?.message || 'borg afronden mislukt'}`); return }
+      if (uit.alUitbetaald) setFout('Deze borg is al aan Marcel uitbetaald. Verreken dat met de volgende uitbetaling.')
+    }
+    await kiesNee(r)
+    sluitAfhandel()
+  }
+  const afhandelStatus = async (status, extra = {}) => {
+    const r = afhandel.r
+    await doe(r, async () => [await bewaarKeuze(r, status, extra), await slotEraf(r)])
+    sluitAfhandel()
+  }
+
   const veld = {
     height: 32, padding: '0 0.5rem', borderRadius: 8, background: 'transparent',
     border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: '0.8rem', fontWeight: 800,
@@ -143,25 +171,9 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
           {r.gepauzeerd && <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>pauze</span>}
           {stand && <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: '#fff' }}>· {stand}</span>}
         </div>
-        {callVoor === r.client_id ? (
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="date" autoFocus value={callDatum} min={vandaagIso()} onChange={e => setCallDatum(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') kiesCall(r); if (e.key === 'Escape') { e.stopPropagation(); setCallVoor(null) } }}
-              style={{ ...veld, cursor: 'text' }} />
-            <button disabled={!callDatum || druk} onClick={() => kiesCall(r)} style={{ ...veld, background: callDatum ? '#fff' : 'transparent', color: callDatum ? '#0a0a0a' : 'rgba(255,255,255,0.4)', borderColor: callDatum ? '#fff' : 'rgba(255,255,255,0.2)', fontWeight: 900 }}>OK</button>
-            <button onClick={() => setCallVoor(null)} aria-label="Annuleer" style={{ ...veld, border: 'none', padding: '0 0.3rem', color: 'rgba(255,255,255,0.55)' }}>×</button>
-          </div>
-        ) : (
-          <select value="" disabled={druk} onChange={e => kies(r, e.target.value)} aria-label={`Keuze voor ${r.naam}`} style={{ ...veld, flexShrink: 0, width: 150 }}>
-            <option value="">Kies…</option>
-            <option value="call">Call ingepland</option>
-            <option value="denkt_na">Denkt na</option>
-            <option value="ja">Ja, door (betaald)</option>
-            <option value="ja_open">Ja, door (nog niet betaald)</option>
-            <option value="challenge">Challenge → 3 × €50</option>
-            <option value="nee">Nee, stopt</option>
-          </select>
-        )}
+        <button type="button" disabled={druk} onClick={() => openAfhandel(r)} style={{ ...veld, flexShrink: 0, padding: '0 0.9rem', fontWeight: 900 }}>
+          Afhandelen
+        </button>
       </div>
     )
   }
@@ -190,10 +202,36 @@ export default function EindeTrajectModal({ rijen, coachId, isMobile, onClose, o
         </div>
       </Venster>
 
+      {afhandel && (
+        <AfhandelModal
+          r={{ ...afhandel.r, sale: null, challenge: afhandel.challenge }}
+          naam={afhandel.r.naam}
+          borgSale={afhandel.borg}
+          borgKandidaten={afhandel.borg ? [] : afhandel.kandidaten}
+          gekozenBorg={afhandel.gekozen}
+          onKiesBorg={kiesBorg}
+          bezig={bezig === afhandel.r.client_id}
+          fout={fout}
+          onClose={sluitAfhandel}
+          onBetaald={sluitAfhandel}
+          onVerleng={() => { const a = afhandel; sluitAfhandel(); kiesJa(a.r, null, true, { borgId: afhandelBorg(a)?.id }) }}
+          onBorgOmzetten={(borg) => { const a = afhandel; sluitAfhandel(); kiesJa(a.r, null, true, { borgOmzetten: borg }) }}
+          onStatus={afhandelStatus}
+          onStopt={afhandelStopt}
+          onHervat={async () => {
+            const r = afhandel.r
+            const { data: client } = await supabase.from('clients').select('*').eq('id', r.client_id).single().then(x => x, () => ({ data: null }))
+            sluitAfhandel()
+            if (client) await doe(r, async () => { try { await hervatTraject(supabase, client); return [] } catch (e) { return [{ error: e }] } })
+          }}
+        />
+      )}
+
       {traject && (
         <TrajectModal
           open modus="verleng" client={traject.client} coachId={coachId}
           voorstel={traject.voorstel} betaald={traject.betaald}
+          borgId={traject.borgId} borgOmzetten={traject.borgOmzetten || null}
           // De doorstap-stand (betaald / ja + afspraak) zet boekVerlenging zelf, net als in
           // Coach Inzicht en Business OS → Klanten.
           onGeboekt={() => onGewijzigd?.()}

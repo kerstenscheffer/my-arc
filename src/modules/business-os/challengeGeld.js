@@ -35,21 +35,26 @@ export function rekenGeld(rijen, ctx) {
   }
   const regel = (r, sub = dagKort(r.moved_at), bedrag = n(r.order_value)) => ({ id: r.id, naam: naam(r), bedrag, sub })
   const opNaam = (l) => l.sort((a, b) => a.naam.localeCompare(b.naam))
-  const borgPlus = (l) => l.map(c => regel(c, dagKort(c.moved_at), n(c.order_value) + n(borgVan.get(c.id)?.order_value)))
+  // Borg plus de verlenging die erbij hoort. In Zeker alleen een betaalde verlenging erbij: een open
+  // verlenging staat onder Toegezegd (24 nov 2026: Martijn Kroes stond met €447 in Zeker, €150 nog niet binnen).
+  const borgPlus = (l, alleenBetaald = false) => l.map(c => {
+    const v = borgVan.get(c.id)
+    return regel(c, dagKort(c.moved_at), n(c.order_value) + (v && (!alleenBetaald || v.payment_received) ? n(v.order_value) : 0))
+  })
   const zekerIds = new Set(zekerB.map(c => c.id))
   const toegezegdIds = new Set(toegezegdB.map(c => c.id))
   return {
     lijsten: {
       verkocht: opNaam(levend.map(c => regel(c))),
       zeker: opNaam([
-        ...borgPlus(zekerB),
+        ...borgPlus(zekerB, true),
         ...blijftB.map(c => regel(c, 'Niet geschikt')),
         ...betaaldV.filter(v => !zekerIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
       ]),
       toegezegd: opNaam([
         ...borgPlus(toegezegdB),
         ...nietBetaald.map(c => regel(c, 'Nog niet betaald')),
-        ...openV.filter(v => !toegezegdIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging')),
+        ...openV.filter(v => !toegezegdIds.has(v.borg_movement_id)).map(v => regel(v, 'Verlenging, nog niet betaald')),
       ]),
       onzeker: opNaam(onzekerB.map(c => regel(c))),
       refund: opNaam(challenges.filter(c => c.challenge_status === 'terugbetaald').map(c => regel(c))),
@@ -78,7 +83,7 @@ export async function haalChallengeGeld() {
   for (const [clientId, i] of instellingen) if (i.sale_id) klantVanSale.set(i.sale_id, clientId)
   const ids = [...klantVanSale.values()]
   const { data: klanten, error } = ids.length
-    ? await supabase.from('clients').select('id, first_name, last_name, coaching_start_date, coaching_total_weeks, coaching_paused_days_total').in('id', ids)
+    ? await supabase.from('clients').select('id, first_name, last_name, coaching_start_date, coaching_total_weeks, coaching_paused_days_total, coaching_status').in('id', ids)
     : { data: [] }
   if (error) throw error
   // Vier tegelijk, net als in Klanten.
