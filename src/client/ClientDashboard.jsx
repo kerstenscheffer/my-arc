@@ -34,6 +34,7 @@ import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
 import AppBetaalmuur from './components/AppBetaalmuur'
+import AppRondleiding from './components/AppRondleiding'
 import { bepaalAppToegang, abonnementMogelijk } from '../lib/appAbonnement'
 
 // Lucide Icons
@@ -156,6 +157,18 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // App-abonnement (24 nov 2026): 'app' = eigen app-account zonder abonnement,
   // 'slot' = klant op slot koos in het slotscherm voor het abonnement.
   const [betaalmuur, setBetaalmuur] = useState(null)
+  // App-gebruiker zonder coaching: geen coach-video's, wel de rondleiding.
+  const appGebruiker = !!client?.app_abonnee
+  // Rondleiding met Kersten: één keer per apparaat, alleen voor app-gebruikers.
+  const [rondleiding, setRondleiding] = useState(false)
+  useEffect(() => {
+    if (!client?.id) return
+    // Alleen lokaal (npm run dev): ?rondleiding=1 toont hem ook voor een gewone klant, om te bekijken.
+    const voorbeeld = import.meta.env.DEV && (() => { try { return new URLSearchParams(window.location.search).has('rondleiding') } catch { return false } })()
+    if (voorbeeld) { setRondleiding(true); return }
+    if (!appGebruiker) return
+    try { if (!localStorage.getItem(`myarc_rondleiding_klaar_${client.id}`)) setRondleiding(true) } catch { /* privé-venster */ }
+  }, [appGebruiker, client?.id])
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   // Alleen lokaal (npm run dev): ?checkin=1 opent de check-in buiten het
@@ -531,11 +544,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           Schuift rechts in, valt daarna terug op een tabje aan de rechterrand
           zodat hij niet met de check-in-pill onderaan vecht. */}
       {/* Ook bij meekijken (24 nov 2026): de coach ziet wat de klant ziet, maar vinkt niets af. */}
-      <VideoReminderPopup
+      {/* App-gebruikers (geen coaching, 24 nov 2026): geen coach-video's. */}
+      {!appGebruiker && <VideoReminderPopup
         client={client}
         isMobile={isMobile}
         alleenKijken={ingebed}
-      />
+      />}
 
       {/* ── Main Content ── */}
       {/* Geen header en geen side-nav meer: enige navigatie is de floating
@@ -619,7 +633,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.
              Verbergen in focus-mode, net als de balk zelf. ── */}
       {/* Niet op Home (17 nov 2026, Kersten): daar stond hij over de agenda heen. */}
-      {!focusMode && currentView !== 'home' && (
+      {!focusMode && !appGebruiker && currentView !== 'home' && (
         <VideoTeaser
           client={client}
           isMobile={isMobile}
@@ -663,6 +677,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             return (
               <button
                 key={item.id}
+                data-rondleiding={item.id}
                 onClick={() => setCurrentView(item.id)}
                 style={{
                   flex: 1,
@@ -881,6 +896,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           // maakte deze balk onnodig lang.
         ] : []}
       />
+
+      {rondleiding && !ingebed && client?.id && (
+        <AppRondleiding clientId={client.id} onKiesPagina={setCurrentView} onKlaar={() => setRondleiding(false)} />
+      )}
 
       {/* Het check-in-formulier niet bij meekijken: dat zou namens de klant indienen. */}
       {!ingebed && <CheckinModal

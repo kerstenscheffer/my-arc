@@ -35,7 +35,14 @@ import { getThumbnailFromUrl } from '../../modules/videos/utils/youtubeHelpers'
 // echt een nieuwe video bij, dan schuift hij rustig open (inschuif).
 const onthouden = new Map()
 
-export default function BelangrijkeVideo({ client, pagina, isMobile = false, compact = false }) {
+// App-gebruikers zonder coaching (clients.app_abonnee, 24 nov 2026) krijgen de
+// verplichte coach-video's niet: die horen bij het coachingtraject.
+export default function BelangrijkeVideo(props) {
+  if (props.client?.app_abonnee) return null
+  return <BelangrijkeVideoInhoud {...props} />
+}
+
+function BelangrijkeVideoInhoud({ client, pagina, isMobile = false, compact = false }) {
   const sleutel = `${client?.id}|${pagina}`
   const [items, setItems] = useState(() => onthouden.get(sleutel) || [])
   const [inschuif, setInschuif] = useState(false)
