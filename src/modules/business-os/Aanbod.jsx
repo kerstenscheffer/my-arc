@@ -44,6 +44,11 @@
 // Smal scherm: de onderdeelnaam staat als klein label boven de drie cellen.
 // Zonder vergelijking: de lijstjes uit tier.onderdelen zoals voorheen. Die
 // blijven altijd in de data staan (oudere app-versies lezen ze).
+//
+// Breder in Laten zien (24 nov 2026): de pagina gebruikt daar 90% van het scherm
+// tot 1400 px (was 1120) en de tabel verdeelt de tier-kolommen naar inhoud, zodat
+// de lange teksten van Premium en Midden op één regel staan. Telefoon en Rekenen
+// zijn niet veranderd.
 
 import { Fragment, useState, useEffect, useLayoutEffect, useRef, useId } from 'react'
 import {
@@ -455,29 +460,41 @@ const vglRaster = (smal, ruim, staart = false) => ({
 })
 
 // Stand Laten zien: de tiers met prijs als kolomkop, daaronder de onderdelen.
-function VergelijkingTonen({ rijen, g, duur, smal, ruim }) {
+// Smal: elke rij is zijn eigen raster, de naam staat als label boven de cellen.
+// Breed: één raster voor de hele tabel (de rijen zelf doen niet mee: display
+// contents, de lijn ertussen is een eigen strook). Zo meet de browser de drie
+// tier-kolommen op hun inhoud: een kolom met lange teksten wordt breder dan een
+// kolom met alleen vinkjes, en wat over is gaat gelijk over de drie. De naamkolom
+// blijft een vijfde van de breedte zoals voorheen, met 196 px als plafond.
+function VergelijkingTonen({ rijen, g, duur, smal, ruim, breedte }) {
   const raster = vglRaster(smal, ruim)
+  const naamBreed = Math.max(0, Math.min(196, Math.round((breedte - 3 * raster.columnGap) * 0.2)))
+  const tabel = smal ? null : { ...raster, gridTemplateColumns: `${naamBreed}px repeat(3, minmax(0, auto))` }
+  const lijn = `1px solid ${C.rand}`
   return (
-    <div role="table" aria-label="Vergelijking" style={{ marginTop: smal ? 28 : 48 }}>
-      <div role="row" style={{ ...raster, paddingBottom: smal ? 24 : 36 }}>
-        {!smal && <span role="columnheader" />}
+    <div role="table" aria-label="Vergelijking" style={{ ...tabel, marginTop: smal ? 28 : 48 }}>
+      <div role="row" style={smal ? { ...raster, paddingBottom: 24 } : { display: 'contents' }}>
+        {!smal && <span role="columnheader" style={{ gridColumn: 1 }} />}
         {TIERS.map(([k, naam]) => (
-          <div key={k} role="columnheader" style={{ minWidth: 0 }}>
+          <div key={k} role="columnheader" style={{ minWidth: 0, paddingBottom: smal ? 0 : 36 }}>
             <TierTonen sleutel={k} naam={naam} tier={g.tiers[k]} duur={duur} g={g} metLijst={false} compact={smal} />
           </div>
         ))}
       </div>
       {rijen.map((r, i) => (
-        <div key={i} role="row" style={{ ...raster, rowGap: 8, padding: smal ? '14px 0' : '16px 0', borderTop: `1px solid ${C.rand}` }}>
-          <span role="rowheader" style={smal
-            ? { ...LABEL, gridColumn: '1 / -1', fontSize: '0.68rem', color: C.zacht, overflowWrap: 'anywhere' }
-            : { minWidth: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.3, color: C.zacht, overflowWrap: 'anywhere' }}>
-            {r.onderdeel}
-          </span>
-          {TIERS.map(([k]) => (
-            <span key={k} role="cell" style={{ display: 'flex', minWidth: 0 }}><CelInhoud waarde={r[k]} klein={smal} /></span>
-          ))}
-        </div>
+        <Fragment key={i}>
+          {!smal && <span role="presentation" aria-hidden="true" style={{ gridColumn: '1 / -1', borderTop: lijn }} />}
+          <div role="row" style={smal ? { ...raster, rowGap: 8, padding: '14px 0', borderTop: lijn } : { display: 'contents' }}>
+            <span role="rowheader" style={smal
+              ? { ...LABEL, gridColumn: '1 / -1', fontSize: '0.68rem', color: C.zacht, overflowWrap: 'anywhere' }
+              : { gridColumn: 1, minWidth: 0, padding: '16px 0', fontSize: '1rem', fontWeight: 700, lineHeight: 1.3, color: C.zacht, overflowWrap: 'anywhere' }}>
+              {r.onderdeel}
+            </span>
+            {TIERS.map(([k]) => (
+              <span key={k} role="cell" style={{ display: 'flex', minWidth: 0, padding: smal ? 0 : '16px 0' }}><CelInhoud waarde={r[k]} klein={smal} /></span>
+            ))}
+          </div>
+        </Fragment>
       ))}
     </div>
   )
@@ -632,9 +649,15 @@ export default function Aanbod({ a, onSluit = null }) {
   const vglRijen = g?.vergelijking || []
   const vglTonen = vergelijkRijen(g)
   const ruim = breedte >= 1000
+  // Laten zien staat schermvullend: 90% van de breedte tot 1400 px, zodat de
+  // celteksten van de vergelijking op één regel passen. De som houdt onder
+  // ±1245 px de oude breedte aan (100% tot 1120), dus telefoon, tablet en split
+  // screen blijven gelijk. Alleen CSS, niet de gemeten breedte: die zou met smal
+  // en ruim heen en weer kunnen springen. Rekenen staat boven de bol en houdt 1120.
+  const doosMaat = tonen ? { width: 'min(100%, max(1120px, 90%))', maxWidth: 1400 } : { width: '100%', maxWidth: 1120 }
 
   return (
-    <div ref={doos} style={{ color: C.wit, width: '100%', maxWidth: 1120, margin: '0 auto' }}>
+    <div ref={doos} style={{ color: C.wit, ...doosMaat, margin: '0 auto' }}>
       {/* ── Duur en stand. Boven de bol blijft deze rij staan tijdens het scrollen. ── */}
       <div style={{
         position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '4px 12px',
@@ -746,7 +769,7 @@ export default function Aanbod({ a, onSluit = null }) {
       )}
 
       {g && tonen && vglTonen.length > 0 && (
-        <VergelijkingTonen rijen={vglTonen} g={g} duur={duur} smal={smal} ruim={ruim} />
+        <VergelijkingTonen rijen={vglTonen} g={g} duur={duur} smal={smal} ruim={ruim} breedte={breedte} />
       )}
 
       {g && tonen && vglTonen.length === 0 && (
