@@ -13,7 +13,7 @@
 // De borg telt pas als winst zodra de verlenging betaald is: de trigger uit
 // borg-na-doorstap.sql zet hem dan op behouden. Er gaat niets naar de klant of Marcel.
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { Loader2, FileDown, Search, X, MessageCircle, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { meldFout } from '../../ui/PaginaVangnet'
@@ -52,8 +52,9 @@ const volgorde = (r) => (r.eindcallNodig ? 0 : r.status === 'ja_mondeling' ? 1 :
 // (16 nov 2026)? 'actie' = jij bent aan zet, 'loopt' = niets te doen, 'klaar'
 // = afgerond. De volgorde van de regels is de volgorde van belang.
 const watNu = (r) => {
-  if (r.status === 'betaald') return { groep: 'klaar', tekst: 'Door, betaald' }
+  // Door en betaald = gewoon een lopend traject (24 nov 2026, Kersten). Afgerond is alleen wie stopt.
   if (r.status === 'nee') return { groep: 'klaar', tekst: 'Gestopt' }
+  if (r.status === 'betaald') return { groep: 'loopt', tekst: '' }
   // Kanban (24 nov 2026): door maar nog niet betaald is een eigen kolom.
   if (r.status === 'ja_mondeling' && r.sale) return { groep: 'betaling', tekst: 'Betaling ophalen', bericht: 'betaling' }
   if (r.status === 'ja_mondeling') return { groep: 'actie', tekst: 'Traject boeken' }
@@ -86,7 +87,20 @@ function berichtVoorstel(r, soort) {
 const dagenTekst = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} ${r.dagen === -1 ? 'dag' : 'dagen'} voorbij` : r.dagen === 0 ? 'Eindigt vandaag' : `Nog ${r.dagen} ${r.dagen === 1 ? 'dag' : 'dagen'}`)
 // Kort voor op de kaart: '11 d voorbij', 'nog 2 d'. De volle tekst staat in de pdf en de tooltip.
 const dagenKort = (r) => (r.onbeperkt ? 'Onbeperkt' : r.dagen == null ? null : r.dagen < 0 ? `${-r.dagen} d voorbij` : r.dagen === 0 ? 'Vandaag' : `Nog ${r.dagen} d`)
-const GROEPEN = [['actie', 'Actie nodig'], ['betaling', 'Door, nog niet betaald'], ['loopt', 'Loopt'], ['klaar', 'Afgerond']]
+// Tijd-label (24 nov 2026, Kersten): hoe dichter bij het einde of erover, hoe roder.
+// Meer dan 21 dagen = rustig grijs. Van 21 naar 0 dagen loopt de kleur van geel-oranje naar rood;
+// voorbij het einde is het vol rood. Op pauze grijs: de klok staat stil.
+function tijdKleur(r) {
+  if (r.gepauzeerd || r.dagen == null) return { bg: 'rgba(255,255,255,0.14)', fg: '#fff' }
+  if (r.dagen < 0) return { bg: 'hsl(0, 85%, 52%)', fg: '#fff' }
+  if (r.dagen > 21) return { bg: 'rgba(255,255,255,0.14)', fg: '#fff' }
+  const t = r.dagen / 21                       // 1 = ver weg, 0 = vandaag
+  const tint = Math.round(4 + t * 40)          // 44 (geel-oranje) → 4 (rood)
+  return { bg: `hsl(${tint}, 90%, 52%)`, fg: tint > 30 ? '#0a0a0a' : '#fff' }
+}
+const tijdTekst = (r) => (r.gepauzeerd ? 'Pauze' : dagenKort(r))
+
+const GROEPEN = [['actie', 'Actie nodig'], ['betaling', 'Door, nog niet betaald'], ['loopt', 'Loopt'], ['klaar', 'Gestopt']]
 
 const dagKort = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace('.', '') : '—')
 const callKort = (iso) => {
@@ -162,6 +176,27 @@ export default function GinoDoorstap({ isMobile = false }) {
   const [zoek, setZoek] = useState('')
   const [afhandel, setAfhandel] = useState(null) // client_id waar het Afhandelen-venster voor open staat
   const [bericht, setBericht] = useState(null)   // { id, tekst, fout } voorstel-bericht dat openstaat
+  // Kanban precies zo hoog als er onder in het scherm ruimte is (24 nov 2026: met een vaste schatting
+  // viel de onderste kaart achter de rand). Gemeten tegen de scrollvlak eromheen (.gk-scroll).
+  const kanbanRef = useRef(null)
+  const [kanbanHoogte, setKanbanHoogte] = useState(null)
+  useLayoutEffect(() => {
+    const meet = () => {
+      const el = kanbanRef.current
+      if (!el) return
+      const ouder = el.closest('.gk-scroll')
+      const eigen = el.getBoundingClientRect()
+      const vlak = ouder ? ouder.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
+      const vanafBoven = eigen.top - vlak.top + (ouder ? ouder.scrollTop : 0)
+      const hoogte = (ouder ? ouder.clientHeight : window.innerHeight) - vanafBoven - 8
+      setKanbanHoogte(h => { const n = Math.max(320, Math.floor(hoogte)); return h === n ? h : n })
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    const ro = typeof ResizeObserver !== 'undefined' && kanbanRef.current?.closest('.gk-scroll') ? new ResizeObserver(meet) : null
+    if (ro) ro.observe(kanbanRef.current.closest('.gk-scroll'))
+    return () => { window.removeEventListener('resize', meet); ro?.disconnect() }
+  })
 
   // De borg die al aan de klant hangt (challenge-sale, open en betaald). Dan hoef je hem niet te kiezen.
   const bekendeBorg = (clientId) => { const id = instellingen.get(clientId)?.sale_id; return id && borgen.some(b => b.id === id) ? id : null }
@@ -233,7 +268,11 @@ export default function GinoDoorstap({ isMobile = false }) {
         const eigen = (sales || []).filter(x => x.client_id === c.id)
         const periode = computePeriod(c)
         return {
-                  challenge: c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id), onbeperkt: !!c.coaching_onbeperkt,
+                  // vanChallenge = kwam via de challenge binnen (telt mee in doorstap en geld). challenge = staat nog
+          // in de challenge-fase: wie door is en betaald heeft hoort bij Coaching (24 nov 2026, Kersten).
+          vanChallenge: c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id),
+          challenge: (c.coaching_total_weeks === CHALLENGE_WEKEN || metBorg.has(c.id) || eigen.some(x => x.borg_movement_id)) && stand?.status !== 'betaald',
+          onbeperkt: !!c.coaching_onbeperkt,
           client_id: c.id, coach_id: stand?.coach_id || c.coach_id, status: stand?.status || null, pakket: stand?.pakket || null, gezet_at: stand?.gezet_at || null, call_datum: stand?.call_datum || null,
           klant: c, sale: eigen.find(x => !x.payment_received) || null, betaaldeSale: eigen.find(x => x.payment_received) || null,
           week: periode ? Math.min(periode.weeksDone + 1, periode.weeksTotal) : null, weken: periode?.weeksTotal || null,
@@ -456,8 +495,10 @@ export default function GinoDoorstap({ isMobile = false }) {
   const getoond = zoekTerm ? zichtbaar.filter(r => naamVan(r.klant).toLowerCase().includes(zoekTerm)) : zichtbaar
   // Door = echt betaald. Een mondeling ja telt pas als het geld binnen is.
   const telt = (id) => !instellingen.get(id)?.telt_niet_mee
-  const zeiJa = zichtbaar.filter(r => r.status === 'betaald' && telt(r.client_id)).length
-  const gesprekken = zichtbaar.filter(gesprekNodig).length
+  // Doorstap rekent over iedereen die via de challenge kwam, ook wie al door is en nu bij Coaching staat.
+  const statRijen = rijen.filter(r => soortFilter === 'alles' || (soortFilter === 'challenge' ? r.vanChallenge : !r.vanChallenge))
+  const zeiJa = statRijen.filter(r => r.status === 'betaald' && telt(r.client_id)).length
+  const gesprekken = statRijen.filter(gesprekNodig).length
   const kiesSoort = (f) => {
     setSoortFilter(f); setOpenGetal(null)
     try { localStorage.setItem(FILTER_KEY, f) } catch { /* privémodus */ }
@@ -466,7 +507,7 @@ export default function GinoDoorstap({ isMobile = false }) {
   const eindTekst = (x) => (x.onbeperkt ? 'Onbeperkt' : dagKort(x.eind))
   // Door tegen echt gestopt. Wie nog nadenkt of nog een gesprek moet hebben heeft nog niet
   // besloten en telt niet mee. Gestopt = zei nee, of de challenge is beëindigd.
-  const nee = zichtbaar.filter(x => x.status === 'nee' && telt(x.client_id))
+  const nee = statRijen.filter(x => x.status === 'nee' && telt(x.client_id))
   const beeindigd = soortFilter === 'coaching' ? [] : gestopt.filter(c => telt(c.id) && !nee.some(x => x.client_id === c.id))
   // Alleen geld telt (16 nov 2026, Kersten): door = verlenging betaald, gestopt = borg
   // echt terugbetaald. Wie nee zei of stopte zonder geregistreerde refund telt nog niet mee.
@@ -485,13 +526,13 @@ export default function GinoDoorstap({ isMobile = false }) {
   const aantalGestopt = terugRegels.length
   const beslist = zeiJa + aantalGestopt
   const doorstapRegels = [
-    ...zichtbaar.filter(x => x.status === 'betaald' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Door, betaald' })),
+    ...statRijen.filter(x => x.status === 'betaald' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Door, betaald' })),
     ...terugRegels,
     ...nee.filter(x => !geldTerug(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gestopt, geen refund' })),
     ...beeindigd.filter(c => !geldTerug(c.id)).map(c => ({ id: c.id, naam: naamVan(c), sub: 'Telt niet: gestopt, geen refund' })),
-    ...zichtbaar.filter(x => x.status === 'ja_mondeling' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: nog niet betaald' })),
-    ...zichtbaar.filter(x => x.status === 'denkt_na' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: denkt na' })),
-    ...zichtbaar.filter(gesprekNodig).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gesprek' })),
+    ...statRijen.filter(x => x.status === 'ja_mondeling' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: nog niet betaald' })),
+    ...statRijen.filter(x => x.status === 'denkt_na' && telt(x.client_id)).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: denkt na' })),
+    ...statRijen.filter(gesprekNodig).map(x => ({ id: x.client_id, naam: naamVan(x.klant), sub: 'Telt niet: gesprek' })),
   ]
   const doorstapGetal = {
     id: 'doorstap', label: 'Doorstap', waarde: beslist ? `${Math.round((zeiJa / beslist) * 100)}%` : '—',
@@ -680,14 +721,16 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           {/* Kanban (24 nov 2026, Kersten): vier kolommen, zodat altijd helder is waar actie nodig is.
               Actie nodig: wie het dichtst bij het einde zit bovenaan. Door, nog niet betaald: vroegste
               betaaldatum bovenaan. Loopt: begin of midden traject. Afgerond staat standaard dicht. */}
+          <style>{'.gd-kolom{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.18) transparent}.gd-kolom::-webkit-scrollbar{width:6px}.gd-kolom::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.18);border-radius:3px}'}</style>
           <div style={{
             // Volle breedte; Afgerond is smal zolang hij dicht staat.
             display: 'grid', gap: isMobile ? 10 : 14,
             ...(isMobile
               ? { gridAutoFlow: 'column', gridAutoColumns: '86%' }
               : { gridTemplateColumns: `repeat(3, minmax(320px, 1fr)) ${!klaarOpen && !zoekTerm ? '180px' : 'minmax(320px, 1fr)'}` }),
-            overflowX: 'auto', scrollSnapType: isMobile ? 'x mandatory' : undefined, WebkitOverflowScrolling: 'touch', alignItems: 'start', paddingBottom: 6,
-          }}>
+            overflowX: 'auto', scrollSnapType: isMobile ? 'x mandatory' : undefined, WebkitOverflowScrolling: 'touch', alignItems: 'stretch', paddingBottom: 6,
+            height: kanbanHoogte || undefined, boxSizing: 'border-box',
+          }} ref={kanbanRef}>
           {GROEPEN.map(([groep, groepLabel]) => {
             const inGroep = getoond.filter(x => watNu(x).groep === groep)
             const dag = (x) => (x.dagen ?? 9999)
@@ -697,20 +740,21 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                 : inGroep
             const dicht = groep === 'klaar' && !klaarOpen && !zoekTerm
             return (
-              <div key={groep} style={{ minWidth: 0, scrollSnapAlign: 'start', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: 8 }}>
+              <div key={groep} style={{ minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', alignSelf: dicht ? 'start' : 'stretch', scrollSnapAlign: 'start', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: 8 }}>
                 <button type="button" onClick={groep === 'klaar' ? () => setKlaarOpen(o => !o) : undefined} aria-expanded={groep === 'klaar' ? klaarOpen : undefined}
                   style={{ display: 'flex', alignItems: 'baseline', gap: 7, width: '100%', padding: '2px 4px 8px', background: 'none', border: 'none', fontFamily: 'inherit', cursor: groep === 'klaar' ? 'pointer' : 'default', color: colors.textPrimary, textAlign: 'left' }}>
                   <span style={{ fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em', color: colors.textPrimary }}>{groepLabel}</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary }}>{lijst.length}{groep === 'klaar' ? (klaarOpen ? ' · verbergen' : ' · tonen') : ''}</span>
                 </button>
                 {!lijst.length && <div style={{ padding: '4px 4px 6px', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary }}>{groep === 'actie' ? 'Niets te doen' : 'Niemand'}</div>}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6 }}>
+                {/* Kolom staat vast, de kaarten scrollen erbinnen (24 nov 2026). Ruimte boven voor de labels die
+                    half over de rand van de eerste kaart steken. */}
+                <div className="gd-kolom" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 2px 4px', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
                 {!dicht && lijst.map((r) => {
             const nodig = gesprekNodig(r)
             const nu = watNu(r)
             const bedrag = r.sale?.order_value ?? r.betaaldeSale?.order_value
             const e = eisen[r.client_id]
-            const eindKleur = r.dagen != null && r.dagen < 0 ? colors.danger : colors.textSecondary
             // De borg van wie stopt: de challenge-sale die aan deze klant hangt.
             const borgId = instellingen.get(r.client_id)?.sale_id || r.sale?.borg_movement_id || r.betaaldeSale?.borg_movement_id
             const borgSale = borgId ? (saleRijen || []).find(x => x.sale_kind === 'challenge' && x.id === borgId) : null
@@ -722,6 +766,16 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                 {r.sale && r.status !== 'betaald' && (
                   <span title={r.pakket || 'Ja gezegd, nog niet betaald'} style={{ position: 'absolute', top: -10, right: 12, zIndex: 1, display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 9px', borderRadius: 999, background: '#f59e0b', color: '#0a0a0a', fontSize: '0.66rem', fontWeight: 900, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>Nog niet betaald</span>
                 )}
+                {/* Tijd: linksboven half over de rand, kleur naar hoe dicht bij het einde. Klik = looptijd/verlenging. */}
+                {!r.onbeperkt && tijdTekst(r) && (() => {
+                  const k = tijdKleur(r)
+                  return (
+                    <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Klik: looptijd of verlenging aanpassen`}
+                      style={{ position: 'absolute', top: -10, left: 12, zIndex: 1, display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 9px', borderRadius: 999, border: 'none', background: k.bg, color: k.fg, fontFamily: 'inherit', fontSize: '0.66rem', fontWeight: 900, whiteSpace: 'nowrap', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                      {tijdTekst(r)}
+                    </button>
+                  )
+                })()}
                 <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
                   {/* Tegel: de week van het traject. Klik = start en aantal weken aanpassen. */}
                   <button type="button" title="Klik: start en aantal weken aanpassen" disabled={r.onbeperkt}
@@ -771,11 +825,6 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
                           {nu.groep === 'actie' ? '→ ' : ''}{nu.tekst}
                         </span>
                       ))}
-                      {/* Dagen in plaats van datums; de datums staan in de tooltip. */}
-                      <button type="button" onClick={() => openTraject(r)} title={`${dagKort(r.start)} – ${dagKort(r.eind)}. Klik: looptijd of verlenging aanpassen`}
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', color: eindKleur }}>
-                        {dagenKort(r) || <><span style={{ color: colors.textSecondary }}>{dagKort(r.start)} – </span>{dagKort(r.eind)}</>}
-                      </button>
                       {metEisen && r.challenge && (
                         <button type="button" onClick={() => setOpenEisen(o => (o === r.client_id ? null : r.client_id))} title="De zes challenge-eisen"
                           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: colors.textSecondary }}>
