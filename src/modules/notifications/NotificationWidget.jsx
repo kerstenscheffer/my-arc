@@ -40,24 +40,23 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
     if (betaling) {
       const d = betaling.dagen
       const wanneer = d <= 0 ? 'vanavond' : d === 1 ? 'morgen' : `over ${d} dagen`
-      // Naam van het vervolg: "6 maanden verlenging"; zonder aanbod "je verlenging" (24 nov 2026, Kersten).
-      const aanbod = String(betaling.aanbod || '').trim()
-      const naam = !aanbod || aanbod === 'je vervolgtraject' ? 'je verlenging' : /verleng/i.test(aanbod) ? aanbod : `${aanbod} verlenging`
+      // Alleen "je verlenging", of "je app verlenging" als het aanbod de app is (24 nov 2026, Kersten).
+      const naam = /\bapp\b/i.test(String(betaling.aanbod || '')) ? 'je app verlenging' : 'je verlenging'
       const betaal = (e) => { e.stopPropagation(); if (betaling.betaal_link) window.open(betaling.betaal_link, '_blank', 'noopener') }
       eigen.push({
         id: `betaling-${betaling.id}`, _betaling: betaling, _vast: true,
         type: 'betaling', priority: 'urgent', status: 'active', // altijd Urgent (24 nov 2026)
         title: 'Je betaling staat nog open',
-        message: `Er staat een betaling open voor ${naam}, rond hem hier af zodat je account niet ${wanneer} op slot gaat.`,
+        message: `Er staat een betaling open voor ${naam}, rond hem hier af zodat je toegang niet ${wanneer} verloopt.`,
         _bericht: (
           <>
-            Er staat een betaling open voor <b style={{ color: '#fff', fontWeight: 800 }}>{naam}</b>, rond hem{' '}
+            Er staat een betaling open voor {naam}, rond hem{' '}
             <button onClick={betaal} style={{
-              padding: 0, border: 'none', background: 'none', font: 'inherit', fontWeight: 900, color: '#10b981',
+              padding: 0, border: 'none', background: 'none', font: 'inherit', fontWeight: 900, color: '#fff',
               textDecoration: 'underline', textUnderlineOffset: 3, cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>hier</button>{' '}
-            af zodat je account niet <b style={{ color: '#ef4444', fontWeight: 900 }}>{wanneer}</b> op slot gaat.
+            af zodat je toegang niet <b style={{ color: '#ef4444', fontWeight: 900 }}>{wanneer}</b> verloopt.
           </>
         ),
       })

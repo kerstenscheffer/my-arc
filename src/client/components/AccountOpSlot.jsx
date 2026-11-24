@@ -74,7 +74,7 @@ export default function AccountOpSlot({ client, onLogout }) {
     {
       id: 'contact', Icon: MessageCircle, titel: 'Contact met je coach',
       sub: 'Vragen of twijfel? Stuur een berichtje.',
-      bericht: `Hoi Kersten, mijn app staat op slot. Kunnen we even contact hebben?${voornaam ? ` Groet, ${voornaam}` : ''}`,
+      bericht: `Hoi Kersten, mijn toegang is verlopen. Kunnen we even contact hebben?${voornaam ? ` Groet, ${voornaam}` : ''}`,
     },
   ].filter(Boolean)
 
@@ -91,7 +91,7 @@ export default function AccountOpSlot({ client, onLogout }) {
           <Lock size={28} strokeWidth={2.4} />
         </div>
         <div style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.03em' }}>
-          {voornaam ? `Hé ${voornaam},` : 'Hé,'} je account staat op pauze
+          {voornaam ? `Hé ${voornaam},` : 'Hé,'} je toegang is verlopen
         </div>
 
         {!geladen ? (
