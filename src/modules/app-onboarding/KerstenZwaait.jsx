@@ -16,7 +16,11 @@ import { useEffect, useRef, useState } from 'react'
 const BRON = '/mascottes/kersten-zwaait.webp'
 const STIL = '/mascottes/kersten-zwaait-stil.webp'
 const DUUR = 5.2
-const PAUZE = 1.6 // seconden stil tussen twee keer zwaaien
+// Ingekort (Kersten, 24 nov 2026): de beweging begint meteen (eerste 0,6 s
+// van de proef overgeslagen), loopt 1,3x zo snel en de pauze is korter.
+const START = 0.6, EIND = 4.75, SNEL = 1.3
+const PAUZE = 0.5 // seconden stil tussen twee keer zwaaien
+const RONDE = (EIND - START) / SNEL + PAUZE
 const BREED = 540, HOOG = 612 // verhouding van het beeldvlak uit de proef
 
 export default function KerstenZwaait({ hoogte = 300 }) {
@@ -225,8 +229,8 @@ export default function KerstenZwaait({ hoogte = 300 }) {
         const stap = (nu) => {
           if (weg) return
           const t = (nu - start) / 1000
-          const inRonde = t % (DUUR + PAUZE)
-          draw(Math.min(DUUR, inRonde), t)
+          const inRonde = t % RONDE
+          draw(Math.min(EIND, START + inRonde * SNEL), t)
           raf = requestAnimationFrame(stap)
         }
         raf = requestAnimationFrame(stap)
