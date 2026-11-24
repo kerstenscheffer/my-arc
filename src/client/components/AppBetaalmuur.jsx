@@ -21,11 +21,17 @@ const VOORDELEN = [
   'Zie hoe je vooruitgaat',
 ]
 
+// Stijl van de onboarding (thema 'arc', 24 nov 2026): zwart, wit, goud, schuine koppen.
+const GOUD = '#FFD700'
+const KOP = { fontFamily: '"Archivo Black", "Arial Black", sans-serif', fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }
+const CSS = `
+  .bm-knop { transition: transform .08s ease, box-shadow .08s ease; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .bm-knop:not(:disabled):active { transform: translateY(4px); box-shadow: none !important; }
+`
 const knopWit = {
-  width: '100%', minHeight: 54, borderRadius: 14, background: '#fff', border: 'none', color: '#0a0a0a',
-  fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  width: '100%', minHeight: 58, borderRadius: 10, background: '#fff', border: 'none', color: '#000',
+  fontSize: '1.15rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', textTransform: 'uppercase',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 0 #9b9b9b',
 }
 const linkKnop = {
   background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit',
@@ -95,10 +101,13 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
 
   return (
     <div style={{
-      minHeight: '100dvh', background: '#0a0a0a', color: '#fff',
+      minHeight: '100dvh', color: '#fff',
+      background: 'radial-gradient(ellipse at 50% 22%, rgba(255,215,0,0.09) 0%, transparent 60%), #0b0b0c',
       display: 'flex', justifyContent: 'center',
-      padding: 'calc(env(safe-area-inset-top) + 1rem) 1rem calc(env(safe-area-inset-bottom) + 1rem)',
+      padding: 'calc(env(safe-area-inset-top) + 1rem) 1.25rem calc(env(safe-area-inset-bottom) + 1rem)',
     }}>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" />
+      <style>{CSS}</style>
       <div style={{ maxWidth: 420, width: '100%' }}>
         {onTerug && (
           <button onClick={onTerug} style={{ ...linkKnop, paddingLeft: 0 }}>
@@ -107,8 +116,8 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
         )}
 
         <div style={{ textAlign: 'center', marginTop: onTerug ? 4 : 16 }}>
-          <img src="/mascottes/kersten-duim.webp" alt="" style={{ width: 110, height: 165, objectFit: 'contain' }} />
-          <div style={{ fontSize: '1.55rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.15, marginTop: 8 }}>
+          <img src="/mascottes/kersten-juichen.webp" alt="" style={{ width: 130, height: 195, objectFit: 'contain' }} />
+          <div style={{ ...KOP, fontSize: '1.75rem', lineHeight: 1.08, marginTop: 6 }}>
             {titel || (voornaam ? `${voornaam}, ga door met MY ARC` : 'Ga door met MY ARC')}
           </div>
         </div>
@@ -116,9 +125,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {VOORDELEN.map(v => (
             <div key={v} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: '1.1rem', fontWeight: 900 }}>
-              <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: '#10b981', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Check size={14} strokeWidth={3.2} />
-              </span>
+              <Check size={22} strokeWidth={3.4} color={GOUD} style={{ flexShrink: 0 }} />
               {v}
             </div>
           ))}
@@ -135,30 +142,29 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
             const actief = a.id === gekozen
             const extra = besparing(a)
             return (
-              <button key={a.id} onClick={() => setGekozen(a.id)} style={{
-                width: '100%', textAlign: 'left', padding: '0.95rem 1rem', borderRadius: 16, cursor: 'pointer',
-                background: actief ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
-                border: `2px solid ${actief ? '#10b981' : 'rgba(255,255,255,0.14)'}`,
-                color: '#fff', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 12,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              <button key={a.id} className="bm-knop" onClick={() => setGekozen(a.id)} style={{
+                width: '100%', textAlign: 'left', padding: '0.95rem 1rem', borderRadius: 10, cursor: 'pointer',
+                background: actief ? GOUD : '#1a1a1c', border: 'none', marginBottom: 4,
+                boxShadow: `0 4px 0 ${actief ? '#9c8200' : '#000'}`,
+                color: actief ? '#000' : '#fff', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 12,
               }}>
                 <span style={{
-                  flexShrink: 0, width: 22, height: 22, borderRadius: 11,
-                  border: `2px solid ${actief ? '#10b981' : 'rgba(255,255,255,0.4)'}`,
-                  background: actief ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, width: 24, height: 24, borderRadius: 12,
+                  border: `3px solid ${actief ? '#000' : 'rgba(255,255,255,0.45)'}`,
+                  background: actief ? '#000' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {actief && <Check size={13} strokeWidth={3.4} color="#0a0a0a" />}
+                  {actief && <Check size={13} strokeWidth={3.6} color={GOUD} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', fontWeight: 900 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.15rem', fontWeight: 900, textTransform: 'uppercase' }}>
                     {a.maanden === 12 ? 'Jaar' : a.maanden === 1 ? 'Maand' : `${a.maanden} maanden`}
-                    {extra && <span style={{ fontSize: '0.9rem', fontWeight: 900, background: '#10b981', color: '#0a0a0a', borderRadius: 6, padding: '2px 6px' }}>{extra}</span>}
+                    {extra && <span style={{ fontSize: '0.85rem', fontWeight: 900, background: actief ? '#000' : GOUD, color: actief ? GOUD : '#000', borderRadius: 6, padding: '2px 6px' }}>{extra}</span>}
                   </span>
-                  {a.proef && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, color: '#fff', marginTop: 2 }}>Eerste {a.proefDuur} gratis</span>}
+                  {a.proef && <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, marginTop: 2 }}>Eerste {a.proefDuur} gratis</span>}
                 </span>
                 <span style={{ textAlign: 'right' }}>
                   <span style={{ display: 'block', fontSize: '1.05rem', fontWeight: 900 }}>{a.prijs}</span>
-                  <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>
+                  <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 900 }}>
                     {a.maanden === 12 ? (a.perMaand ? `${a.perMaand} /mnd` : 'per jaar') : a.maanden === 1 ? 'per maand' : 'per periode'}
                   </span>
                 </span>
@@ -169,7 +175,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
 
         {keuze && (
           <>
-            <button onClick={start} disabled={bezig} style={{ ...knopWit, marginTop: 18, opacity: bezig ? 0.6 : 1 }}>
+            <button className="bm-knop" onClick={start} disabled={bezig} style={{ ...knopWit, marginTop: 18, opacity: bezig ? 0.6 : 1 }}>
               {bezig ? 'Even wachten…' : keuze.proef ? `Start gratis` : 'Start'}
             </button>
             <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.45, marginTop: 12, textAlign: 'center' }}>

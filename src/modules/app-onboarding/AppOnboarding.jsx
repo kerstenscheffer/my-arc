@@ -505,6 +505,12 @@ function Account({ antw, onKlaar }) {
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   const [bevestigen, setBevestigen] = useState(false)
+  // Al ingelogd (bijvoorbeeld met Apple): geen nieuw account nodig.
+  const [ingelogd, setIngelogd] = useState(null)
+  useEffect(() => {
+    if (VOORBEELD) return
+    supabase.auth.getSession().then(({ data }) => setIngelogd(data?.session?.user?.email || (data?.session ? 'je account' : null)), () => null)
+  }, [VOORBEELD])
 
   const maak = async (e) => {
     e?.preventDefault()
@@ -524,6 +530,15 @@ function Account({ antw, onKlaar }) {
     }
     if (!data?.session) { setBevestigen(true); return } // e-mailbevestiging staat aan
     onKlaar()
+  }
+
+  if (ingelogd) {
+    return (
+      <div style={{ textAlign: 'center' }}>
+        <div style={subTekst}>Je bent ingelogd als {ingelogd}.</div>
+        <WitteKnop onClick={onKlaar} style={{ marginTop: '1.25rem' }}>Maak mijn plan</WitteKnop>
+      </div>
+    )
   }
 
   if (bevestigen) {

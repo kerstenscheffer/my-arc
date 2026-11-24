@@ -317,6 +317,15 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       }
       if (!clientData) {
         if (opAchtergrond) { console.warn('Klant verversen gaf niets terug; oude gegevens blijven staan'); return }
+        // Nieuw account zonder klantrij (24 nov 2026): wie zich met Apple
+        // aanmeldt, of wiens onboarding halverwege stopte, gaat naar de
+        // onboarding en maakt daar zijn plan. Alleen voor die twee gevallen; een
+        // coachingklant zonder gekoppelde rij houdt de foutmelding (die hoort de
+        // coach te koppelen, niet zelf een app-account te maken).
+        if (!previewClientId && !uitSleutel && (authUser.app_metadata?.provider === 'apple' || authUser.user_metadata?.bron === 'app_onboarding')) {
+          window.location.href = '/aanmelden'
+          return
+        }
         setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return
       }
       // Op slot geldt alleen voor de klant zelf; de coach die meekijkt ziet
