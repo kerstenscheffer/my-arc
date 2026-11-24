@@ -16,7 +16,7 @@ const vandaagIso = () => new Date().toLocaleDateString('sv-SE')
 
 // r = de rij uit GinoDoorstap. borgSale = gekoppelde challenge-sale (of null).
 // borgKandidaten = betaalde open borgen om te koppelen als er nog geen is.
-export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onVerleng, onStatus, onStopt, onHervat }) {
+export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKandidaten = [], gekozenBorg = '', onKiesBorg, bezig, fout, onClose, onBetaald, onVerleng, onBorgOmzetten, onStatus, onStopt, onHervat }) {
   const [stap, setStap] = useState('kies')
   const [callDatum, setCallDatum] = useState(r.call_datum && r.call_datum >= vandaagIso() ? r.call_datum : '')
 
@@ -78,6 +78,9 @@ export default function AfhandelModal({ r, naam, vast = false, borgSale, borgKan
             {open && optie('betaald', 'Betaling is binnen', openTekst, onBetaald)}
             {!open && optie('verleng', vast ? 'Nog een keer verlengen' : 'Verlengt', 'Maanden, startdatum, prijs, betaald of nog niet', onVerleng)}
             {!vast && <>
+            {/* Borg omzetten (24 nov 2026, Joris): geen geld terug, wel een aanbod ervoor in de plaats. */}
+            {!open && borgTeKiezen && borg.challenge_status !== 'terugbetaald' && onBorgOmzetten
+              && optie('borg-om', 'Borg omzetten', `Borg ${euro(borg.order_value)} wordt de betaling van een aanbod, bv. App 1 jaar`, () => onBorgOmzetten(borg))}
             {optie('stopt', 'Stopt', borgTeKiezen ? `Borg ${euro(borg.order_value)} terug of niet` : 'App gaat op slot na het einde', () => setStap('stopt'), r.status === 'nee')}
             {optie('denkt_na', 'Denkt na', 'Komt bovenaan terug om op te volgen', () => onStatus('denkt_na'), r.status === 'denkt_na')}
             {optie('call', 'Call ingepland', r.status === 'call' && r.call_datum ? `Nu: ${r.call_datum}` : 'Kies de datum', () => setStap('call'), r.status === 'call')}

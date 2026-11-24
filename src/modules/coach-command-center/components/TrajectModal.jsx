@@ -58,6 +58,12 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const [opties, setOpties] = useState([])
   const [keuzeAanbod, setKeuzeAanbod] = useState(null)
   const [eigenPrijs, setEigenPrijs] = useState(false)
+  // Financiën (24 nov 2026, Patrick: 6 x €125 met borg verrekend en 20% korting bij vooruit).
+  // Volgorde: korting over het volle traject, daarna de borg eraf (afwijkend van de Aanbod-rekenaar).
+  const [borgSale, setBorgSale] = useState(null)        // betaalde challenge-borg van deze klant
+  const [borgVerrekenen, setBorgVerrekenen] = useState(false)
+  const [kortingPct, setKortingPct] = useState(0)
+  const [standaardKorting, setStandaardKorting] = useState(20) // vooruitPct uit Aanbod
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
 
@@ -71,6 +77,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     setStartOffset(0); setMaanden(4); setWeken('12')
     setStartKeuze('direct'); setStartDatum(''); setIsBetaald(betaald !== false); setBetaalDatum('')
     setKeuzeAanbod(null); setEigenPrijs(false); setOpties([])
+    setBorgSale(null); setBorgVerrekenen(false); setKortingPct(0)
     setBetaling(client.payment_plan === 'monthly' ? 'monthly' : 'prepaid')
     setPrijs(client.payment_plan === 'monthly' ? 150 : 500)
     if (voorstel) {
@@ -81,7 +88,36 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
     setVorige(null)
     if (modus !== 'verleng') return
     // Met een voorstel (Einde traject → challenge-afspraak) geen aanbod-stap.
-    if (!voorstel) laadAanbod().then(a => { if (!weg && !a.fout) setOpties(aanbodOpties(a.gegevens)) }).catch(() => {})
+    if (!voorstel) laadAanbod().then(a => {
+      if (weg || a.fout) return
+      setOpties(aanbodOpties(a.gegevens))
+      if (a.gegevens?.vooruitPct != null) setStandaardKorting(a.gegevens.vooruitPct)
+    }).catch(() => {})
+    // De borg die verrekend kan worden: meegegeven (borgId) of de gekoppelde challenge-sale.
+    if (!borgOmzetten) {
+      const q = supabase.from('lead_movements').select('id, order_value, challenge_status, payment_received')
+        .eq('sale_kind', 'challenge').eq('payment_received', true).in('challenge_status', ['open', 'behouden']).is('reverted_at', null)
+      ;(borgId ? q.eq('id', borgId) : q.eq('client_id', client.id)).order('moved_at', { ascending: false }).limit(1)
+        .then(async ({ data }) => {
+          if (weg) return
+          if (data?.[0]) { setBorgSale(data[0]); return }
+          if (borgId) return
+          // Nog niet gekoppeld (meestal: de sale hangt aan de Instagram-naam). Precies één losse
+          // borg met de voornaam (of voor+achternaam aan elkaar) erin = deze klant. Staat standaard
+          // uit; kiest de coach hem, dan wordt hij bij het boeken gekoppeld.
+          const voor = String(client.first_name || '').trim().toLowerCase()
+          if (voor.length < 3) return
+          const { data: los } = await supabase.from('lead_movements').select('id, order_value, challenge_status, payment_received, lead_name')
+            .eq('sale_kind', 'challenge').eq('payment_received', true).in('challenge_status', ['open', 'behouden'])
+            .is('reverted_at', null).is('client_id', null).ilike('lead_name', `%${voor}%`).limit(3)
+            .then(r => r, () => ({ data: [] }))
+          const plat = (t) => String(t || '').toLowerCase().replace(/[^a-z]/g, '')
+          const achter = plat(client.last_name)
+          const zeker = (los || []).filter(m => !achter || plat(m.lead_name).includes(plat(voor) + achter) || plat(m.lead_name).includes(achter))
+          const kies = zeker.length === 1 ? zeker[0] : (los || []).length === 1 ? los[0] : null
+          if (!weg && kies) setBorgSale(kies)
+        }, () => {})
+    }
     ;(async () => {
       const v = await vorigeSale(supabase, client)
       if (weg || !v) return
@@ -109,11 +145,17 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   // Volgorde van de stappen per modus. Verlengen begint met het aanbod (behalve met een voorstel).
   const STAPPEN = isStart ? ['start', 'duur', 'betaling'] : borgOmzetten ? ['aanbod', 'duur'] : (voorstel ? ['duur', 'betaling', 'prijs'] : ['aanbod', 'duur', 'betaling', 'prijs'])
   const stappen = STAPPEN.length
-  const prijsVan = (o, b) => (b === 'monthly' ? o.perMaand : o.vooruit)
+  // Prijs uit het aanbod bij een betaalwijze. Ontbreekt die vorm, dan afgeleid: ineens = maanden × per
+  // maand (korting gaat er apart af), per maand = ineens / maanden.
+  const prijsVan = (o, b, mnd = o.maanden) => (b === 'monthly'
+    ? (o.perMaand || Math.round((o.vooruit || 0) / Math.max(1, mnd)))
+    : (o.vooruit || (o.perMaand || 0) * mnd))
+  // Korting bij vooruit alleen als het aanbod geen eigen ineens-prijs heeft (daar zit hij al in).
+  const kortingVoor = (o, b) => (b === 'prepaid' && o && !o.vooruit ? (standaardKorting || 0) : 0)
   const kiesAanbod = (o) => {
     setKeuzeAanbod(o); setEigenPrijs(false); setMaanden(o.maanden)
     const b = o.vooruit && o.perMaand ? betaling : o.perMaand ? 'monthly' : 'prepaid'
-    setBetaling(b); setPrijs(prijsVan(o, b))
+    setBetaling(b); setKortingPct(kortingVoor(o, b))
     setStap(2)
   }
   const periode = computePeriod(client)
@@ -128,7 +170,20 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const plan = isStart ? null : planVervolg(client, { maanden, startOp: vervolgStart })
   const nieuwEind = isStart ? plusDagen(startIso, (wekenGeldig ? wekenGetal : 0) * 7) : plan.eind
   const totaalWeken = isStart ? wekenGetal : plan.totaalWeken
-  const totaalBedrag = betaling === 'monthly' ? prijs * maanden : prijs
+  // Bedragen: basis (aanbod of eigen prijs) → min borg → min korting (alleen ineens).
+  const effPrijs = keuzeAanbod && !eigenPrijs ? prijsVan(keuzeAanbod, betaling, maanden) : prijs
+  const basisTotaal = betaling === 'monthly' ? effPrijs * maanden : effPrijs
+  // Korting over het volle traject, daarna de borg eraf (24 nov 2026, Kersten bij Patrick:
+  // 6 x €125 = €750, 20% = €150 korting, min borg €297 = €303).
+  const kortingAf = betaling === 'prepaid' ? Math.round(basisTotaal * (Number(kortingPct) || 0) / 100) : 0
+  const naKorting = basisTotaal - kortingAf
+  const borgAf = borgVerrekenen && borgSale ? Math.min(naKorting, Math.round(Number(borgSale.order_value) || 0)) : 0
+  const totaalBedrag = naKorting - borgAf
+  const perTermijn = betaling === 'monthly' ? Math.round((totaalBedrag / Math.max(1, maanden)) * 100) / 100 : null
+  const afspraak = [
+    borgAf ? `borg €${borgAf} verrekend` : null,
+    kortingAf ? `${kortingPct}% korting vooruit` : null,
+  ].filter(Boolean).reverse().join(', ')
   const startGeldig = isStart || nieuwEind > vandaagIso()
 
   const bewaar = async () => {
@@ -160,6 +215,11 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         borgId,
         aanbod: keuzeAanbod?.naam || null,
         borgOmzetten,
+        totaal: totaalBedrag,
+        prijsTekst: betaling === 'monthly'
+          ? `${maanden}x €${Math.round(perTermijn)}${afspraak ? ` (${afspraak})` : ''}`
+          : `€${totaalBedrag}${afspraak ? ` (€${basisTotaal}, ${afspraak})` : ''}`,
+        borgVerrekend: borgAf ? borgSale : null,
       })
       onClientUpdate?.(uit.clientPayload)
       onGeboekt?.(uit.pakket, uit.doorstap)
@@ -213,7 +273,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
   const keuze = (id, titel, sub) => {
     const aan = betaling === id
     return (
-      <button key={id} onClick={() => { setBetaling(id); if (keuzeAanbod && !eigenPrijs && prijsVan(keuzeAanbod, id)) setPrijs(prijsVan(keuzeAanbod, id)) }} style={{
+      <button key={id} onClick={() => { setBetaling(id); if (keuzeAanbod && !eigenPrijs) setKortingPct(kortingVoor(keuzeAanbod, id)) }} style={{
         width: '100%', minHeight: 58, marginBottom: 8, padding: '0 1rem',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
@@ -238,6 +298,17 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
       border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
     }}>{tekst}</button>
+  )
+  // Wat hij betaalt: totaal, borg eraf, korting eraf, te betalen. In de betaalstap en de prijsstap.
+  const somBlok = (
+              <div style={{ margin: '0 auto 14px', maxWidth: 280, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Totaal</span><span>{euro(basisTotaal)}</span></div>
+                {kortingAf > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{kortingPct}% korting vooruit</span><span>−{euro(kortingAf)}</span></div>}
+                {borgAf > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Borg verrekend</span><span>−{euro(borgAf)}</span></div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff', fontWeight: 900, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 4, paddingTop: 4 }}>
+                  <span>{betaling === 'monthly' ? `Hij betaalt ${maanden} × ${euro(perTermijn)}` : 'Hij betaalt'}</span><span>{euro(totaalBedrag)}</span>
+                </div>
+              </div>
   )
   const datumVeld = {
     width: '100%', minHeight: 44, boxSizing: 'border-box', padding: '0 0.75rem', marginBottom: 6,
@@ -325,6 +396,7 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         {huidig === 'aanbod' && (
           <>
             {vraag('Wat neemt hij?')}
+            {borgOmzetten && onder(`Zijn borg van ${euro(Number(borgOmzetten.order_value) || 0)} is de betaling. Er komt geen nieuwe omzet bij.`)}
             {opties.map((o, i) => {
               const geld = [o.vooruit ? `${euro(o.vooruit)} ineens` : null, o.perMaand ? `${euro(o.perMaand)}/mnd` : null].filter(Boolean).join(' · ')
               const aan = keuzeAanbod?.id === o.id
@@ -385,8 +457,28 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         {huidig === 'betaling' && (
           <>
             {vraag('Hoe betaalt hij?')}
-            {(!keuzeAanbod || keuzeAanbod.vooruit || eigenPrijs) && keuze('prepaid', 'In één keer', keuzeAanbod?.vooruit && !eigenPrijs ? euro(keuzeAanbod.vooruit) : 'Prepaid, alles vooraf')}
-            {(!keuzeAanbod || keuzeAanbod.perMaand || eigenPrijs) && keuze('monthly', 'Maandelijks', keuzeAanbod?.perMaand && !eigenPrijs ? `${keuzeAanbod.maanden} × ${euro(keuzeAanbod.perMaand)}` : 'Elke maand een termijn')}
+            {keuze('prepaid', 'In één keer', keuzeAanbod && !eigenPrijs
+              ? (keuzeAanbod.vooruit ? euro(keuzeAanbod.vooruit) : `${maanden} × ${euro(keuzeAanbod.perMaand)} = ${euro(prijsVan(keuzeAanbod, 'prepaid', maanden))}, korting kan`)
+              : 'Prepaid, alles vooraf')}
+            {keuze('monthly', 'Maandelijks', keuzeAanbod && !eigenPrijs ? `${maanden} × ${euro(prijsVan(keuzeAanbod, 'monthly', maanden))}` : 'Elke maand een termijn')}
+            {borgSale && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {pil(borgVerrekenen, () => setBorgVerrekenen(v => !v), `${borgVerrekenen ? '✓ ' : ''}Borg ${euro(Number(borgSale.order_value) || 0)} verrekenen`)}
+              </div>
+            )}
+            {betaling === 'prepaid' && (
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44, marginTop: 6, padding: '0 0.25rem', fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>
+                Korting bij vooruit
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input value={kortingPct} inputMode="numeric" aria-label="Korting bij vooruitbetalen in procent"
+                    onChange={(e) => setKortingPct(Math.min(100, Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 0))}
+                    onFocus={(e) => e.target.select()}
+                    style={{ width: 48, minHeight: 36, textAlign: 'right', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.35)', color: '#fff', fontFamily: 'inherit', fontSize: '1rem', fontWeight: 900, outline: 'none' }} />
+                  %
+                </span>
+              </label>
+            )}
+            <div style={{ marginTop: 10 }}>{somBlok}</div>
             <div style={{ height: 10 }} />
           </>
         )}
@@ -399,9 +491,9 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
               <div style={{ textAlign: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{keuzeAanbod.naam}</div>
                 <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>
-                  {betaling === 'monthly' ? `${maanden} × ${euro(prijs)}` : euro(prijs)}
+                  {betaling === 'monthly' ? `${maanden} × ${euro(effPrijs)}` : euro(effPrijs)}
                 </div>
-                <button type="button" onClick={() => setEigenPrijs(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '4px 8px' }}>
+                <button type="button" onClick={() => { setPrijs(effPrijs); setEigenPrijs(true) }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '4px 8px' }}>
                   Andere prijs
                 </button>
               </div>
@@ -416,8 +508,8 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
                 groot="1.6rem"
               />
             )}
-            {onder(betaling === 'monthly'
-              ? `${maanden} × ${euro(prijs)} = ${euro(totaalBedrag)} omzet`
+            {(borgAf > 0 || kortingAf > 0) ? somBlok : onder(betaling === 'monthly'
+              ? `${maanden} × ${euro(effPrijs)} = ${euro(totaalBedrag)} omzet`
               : `${euro(totaalBedrag)} omzet${isBetaald ? ', deze maand binnen' : ''}`)}
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: -6, marginBottom: 16 }}>
               {maanden} mnd vanaf {mooiKort(plan.start)} · loopt tot <span style={{ color: '#fff', fontWeight: 900 }}>{mooi(nieuwEind)}</span>

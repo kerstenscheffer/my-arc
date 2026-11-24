@@ -118,8 +118,8 @@ export function planVervolg(client, { maanden, startOp }) {
 }
 
 // Korte omschrijving voor client_doorstap.pakket en de schermen die die tonen.
-export function pakketTekst({ maanden, betaling, prijs, start, betaald, betaalDatum, aanbod = null }) {
-  const geld = betaling === 'monthly' ? `${maanden}x €${prijs}` : `€${prijs}`
+export function pakketTekst({ maanden, betaling, prijs, start, betaald, betaalDatum, aanbod = null, prijsTekst = null }) {
+  const geld = prijsTekst || (betaling === 'monthly' ? `${maanden}x €${prijs}` : `€${prijs}`)
   const open = betaald ? '' : `, nog niet betaald${betaalDatum ? ` (verwacht ${kortDatum(betaalDatum)})` : ''}`
   return `${aanbod ? `${aanbod}: ` : ''}${maanden} mnd vanaf ${kortDatum(start)}, ${geld}${open}`
 }
@@ -162,11 +162,14 @@ export async function vorigeSale(supabase, client) {
 export async function boekVerlenging(supabase, {
   client, coachId, maanden, betaling, prijs, startOp = null,
   betaald = true, betaalDatum = null, vorige = null, borgId, aanbod = null, borgOmzetten = null,
+  totaal: totaalGegeven = null, prijsTekst = null, borgVerrekend = null,
 }) {
   const plan = planVervolg(client, { maanden, startOp })
   // Borg omzetten (24 nov 2026, Joris → App 1 jaar): de borg ís de betaling. Geen nieuwe
   // omzetregel (dan telde het geld dubbel); de borg gaat op behouden en hangt aan de klant.
-  const totaal = borgOmzetten ? 0 : (betaling === 'monthly' ? prijs * maanden : prijs)
+  // totaal = wat er nog te betalen is (na borg en korting, berekend in TrajectModal). Borg
+  // verrekend: de borg hangt aan deze verlenging en gaat op behouden zodra die betaald is (trigger).
+  const totaal = borgOmzetten ? 0 : (totaalGegeven != null ? totaalGegeven : (betaling === 'monthly' ? prijs * maanden : prijs))
   const vandaag = vandaagIso()
 
   const clientPayload = {
@@ -183,7 +186,7 @@ export async function boekVerlenging(supabase, {
   const { data: { user } = {} } = await supabase.auth.getUser()
   const coach = user?.id || coachId || null
 
-  let borg = borgId
+  let borg = borgVerrekend?.id || borgId
   if (borg === undefined) {
     const { data: open } = await supabase.from('lead_movements').select('id')
       .eq('client_id', client.id).eq('sale_kind', 'challenge').eq('challenge_status', 'open').is('reverted_at', null)
@@ -223,9 +226,13 @@ export async function boekVerlenging(supabase, {
     }
   }
 
-  if (borgOmzetten?.id) {
-    const patch = { client_id: client.id, ...(borgOmzetten.challenge_status === 'open' ? { challenge_status: 'behouden' } : {}) }
-    const { error: borgFout } = await supabase.from('lead_movements').update(patch).eq('id', borgOmzetten.id)
+  // Borg die (deels) de betaling is: aan de klant hangen. Dekt hij alles (niets meer te betalen),
+  // dan meteen behouden, net als bij omzetten.
+  const borgBetaling = borgOmzetten || (borgVerrekend && totaal <= 0 ? borgVerrekend : null)
+  if (borgBetaling?.id || borgVerrekend?.id) {
+    const b = borgBetaling || borgVerrekend
+    const patch = { client_id: client.id, ...(borgBetaling && b.challenge_status === 'open' ? { challenge_status: 'behouden' } : {}) }
+    const { error: borgFout } = await supabase.from('lead_movements').update(patch).eq('id', b.id)
     if (borgFout) {
       const e = new Error('Verlengd, maar de borg is niet bijgewerkt: ' + borgFout.message)
       e.clientPayload = clientPayload
@@ -235,7 +242,7 @@ export async function boekVerlenging(supabase, {
 
   const pakket = borgOmzetten
     ? `${aanbod ? `${aanbod}: ` : ''}${maanden} mnd vanaf ${kortDatum(plan.start)}, betaald met borg €${Math.round(Number(borgOmzetten.order_value) || 0)}`
-    : pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum, aanbod })
+    : pakketTekst({ maanden, betaling, prijs, start: plan.start, betaald, betaalDatum, aanbod, prijsTekst })
   const { data: doorstap } = await supabase.from('client_doorstap').insert({
     client_id: client.id, coach_id: client.coach_id || coach, status: betaald ? 'betaald' : 'ja_mondeling',
     pakket, gezet_door: coach,

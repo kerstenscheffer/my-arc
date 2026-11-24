@@ -277,11 +277,11 @@ export default function GinoDoorstap({ isMobile = false }) {
   }, [saleRijen, instellingen, eisen])
 
   // Einde aanklikken: looptijd of verlenging aanpassen, hetzelfde venster als in Coach Inzicht.
-  const openTraject = async (r) => {
+  const openTraject = async (r, borgOmzetten = null) => {
     const { data: client, error } = await supabase.from('clients').select('*').eq('id', r.client_id).single()
       .then(x => x, e => ({ error: e }))
     if (error) { setFout(error.message || 'Klant laden mislukt'); return }
-    setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id) })
+    setTraject({ client, rij: r, betaald: true, borgId: borgVoor(r.client_id), borgOmzetten })
   }
 
   const zetStatus = async (clientId, klantCoach, status, pakket = null, extra = {}) => {
@@ -800,6 +800,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
           onClose={() => setAfhandel(null)}
           onBetaald={async () => { await betaald(afhandelRij); setAfhandel(null) }}
           onVerleng={() => { const r = afhandelRij; setAfhandel(null); openTraject(r) }}
+          onBorgOmzetten={(borg) => { const r = afhandelRij; setAfhandel(null); openTraject(r, borg) }}
           onStatus={async (status, extra) => { if (await wijzig(afhandelRij.client_id, afhandelRij.coach_id, status, afhandelRij.pakket, extra)) setAfhandel(null) }}
           onStopt={(borg, borgStatus) => stopt(afhandelRij, borg, borgStatus)}
           onHervat={async () => { const r = afhandelRij; setAfhandel(null); await hervat(r) }}
@@ -808,7 +809,7 @@ Binnen een groep op einddatum {eindOplopend ? '↑' : '↓'}
 
       {traject && (
         <TrajectModal open modus="verleng" client={traject.client} coachId={coachId}
-          betaald={traject.betaald !== false} borgId={traject.borgId}
+          betaald={traject.betaald !== false} borgId={traject.borgId} borgOmzetten={traject.borgOmzetten || null}
           onClose={trajectDicht} />
       )}
     </div>
