@@ -17,7 +17,12 @@ const SLEUTEL_IOS = 'appl_SYxWUmjyiYLUoZwLOExEGIrTmty'
 const SLEUTEL_ANDROID = 'goog_zMtmOyAtyFhkyXKnSqffCssvlpm'
 export const TOEGANG = 'premium'
 
-export const VOORWAARDEN_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+const OP_ANDROID = Capacitor.getPlatform() === 'android'
+export const VOORWAARDEN_URL = OP_ANDROID
+  ? 'https://play.google.com/about/play-terms/'
+  : 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+// Waar je opzegt, voor de tekst onder de knop op de betaalmuur.
+export const OPZEG_PLEK = OP_ANDROID ? 'Google Play' : 'je Apple ID'
 export const PRIVACY_URL = 'https://www.myarcfitness.com/privacy'
 
 let klaar = null // Promise<Purchases|null>
@@ -30,8 +35,13 @@ const sleutel = () => {
   return ''
 }
 
-/** Kan dit apparaat een abonnement afsluiten? */
-export const abonnementMogelijk = () => Capacitor.isNativePlatform() && !!sleutel()
+/** Kan dit apparaat een abonnement afsluiten?
+ *  Ook de native plugin moet er zijn: oudere app-versies (iOS 2.0, Android
+ *  versionCode 8 en eerder) krijgen deze code via de live-update, maar hebben
+ *  RevenueCat niet in de app zitten. Zonder deze check zagen zij "Maak je plan"
+ *  en een betaalmuur waar niets te kopen viel (25 nov 2026). */
+export const abonnementMogelijk = () =>
+  Capacitor.isNativePlatform() && !!sleutel() && Capacitor.isPluginAvailable('Purchases')
 
 /** RevenueCat klaarzetten voor dit account. Geeft null als het niet kan. */
 export async function startRevenueCat(authUserId) {

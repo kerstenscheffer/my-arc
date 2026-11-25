@@ -215,16 +215,26 @@ export default function LoginMain() {
             onboarding. Alleen in de app; Apple eist dat je daar zelf een account
             kunt maken. Op het web blijft dit weg (daar is geen betaalmuur), en op
             Android ook zolang RevenueCat daar nog niet is ingesteld. */}
-        {abonnementMogelijk() && (
+        {abonnementMogelijk() && (<>
+          {/* Coachingklanten hebben al een account uit de intake. Zonder deze
+              regel tikken ze soms op "Maak je plan" en maken ze een betaald
+              app-account aan (25 nov 2026). */}
+          <div style={{
+            marginTop: '1.4rem', padding: '0.8rem 0.9rem', borderRadius: 12,
+            background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.35)',
+            color: '#fff', fontSize: '1rem', fontWeight: 900, lineHeight: 1.4, textAlign: 'center',
+          }}>
+            Coaching bij Kersten? Log hierboven in met de mail die je van ons kreeg.
+          </div>
           <button type="button" onClick={() => { window.location.href = '/aanmelden' }} style={{
-            marginTop: '1.4rem', width: '100%', minHeight: 46, borderRadius: 12, cursor: 'pointer',
+            marginTop: '0.8rem', width: '100%', minHeight: 46, borderRadius: 12, cursor: 'pointer',
             background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff',
             fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
             Nog geen account? Maak je plan
           </button>
-        )}
+        </>)}
 
       </div>
 

@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check, LogOut, ArrowLeft, RotateCcw } from 'lucide-react'
-import { haalAanbod, koop, herstel, abonnementMogelijk, VOORWAARDEN_URL, PRIVACY_URL } from '../../lib/appAbonnement'
+import { haalAanbod, koop, herstel, abonnementMogelijk, VOORWAARDEN_URL, PRIVACY_URL, OPZEG_PLEK } from '../../lib/appAbonnement'
 
 // Kersten (24 nov 2026): groot, vet, wit, korte zinnen.
 const VOORDELEN = [
@@ -185,7 +185,7 @@ export default function AppBetaalmuur({ authUserId, voornaam, titel, onGelukt, o
               {keuze.proef
                 ? `Eerst ${keuze.proefDuur} gratis. Daarna ${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `
                 : `${keuze.prijs} per ${keuze.maanden === 12 ? 'jaar' : 'maand'}. `}
-              Het loopt vanzelf door. Stoppen? Zeg het 24 uur voor het einde op in je Apple ID.
+              Het loopt vanzelf door. Stoppen? Zeg het 24 uur voor het einde op in {OPZEG_PLEK}.
             </div>
           </>
         )}
