@@ -26,7 +26,7 @@ import { INLOG_PAD } from '../startPagina'
 const TITEL = 'Online fitness coaching voor mannen | MY ARC Coaching'
 const OMSCHRIJVING = 'Online fitness coaching voor mannen van 25 tot 55. In 6 weken droger met de 80/20 methode, met ruimte voor uit eten en de borrel. Gratis weekmenu, trainingsschema en 8 gidsen.'
 
-const CHALLENGE_START = '/6week-checkout'
+const CHALLENGE_START = '/challenge' // funnel met plan-call (was /6week-checkout, de betaalpagina)
 const CHALLENGE_INFO = '/6weekchallenge'
 const INSTAGRAM = 'https://www.instagram.com/kerstenscheffer'
 const YOUTUBE = 'https://www.youtube.com/@kerstenscheffer'
