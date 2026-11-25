@@ -12,17 +12,19 @@ export default function BijsturingLabel({ b }) {
   const kleur = STATUS_KLEUR[b.status] || colors.textPrimary
   const kort = b.bijsturing ? `${b.punt} → ${b.bijsturing}` : b.punt
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: space[1], position: 'relative', zIndex: open ? 30 : 1 }}
+    // Half over, half onder de bovenrand (Kersten, 25 nov): hoogte 22, dus
+    // -11 eronder. Rechts 58 vrij voor het video-rondje op de rand.
+    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 58, marginBottom: -11, position: 'relative', zIndex: open ? 30 : 5 }}
       onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button type="button" onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
         title={kort}
         style={{
-          maxWidth: '85%', minHeight: 28, padding: `0 ${space[2]}px`, borderRadius: radius.pill, cursor: 'pointer', fontFamily: 'inherit',
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: `${kleur}22`, border: `1px solid ${kleur}66`, color: colors.textPrimary,
-          fontSize: 13, fontWeight: 800,
+          maxWidth: '85%', height: 22, padding: '0 8px', borderRadius: radius.pill, cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 5,
+          background: `linear-gradient(${kleur}26, ${kleur}26), #0a0a0a`, border: `1px solid ${kleur}88`, color: colors.textPrimary,
+          fontSize: 12, fontWeight: 900, lineHeight: 1,
         }}>
-        <span style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: kleur }} />
+        <span style={{ width: 6, height: 6, borderRadius: 3, flexShrink: 0, background: kleur }} />
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kort}</span>
       </button>
       {open && (
