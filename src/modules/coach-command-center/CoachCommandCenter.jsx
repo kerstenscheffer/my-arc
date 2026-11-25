@@ -2,6 +2,7 @@
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
 import { PAKKETTEN, krijgtMaandag } from './klantPakket'
+import { gehadDezeRonde } from './klantBord'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Keuze from '../meal-plan/components/Keuze'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff, Columns3, LayoutGrid } from 'lucide-react'
@@ -411,7 +412,8 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
   const nogTeGaan = actieveKlanten.length - gehadVandaag
 
   const aantalMaandag = pakketVan ? clientsWithData.filter(krijgtMaandagVideo).length : 0
-  const isGehad = (c) => !!c.dagCheck?.dagen?.includes(vandaagStr)
+  // Nog langs / Afgevinkt = deze ronde (sinds maandag voor Op koers, sinds donderdag voor de rest).
+  const isGehad = (c) => gehadDezeRonde(c.dagCheck?.dagen, pakketVanKlant(c))
   // Tellers in het menu binnen de gekozen status, zodat ze kloppen met de lijst.
   const binnenStatus = clientsWithData.filter(c => statusFilter === 'all' || c.status === statusFilter)
   const vinkGedaan = binnenStatus.filter(isGehad).length
@@ -724,7 +726,7 @@ export default function CoachCommandCenter({ db, onNavigatePlan, onNavigateWorko
           {/* CLIENT CARDS — als skelet tot de urgentie-sortering er is, dan
               één keer in met een korte fade. Zelfde hoogte als de echte kaart. */}
           {weergave === 'bord' && kaartFase === 'klaar' ? (
-            <KlantBord supabase={db.supabase} klanten={filteredClients} renderKaart={c => kaartVoor(c, true)} isMobile={isMobile} />
+            <KlantBord supabase={db.supabase} klanten={filteredClients} renderKaart={c => kaartVoor(c, true)} isMobile={isMobile} pakketVan={pakketVanKlant} />
           ) : (
           <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem', animation: kaartFase === 'klaar' ? 'ccKaartIn 0.28s ease' : 'none' }}>
             <style>{'@keyframes ccKaartIn { from { opacity: 0.35; } to { opacity: 1; } } @keyframes ccSkelet { 0% { opacity: 0.55; } 50% { opacity: 0.85; } 100% { opacity: 0.55; } }'}</style>

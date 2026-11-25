@@ -14,7 +14,7 @@ import {
 const NOG = '__nog__'
 const KOLOM = 340
 
-export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) {
+export default function KlantBord({ supabase, klanten, renderKaart, isMobile, pakketVan = () => null }) {
   const [bord, setBord] = useState(null)
   const bordGeladen = !!bord
   const [dropKolom, setDropKolom] = useState(null)
@@ -51,12 +51,10 @@ export default function KlantBord({ supabase, klanten, renderKaart, isMobile }) 
   if (!bord) return <div style={{ padding: space[6], color: colors.textSecondary, fontWeight: 800 }}>Bord laden…</div>
 
   const bestaand = new Set(bord.secties.map(s => s.id))
-  const startId = (bord.secties.find(s => s.rol === 'maandag') || bord.secties[0])?.id
   const moment = weekMoment()
-  const sectieById = Object.fromEntries(bord.secties.map(s => [s.id, s]))
   const sectieVan = (c) => (bestaand.has(bord.plek[c.id]) ? bord.plek[c.id] : NOG)
   const perKolom = {}
-  const volheid = (c) => kaartVolheid({ sectie: sectieById[sectieVan(c)], startId, tijd: bord.tijd?.[c.id], dagen: c.dagCheck?.dagen, moment })
+  const volheid = (c) => kaartVolheid({ dagen: c.dagCheck?.dagen, pakket: pakketVan(c), moment })
   for (const c of klanten) (perKolom[sectieVan(c)] ||= []).push(c)
   // Afgerond (afgevinkt of al gedaan deze week) zakt naar onderen; verder blijft
   // de urgentie-volgorde staan (sort is stabiel).

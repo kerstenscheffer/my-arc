@@ -103,8 +103,14 @@ export default function LoginMain() {
     if (!resetEmail) { setResetMsg({ ok: false, text: 'Vul je email in' }); return }
     setResetLoading(true); setResetMsg(null)
     const result = await passwordReset.sendResetEmail(resetEmail)
-    setResetMsg({ ok: result.success, text: result.success ? result.message : result.error })
-    if (result.success) setTimeout(() => { setShowReset(false); setResetEmail(''); setResetMsg(null) }, 3000)
+    // Supabase meldt "gelukt" ook als er geen account met dit adres is (en
+    // stuurt dan niets). Daarom geen "verstuurd!" maar een eerlijke tekst die
+    // ook zegt wat je doet als er geen mail komt (25 nov 2026).
+    const geenAccountTip = abonnementMogelijk() ? ' Nog geen account? Tik op Maak je plan.' : ''
+    setResetMsg({ ok: result.success, text: result.success
+      ? `Heb je een account met ${resetEmail.trim()}? Dan krijg je zo een mail. Geen mail? Kijk in je spam en check of het adres klopt.${geenAccountTip}`
+      : result.error })
+    if (result.success) setTimeout(() => { setShowReset(false); setResetEmail(''); setResetMsg(null) }, 12000)
     setResetLoading(false)
   }
 
@@ -258,10 +264,10 @@ export default function LoginMain() {
             </p>
             {resetMsg && (
               <div style={{
-                padding: '0.7rem', borderRadius: 10, fontSize: '0.76rem', fontWeight: 800, marginBottom: '0.9rem',
-                background: resetMsg.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-                border: `1px solid ${resetMsg.ok ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                color: resetMsg.ok ? '#10b981' : '#ef4444',
+                padding: '0.8rem 0.9rem', borderRadius: 10, fontSize: '1rem', fontWeight: 900, lineHeight: 1.4, marginBottom: '0.9rem',
+                background: resetMsg.ok ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
+                border: `1px solid ${resetMsg.ok ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                color: '#fff',
               }}>
                 {resetMsg.text}
               </div>
