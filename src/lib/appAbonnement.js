@@ -14,7 +14,7 @@
 import { Capacitor } from '@capacitor/core'
 
 const SLEUTEL_IOS = 'appl_SYxWUmjyiYLUoZwLOExEGIrTmty'
-const SLEUTEL_ANDROID = '' // volgt zodra de Play-app in RevenueCat staat
+const SLEUTEL_ANDROID = 'goog_zMtmOyAtyFhkyXKnSqffCssvlpm'
 export const TOEGANG = 'premium'
 
 export const VOORWAARDEN_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
