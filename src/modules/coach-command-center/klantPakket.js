@@ -5,7 +5,7 @@
 // heeft wekelijkse monitoring en feedback; daarop filtert Command voor een
 // data- + feedbackdag. Zie klant-pakket.sql.
 export const PAKKETTEN = [
-  { id: 'app', naam: 'Solo' },
+  { id: 'app', naam: 'App' },
   { id: 'basis', naam: 'Op koers' },
   { id: 'midden', naam: 'Coaching' },
   { id: 'premium', naam: 'All-in' },

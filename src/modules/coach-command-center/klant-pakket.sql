@@ -66,3 +66,25 @@ update public.clients set maandag_checkin = false where id in (
   '6a879fc6-2db7-4fdb-9036-ff304621506f', -- JT
   '94bc4d3e-0680-4354-80c9-7c15846a1b65'  -- Success Test User
 );
+
+-- App-gebruikers (25 nov 2026, Kersten): wie zich zelf in de app aanmeldt
+-- (clients.app_abonnee) staat in Command onder pakket 'app' (label "App",
+-- voorheen "Solo"). De trigger zet het bij aanmaken, of als de vlag aan gaat.
+-- Wordt een app-gebruiker later coachingklant, dan zet de sale-trigger of de
+-- coach het pakket gewoon om.
+create or replace function public.pakket_app_abonnee()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(new.app_abonnee, false)
+     and (tg_op = 'INSERT' or not coalesce(old.app_abonnee, false)) then
+    new.pakket := 'app';
+  end if;
+  return new;
+end $$;
+revoke all on function public.pakket_app_abonnee() from public, anon, authenticated;
+
+drop trigger if exists trg_pakket_app_abonnee on public.clients;
+create trigger trg_pakket_app_abonnee before insert or update of app_abonnee on public.clients
+  for each row execute function public.pakket_app_abonnee();
+
+update public.clients set pakket = 'app' where coalesce(app_abonnee, false) and pakket is distinct from 'app';
