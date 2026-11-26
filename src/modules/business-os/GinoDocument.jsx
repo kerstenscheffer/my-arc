@@ -11,9 +11,9 @@
 // Bewerken (24 nov 2026) gebeurt in de opgemaakte weergave zelf, zoals Google
 // Docs: DocumentBewerker.jsx + documentOpmaak.js. Opslag blijft dezelfde
 // markdown; wat een kop, punt of tabel is staat op één plek (documentOpmaak.js)
-// en geldt voor lezen én bewerken. Het kleine icoon rechts in de opmaakbalk wisselt naar de oude ruwe
-// tekst (textarea); daar opent een tabblad ook vanzelf als openen → opslaan
-// niet teken voor teken hetzelfde zou geven.
+// en geldt voor lezen én bewerken. Het kleine icoon rechts in de opmaakbalk
+// wisselt naar de oude ruwe tekst (textarea); daar opent een tabblad ook vanzelf
+// als openen → opslaan niet teken voor teken hetzelfde zou geven.
 //
 // Zweeft sinds 20 nov 2026 los over de pagina: sleep aan de kopbalk, de plek
 // blijft bewaard (localStorage bos_doc_pos) en wordt binnen het scherm gehouden.
