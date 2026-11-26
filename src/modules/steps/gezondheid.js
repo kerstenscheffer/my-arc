@@ -99,6 +99,8 @@ const lees = (dataType, startDate, endDate, limit) =>
 // toestel het niet kan (web, oude app, niet gekoppeld).
 export async function gezondheidPerDag(dagenTerug = 7) {
   if (welkePlugin() !== 'nieuw' || !isGekoppeld()) return null
+  // Android leest alleen stappen (Play-keuring 26 nov 2026), zie leesRechten().
+  if (platform() === 'android') return null
   // Een dag eerder beginnen: de nacht naar de eerste dag begint de avond ervoor.
   const start = new Date()
   start.setDate(start.getDate() - dagenTerug)

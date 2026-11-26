@@ -56,12 +56,15 @@
     <!-- Permissions -->
 
     <!-- @capgo/capacitor-health declareert in zijn eigen manifest ruim veertig
-         lees- en schrijfrechten. Wij lezen er vier: stappen, slaap,
-         rusthartslag en HRV (telefoonStappen.js / gezondheid.js) en schrijven
-         niets. Google Play laat je elk gezondheidsrecht apart verantwoorden en
+         lees- en schrijfrechten. Op Android lezen we alleen stappen
+         (telefoonStappen.js leesRechten) en schrijven niets. Slaap, rust-HR en
+         HRV zijn er 26 nov 2026 uit: Play keurde ze af zonder video met horloge. Google Play laat je elk gezondheidsrecht apart verantwoorden en
          weigert rechten die de app niet gebruikt. Daarom strepen we de rest hier
          weg. Voeg een recht pas weer toe als de app het ook echt opvraagt, en
          verantwoord het in de Play Console (Gezondheidsapps-declaratie). -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" tools:node="remove" />

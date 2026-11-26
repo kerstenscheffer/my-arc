@@ -51,6 +51,9 @@ export function welkePlugin() {
 // Wat de nieuwe plugin bij het koppelen vraagt. Op Android moet elk hiervan
 // ook in de manifest staan (de rest is daar weggestreept).
 export const NIEUWE_LEESRECHTEN = ['steps', 'sleep', 'restingHeartRate', 'heartRateVariability']
+// Android: alleen stappen (26 nov 2026). Google Play keurde slaap, rust-HR en
+// HRV af (vraagt een video met horloge). De manifest streept ze ook weg.
+export const leesRechten = () => (platform() === 'android' ? ['steps'] : NIEUWE_LEESRECHTEN)
 
 const ONTHOUD_SLEUTEL = 'myarc_stappen_health_gekoppeld'
 const GEVRAAGD_SLEUTEL = 'myarc_stappen_health_gevraagd'
@@ -101,7 +104,7 @@ const onthoud = (ja) => {
 export async function koppel() {
   if (!(await heeftTelefoonBron())) return null
   try {
-    if (welkePlugin() === 'nieuw') await Nieuw.requestAuthorization({ read: NIEUWE_LEESRECHTEN })
+    if (welkePlugin() === 'nieuw') await Nieuw.requestAuthorization({ read: leesRechten() })
     else await Oud.requestHealthPermissions({ permissions: ['READ_STEPS'] })
     noteerNieuwGevraagd()
   } catch (e) {
