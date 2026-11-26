@@ -439,9 +439,11 @@ export function maakBewerker(root, opties = {}) {
   let stapTijd = 0
   let stapBegin = 0
   let stapSoort = ''
-  // Inklappen: is er al eens getekend, en welke open sleutels zijn het laatst gemeld.
+  // Inklappen: is er al eens getekend, welke open sleutels zijn het laatst gemeld, en klapte de
+  // toets die nu ingedrukt is net een onderdeel open (dan wist die toets nog niets).
   let geladen = false
   let gemeldOpen = null
+  let netOnthuld = false
 
   const br = () => doc.createElement('br')
 
@@ -633,19 +635,20 @@ export function maakBewerker(root, opties = {}) {
     }
     return open
   }
-  // Vóór een ingreep. Cursor in een dicht onderdeel: het klapt open en de ingreep gaat door.
-  // Selectie die over dichte inhoud loopt: het klapt open en de ingreep gaat níet door (true),
-  // zodat je eerst ziet wat je weghaalt of verandert. De tweede keer gaat hij gewoon door.
+  // Vóór een ingreep: klapt open wat de ingreep raakt en zegt wat er open ging.
+  // 'open' = de cursor stond in een dicht onderdeel. Typen, plakken en opmaak gaan gewoon door,
+  //   wissen niet (eerst zien wat je weghaalt).
+  // 'over' = de selectie liep over dichte inhoud. De ingreep gaat dan niet door; de tweede keer wel.
   function eerstZien() {
     const g = grenzen()
-    if (!g) return false
+    if (!g) return ''
     let open = false
     let over = false
     if (g.dicht) open = onthul(g.start.b)
     else for (const b of tussen(g.start.b, g.eind.b)) if (onthul(b)) over = true
     if (open) inBeeld(g.start.b)
     if (open || over) meldKlap()
-    return over
+    return over ? 'over' : open ? 'open' : ''
   }
 
   // Er is altijd een blok, en onder een tabel of lijn aan het eind staat een regel om in te typen.
@@ -1286,7 +1289,7 @@ export function maakBewerker(root, opties = {}) {
   }
 
   function pas(soort) {
-    if (soort !== 'terug' && soort !== 'vooruit' && eerstZien()) return
+    if (soort !== 'terug' && soort !== 'vooruit' && eerstZien() === 'over') return
     if (soort === 'b' || soort === 'i') wisselInline(soort)
     else if (soort === 'lijn') voegLijnIn()
     else if (soort === 'in' || soort === 'uit') spring(soort === 'uit')
@@ -1423,8 +1426,10 @@ export function maakBewerker(root, opties = {}) {
     const viaMenu = { insertOrderedList: 'nummer', insertUnorderedList: 'lijst', insertHorizontalRule: 'lijn' }[type]
     if (viaMenu) { e.preventDefault(); pas(viaMenu); return }
     if (type === 'insertLink') { e.preventDefault(); return }
-    // Loopt de selectie over een dicht onderdeel, dan klapt dat eerst open en gebeurt er verder nog niets.
-    if (eerstZien() && e.cancelable) { e.preventDefault(); return }
+    // Loopt de selectie over een dicht onderdeel, of wis je met de cursor in een dicht onderdeel,
+    // dan klapt dat eerst open en gebeurt er verder nog niets.
+    const zag = eerstZien()
+    if ((zag === 'over' || ((zag === 'open' || netOnthuld) && type.startsWith('delete'))) && e.cancelable) { e.preventDefault(); return }
     const g = grenzen()
     if (!g) return
     if (type === 'insertFromPaste' || type === 'insertFromDrop' || type === 'insertFromPasteAsQuotation') {
@@ -1496,7 +1501,10 @@ export function maakBewerker(root, opties = {}) {
     const mod = e.metaKey || e.ctrlKey
     const k = (e.key || '').toLowerCase()
     // Een toets terwijl de cursor in een dicht onderdeel staat: dat klapt open, je ziet waar je typt.
-    if (!['shift', 'meta', 'control', 'alt', 'capslock', 'escape'].includes(k) && onthulCursor()) meldKlap()
+    // (Zonder dit zet de browser de letter in het eerstvolgende blok dat wel in beeld is.)
+    const s = doc.getSelection()
+    netOnthuld = !['shift', 'meta', 'control', 'alt', 'capslock', 'escape'].includes(k) && !!s && s.isCollapsed && onthulCursor()
+    if (netOnthuld) meldKlap()
     if (mod && !e.altKey && (k === 'b' || k === 'i')) { e.preventDefault(); pas(k); return }
     if (mod && !e.altKey && k === 'z') { e.preventDefault(); if (e.shiftKey) opnieuw(); else ongedaan(); return }
     if (mod && !e.altKey && k === 'y') { e.preventDefault(); opnieuw(); return }
@@ -1507,7 +1515,7 @@ export function maakBewerker(root, opties = {}) {
     if (inVak(e.target)) return
     e.preventDefault()
     const t = e.clipboardData ? e.clipboardData.getData('text/plain') : ''
-    if (!t || eerstZien()) return
+    if (!t || eerstZien() === 'over') return
     stap()
     plak(t)
     klaarOp()
@@ -1518,7 +1526,7 @@ export function maakBewerker(root, opties = {}) {
     if (!g || g.dicht || !e.clipboardData) return
     e.preventDefault()
     // Knippen over een dicht onderdeel: eerst open, er wordt nog niets geknipt. Kopiëren neemt alles mee.
-    if (e.type === 'cut' && eerstZien()) return
+    if (e.type === 'cut' && eerstZien() === 'over') return
     e.clipboardData.setData('text/plain', mdVanSelectie(g))
     if (e.type === 'cut') { stap(); wis(g); klaarOp() }
   }
@@ -1694,7 +1702,7 @@ export function maakBewerker(root, opties = {}) {
     [root, 'paste', opPaste], [root, 'copy', opCopy], [root, 'cut', opCopy],
     [root, 'dragstart', opSleep], [root, 'drop', opSleep], [root, 'click', opKlik], [root, 'focusout', opFocusUit],
     [root, 'compositionstart', opStartSamen], [root, 'compositionend', opEindSamen],
-    [doc, 'selectionchange', opSelectie],
+    [doc, 'selectionchange', opSelectie], [root, 'keyup', () => { netOnthuld = false }],
     // Het pijltje: op het rolvlak, zodat ook een tik in de rand links van de kop meetelt.
     [scroller || root, 'mousedown', opMuisNeer], [scroller || root, 'click', opPijlKlik],
     [scroller || root, 'touchstart', opTikStart, { passive: true }], [scroller || root, 'touchmove', opTikBeweeg, { passive: true }],
