@@ -20,11 +20,15 @@
 //   ruwe tekst.
 // - Klopt openen → opslaan niet teken voor teken, dan is ok false en opent het
 //   scherm het document in de oude ruwe vorm.
+// - Inklappen van een ###-onderdeel (26 nov 2026) is alleen beeld: de blokken
+//   blijven in het vlak staan (data-weg = display none), dus opslaan geeft altijd
+//   de volledige tekst. Zie 'Inklappen' in maakBewerker.
 //
 // Testen (lokale headless Chrome, geen netwerk): ~/Gino/doc-editor-test/
 //   haal.mjs        haalt alle rijen van business_os_documenten op (md5-controle)
 //   test.mjs        heen-en-terug per rij, toetsgedrag, willekeurige bewerkingen
 //   scherm-test.mjs het hele documentscherm met nep-opslag, desktop en telefoonmaat
+// en ~/Gino/doc-inklap-test/inklap-test.mjs voor het inklappen (lezen én bewerken).
 // Draai ze na elke wijziging hier of aan de regels hieronder.
 
 // ── Regels van de markdown-vorm (ook gebruikt door de leesweergave) ──
@@ -51,6 +55,21 @@ const isLijst = (t) => t === 'li' || t === 'ol' || t === 'pijl'
 const bewerkbaar = (b) => !!b && !!b.dataset && b.dataset.t !== 'hr' && b.dataset.t !== 'ruw'
 const inspringVan = (pre) => (pre || '').match(/^\s*/)[0]
 const diepte = (pre) => Math.floor(inspringVan(pre).replace(/\t/g, '  ').length / 2)
+
+// Sleutel van een ###-onderdeel (voor open/dicht): het kopje erboven (# of ##) plus de eigen tekst,
+// zodat hetzelfde onderwerp onder twee calls los open kan. Een dubbele krijgt een volgnummer.
+// Roep hem aan voor elke kopregel, in volgorde; lezen en bewerken krijgen zo dezelfde sleutels.
+export function sleutelMaker() {
+  let ouder = ''
+  const gezien = {}
+  return (n, kopTekst) => {
+    if (n < 3) { ouder = kopTekst.trim(); return null }
+    if (n > 3) return null
+    const basis = `${ouder}\n${kopTekst.trim()}`
+    gezien[basis] = (gezien[basis] || 0) + 1
+    return gezien[basis] > 1 ? `${basis}\n${gezien[basis]}` : basis
+  }
+}
 
 // Eén regel (geen tabel, niet leeg) → soort, letterlijk begin en de tekst erachter.
 export function ontleedRegel(r) {
@@ -383,7 +402,9 @@ export const BEWERK_CSS = `
 .bd-vlak > [data-t="h2"] { margin-top: 14px; margin-bottom: 2px; }
 .bd-vlak > [data-t="h1"]:first-child, .bd-vlak > [data-t="h2"]:first-child { margin-top: 0; }
 .bd-vlak > [data-t="h3"] { font-size: 0.8rem; margin-top: 20px; margin-bottom: -4px; padding: 10px 0 6px 20px; border-top: 1px solid rgba(255,255,255,0.06); }
-.bd-vlak > [data-t="h3"]::before { content: ''; position: absolute; left: 0; top: 10px; width: 14px; height: 1.2em; height: 1lh; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat; }
+.bd-vlak > [data-t="h3"]::before { content: ''; position: absolute; left: 0; top: 10px; width: 14px; height: 1.2em; height: 1lh; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat; cursor: pointer; }
+.bd-vlak > [data-t="h3"][data-dicht]::before { transform: rotate(-90deg); }
+.bd-vlak > [data-weg] { display: none; }
 .bd-vlak > [data-t="h4"] { color: #fff; font-size: 0.9rem; font-weight: 800; line-height: inherit; min-height: 1.2em; margin-top: 12px; margin-bottom: 2px; }
 .bd-vlak > [data-t="hr"] { height: 1px; min-height: 0; background: rgba(255,255,255,0.14); margin: 10px 0; }
 .bd-vlak > [data-teken] { padding-left: calc(var(--bd-w, 0.6em) + 8px); }
@@ -403,8 +424,10 @@ export const BEWERK_CSS = `
 
 // root = het contentEditable-vlak. Geeft { ok, ... } terug; bij ok false is er niets aangeraakt
 // dat bewaard kan worden en hoort het scherm de ruwe vorm te tonen.
+// open = sleutels van de ###-onderdelen die open staan (zoals in de leesweergave); null = alles open.
+// onKlap(lijst) meldt de open sleutels zodra die veranderen (tik op een pijltje, kop hernoemd, nieuw onderdeel).
 export function maakBewerker(root, opties = {}) {
-  const { md: startMd = '', scroller = null, onWijzig = null, onBlur = null } = opties
+  const { md: startMd = '', scroller = null, onWijzig = null, onBlur = null, open: startOpen = null, onKlap = null } = opties
   const doc = root.ownerDocument
   let huidig = String(startMd ?? '')
   // Opmaak die pas geldt voor het volgende teken (⌘B zonder selectie, of net na het sluiten van **vet**).
@@ -416,6 +439,9 @@ export function maakBewerker(root, opties = {}) {
   let stapTijd = 0
   let stapBegin = 0
   let stapSoort = ''
+  // Inklappen: is er al eens getekend, en welke open sleutels zijn het laatst gemeld.
+  let geladen = false
+  let gemeldOpen = null
 
   const br = () => doc.createElement('br')
 
@@ -494,6 +520,8 @@ export function maakBewerker(root, opties = {}) {
   }
 
   function laad(md) {
+    // Opnieuw tekenen (ongedaan maken, + Onderdeel): wat dicht stond blijft dicht.
+    const stand = geladen ? klapStand() : null
     const { blokken, na } = ontleed(md)
     const frag = doc.createDocumentFragment()
     for (const p of blokken) frag.append(maak(p))
@@ -508,6 +536,116 @@ export function maakBewerker(root, opties = {}) {
     extra.set(root, { na: rest })
     wacht = null
     borg()
+    const alle = koppen()
+    alle.forEach((k, i) => {
+      const dicht = stand
+        // Zelfde aantal onderdelen: op volgorde (een hernoemde kop blijft dan ook dicht), anders op koptekst.
+        ? (stand.n === alle.length ? stand.plek.includes(i) : stand.sleutels.includes(k.sleutel))
+        : !!startOpen && !startOpen.includes(k.sleutel)
+      k.b.toggleAttribute('data-dicht', dicht)
+    })
+    werkKlapBij()
+    geladen = true
+  }
+
+  // ── Inklappen van ###-onderdelen ──
+  // Alleen beeld. data-dicht op de kop = dicht; data-weg op elk blok dat daardoor niet in beeld staat
+  // (zelfde indeling als de leesweergave: alles tot het volgende kopje van niveau 1-3). De blokken
+  // blijven in het vlak, dus naarMarkdown geeft altijd de volledige tekst.
+  // Wat dicht staat verandert nooit ongezien: komt de cursor erin, of raakt een ingreep het, dan klapt
+  // het eerst open (onthulCursor, eerstZien).
+  const isDicht = (b) => b.hasAttribute('data-dicht')
+  const isWeg = (b) => !!b && b.hasAttribute('data-weg')
+  function werkKlapBij() {
+    let weg = false
+    for (const b of root.children) {
+      const t = b.dataset.t
+      if (t === 'h3') {
+        weg = isDicht(b)
+        if (isWeg(b)) b.removeAttribute('data-weg')
+        continue
+      }
+      // Geen ###-kop meer: dan valt er ook niets meer onder dicht.
+      if (isDicht(b)) b.removeAttribute('data-dicht')
+      if (t === 'h1' || t === 'h2') weg = false
+      if (weg !== isWeg(b)) b.toggleAttribute('data-weg', weg)
+    }
+  }
+  // Elke ###-kop met zijn sleutel: dezelfde als in de leesweergave, uit de regel zoals hij wordt opgeslagen.
+  function koppen() {
+    const maakSleutel = sleutelMaker()
+    const uit = []
+    for (const b of root.children) {
+      if (!/^h[1-4]$/.test(b.dataset.t || '')) continue
+      const kop = blokTekst(b).match(KOPREGEL)
+      const sleutel = kop && maakSleutel(kop[1].length, kop[2])
+      if (sleutel && b.dataset.t === 'h3') uit.push({ b, sleutel })
+    }
+    return uit
+  }
+  function klapStand() {
+    const alle = koppen()
+    return {
+      n: alle.length,
+      plek: alle.map((k, i) => (isDicht(k.b) ? i : -1)).filter(i => i >= 0),
+      sleutels: alle.filter(k => isDicht(k.b)).map(k => k.sleutel),
+    }
+  }
+  const openSleutels = () => koppen().filter(k => !isDicht(k.b)).map(k => k.sleutel)
+  function meldKlap() {
+    if (!onKlap) return
+    const lijst = openSleutels()
+    const s = lijst.join('\u0000')
+    if (s === gemeldOpen) return
+    gemeldOpen = s
+    onKlap(lijst)
+  }
+  // open: true/false, of niets = omklappen.
+  function klap(b, open = null) {
+    if (!b || b.dataset.t !== 'h3') return
+    b.toggleAttribute('data-dicht', open == null ? !isDicht(b) : !open)
+    werkKlapBij()
+    meldKlap()
+  }
+  function klapAlles(open) {
+    for (const b of root.querySelectorAll(':scope > [data-t="h3"]')) b.toggleAttribute('data-dicht', !open)
+    werkKlapBij()
+    meldKlap()
+  }
+  // Klapt het onderdeel open waarin dit blok dicht staat. true = er ging iets open.
+  function onthul(b) {
+    if (!isWeg(b)) return false
+    let kop = b.previousElementSibling
+    while (kop && kop.dataset.t !== 'h3') kop = kop.previousElementSibling
+    if (kop) kop.removeAttribute('data-dicht')
+    werkKlapBij()
+    return true
+  }
+  // Staat de cursor in een dicht onderdeel, dan klapt dat open: je typt nooit in iets wat je niet ziet.
+  function onthulCursor() {
+    const s = doc.getSelection()
+    if (!s || !s.rangeCount) return false
+    let open = false
+    for (const n of [s.anchorNode, s.focusNode]) {
+      if (!n || n === root || !root.contains(n)) continue
+      const b = blokVan(n)
+      if (b && onthul(b)) { open = true; inBeeld(b) }
+    }
+    return open
+  }
+  // Vóór een ingreep. Cursor in een dicht onderdeel: het klapt open en de ingreep gaat door.
+  // Selectie die over dichte inhoud loopt: het klapt open en de ingreep gaat níet door (true),
+  // zodat je eerst ziet wat je weghaalt of verandert. De tweede keer gaat hij gewoon door.
+  function eerstZien() {
+    const g = grenzen()
+    if (!g) return false
+    let open = false
+    let over = false
+    if (g.dicht) open = onthul(g.start.b)
+    else for (const b of tussen(g.start.b, g.eind.b)) if (onthul(b)) over = true
+    if (open) inBeeld(g.start.b)
+    if (open || over) meldKlap()
+    return over
   }
 
   // Er is altijd een blok, en onder een tabel of lijn aan het eind staat een regel om in te typen.
@@ -693,7 +831,11 @@ export function maakBewerker(root, opties = {}) {
     meld()
   }
 
-  function meld() {
+  // metCursor false = alleen uitlezen (opslaan, focus weg): dan klapt er niets open.
+  function meld(metCursor = true) {
+    werkKlapBij()
+    if (metCursor) onthulCursor()
+    meldKlap()
     const md = naarMarkdown(root)
     if (md === huidig) return
     huidig = md
@@ -1144,6 +1286,7 @@ export function maakBewerker(root, opties = {}) {
   }
 
   function pas(soort) {
+    if (soort !== 'terug' && soort !== 'vooruit' && eerstZien()) return
     if (soort === 'b' || soort === 'i') wisselInline(soort)
     else if (soort === 'lijn') voegLijnIn()
     else if (soort === 'in' || soort === 'uit') spring(soort === 'uit')
@@ -1280,6 +1423,8 @@ export function maakBewerker(root, opties = {}) {
     const viaMenu = { insertOrderedList: 'nummer', insertUnorderedList: 'lijst', insertHorizontalRule: 'lijn' }[type]
     if (viaMenu) { e.preventDefault(); pas(viaMenu); return }
     if (type === 'insertLink') { e.preventDefault(); return }
+    // Loopt de selectie over een dicht onderdeel, dan klapt dat eerst open en gebeurt er verder nog niets.
+    if (eerstZien() && e.cancelable) { e.preventDefault(); return }
     const g = grenzen()
     if (!g) return
     if (type === 'insertFromPaste' || type === 'insertFromDrop' || type === 'insertFromPasteAsQuotation') {
@@ -1301,8 +1446,17 @@ export function maakBewerker(root, opties = {}) {
       const b = g.start.b
       if (!bewerkbaar(b)) { e.preventDefault(); return }
       const pos = tekstVoor(b, g.start.node, g.start.off)
-      if (type.endsWith('Backward') && pos === 0) { e.preventDefault(); stap(); wisTerug(b); klaarOp(); return }
-      if (type.endsWith('Forward') && pos === b.textContent.length) { e.preventDefault(); stap(); wisVooruit(b); klaarOp(); return }
+      // Samenvoegen met een regel die dicht staat: eerst open, zodat je ziet waarmee.
+      if (type.endsWith('Backward') && pos === 0) {
+        e.preventDefault()
+        if (b.dataset.t === 'p' && onthul(b.previousElementSibling)) { meldKlap(); return }
+        stap(); wisTerug(b); klaarOp(); return
+      }
+      if (type.endsWith('Forward') && pos === b.textContent.length) {
+        e.preventDefault()
+        if (onthul(b.nextElementSibling)) { meldKlap(); return }
+        stap(); wisVooruit(b); klaarOp(); return
+      }
       stap('typ')
       return
     }
@@ -1341,17 +1495,19 @@ export function maakBewerker(root, opties = {}) {
     if (inVak(e.target)) return
     const mod = e.metaKey || e.ctrlKey
     const k = (e.key || '').toLowerCase()
+    // Een toets terwijl de cursor in een dicht onderdeel staat: dat klapt open, je ziet waar je typt.
+    if (!['shift', 'meta', 'control', 'alt', 'capslock', 'escape'].includes(k) && onthulCursor()) meldKlap()
     if (mod && !e.altKey && (k === 'b' || k === 'i')) { e.preventDefault(); pas(k); return }
     if (mod && !e.altKey && k === 'z') { e.preventDefault(); if (e.shiftKey) opnieuw(); else ongedaan(); return }
     if (mod && !e.altKey && k === 'y') { e.preventDefault(); opnieuw(); return }
-    if (e.key === 'Tab' && !mod && !e.altKey) { e.preventDefault(); spring(e.shiftKey) }
+    if (e.key === 'Tab' && !mod && !e.altKey) { e.preventDefault(); pas(e.shiftKey ? 'uit' : 'in') }
   }
 
   function opPaste(e) {
     if (inVak(e.target)) return
     e.preventDefault()
     const t = e.clipboardData ? e.clipboardData.getData('text/plain') : ''
-    if (!t) return
+    if (!t || eerstZien()) return
     stap()
     plak(t)
     klaarOp()
@@ -1361,6 +1517,8 @@ export function maakBewerker(root, opties = {}) {
     const g = grenzen()
     if (!g || g.dicht || !e.clipboardData) return
     e.preventDefault()
+    // Knippen over een dicht onderdeel: eerst open, er wordt nog niets geknipt. Kopiëren neemt alles mee.
+    if (e.type === 'cut' && eerstZien()) return
     e.clipboardData.setData('text/plain', mdVanSelectie(g))
     if (e.type === 'cut') { stap(); wis(g); klaarOp() }
   }
@@ -1382,7 +1540,57 @@ export function maakBewerker(root, opties = {}) {
     laatsteBereik = r.cloneRange()
     if (wacht && (s.anchorNode !== wacht.node || s.anchorOffset !== wacht.off || !r.collapsed)) wacht = null
   }
-  const opStartSamen = () => { samenstellen = true }
+  // ── Tik op het pijltje van een ###-kop ──
+  // Het pijltje (::before) staat in de linkermarge van de kop. Ook de rand links daarvan en een paar
+  // pixels erboven tellen mee, zodat je er met een vinger niet naast tikt.
+  function kopBijPijl(x, y) {
+    if (x < (scroller || root).getBoundingClientRect().left) return null
+    for (const b of root.querySelectorAll(':scope > [data-t="h3"]')) {
+      const r = b.getBoundingClientRect()
+      // De koppen staan van boven naar beneden: ligt de tik boven deze, dan ook boven de rest.
+      if (y < r.top - 8) return null
+      if (y < r.bottom && x < r.left + 20) return b
+    }
+    return null
+  }
+  let pijlDoel = null // kop waarop de muis neerkwam
+  let tik = null // aanraking die op een pijltje begon
+  let tikTijd = 0 // laatste aanraak-tik; sommige browsers sturen daarna nog een muisklik
+  function opMuisNeer(e) {
+    pijlDoel = e.button === 0 ? kopBijPijl(e.clientX, e.clientY) : null
+    // Tegenhouden = geen focus, de cursor blijft waar hij was en er opent geen toetsenbord.
+    if (pijlDoel) e.preventDefault()
+  }
+  function opPijlKlik(e) {
+    const b = pijlDoel
+    pijlDoel = null
+    if (!b || !b.isConnected || Date.now() - tikTijd < 700) return
+    if (kopBijPijl(e.clientX, e.clientY) === b) klap(b)
+  }
+  function opTikStart(e) {
+    tik = null
+    if (e.touches.length !== 1) return
+    const t = e.touches[0]
+    const b = kopBijPijl(t.clientX, t.clientY)
+    if (b) tik = { b, x: t.clientX, y: t.clientY }
+  }
+  function opTikBeweeg(e) {
+    const t = e.touches[0]
+    // Schuiven is geen tik.
+    if (tik && (!t || Math.abs(t.clientX - tik.x) > 10 || Math.abs(t.clientY - tik.y) > 10)) tik = null
+  }
+  function opTikEind(e) {
+    const t = tik
+    tik = null
+    if (!t || !t.b.isConnected || !e.cancelable) return
+    // Houdt de nagebootste muisklik tegen: die zou de cursor in de kop zetten en het toetsenbord openen.
+    e.preventDefault()
+    tikTijd = Date.now()
+    klap(t.b)
+  }
+  const opTikWeg = () => { tik = null }
+
+  const opStartSamen = () => { samenstellen = true; if (onthulCursor()) meldKlap() }
   function opEindSamen() {
     samenstellen = false
     normaliseer()
@@ -1416,8 +1624,10 @@ export function maakBewerker(root, opties = {}) {
 
   // Zet het vlak op dezelfde plek als waar je in de leesweergave was en de cursor waar je tikte.
   function begin({ regel = null, top = null, x = null, y = null, einde = false, selecteer = false, focus = true } = {}) {
-    const bewerkbare = [...root.children].filter(bewerkbaar)
+    const bewerkbare = [...root.children].filter(x => bewerkbaar(x) && !isWeg(x))
     let b = regel != null ? blokBijRegel(regel) : null
+    // De regel staat in een dicht onderdeel: dan begint het bij de kop daarvan.
+    while (b && isWeg(b)) b = b.previousElementSibling
     if (einde || !b) b = einde || focus ? bewerkbare[bewerkbare.length - 1] || null : null
     if (b && einde) inBeeld(b)
     else if (b && top != null && scroller) scroller.scrollTop += b.getBoundingClientRect().top - top
@@ -1444,6 +1654,7 @@ export function maakBewerker(root, opties = {}) {
   function bovenste() {
     const grens = scroller ? scroller.getBoundingClientRect().top : 0
     for (const b of root.children) {
+      if (isWeg(b)) continue
       const r = b.getBoundingClientRect()
       if (r.bottom > grens + 1) return { regel: regelVanBlok(b), top: r.top }
     }
@@ -1466,7 +1677,7 @@ export function maakBewerker(root, opties = {}) {
   }
 
   function focusEind() {
-    const bewerkbare = [...root.children].filter(bewerkbaar)
+    const bewerkbare = [...root.children].filter(x => bewerkbaar(x) && !isWeg(x))
     const b = bewerkbare[bewerkbare.length - 1]
     if (!b) return
     root.focus({ preventScroll: true })
@@ -1484,8 +1695,14 @@ export function maakBewerker(root, opties = {}) {
     [root, 'dragstart', opSleep], [root, 'drop', opSleep], [root, 'click', opKlik], [root, 'focusout', opFocusUit],
     [root, 'compositionstart', opStartSamen], [root, 'compositionend', opEindSamen],
     [doc, 'selectionchange', opSelectie],
+    // Het pijltje: op het rolvlak, zodat ook een tik in de rand links van de kop meetelt.
+    [scroller || root, 'mousedown', opMuisNeer], [scroller || root, 'click', opPijlKlik],
+    [scroller || root, 'touchstart', opTikStart, { passive: true }], [scroller || root, 'touchmove', opTikBeweeg, { passive: true }],
+    [scroller || root, 'touchend', opTikEind, { passive: false }], [scroller || root, 'touchcancel', opTikWeg],
   ]
-  if (ok) for (const [el, soort, f] of luister) el.addEventListener(soort, f)
+  if (ok) for (const [el, soort, f, hoe] of luister) el.addEventListener(soort, f, hoe)
+  // Wat bij het openen dicht stond is geen wijziging: alleen wat daarna verandert wordt gemeld.
+  gemeldOpen = openSleutels().join('\u0000')
 
   return {
     ok,
@@ -1494,12 +1711,15 @@ export function maakBewerker(root, opties = {}) {
     bovenste,
     voegOnderdeelToe,
     focusEind,
-    markdown: () => { meld(); return huidig },
+    // Een onderdeel in- of uitklappen gaat via het pijltje; dit is voor de knop 'alles open/dicht'.
+    klapAlles,
+    openSleutels,
+    markdown: () => { meld(false); return huidig },
     // Alleen voor de test: opslaan zonder het vangnet van de oorspronkelijke regels, en de regel per blok.
     markdownZonderVangnet: () => naarMarkdown(root, true),
     regelsPerBlok: () => [...root.children].map(regelVan),
     sluit: () => {
-      for (const [el, soort, f] of luister) el.removeEventListener(soort, f)
+      for (const [el, soort, f, hoe] of luister) el.removeEventListener(soort, f, hoe)
       if (meter) meter.remove()
       root.textContent = ''
     },

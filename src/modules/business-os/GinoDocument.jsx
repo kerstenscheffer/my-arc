@@ -11,8 +11,7 @@
 // Bewerken (24 nov 2026) gebeurt in de opgemaakte weergave zelf, zoals Google
 // Docs: DocumentBewerker.jsx + documentOpmaak.js. Opslag blijft dezelfde
 // markdown; wat een kop, punt of tabel is staat op één plek (documentOpmaak.js)
-// en geldt voor lezen én bewerken. Alle ###-onderdelen staan tijdens bewerken
-// open. Het kleine icoon rechts in de opmaakbalk wisselt naar de oude ruwe
+// en geldt voor lezen én bewerken. Het kleine icoon rechts in de opmaakbalk wisselt naar de oude ruwe
 // tekst (textarea); daar opent een tabblad ook vanzelf als openen → opslaan
 // niet teken voor teken hetzelfde zou geven.
 //
@@ -30,19 +29,25 @@
 // inspringen en ongedaan maken, en schuift de balk opzij.
 // Lezen (24 nov 2026): elk ###-onderdeel is uitklapbaar en staat standaard dicht;
 // tekst onder # en ## blijft open. Welke open staan wordt per tab onthouden
-// (localStorage bos_doc_open, op koptekst). Knop in de kopbalk: alles open/dicht.
+// (localStorage bos_doc_onderdelen, op koptekst). Knop in de kopbalk: alles open/dicht.
+// Sinds 26 nov 2026 werkt het pijltje ook tijdens bewerken, met dezelfde open/dicht-stand
+// (de bewerker meldt hem terug via onKlap). Bewerken begint alleen met een tik in de tekst
+// zelf: een tik op of net naast een pijltje klapt alleen, de rand om de tekst doet niets.
+// De stand had eerst de sleutel bos_doc_open, dezelfde als 'document open/dicht'
+// (documentData.js): die twee overschreven elkaar, dus na herladen was de stand weg.
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, Maximize2, Minimize2, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus, Code2, IndentIncrease, IndentDecrease, Undo2 } from 'lucide-react'
 import { createPortal } from '../../client/paginaPortal'
 import DocumentBewerker from './DocumentBewerker'
-import { KOPREGEL, TABELREGEL, SCHEIDINGSRIJ, LIJNREGEL, PIJLREGEL, PUNTREGEL, PUNT_KAAL, NUMMERREGEL, inlineRe, cellen } from './documentOpmaak'
+import { KOPREGEL, TABELREGEL, SCHEIDINGSRIJ, LIJNREGEL, PIJLREGEL, PUNTREGEL, PUNT_KAAL, NUMMERREGEL, inlineRe, cellen, sleutelMaker } from './documentOpmaak'
 
 const POS_SLEUTEL = 'bos_doc_pos'
 const TAB_SLEUTEL = 'bos_doc_tab_id'
 const MAAT_SLEUTEL = 'bos_doc_maat'
 const DICHT_SLEUTEL = 'bos_doc_ingeklapt'
-const OPEN_SLEUTEL = 'bos_doc_open'
+// Niet 'bos_doc_open': die sleutel is van useDocumentDicht (document zelf open of dicht).
+const OPEN_SLEUTEL = 'bos_doc_onderdelen'
 const RAND = 8
 // Langer dan dit: tikken in de tekst opent geen bewerkvak (je wilt kunnen scrollen en selecteren).
 const TIK_BEWERK_MAX = 5000
@@ -87,21 +92,7 @@ function Tabel({ rijen, regel }) {
   )
 }
 
-// Sleutel van een ###-onderdeel: het kopje erboven (# of ##) plus de eigen tekst,
-// zodat hetzelfde onderwerp onder twee calls los open kan. Een dubbele krijgt een volgnummer.
-function sleutelMaker() {
-  let ouder = ''
-  const gezien = {}
-  return (n, kopTekst) => {
-    if (n < 3) { ouder = kopTekst.trim(); return null }
-    if (n > 3) return null
-    const basis = `${ouder}\n${kopTekst.trim()}`
-    gezien[basis] = (gezien[basis] || 0) + 1
-    return gezien[basis] > 1 ? `${basis}\n${gezien[basis]}` : basis
-  }
-}
-
-// Alle ###-onderdelen van een document, in volgorde.
+// Alle ###-onderdelen van een document, in volgorde (sleutelMaker staat in documentOpmaak.js).
 function onderdeelSleutels(tekst) {
   const maak = sleutelMaker()
   const uit = []
@@ -114,7 +105,8 @@ function onderdeelSleutels(tekst) {
 }
 
 // open = sleutels van de ###-onderdelen die open staan; wissel(sleutel) klapt er één om.
-function Weergave({ tekst, open, wissel }) {
+// tik = een tik in de tekst opent bewerken (alleen voor de muisaanwijzer; de tik zelf vangt het leesvlak).
+function Weergave({ tekst, open, wissel, tik }) {
   const regels = String(tekst || '').split('\n')
   const maak = sleutelMaker()
   const uit = []
@@ -143,7 +135,7 @@ function Weergave({ tekst, open, wissel }) {
           wissel(sleutel)
         }
         uit.push(
-          <div key={i} data-regel={i} data-uitklap role="button" tabIndex={0} aria-expanded={isOpen} title={isOpen ? 'Inklappen' : 'Uitklappen'}
+          <div key={i} data-regel={i} data-uitklap data-sleutel={sleutel} role="button" tabIndex={0} aria-expanded={isOpen} title={isOpen ? 'Inklappen' : 'Uitklappen'}
             onClick={klap} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); klap(e) } }}
             style={{ ...KOP, fontSize: '0.8rem', marginTop: 20, paddingTop: 10, paddingBottom: 6, marginBottom: -4, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
             {/* Het onzichtbare teken geeft de chevron de hoogte van één tekstregel, ook als de kop afbreekt. */}
@@ -187,7 +179,7 @@ function Weergave({ tekst, open, wissel }) {
     if (!r.trim()) continue
     uit.push(<div key={i} data-regel={i} style={TEKST}><Inline tekst={r} /></div>)
   }
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{uit}</div>
+  return <div data-tekst title={tik ? 'Tik om te bewerken' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 4, cursor: tik ? 'text' : undefined }}>{uit}</div>
 }
 
 const lees = (k, terug) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? terug } catch { return terug } }
@@ -637,22 +629,37 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = fa
 
   const tekst = actief?.inhoud || ''
   const tikBewerk = tekst.length <= TIK_BEWERK_MAX
-  // Uitklapbare ###-onderdelen van dit tabblad.
-  const onderdelen = useMemo(() => onderdeelSleutels(tekst), [tekst])
+  // Uitklapbare ###-onderdelen van dit tabblad; tijdens bewerken die van de tekst zoals hij nu in het vlak staat.
+  const onderdelen = useMemo(() => onderdeelSleutels(bewerk ? concept : tekst), [bewerk, concept, tekst])
   const bewaardOpen = actief ? openPerTab[actief.id] : null
   const openLijst = Array.isArray(bewaardOpen) ? bewaardOpen : []
   const allesOpen = onderdelen.length > 0 && onderdelen.every(s => openLijst.includes(s))
   // Bewaart alleen kopjes die nu bestaan: een hernoemd kopje is daarna gewoon weer dicht.
-  const zetOpen = (lijst) => {
-    if (!actief) return
-    const n = { ...openPerTab }
-    const geldig = lijst.filter(s => onderdelen.includes(s))
-    if (geldig.length) n[actief.id] = geldig
-    else delete n[actief.id]
-    setOpenPerTab(n)
-    schrijf(OPEN_SLEUTEL, n)
+  // De bewerker geeft zijn eigen lijst (alleen = null): die klopt al met wat er in het vlak staat.
+  const zetOpen = (lijst, tabId = actief?.id, alleen = onderdelen) => {
+    if (!tabId) return
+    const geldig = alleen ? lijst.filter(s => alleen.includes(s)) : lijst
+    setOpenPerTab(o => {
+      const n = { ...o }
+      if (geldig.length) n[tabId] = geldig
+      else delete n[tabId]
+      schrijf(OPEN_SLEUTEL, n)
+      return n
+    })
   }
   const wisselOnderdeel = (s) => zetOpen(openLijst.includes(s) ? openLijst.filter(x => x !== s) : [...openLijst, s])
+  // Tik in het leesvlak. Op een kop met pijltje klapt Weergave zelf; net naast het pijltje (de rand
+  // links ervan of vlak erboven) telt ook als het pijltje. Bewerken begint alleen met een tik in de
+  // tekst zelf, of op een leeg tabblad.
+  const leesKlik = (e) => {
+    if (e.target.closest('[data-uitklap]')) return
+    for (const rij of leesvlak.current?.querySelectorAll('[data-uitklap]') || []) {
+      const r = rij.getBoundingClientRect()
+      if (e.clientY < r.top - 8) break
+      if (e.clientY < r.bottom && e.clientX < r.left + 20) { wisselOnderdeel(rij.dataset.sleutel); return }
+    }
+    if (tikBewerk && (!tekst.trim() || e.target.closest('[data-tekst]'))) start('', e)
+  }
   // Vastgezet = bovenaan als eigen boom (met subtabs); de gewone lijst toont de rest.
   const ouderVan = (t) => tabs.find(x => x.id === t.parent_id)
   const vastVoorouder = (t) => { for (let p = ouderVan(t); p; p = ouderVan(p)) if (p.vastgezet) return true; return false }
@@ -689,8 +696,8 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = fa
         </div>
         {!dicht && actief && (
           <>
-            {!bewerk && onderdelen.length > 0 && (
-              <button type="button" onClick={() => zetOpen(allesOpen ? [] : onderdelen)} title={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} aria-label={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} style={knop}>
+            {!(bewerk && ruw) && onderdelen.length > 0 && (
+              <button type="button" onMouseDown={(e) => { if (bewerk) e.preventDefault() }} onClick={() => (bewerk ? stuur.current?.klapAlles(!allesOpen) : zetOpen(allesOpen ? [] : onderdelen))} title={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} aria-label={allesOpen ? 'Alles dichtklappen' : 'Alles openklappen'} style={knop}>
                 {allesOpen ? <ChevronsDownUp size={15} strokeWidth={2.4} /> : <ChevronsUpDown size={15} strokeWidth={2.4} />}
               </button>
             )}
@@ -749,6 +756,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = fa
             <Opmaakbalk pas={(soort) => (ruw ? pasOpmaak(soort) : stuur.current?.pas(soort))} isMobile={isMobile} ruw={ruw} wisselRuw={wisselRuw} alleenRuw={alleenRuw} />
             {!ruw ? (
               <DocumentBewerker key={`${bewerkId.current}:${sessie}`} tekst={concept} start={beginBij.current} stuur={stuur} isMobile={isMobile}
+                open={openLijst} onKlap={(lijst) => zetOpen(lijst, bewerkId.current, null)}
                 onWijzig={setConcept}
                 onBlur={() => { clearTimeout(timer.current); if (stuur.current) opslaan(stuur.current.markdown()) }}
                 onMislukt={() => { setRuw(true); setAlleenRuw(true) }} />
@@ -763,15 +771,15 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = fa
             )}
             </div>
           ) : (
-            <div key={actief?.id || 'leeg'} ref={leesvlak} onClick={tikBewerk && actief ? (e) => { if (!e.target.closest('[data-uitklap]')) start('', e) } : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
-              style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 40vh' : '20px 28px 40vh' }}>
+            <div key={actief?.id || 'leeg'} ref={leesvlak} onClick={actief ? leesKlik : undefined} title={tikBewerk && actief && !tekst.trim() ? 'Tik om te bewerken' : undefined}
+              style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief && !tekst.trim() ? 'text' : 'auto', padding: isMobile ? '12px 14px 40vh' : '20px 28px 40vh' }}>
               {!docs.geladen ? <div style={{ ...TEKST, color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
                 : !actief ? (
                   <button type="button" onClick={(e) => { e.stopPropagation(); acties.nieuw(null) }} style={{ ...menuRegel, display: 'inline-flex', alignItems: 'center', gap: 8, width: 'auto', border: '1px solid rgba(255,255,255,0.15)', padding: '10px 14px' }}>
                     <Plus size={14} strokeWidth={2.6} /> Eerste tabblad maken
                   </button>
                 )
-                : tekst.trim() ? <Weergave tekst={tekst} open={openLijst} wissel={wisselOnderdeel} />
+                : tekst.trim() ? <Weergave tekst={tekst} open={openLijst} wissel={wisselOnderdeel} tik={tikBewerk} />
                 : <div style={{ ...TEKST, color: 'rgba(255,255,255,0.3)' }}>Leeg tabblad. Tik om te schrijven, of vraag Gino iets vast te leggen.</div>}
             </div>
           )}
