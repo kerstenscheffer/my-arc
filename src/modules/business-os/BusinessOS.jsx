@@ -902,6 +902,9 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
   // Avatar-document boven de bol (19 nov 2026); na elk Gino-antwoord opnieuw laden, hij kan hem aanpassen.
   const docs = useGinoDocumenten()
   const [docDicht, setDocDicht] = useDocumentDicht()
+  // Document volledig scherm; de bol (en chatbalk) komt er dan bovenop (26 nov 2026).
+  const [docVol, zetDocVolState] = useState(() => { try { return localStorage.getItem('bos_doc_vol') === '1' } catch { return false } })
+  const setDocVol = (v) => { zetDocVolState(v); try { localStorage.setItem('bos_doc_vol', v ? '1' : '0') } catch { /* leeg */ } }
   const laadDocs = docs.laad
   const dachtNet = useRef(false)
   useEffect(() => { if (dachtNet.current && !denkt) laadDocs(); dachtNet.current = denkt }, [denkt, laadDocs])
@@ -1405,6 +1408,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
     return null
   }
 
+  const docVolOpen = docVol && !docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && !aanbodBoven
   return (
     // Vaste pagina: precies de ruimte boven de zwevende navbalk (in split
     // screen de hele helft). Alleen de chatlijst scrolt. Ring en chatbalk
@@ -1535,7 +1539,7 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
         )}
         {/* Avatar zweeft sleepbaar over de pagina (Kersten, 20 nov 2026). */}
         {!docDicht && !zwevend && !beperkt && !kalender && !podiumOpen && !aanbodBoven && (
-          <GinoDocument docs={docs} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} />
+          <GinoDocument docs={docs} isMobile={isMobile} dicht={docDicht} setDicht={setDocDicht} vol={docVol} setVol={setDocVol} />
         )}
         {/* Aanbod, stand Rekenen: boven de bol, scrolt in zijn eigen vak. De stand
             Laten zien opent onderaan als schermvullend Blad. */}
@@ -1569,7 +1573,8 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
           position: 'fixed', left: miniPos?.x ?? 0, top: miniPos?.y ?? 0, zIndex: 60, pointerEvents: 'auto', width: 'min(760px, calc(100vw - 16px))',
           display: 'flex', alignItems: 'flex-end', gap: 10, padding: '8px 12px', boxSizing: 'border-box',
           background: 'rgba(10,10,10,0.97)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 18, boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
-        } : telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'flex-end', gap: 6, flexShrink: 0, paddingTop: STATUS_H + STATUS_GAT } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }}>
+        } : { ...(telefoonKlein ? { width: '100%', display: 'flex', alignItems: 'flex-end', gap: 6, flexShrink: 0, paddingTop: STATUS_H + STATUS_GAT } : { width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0  }),
+          ...(docVolOpen ? { position: 'relative', zIndex: 61 } : null) }}>
           {/* Bol met erboven (gecentreerd) de Mac/API-aanduiding; de timer staat boven het geheel. */}
           {/* Bol naast de balk (klein): bol gecentreerd op het invoerveld, Mac-label erboven op de hoogte van de statusregel. */}
           <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', ...(bolNaast ? { marginBottom: bolOnder } : null) }}>

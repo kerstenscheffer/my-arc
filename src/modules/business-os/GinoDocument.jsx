@@ -33,7 +33,7 @@
 // (localStorage bos_doc_open, op koptekst). Knop in de kopbalk: alles open/dicht.
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus, Code2, IndentIncrease, IndentDecrease, Undo2 } from 'lucide-react'
+import { Pencil, Plus, Check, X, GripVertical, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FileText, Maximize2, Minimize2, MoreVertical, PanelLeft, Pin, Heading1, Heading2, Heading3, List, ListOrdered, ArrowRight, Bold, Italic, Minus, Code2, IndentIncrease, IndentDecrease, Undo2 } from 'lucide-react'
 import { createPortal } from '../../client/paginaPortal'
 import DocumentBewerker from './DocumentBewerker'
 import { KOPREGEL, TABELREGEL, SCHEIDINGSRIJ, LIJNREGEL, PIJLREGEL, PUNTREGEL, PUNT_KAAL, NUMMERREGEL, inlineRe, cellen } from './documentOpmaak'
@@ -394,7 +394,7 @@ function TabRegel({ tab, alle, sectie, diepte, actief, kies, dicht, wisselDicht,
 }
 
 // docs = useGinoDocumenten()
-export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
+export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = false, setVol }) {
   const { tabs } = docs
   const [actiefId, setActiefId] = useState(() => lees(TAB_SLEUTEL, null))
   const actief = tabs.find(t => t.id === actiefId) || tabs[0] || null
@@ -453,7 +453,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
   }, [dicht])
 
   const pakVast = (e) => {
-    if (e.button !== 0 || e.target.closest('button, input')) return
+    if (vol || e.button !== 0 || e.target.closest('button, input')) return
     e.preventDefault()
     sleep.current = { dx: e.clientX - plek.x, dy: e.clientY - plek.y, id: e.pointerId }
     e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -661,10 +661,13 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
 
   return createPortal(
     <div ref={venster} onClick={() => setMenuVoor(null)} style={{
-      position: 'fixed', left: plek.x, top: plek.y, zIndex: 59,
-      width: maat?.b ? `min(${maat.b}px, calc(100vw - ${2 * RAND}px))` : `min(1040px, calc(100vw - ${2 * RAND}px))`,
-      height: dicht ? 'auto' : maat?.h ? `min(${maat.h}px, calc(100dvh - ${plek.y + RAND}px))` : `min(680px, calc(100dvh - ${plek.y + RAND}px))`,
-      minWidth: 300, minHeight: dicht ? 0 : 220, resize: dicht || isMobile ? 'none' : 'both', overflow: 'hidden',
+      position: 'fixed', zIndex: 59,
+      // Volledig scherm (Kersten, 26 nov): hele scherm, de Gino-bol blijft erboven (BusinessOS tilt hem op).
+      ...(vol && !dicht ? { left: RAND, top: RAND, width: `calc(100vw - ${2 * RAND}px)`, height: `calc(100dvh - ${2 * RAND}px)`, resize: 'none' } : null),
+      left: vol && !dicht ? RAND : plek.x, top: vol && !dicht ? RAND : plek.y,
+      width: vol && !dicht ? `calc(100vw - ${2 * RAND}px)` : maat?.b ? `min(${maat.b}px, calc(100vw - ${2 * RAND}px))` : `min(1040px, calc(100vw - ${2 * RAND}px))`,
+      height: dicht ? 'auto' : vol ? `calc(100dvh - ${2 * RAND}px)` : maat?.h ? `min(${maat.h}px, calc(100dvh - ${plek.y + RAND}px))` : `min(680px, calc(100dvh - ${plek.y + RAND}px))`,
+      minWidth: 300, minHeight: dicht ? 0 : 220, resize: dicht || isMobile || vol ? 'none' : 'both', overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
       background: '#000', border: '3px solid #fff', borderRadius: 22, boxSizing: 'border-box', textAlign: 'left',
       boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
@@ -699,6 +702,11 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
               ? <button type="button" onClick={klaar} title="Klaar" aria-label="Klaar" style={{ ...knop, background: WIT, color: '#000', border: 'none' }}><Check size={15} strokeWidth={3} /></button>
               : <button type="button" onClick={() => start()} title="Bewerken" aria-label="Bewerken" style={knop}><Pencil size={14} strokeWidth={2.6} /></button>}
           </>
+        )}
+        {!dicht && setVol && (
+          <button type="button" onClick={() => setVol(!vol)} title={vol ? 'Kleiner' : 'Volledig scherm'} aria-label={vol ? 'Kleiner' : 'Volledig scherm'} aria-pressed={vol} style={knop}>
+            {vol ? <Minimize2 size={15} strokeWidth={2.6} /> : <Maximize2 size={15} strokeWidth={2.6} />}
+          </button>
         )}
         <button type="button" onClick={() => { if (bewerk) klaar(); setDicht(true) }} title="Sluiten" aria-label="Sluiten" style={knop}><X size={15} strokeWidth={2.6} /></button>
       </div>
@@ -757,7 +765,7 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht }) {
             </div>
           ) : (
             <div key={actief?.id || 'leeg'} ref={leesvlak} onClick={tikBewerk && actief ? (e) => { if (!e.target.closest('[data-uitklap]')) start('', e) } : undefined} title={tikBewerk && actief ? 'Tik om te bewerken' : undefined}
-              style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 16px' : '20px 28px 24px' }}>
+              style={{ flex: 1, minWidth: 0, overflowY: 'auto', cursor: tikBewerk && actief ? 'text' : 'auto', padding: isMobile ? '12px 14px 40vh' : '20px 28px 40vh' }}>
               {!docs.geladen ? <div style={{ ...TEKST, color: 'rgba(255,255,255,0.35)' }}>Laden…</div>
                 : !actief ? (
                   <button type="button" onClick={(e) => { e.stopPropagation(); acties.nieuw(null) }} style={{ ...menuRegel, display: 'inline-flex', alignItems: 'center', gap: 8, width: 'auto', border: '1px solid rgba(255,255,255,0.15)', padding: '10px 14px' }}>

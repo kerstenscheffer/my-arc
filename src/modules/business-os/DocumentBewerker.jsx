@@ -45,7 +45,7 @@ export default function DocumentBewerker({ tekst, start, stuur, onWijzig, onBlur
     <div ref={rol}
       // Tik naast of onder de tekst: cursor aan het eind.
       onMouseDown={(e) => { if (e.target === rol.current) { e.preventDefault(); stuur.current?.focusEind() } }}
-      style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', position: 'relative', cursor: 'text', padding: isMobile ? '12px 14px 16px' : '20px 28px 24px' }}>
+      style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', position: 'relative', cursor: 'text', padding: isMobile ? '12px 14px 40vh' : '20px 28px 40vh' }}>
       <style>{BEWERK_CSS}</style>
       <div ref={vlak} className="bd-vlak" contentEditable suppressContentEditableWarning spellCheck={false}
         role="textbox" aria-multiline="true" aria-label="Document bewerken" />
