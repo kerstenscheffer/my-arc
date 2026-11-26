@@ -7,9 +7,14 @@
 //
 // items: [{ id, soort, dag:'YYYY-MM-DD', startMin?, eindMin?, tijd?, titel, sub? }]
 // soort: call | agenda | content | concept | taak | herinnering
+//
+// Content met stand niet_gepost (26 nov 2026: goedgekeurd in Metricool, niet live
+// gegaan) krijgt een rood label in de dagkop en in de lijst; een klik opent de
+// post in Metricool. Het label blijft fel, ook op een voorbije dag.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, ChevronDown } from 'lucide-react'
+import { NIET_GEPOST, NIET_GEPOST_LABEL, NIET_GEPOST_KLEUR, openItem } from './contentStatusData'
 // Dik wit, geen groen als accent (10 nov 2026); kleur zit alleen nog in de blokken (Google-tinten).
 const G = '#ffffff'
 const DAGLETTER = ['ZO', 'MA', 'DI', 'WO', 'DO', 'VR', 'ZA']
@@ -202,40 +207,66 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
           const isVandaag = k === vandaag
           const verleden = k < vandaag
           const open = openDag === k
+          const nietGepost = los.filter(it => it.stand === NIET_GEPOST)
+          // Voorbije dag met iets dat niet gepost is: de kolom zelf blijft fel en de
+          // rest (wijzer, teller, tijdlijn) dimt los, zodat het rode label opvalt.
+          const felLabel = nietGepost.length > 0 && verleden && !open && !uitlicht
+          const rest = felLabel ? { opacity: 0.5 } : null
           return (
             <div key={k} className="gw-dag" onClick={() => onKies?.(k)} style={{
               position: 'relative', cursor: 'pointer', padding: '0 3px', borderRadius: 12, transition: 'opacity .4s',
               // Open: boven de andere kolommen en niet gedimd, anders valt de lijst eronder.
-              opacity: open ? 1 : uitlicht ? (k === uitlicht ? 1 : 0.28) : verleden ? 0.5 : 1,
+              opacity: open || felLabel ? 1 : uitlicht ? (k === uitlicht ? 1 : 0.28) : verleden ? 0.5 : 1,
               ...(open ? { zIndex: 30 } : {}),
               ...(k === uitlicht ? { boxShadow: `0 0 0 1.5px ${G}, 0 0 28px ${G}55`, background: `${G}10`, animation: 'gw-aanwijs 1.6s ease-in-out 3' } : {}),
             }}>
               {/* kop: wijzer + losse dingen van die dag (content, taken) */}
               <div style={{ height: KOP, position: 'sticky', top: 0, zIndex: 5, background: '#000', margin: '0 -4px', padding: '0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, animation: `gw-in .4s ease-out ${di * 60}ms both` }}>
-                <Wijzer deel={totaal / maxDag} dag={DAGLETTER[d.getDay()]} nr={d.getDate()} vandaag={isVandaag} vertraging={200 + di * 80} />
+                <div style={rest || undefined}>
+                  <Wijzer deel={totaal / maxDag} dag={DAGLETTER[d.getDay()]} nr={d.getDate()} vandaag={isVandaag} vertraging={200 + di * 80} />
+                </div>
                 {los.length > 0 && (
-                  <div style={{ position: 'relative', maxWidth: '100%' }}>
+                  <div style={{ position: 'relative', maxWidth: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    {/* Smal scherm: geen plek voor het label, dan kleurt de teller zelf rood. */}
                     <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpenDag(open ? null : k) }} style={{
-                      display: 'flex', alignItems: 'center', gap: 3, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
-                      background: open ? `${G}22` : 'transparent', border: `1px solid ${G}55`, color: '#fff',
+                      display: 'flex', alignItems: 'center', gap: 3, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer', flexShrink: 0,
+                      background: open ? `${G}22` : 'transparent', border: `1px solid ${isMobile && nietGepost.length ? NIET_GEPOST_KLEUR : `${G}55`}`,
+                      color: isMobile && nietGepost.length ? NIET_GEPOST_KLEUR : '#fff',
                       fontFamily: 'inherit', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+                      ...(isMobile && nietGepost.length ? null : rest),
                     }}>
-                      {los.length}{isMobile ? '' : ' gepland'}
-                      <ChevronDown size={11} strokeWidth={3} color={G} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none' }} />
+                      {los.length}{isMobile || nietGepost.length ? '' : ' gepland'}
+                      <ChevronDown size={11} strokeWidth={3} color={isMobile && nietGepost.length ? NIET_GEPOST_KLEUR : G} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none' }} />
                     </button>
+                    {/* Eén niet gepost: klik opent hem in Metricool. Meer: de lijst van die dag. */}
+                    {!isMobile && nietGepost.length > 0 && (
+                      <button type="button" title={nietGepost.length === 1 ? 'Open in Metricool' : undefined}
+                        onClick={(e) => { e.stopPropagation(); if (nietGepost.length === 1) openItem(nietGepost[0]); else setOpenDag(open ? null : k) }} style={{
+                          minWidth: 0, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                          fontSize: 12, fontWeight: 900, color: NIET_GEPOST_KLEUR, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                        {nietGepost.length === 1 ? NIET_GEPOST_LABEL : `${nietGepost.length} ${NIET_GEPOST_LABEL.toLowerCase()}`}
+                      </button>
+                    )}
                     {open && (
                       <div onClick={(e) => e.stopPropagation()} style={{
                         ...(isMobile ? { position: 'fixed', left: 12, right: 12, top: 170 } : { position: 'absolute', top: 24, [di >= dagen.length - 2 ? 'right' : 'left']: 0, width: 240 }), maxHeight: 260, overflowY: 'auto',
                         background: '#0a0a0a', border: `1px solid ${G}55`, borderRadius: 12, padding: 4, boxShadow: '0 14px 40px rgba(0,0,0,0.7)',
                       }}>
-                        {los.map(it => (
-                          <button key={it.id} type="button" onClick={() => { setOpenDag(null); onKies?.(k) }} style={{
-                            display: 'block', width: '100%', padding: '7px 9px', background: 'transparent', border: 'none', borderRadius: 8,
-                            color: '#fff', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, textAlign: 'left', lineHeight: 1.3, cursor: 'pointer',
-                          }}>
-                            {it.soort === 'concept' ? '+ ' : ''}{it.titel}
-                          </button>
-                        ))}
+                        {los.map(it => {
+                          // Niet gepost: klik opent de post in Metricool; de lijst blijft open voor de volgende.
+                          const ng = it.stand === NIET_GEPOST
+                          return (
+                            <button key={it.id} type="button" title={ng ? 'Open in Metricool' : undefined}
+                              onClick={() => { if (ng) openItem(it); else { setOpenDag(null); onKies?.(k) } }} style={{
+                                display: 'block', width: '100%', padding: '7px 9px', background: 'transparent', border: 'none', borderRadius: 8,
+                                color: '#fff', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, textAlign: 'left', lineHeight: 1.3, cursor: 'pointer',
+                              }}>
+                              {it.soort === 'concept' ? '+ ' : ''}{it.titel}
+                              {ng && <span style={{ display: 'block', marginTop: 2, fontSize: 12, fontWeight: 900, color: NIET_GEPOST_KLEUR }}>{NIET_GEPOST_LABEL}</span>}
+                            </button>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -243,7 +274,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
               </div>
 
               {/* tijdlijn van de dag */}
-              <div style={{ position: 'relative', height: lijnH }}>
+              <div style={{ position: 'relative', height: lijnH, ...rest }}>
                 <div className="gw-kolomlijn" style={{
                   position: 'absolute', left: '50%', top: 0, width: 1, height: '100%', opacity: isVandaag ? 1 : 0.5,
                   background: isVandaag ? `linear-gradient(to bottom, ${G}00, ${G}55 15%, ${G}55 85%, ${G}00)` : 'rgba(255,255,255,0.06)',

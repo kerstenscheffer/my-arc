@@ -7,6 +7,8 @@
 // _posts), outreach uit het leadbord (content_lead_stats). Wijzigt daar de
 // telling, pas het hier ook aan.
 
+import { NIET_GEPOST } from './contentStatusData'
+
 export const CONTENT_SOORTEN = [
   { id: 'reel', label: 'Reels', doel: 1 },
   { id: 'foto', label: "Foto's", doel: 1 },
@@ -33,13 +35,14 @@ export const soortVanType = (t, woord) => {
 export const typeLabel = (t, woord) => (soortVanType(t, woord) === 'magnet' ? 'magnet' : t)
 
 // Wat één vakje (rij + dag) telt, zodat het getal en de klik-lijst altijd gelijk
-// zijn. Vandaag en later: alle geplande items. Verleden: alleen wat geplaatst of
-// mislukt is; een blijven liggen draft zie je daar via de dagkop.
+// zijn. Vandaag en later: alle geplande items. Verleden: alleen wat geplaatst,
+// mislukt of niet gepost is (goedgekeurd in Metricool, niet live gegaan); een
+// blijven liggen draft zie je daar via de dagkop.
 // los = geplaatst zonder gepland item (n uit Metricool/zelf ingevuld, geen rij
 // in content_items, dus ook niets om te openen).
 export function vakTelling(items, dag, vandaag, n = 0) {
   const verleden = dag < vandaag
-  const telt = (items || []).filter(it => !verleden || it.stand === 'gepost' || it.stand === 'mislukt')
+  const telt = (items || []).filter(it => !verleden || it.stand === 'gepost' || it.stand === 'mislukt' || it.stand === NIET_GEPOST)
   const gepost = telt.filter(it => it.stand === 'gepost').length
   const los = dag > vandaag ? 0 : Math.max(0, n - gepost)
   return { telt, los, getal: telt.length + los }

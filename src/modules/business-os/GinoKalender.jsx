@@ -27,9 +27,9 @@ import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
 import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand, typeLabel } from './contentStand'
-import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
+import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD, NIET_GEPOST } from './contentStatusData'
 import { useTijdPlek } from './tijdPlek'
-import { StandChip } from './contentStatus'
+import { StandChip, NietGepostKnop } from './contentStatus'
 import { botsingenPerDag, BOTS_KLEUR } from './contentBotsing'
 import GinoOmzet from './GinoOmzet'
 import GinoKeten from './GinoKeten'
@@ -100,7 +100,7 @@ async function laadPeriode(van, tot, beperkt = false) {
     beperkt ? leeg() : supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
-    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord, metricool_link')
+    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout, autopilot_woord, metricool_link, metricool_stand')
       .in('coach_id', coachIds).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
     beperkt ? leeg() : supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline, scheduled_start_time, scheduled_end_time, estimated_minutes, color')
@@ -125,7 +125,8 @@ async function laadPeriode(van, tot, beperkt = false) {
     titel: c.clients?.first_name ? voornaam(c.clients.first_name) : (c.call_title || 'Call'),
     kleur: GOOGLE.oranje,
   }))
-  // Stand (draft/ingepland/gepost/mislukt) uit content_items_status.
+  // Stand (draft/ingepland/gepost/mislukt) uit content_items_status; niet_gepost
+  // (metricool_stand 'melding' en het moment is voorbij) komt uit metStand.
   // Testrijen ('__test…') tellen nergens mee.
   ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => {
     const label = typeLabel(c.type, c.autopilot_woord)
@@ -527,7 +528,9 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Binnen 15 min van {botstMet}</div>
                       )}
                     </div>
-                    {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
+                    {it.soort === 'content' && it.stand && (it.stand === NIET_GEPOST
+                      ? <NietGepostKnop it={it} />
+                      : <StandChip stand={it.stand} views={it.views} />)}
                     {it.soort === 'content' && it.contentId && (
                       it.permalink
                         ? <a href={it.permalink} target="_blank" rel="noreferrer" title="Open op Instagram" style={{ ...bekijk, background: A, textDecoration: 'none' }}>Bekijk</a>

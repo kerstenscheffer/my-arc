@@ -11,12 +11,17 @@
 // Klikken (5 nov 2026): dagkop en lege vakjes openen het dagoverzicht. Een vakje
 // met 1 item opent dat item, met meer items een lijstje van precies die rij en
 // die dag. Item openen = de draft in Metricool als die er is, anders de preview.
+//
+// Niet gepost (26 nov 2026): goedgekeurd in Metricool maar niet live gegaan
+// (contentStatusData.js). Het vakje kleurt rood, in de lijstjes staat het rode
+// label. Bovenaan één rode regel met het aantal van de maand: klik = alleen die
+// posts als lijst (klik op een post opent hem in Metricool), nog een klik = alles.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clapperboard, Image as ImageIcon, CircleDot, Magnet, Youtube, Send, X } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 import { CONTENT_SOORTEN, sleutel, soortVanType, dagScore, vakTelling } from './contentStand'
-import { STANDEN, standVak, kortGetal, openContent } from './contentStatusData'
+import { ALLE_STANDEN, standVak, standenVanDag, nietGepostPerDag, kortGetal, openItem, NIET_GEPOST, NIET_GEPOST_KLEUR } from './contentStatusData'
 import { StandLegenda, StandChip } from './contentStatus'
 import { BOTS_KLEUR } from './contentBotsing'
 
@@ -28,10 +33,6 @@ const STAND_H = 54 // rij met per dag het aantal per status
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const kort = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n))
 const maandagIso = (k) => { const d = new Date(`${k}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d) }
-const openItem = (it) => {
-  if (it.metricoolLink) window.open(it.metricoolLink, '_blank', 'noopener,noreferrer')
-  else if (it.contentId) openContent(it.contentId)
-}
 const opTijd = (a, b) => (a.tijd ? (b.tijd ? a.tijd.localeCompare(b.tijd, undefined, { numeric: true }) : -1) : (b.tijd ? 1 : 0))
 
 // Lijstje van één vakje. Blijft open na een klik, zodat je de volgende draft kunt pakken.
@@ -103,6 +104,12 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
   const sluitVak = useCallback(() => setVak(null), [])
   useEffect(() => { setVak(null) }, [dagen])
   const vandaag = iso(new Date())
+  // Niet gepost in deze maand, oudste eerst.
+  const nietGepost = useMemo(() => dagen.flatMap(d => (perDag?.[iso(d)] || []).filter(it => it.soort === 'content' && it.stand === NIET_GEPOST).sort(opTijd)), [dagen, perDag])
+  const nietGepostDag = useMemo(() => nietGepostPerDag(nietGepost, it => it.dag), [nietGepost])
+  const [alleenNietGepost, setAlleenNietGepost] = useState(false)
+  // Zonder niet-geposte posts is er geen regel om terug te klikken: dan altijd alles.
+  const filter = alleenNietGepost && nietGepost.length > 0
   const vandaagIdx = dagen.findIndex(d => iso(d) === vandaag)
   const samen = stand?.samen || {}
   const doelen = stand?.doelen || {}
@@ -123,8 +130,9 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
     const doelIdx = focusDag ? dagen.findIndex(d => focus.has(iso(d))) : -1
     if (el && doelIdx >= 0) { el.scrollTo({ left: Math.max(0, doelIdx - 4) * (KOLOM + 4), behavior: 'smooth' }); return }
     if (el && vandaagIdx > 4) el.scrollTo({ left: (vandaagIdx - 4) * (KOLOM + 4), behavior: 'smooth' })
+    // filter: terug uit de lijst staat het rooster er opnieuw, dus weer naar vandaag schuiven.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vandaagIdx, dagen, focus])
+  }, [vandaagIdx, dagen, focus, filter])
 
   // Gepland en voorgesteld per dag per soort.
   const plan = useMemo(() => {
@@ -133,7 +141,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
       for (const it of lijst) {
         if (it.soort !== 'content' && it.soort !== 'concept') continue
         const s = soortVanType(it.type, it.woord)
-        const v = (p[sleutel(k, s)] ||= { draft: 0, ingepland: 0, gepost: 0, mislukt: 0, concept: 0, items: [] })
+        const v = (p[sleutel(k, s)] ||= { draft: 0, ingepland: 0, gepost: 0, mislukt: 0, [NIET_GEPOST]: 0, concept: 0, items: [] })
         if (it.soort === 'concept') v.concept++
         else { v[it.stand || 'draft']++; v.items.push(it) }
       }
@@ -158,9 +166,33 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <StandLegenda style={{ paddingBottom: 10, flexShrink: 0 }} />
+      {nietGepost.length > 0 && (
+        <button type="button" aria-pressed={filter} onClick={() => { setVak(null); setAlleenNietGepost(!filter) }} style={{
+          alignSelf: 'flex-start', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 32, padding: 0, marginBottom: 8,
+          border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 16, fontWeight: 900, color: NIET_GEPOST_KLEUR,
+        }}>
+          {nietGepost.length} niet gepost
+          {filter && <X size={16} strokeWidth={3} />}
+        </button>
+      )}
+      {filter && (
+        <div className="gk-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          {nietGepost.map(it => (
+            <button key={it.id} type="button" title="Open in Metricool" onClick={() => openItem(it)} style={{
+              width: '100%', minHeight: 56, display: 'block', padding: '10px 0', cursor: 'pointer', textAlign: 'left',
+              background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', fontFamily: 'inherit', color: '#fff',
+            }}>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+                {new Date(`${it.dag}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}{it.tijd ? ` · ${it.tijd}` : ''}
+              </span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 15, fontWeight: 900, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{it.titel}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!filter && <StandLegenda style={{ paddingBottom: 10, flexShrink: 0 }} />}
       {/* Vandaag: ring + wat er nog moet */}
-      {scoreVandaag != null && (
+      {!filter && scoreVandaag != null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, flexShrink: 0, animation: 'gk-blad .4s ease-out both' }}>
           <div style={{ position: 'relative', width: 42, height: 42 }}>
             <Ring deel={scoreVandaag} vandaag grootte={42} vertraging={200} />
@@ -177,7 +209,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
         </div>
       )}
 
-      <div className="gk-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-start', overflowY: 'auto' }}>
+      {!filter && <div className="gk-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-start', overflowY: 'auto' }}>
         {/* Labels */}
         <div style={{ width: labelB, flexShrink: 0, paddingTop: 40 }}>
           <div style={{ height: STAND_H, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{isMobile ? '' : 'Per status'}</div>
@@ -224,12 +256,14 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                   </div>
                   {(() => {
                     const r = perStand[k]
-                    const tekst = r ? STANDEN.filter(s => r[s.id]).map(s => `${r[s.id]} ${s.label.toLowerCase()}`).join(' · ') + (r.views ? ` · ${kortGetal(r.views)} views` : '') : ''
+                    // Niet gepost telt de database als draft: hier apart en in het rood.
+                    const standen = standenVanDag(r, nietGepostDag[k] || 0)
+                    const tekst = standen.map(s => `${s.n} ${s.label.toLowerCase()}`).join(' · ') + (r?.views ? ` · ${kortGetal(r.views)} views` : '')
                     return (
                       <div title={tekst || undefined} style={{ height: STAND_H, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                        {STANDEN.filter(s => r?.[s.id]).map(s => (
+                        {standen.map(s => (
                           <span key={s.id} style={{ minWidth: 22, height: 11, padding: '0 3px', borderRadius: 4, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, lineHeight: 1, borderWidth: 1, ...standVak(s.id) }}>
-                            {r[s.id]}
+                            {s.n}
                           </span>
                         ))}
                       </div>
@@ -242,7 +276,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                     const weekVol = s.week && doel > 0 && weekSom(k, s.id) >= doel
                     const gehaald = s.week ? weekVol : doel > 0 && n >= doel
                     const toonGepland = toekomst || (isVandaag && n === 0)
-                    const mislukt = p?.mislukt || 0
+                    const mislukt = (p?.mislukt || 0) + (p?.[NIET_GEPOST] || 0) // niet gepost kleurt net zo rood
                     const ingepland = toonGepland && p?.ingepland ? p.ingepland : 0
                     const draft = toonGepland && !ingepland && p?.draft ? p.draft : 0
                     const voorstel = toonGepland && !ingepland && !draft && p?.concept ? p.concept : 0
@@ -266,7 +300,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                     const telling = vakTelling(p?.items, k, vandaag, n)
                     const inhoud = telling.getal || (voorstel ? '+' : '')
                     const uitleg = telling.telt.length
-                      ? [...STANDEN.filter(st => telling.telt.some(it => it.stand === st.id)).map(st => `${telling.telt.filter(it => it.stand === st.id).length} ${st.label.toLowerCase()}`), ...(telling.los ? [`${telling.los} los geplaatst`] : [])].join(' · ')
+                      ? [...ALLE_STANDEN.filter(st => telling.telt.some(it => it.stand === st.id)).map(st => `${telling.telt.filter(it => it.stand === st.id).length} ${st.label.toLowerCase()}`), ...(telling.los ? [`${telling.los} los geplaatst`] : [])].join(' · ')
                       : voorstel ? 'Voorstel van Gino' : n ? `${n}/${doel}` : undefined
                     // Zonder gepland item: niet afvangen, de kolom opent het dagoverzicht.
                     const opVak = (e) => {
@@ -305,8 +339,8 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
             })}
           </div>
         </div>
-      </div>
-      {vak && (
+      </div>}
+      {vak && !filter && (
         <VakLijst
           soort={CONTENT_SOORTEN.find(s => s.id === vak.soort)}
           dag={vak.dag}

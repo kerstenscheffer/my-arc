@@ -1628,8 +1628,9 @@ export default function BusinessOS({ isMobile, beperkt = false, zwevend = false 
             contentKomende14Dagen: {
               geplandeDagen: content.perDag.filter(d => d.items.length > 0).length,
               legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
-              // Wat er echt staat: draft (nog niet klaar), ingepland (gaat vanzelf live), gepost (incl. zelf geplaatst), mislukt.
-              perDagStand: standVoorGino(content.perStand),
+              // Wat er echt staat: draft (nog niet klaar), ingepland (gaat vanzelf live), gepost (incl. zelf geplaatst), mislukt,
+              // niet_gepost (goedgekeurd in Metricool, maar Automatisch plaatsen stond uit: alleen een herinnering, niet live).
+              perDagStand: standVoorGino(content.perStand, content.perDag.flatMap(d => d.items)),
               // link = deeplink naar het preview-venster; Gino mag hem zo in de chat zetten.
               items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status, stand: it.stand || null, link: contentLink(it.id) }))),
             },
