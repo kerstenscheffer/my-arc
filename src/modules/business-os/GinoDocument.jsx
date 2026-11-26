@@ -663,7 +663,6 @@ export default function GinoDocument({ docs, isMobile, dicht, setDicht, vol = fa
     <div ref={venster} onClick={() => setMenuVoor(null)} style={{
       position: 'fixed', zIndex: 59,
       // Volledig scherm (Kersten, 26 nov): hele scherm, de Gino-bol blijft erboven (BusinessOS tilt hem op).
-      ...(vol && !dicht ? { left: RAND, top: RAND, width: `calc(100vw - ${2 * RAND}px)`, height: `calc(100dvh - ${2 * RAND}px)`, resize: 'none' } : null),
       left: vol && !dicht ? RAND : plek.x, top: vol && !dicht ? RAND : plek.y,
       width: vol && !dicht ? `calc(100vw - ${2 * RAND}px)` : maat?.b ? `min(${maat.b}px, calc(100vw - ${2 * RAND}px))` : `min(1040px, calc(100vw - ${2 * RAND}px))`,
       height: dicht ? 'auto' : vol ? `calc(100dvh - ${2 * RAND}px)` : maat?.h ? `min(${maat.h}px, calc(100dvh - ${plek.y + RAND}px))` : `min(680px, calc(100dvh - ${plek.y + RAND}px))`,
