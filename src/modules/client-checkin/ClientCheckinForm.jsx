@@ -1013,12 +1013,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         padding: isMobile ? '2.5rem 1rem' : '3rem', textAlign: 'center',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       }}>
-        <CheckCircle size={isMobile ? 48 : 56} color="#fff" style={{ marginBottom: '1.25rem' }} />
+        <CheckCircle size={isMobile ? 48 : 56} color="#10b981" style={{ marginBottom: '1.25rem' }} />
         <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem', letterSpacing: '-0.02em' }}>
           Check-in verstuurd
         </h2>
-        <p style={{ color: GRIJS, fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 700 }}>
-          Je hoort binnen 24 uur van me met feedback en eventuele bijsturing.
+        <p style={{ color: '#fff', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 700 }}>
+          Maandag kijkt Kersten alles na en krijg je een video met feedback en je punten voor de komende week.
         </p>
       </div>
     )
@@ -1069,8 +1069,13 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
       }}>
       {/* De titel in vet wit, met de voortgangsband eronder. */}
       {titel && (
-        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', marginBottom: 8 }}>
-          {titel}
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
+            {titel}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
+            Inleveren voor zondag 12:00
+          </div>
         </div>
       )}
       {/* Voortgang in dezelfde vorm als de slaap- en stappenbalk op Home: een
