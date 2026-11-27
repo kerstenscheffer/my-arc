@@ -57,7 +57,7 @@ const SOORT_FOTO = {
 const tegelFoto = (soort) => (soort === DRINKEN && FOTOS.Drinken ? `${FOTOS.Drinken}?w=500&h=320&fit=crop&q=70` : FOTOS[SOORT_FOTO[soort]] ? `${FOTOS[SOORT_FOTO[soort]]}?w=500&h=320&fit=crop&q=70` : null)
 const GANGEN = [['voor', 'Voorgerecht'], ['hoofd', 'Hoofdgerecht'], ['bij', 'Erbij'], ['na', 'Dessert'], ['drank', 'Drinken']]
 // Hoeveel at je ervan? Geen grammen: een deel van het bord.
-const DELEN = [[0.7, 'Klein'], [1, 'Middel'], [1.3, 'Groot'], [1.7, 'Enorm']]
+const DELEN = [[0.25, 'Paar happen'], [0.5, 'Gedeeld'], [0.7, 'Klein'], [1, 'Middel'], [1.3, 'Groot'], [1.7, 'Enorm']]
 
 // Ongeveer hoeveel gram een normale portie weegt, zodat je bij Klein / Middel /
 // Groot / Enorm een gewicht ziet. Staat het gewicht in de portie ("200 g"),
@@ -163,7 +163,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     if (!regels.length || bezig) return
     setBezig(true)
     try {
-      const deelTekst = (d, k) => (k?.zelf ? ' (aangepast)' : d === 1 ? '' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
+      const deelTekst = (d, k) => (k?.zelf ? ' (aangepast)' : d === 1 ? '' : d === 0.25 ? ' (paar happen)' : d === 0.5 ? ' (gedeeld)' : d < 1 ? ' (klein)' : d > 1.5 ? ' (enorm)' : ' (groot)')
       await onLog({
         name: soort === DRINKEN ? 'Drankjes' : soort ? `Uit eten: ${soort}` : 'Uit eten',
         type: 'custom', source: 'uiteten', per100g: false, amount: 1, per_unit: 'portion',
@@ -271,7 +271,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Hoe groot was het?</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: 'rgba(255,255,255,0.06)' }}>
           {DELEN.map(([d, label]) => {
             const gram = (maatGerecht.delen ? maatGerecht.delen.reduce((n, x) => n + x.g, 0) : gramVan(maatGerecht)) * d
             // Suggestie: wat jij hier de vorige keer koos; anders Middel, de gewone restaurantportie.
@@ -279,7 +279,7 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
             const tip = vorige === d ? 'jouw vorige' : (vorige == null && d === 1 ? 'meestal' : null)
             return (
               <button key={d} onClick={() => { tik(maatGerecht.id); zet(maatGerecht.id, { deel: d }); bewaarVorige(maatGerecht.id, d); setMaatOpen(null) }} style={{
-                position: 'relative', flex: 1, minWidth: 0, minHeight: 88, padding: '0.7rem 0 0.6rem', borderRadius: 0, border: 'none', fontFamily: 'inherit', cursor: 'pointer',
+                position: 'relative', minHeight: 88, padding: '0.7rem 0 0.6rem', borderRadius: 0, border: 'none', fontFamily: 'inherit', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 background: tip ? 'rgba(255,255,255,0.12)' : 'transparent', color: '#fff',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
