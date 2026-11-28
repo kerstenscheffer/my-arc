@@ -158,6 +158,13 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
     return n
   })
   const zet = (id, velden) => setGekozen(prev => (prev[id] ? { ...prev, [id]: { ...prev[id], ...velden } } : prev))
+  const verhoog = (id) => setGekozen(prev => prev[id] ? { ...prev, [id]: { ...prev[id], aantal: prev[id].aantal + 1 } } : prev)
+  const verlaag = (id) => setGekozen(prev => {
+    if (!prev[id]) return prev
+    const n = { ...prev }
+    if (n[id].aantal <= 1) delete n[id]; else n[id] = { ...n[id], aantal: n[id].aantal - 1 }
+    return n
+  })
 
   const log = async () => {
     if (!regels.length || bezig) return
@@ -200,13 +207,19 @@ export default function UitetenTab({ db, client = null, onLog, isMobile, default
           // Tik op de kaart: eerst kijken wat erin zit, daar kies je of je hem toevoegt. De plus rechts voegt direct toe.
           onTik={() => setDetail(r.id)} onCheck={() => setDetail(r.id)}
           // Onderaan de kaart dezelfde knoppenrij als op een planmaaltijd: links direct toevoegen, rechts naar de info.
-          acties={[
-            k
-              ? { icon: <Check size={13} strokeWidth={3.2} />, label: 'Toegevoegd, tik om weg te halen', onClick: () => { tik(r.id); setMaatOpen(null) }, kleur: GROEN }
-// Plus = de maatkeuze klapt onder de kaart uit; pas na je keuze zit het gerecht in je etentje. Een drankje gaat er direct in.
-              : { icon: <Plus size={13} strokeWidth={3} />, label: 'Toevoegen', onClick: () => (gang === 'drank' ? tik(r.id) : setMaatOpen(v => (v === r.id ? null : r.id))) },
-            { icon: <Info size={13} strokeWidth={2.8} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
-          ]}
+          acties={k
+            ? [
+                { icon: <Minus size={13} strokeWidth={3} />, label: k.aantal === 1 ? 'Verwijderen' : 'Minder', onClick: () => verlaag(r.id) },
+                { icon: <span style={{ fontWeight: 900, fontSize: '0.9rem', color: '#fff', lineHeight: 1 }}>{k.aantal}</span>, label: `Aantal: ${k.aantal}`, onClick: () => {} },
+                { icon: <Plus size={13} strokeWidth={3} />, label: 'Meer', onClick: () => verhoog(r.id), kleur: GROEN },
+                { icon: <Info size={13} strokeWidth={2.8} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
+              ]
+            : [
+                // Plus = de maatkeuze klapt open; pas na je keuze zit het gerecht in je etentje. Een drankje gaat er direct in.
+                { icon: <Plus size={13} strokeWidth={3} />, label: 'Toevoegen', onClick: () => (gang === 'drank' ? tik(r.id) : setMaatOpen(v => (v === r.id ? null : r.id))) },
+                { icon: <Info size={13} strokeWidth={2.8} />, label: 'Info en aanpassen', onClick: () => setDetail(r.id) },
+              ]
+          }
         />
       </div>
     )
